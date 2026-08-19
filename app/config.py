@@ -1,0 +1,46 @@
+"""
+Módulo de configuración global de la aplicación UniMon.
+Utiliza Pydantic Settings para cargar y validar variables de entorno desde el archivo .env.
+"""
+
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """
+    Configuración centralizada para el backend de UniMon.
+    Valida variables de conexión a GLPI, Ollama y parámetros del servidor.
+    """
+    # Configuración de Servidor
+    app_name: str = "UniMon - Asistente Virtual de Soporte Técnico USB"
+    app_version: str = "1.0.0"
+    environment: str = "development"
+    port: int = 8000
+    host: str = "0.0.0.0"
+    debug: bool = True
+
+    # Configuración de GLPI REST API
+    glpi_base_url: str = "https://pruebas.us5.glpi-network.cloud/api.php/v1"
+    glpi_app_token: str = "4l3q2EMwU12pdL0RCUtxcI8botN7tODo58XxD3MJ"
+    glpi_user_token: str = "1YfLnz0S6OIjs4yFV2rIPk9PMXIndhW7YpBagyCI"
+    glpi_timeout: float = 15.0
+
+    # Configuración de Ollama (RAG / LLM)
+    ollama_base_url: str = "http://localhost:11434"
+    llm_model: str = "llama3.1"
+    ollama_timeout: float = 30.0
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """
+    Retorna una instancia única (cacheada) de la configuración de la aplicación.
+    """
+    return Settings()

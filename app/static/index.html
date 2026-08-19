@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UniMon - Asistente de Soporte Técnico USB</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --card-bg: rgba(18, 26, 43, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-usb: #0056b3;
+      --accent-glow: #00a3ff;
+      --accent-gold: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --user-bubble: #1e3a8a;
+      --bot-bubble: rgba(30, 41, 59, 0.85);
+      --ticket-bg: rgba(16, 185, 129, 0.1);
+      --ticket-border: rgba(16, 185, 129, 0.3);
+      --ticket-color: #34d399;
+      --danger: #ef4444;
+      --radius-lg: 16px;
+      --radius-sm: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(0, 163, 255, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(0, 86, 179, 0.2) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: rgba(11, 15, 25, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #0056b3, #00d2ff);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 15px rgba(0, 163, 255, 0.4);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #ffffff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+    }
+
+    .badge .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    /* Main Container */
+    .app-container {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1.5rem;
+      height: calc(100vh - 80px);
+    }
+
+    /* Left Sidebar: User profile & Quick options */
+    .sidebar {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      backdrop-filter: blur(10px);
+      overflow-y: auto;
+    }
+
+    .sidebar h2 {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--accent-glow);
+      margin-bottom: 0.25rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .form-control {
+      background: rgba(11, 15, 25, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .form-control:focus {
+      border-color: var(--accent-glow);
+      box-shadow: 0 0 8px rgba(0, 163, 255, 0.25);
+    }
+
+    .quick-prompts {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .quick-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-sm);
+      padding: 9px 12px;
+      color: #cbd5e1;
+      font-family: inherit;
+      font-size: 0.82rem;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .quick-btn:hover {
+      background: rgba(0, 163, 255, 0.12);
+      border-color: rgba(0, 163, 255, 0.4);
+      color: #ffffff;
+      transform: translateX(3px);
+    }
+
+    /* Right Panel: Chat window */
+    .chat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      display: flex;
+      gap: 12px;
+      max-width: 85%;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .message.bot {
+      align-self: flex-start;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .message.user .avatar {
+      background: #3b82f6;
+    }
+
+    .message.bot .avatar {
+      background: linear-gradient(135deg, #0284c7, #00d2ff);
+      box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+    }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: var(--radius-lg);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .message.user .bubble {
+      background: var(--user-bubble);
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+
+    .message.bot .bubble {
+      background: var(--bot-bubble);
+      border: 1px solid var(--card-border);
+      color: #e2e8f0;
+      border-bottom-left-radius: 2px;
+    }
+
+    .bubble p {
+      margin-bottom: 8px;
+    }
+    .bubble p:last-child {
+      margin-bottom: 0;
+    }
+
+    .bubble ul {
+      margin-left: 18px;
+      margin-bottom: 8px;
+    }
+
+    .meta-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-muted);
+    }
+
+    /* Ticket Notification Card */
+    .ticket-badge {
+      margin-top: 10px;
+      padding: 12px;
+      background: var(--ticket-bg);
+      border: 1px solid var(--ticket-border);
+      border-radius: var(--radius-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.85rem;
+    }
+
+    .ticket-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      color: var(--ticket-color);
+    }
+
+    .ticket-id {
+      background: rgba(16, 185, 129, 0.2);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Chat Input Area */
+    .chat-input-area {
+      padding: 1rem 1.25rem;
+      background: rgba(11, 15, 25, 0.9);
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    .chat-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 12px 20px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.92rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .chat-input:focus {
+      border-color: var(--accent-glow);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 12px rgba(0, 163, 255, 0.2);
+    }
+
+    .send-btn {
+      background: linear-gradient(135deg, #0066cc, #00a3ff);
+      color: white;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      box-shadow: 0 0 12px rgba(0, 163, 255, 0.3);
+    }
+
+    .send-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 16px rgba(0, 163, 255, 0.5);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: inline-flex;
+      gap: 4px;
+      padding: 8px 12px;
+    }
+
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(1) { animation-delay: 0s; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40% { transform: translateY(-6px); opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 860px) {
+      .app-container {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .sidebar {
+        display: none;
+      }
+      .chat-card {
+        height: calc(100vh - 120px);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">⚡</div>
+      <div class="brand-text">
+        <h1>UniMon • Asistente Virtual USB</h1>
+        <p>Soporte Técnico GLPI & Base de Conocimiento Inteligente</p>
+      </div>
+    </div>
+    <div class="header-badges">
+      <div class="badge" title="Estado de la API"><span class="dot"></span> Online</div>
+      <a href="/docs" target="_blank" class="badge" style="text-decoration:none; color:inherit;">📚 Docs Swagger</a>
+    </div>
+  </header>
+
+  <div class="app-container">
+    <!-- Panel Lateral: Perfil de Usuario USB y Sugerencias -->
+    <aside class="sidebar">
+      <div>
+        <h2>👤 Datos del Usuario</h2>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px;">Información para reportes y tickets en GLPI</p>
+        
+        <div class="form-group" style="margin-bottom:10px;">
+          <label for="userName">Nombre Completo</label>
+          <input type="text" id="userName" class="form-control" value="Alejandro Hernández" placeholder="Tu nombre">
+        </div>
+        
+        <div class="form-group" style="margin-bottom:10px;">
+          <label for="userEmail">Correo USB</label>
+          <input type="email" id="userEmail" class="form-control" value="18-10000@usb.ve" placeholder="ejemplo@usb.ve">
+        </div>
+        
+        <div class="form-group" style="margin-bottom:10px;">
+          <label for="userCampus">Sede</label>
+          <select id="userCampus" class="form-control">
+            <option value="Sartenejas" selected>Sartenejas</option>
+            <option value="Litoral">Sede del Litoral</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="userRole">Rol</label>
+          <select id="userRole" class="form-control">
+            <option value="Estudiante" selected>Estudiante</option>
+            <option value="Profesor">Profesor</option>
+            <option value="Administrativo">Personal Administrativo</option>
+            <option value="Obrero">Personal Obrero</option>
+          </select>
+        </div>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--card-border);">
+
+      <div>
+        <h2>⚡ Preguntas de Ejemplo</h2>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Haz clic para probar respuestas o creación de tickets:</p>
+        
+        <div class="quick-prompts">
+          <button class="quick-btn" onclick="sendQuickMessage('¿Cómo me conecto a la red eduroam en Sartenejas?')">
+            📶 <span>Configurar Wi-Fi Eduroam</span>
+          </button>
+          <button class="quick-btn" onclick="sendQuickMessage('¿Cómo accedo al Campus Virtual de la USB?')">
+            🎓 <span>Acceso a Campus Virtual</span>
+          </button>
+          <button class="quick-btn" onclick="sendQuickMessage('No tengo internet en el edificio MEM, el cable de red está dañado y no hay señal.')">
+            🚨 <span>Reportar falla técnica (Ticket GLPI)</span>
+          </button>
+          <button class="quick-btn" onclick="sendQuickMessage('Olvidé la contraseña de mi correo institucional USB.')">
+            🔑 <span>Recuperar clave de correo</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Ventana de Chat Principal -->
+    <main class="chat-card">
+      <div class="chat-messages" id="chatMessages">
+        <!-- Mensaje de Bienvenida -->
+        <div class="message bot">
+          <div class="avatar">⚡</div>
+          <div class="bubble">
+            <p><strong>¡Hola! Soy UniMon</strong>, el Asistente Virtual de Soporte Técnico de la <strong>Universidad Simón Bolívar (USB)</strong>.</p>
+            <p>Puedo responder tus dudas sobre <strong>Wi-Fi eduroam</strong>, <strong>Campus Virtual</strong>, <strong>cuentas @usb.ve</strong> o generar automáticamente un ticket de atención técnica en <strong>GLPI</strong> si presentas una falla o problema técnico en el campus.</p>
+            <div class="meta-tag">🤖 UniMon USB • Base de Conocimiento Activa</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Área de Entrada de Texto -->
+      <form class="chat-input-area" id="chatForm" onsubmit="handleChatSubmit(event)">
+        <div class="input-wrapper">
+          <input 
+            type="text" 
+            id="messageInput" 
+            class="chat-input" 
+            placeholder="Escribe tu consulta o describe tu problema técnico..." 
+            autocomplete="off"
+            required
+          >
+        </div>
+        <button type="submit" id="sendBtn" class="send-btn" title="Enviar Mensaje">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </main>
+  </div>
+
+  <script>
+    const chatMessages = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function scrollToBottom() {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function formatText(text) {
+      if (!text) return "";
+      // Convertir saltos de línea, negritas y viñetas simples
+      let formatted = text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;font-family:monospace;">$1</code>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+      return `<p>${formatted}</p>`;
+    }
+
+    function addMessage(sender, htmlContent, meta = null, ticketDetails = null) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${sender}`;
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.innerHTML = sender === 'user' ? '👤' : '⚡';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.innerHTML = htmlContent;
+
+      if (ticketDetails) {
+        const ticketCard = document.createElement('div');
+        ticketCard.className = 'ticket-badge';
+        ticketCard.innerHTML = `
+          <div class="ticket-header">
+            <span>🎫 Ticket GLPI Registrado</span>
+            <span class="ticket-id">#${ticketDetails.ticket_id}</span>
+          </div>
+          <div><strong>Categoría:</strong> ${ticketDetails.category}</div>
+          <div><strong>Urgencia:</strong> ${ticketDetails.urgency}/5 | <strong>Impacto:</strong> ${ticketDetails.impact}/5</div>
+          <div style="font-size:0.75rem; color:#a7f3d0;">Estado: Creado exitosamente en el servidor GLPI USB</div>
+        `;
+        bubble.appendChild(ticketCard);
+      }
+
+      if (meta) {
+        const metaTag = document.createElement('div');
+        metaTag.className = 'meta-tag';
+        metaTag.innerHTML = meta;
+        bubble.appendChild(metaTag);
+      }
+
+      messageDiv.appendChild(avatar);
+      messageDiv.appendChild(bubble);
+      chatMessages.appendChild(messageDiv);
+      scrollToBottom();
+    }
+
+    function showTypingIndicator() {
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message bot';
+      typingDiv.id = 'typingIndicator';
+      typingDiv.innerHTML = `
+        <div class="avatar">⚡</div>
+        <div class="bubble">
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+      `;
+      chatMessages.appendChild(typingDiv);
+      scrollToBottom();
+    }
+
+    function removeTypingIndicator() {
+      const typingDiv = document.getElementById('typingIndicator');
+      if (typingDiv) {
+        typingDiv.remove();
+      }
+    }
+
+    async function handleChatSubmit(event) {
+      if (event) event.preventDefault();
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      // 1. Mostrar mensaje del usuario
+      addMessage('user', `<p>${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`);
+      messageInput.value = '';
+      sendBtn.disabled = true;
+
+      // 2. Mostrar indicador de escritura
+      showTypingIndicator();
+
+      // 3. Preparar payload con datos del usuario
+      const payload = {
+        message: text,
+        user_data: {
+          name: document.getElementById('userName').value || "Usuario USB",
+          email: document.getElementById('userEmail').value || "18-10000@usb.ve",
+          usb_id: document.getElementById('userEmail').value.split('@')[0] || "18-10000",
+          campus: document.getElementById('userCampus').value || "Sartenejas",
+          role: document.getElementById('userRole').value || "Estudiante"
+        }
+      };
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        removeTypingIndicator();
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          const errMsg = errData.detail || `Error en el servidor (${response.status})`;
+          addMessage('bot', `<p style="color:var(--danger)">⚠️ <strong>Error:</strong> ${errMsg}</p>`);
+          return;
+        }
+
+        const data = await response.json();
+        
+        let metaInfo = `🤖 Intención: ${data.intent}`;
+        if (data.source) {
+          metaInfo += ` • Fuente: ${data.source}`;
+        }
+
+        addMessage(
+          'bot', 
+          formatText(data.reply), 
+          metaInfo, 
+          data.ticket_details
+        );
+
+      } catch (err) {
+        removeTypingIndicator();
+        addMessage('bot', `<p style="color:var(--danger)">⚠️ <strong>Error de conexión:</strong> No se pudo comunicar con el servidor backend (${err.message}).</p>`);
+      } finally {
+        sendBtn.disabled = false;
+        messageInput.focus();
+      }
+    }
+
+    function sendQuickMessage(text) {
+      messageInput.value = text;
+      handleChatSubmit();
+    }
+  </script>
+</body>
+</html>
