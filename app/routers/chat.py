@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.services.router_logic import RouterLogic, IntentType
-from app.services.glpi_service import GLPIService, GLPIException
+from app.services.glpi_service import GLPIService, GLPIException, is_valid_email
 from app.services.rag_service import RAGService
 
 logger = logging.getLogger("unimon.chat_router")
@@ -29,7 +29,7 @@ class UserData(BaseModel):
     Datos de identificación del miembro de la comunidad USB.
     """
     name: Optional[str] = Field(default=None, description="Nombre completo del usuario", example="Alejandro Hernández")
-    email: Optional[str] = Field(default=None, description="Correo electrónico institucional USB", example="18-10000@usb.ve")
+    email: Optional[str] = Field(default=None, description="Correo electrónico institucional o personal", example="18-10000@usb.ve")
     usb_id: Optional[str] = Field(default=None, description="Carnet o identificación USB", example="18-10000")
     campus: Optional[str] = Field(default="Sartenejas", description="Sede universitaria (Sartenejas o Litoral)", example="Sartenejas")
     role: Optional[str] = Field(default="Estudiante", description="Rol en la USB (Estudiante, Profesor, Administrativo, Obrero)", example="Estudiante")
@@ -105,7 +105,9 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
     # 2. Flujo de creación de Ticket en GLPI (CREATE_TICKET)
     if detected_intent == IntentType.CREATE_TICKET:
         user_display_name = user_info.name or "Usuario Anónimo USB"
-        user_email = user_info.email or "Sin correo especificado"
+        raw_email = user_info.email.strip() if user_info.email else ""
+        user_email = raw_email if (raw_email and is_valid_email(raw_email)) else None
+        email_display = raw_email if raw_email else "Sin correo especificado"
         user_id = user_info.usb_id or "Sin carnet"
         user_campus = user_info.campus or "Sartenejas"
         user_role = user_info.role or "Comunidad USB"
@@ -116,7 +118,7 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
             f"<b>REPORTE DE INCIDENTE TÉCNICO - ASISTENTE UNIMON USB</b><br><br>"
             f"<b>Usuario:</b> {user_display_name} ({user_role})<br>"
             f"<b>Carnet/ID:</b> {user_id}<br>"
-            f"<b>Correo Institucional:</b> {user_email}<br>"
+            f"<b>Correo de Contacto:</b> {email_display}<br>"
             f"<b>Sede:</b> {user_campus}<br>"
             f"<b>Categoría Asignada:</b> {category_name}<br>"
             f"<b>Nivel de Urgencia Calculado:</b> {urgency}/5<br><br>"
@@ -129,7 +131,8 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
                 name=ticket_subject,
                 content=ticket_content,
                 urgency=urgency,
-                impact=impact
+                impact=impact,
+                requester_email=user_email
             )
 
             ticket_id = ticket_res["ticket_id"]

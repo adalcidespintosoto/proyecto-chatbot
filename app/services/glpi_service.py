@@ -5,11 +5,24 @@ creación de tickets con tipología institucional y cierre garantizado de sesió
 """
 
 import logging
+import re
 from typing import Optional, Dict, Any
 import httpx
 from app.config import get_settings
 
 logger = logging.getLogger("unimon.glpi_service")
+
+EMAIL_REGEX = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+
+
+def is_valid_email(email: Optional[str]) -> bool:
+    """
+    Valida únicamente que el texto tenga un formato válido de correo electrónico.
+    Acepta tanto correos institucionales (@usb.ve) como personales (@gmail.com, etc.).
+    """
+    if not email or not isinstance(email, str):
+        return False
+    return bool(EMAIL_REGEX.match(email.strip()))
 
 
 class GLPIException(Exception):
@@ -93,6 +106,53 @@ class GLPIService:
             logger.warning(f"Error al intentar cerrar la sesión en GLPI: {exc}")
             return False
 
+    async def add_ticket_user(
+        self,
+        client: httpx.AsyncClient,
+        session_token: str,
+        ticket_id: int,
+        email: str,
+        user_type: int = 1,
+        use_notification: int = 1
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Asocia un actor (solicitante) a un ticket en GLPI mediante POST /Ticket/{ticket_id}/Ticket_User.
+
+        Args:
+            client: Cliente HTTP asíncrono activo.
+            session_token: Token de sesión activa en GLPI.
+            ticket_id: ID del ticket recién creado.
+            email: Correo electrónico alternativo del solicitante (institucional o personal).
+            user_type: Tipo de actor (1 = Solicitante).
+            use_notification: 1 para activar notificaciones automáticas por correo.
+
+        Returns:
+            Dict con la respuesta de GLPI o None si falla.
+        """
+        url = f"{self.base_url}/Ticket/{ticket_id}/Ticket_User"
+        headers = self._get_headers(session_token=session_token)
+        actor_payload = {
+            "input": {
+                "tickets_id": ticket_id,
+                "type": user_type,
+                "alternative_email": email.strip(),
+                "use_notification": use_notification
+            }
+        }
+
+        try:
+            logger.info(f"Asociando actor solicitante ({email.strip()}) al ticket #{ticket_id}...")
+            response = await client.post(url, json=actor_payload, headers=headers, timeout=self.timeout)
+            if response.status_code in (200, 201):
+                logger.info(f"Actor solicitante ({email.strip()}) asociado exitosamente al ticket #{ticket_id}.")
+                return response.json()
+            else:
+                logger.warning(f"Respuesta inesperada al asociar actor al ticket #{ticket_id}: {response.status_code} - {response.text}")
+                return None
+        except Exception as exc:
+            logger.warning(f"Error al asociar actor solicitante al ticket #{ticket_id}: {exc}")
+            return None
+
     async def create_ticket(
         self,
         name: str,
@@ -100,10 +160,12 @@ class GLPIService:
         urgency: int = 3,
         impact: int = 3,
         itilcategories_id: Optional[int] = None,
-        type_ticket: int = 1  # 1 = Incidente, 2 = Solicitud / Requerimiento
+        type_ticket: int = 1,  # 1 = Incidente, 2 = Solicitud / Requerimiento
+        requester_email: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Crea un ticket en GLPI gestionando de manera segura el ciclo de vida de la sesión (initSession -> create -> killSession).
+        Si requester_email contiene un correo válido, asocia inmediatamente el actor mediante POST /Ticket/{ticket_id}/Ticket_User.
 
         Args:
             name: Asunto o título breve del ticket.
@@ -112,9 +174,10 @@ class GLPIService:
             impact: Nivel de impacto (1 a 5).
             itilcategories_id: ID opcional de categoría en GLPI.
             type_ticket: 1 para Incidente, 2 para Solicitud.
+            requester_email: Correo (institucional o personal) del solicitante para asociación como actor.
 
         Returns:
-            Dict con 'ticket_id', 'message' y datos de la respuesta.
+            Dict con 'ticket_id', 'status', 'actor_associated' y mensaje descriptivo.
         """
         async with httpx.AsyncClient() as client:
             session_token = None
@@ -148,16 +211,32 @@ class GLPIService:
 
                 res_data = response.json()
                 ticket_id = res_data.get("id")
-
                 logger.info(f"Ticket #{ticket_id} registrado exitosamente en GLPI.")
+
+                # 3. Si se especificó un correo con formato válido, asociar inmediatamente el actor solicitante
+                actor_data = None
+                actor_associated = False
+                if requester_email and is_valid_email(requester_email):
+                    actor_data = await self.add_ticket_user(
+                        client=client,
+                        session_token=session_token,
+                        ticket_id=ticket_id,
+                        email=requester_email,
+                        user_type=1,
+                        use_notification=1
+                    )
+                    actor_associated = actor_data is not None
+
                 return {
                     "ticket_id": ticket_id,
                     "status": "success",
+                    "actor_associated": actor_associated,
                     "raw_response": res_data,
+                    "actor_response": actor_data,
                     "message": f"Ticket #{ticket_id} registrado exitosamente en el sistema de soporte GLPI de la USB."
                 }
 
             finally:
-                # 3. Cierre garantizado de la sesión
+                # 4. Cierre garantizado de la sesión
                 if session_token:
                     await self.kill_session(client, session_token)
