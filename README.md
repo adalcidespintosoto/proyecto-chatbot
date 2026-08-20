@@ -1,48 +1,59 @@
-# 🎓 UniMon Backend - Asistente Virtual de Soporte Técnico USB
+# 🎓 UniMon Backend - Asistente Virtual de Soporte Técnico y Gestión de TI (Unisimon)
 
-Backend modular y asíncrono desarrollado en **FastAPI** y **Python** para el Asistente Virtual de Soporte Técnico de la **Universidad Simón Bolívar (USB)**, denominado **"UniMon"**.
+Backend modular y asíncrono desarrollado en **FastAPI** y **Python** para el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la **Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia)**, denominado **"UniMon"**.
 
 El sistema integra:
-1. **Clasificación de Intenciones & Router de Soporte:** Detecta si la consulta es de tipo informativo (`RAG_QUERY`) o si requiere apertura de ticket (`CREATE_TICKET`), calculando la urgencia institucional y categoría del incidente.
-2. **Integración con GLPI REST API:** Conexión asíncrona segura con GLPI (`initSession`, `createTicket`, `killSession` garantizado) para registrar incidentes técnicos de la USB.
-3. **Módulo RAG / LLM con Ollama:** Consultas institucionales con modelo `llama3.1` y base de conocimientos especializada (Campus Virtual, WiFi Eduroam, DTI/DST, correo institucional `@usb.ve`).
+1. **Clasificación Semántica de Intenciones & Router de Soporte:** Detecta si la consulta es de tipo informativo/procedimental (`RAG_QUERY`) o si requiere apertura de ticket (`CREATE_TICKET`), calculando la urgencia institucional y categoría del incidente.
+2. **Motor RAG Local con ChromaDB + Ollama (`llama3.1:8b`):** Base de conocimientos vectorizada basada en los procedimientos institucionales de TI (`P-GT-01`, `P-GT-07`, `P-GT-08`, `P-GT-10`, `P-GT-11`, `P-GT-13`) con embeddings `intfloat/multilingual-e5-base` y $k=4$ fragmentos recuperados.
+3. **Integración con GLPI REST API:** Conexión asíncrona segura con GLPI Cloud (`initSession`, `createTicket`, asociación de actor solicitante vía `Ticket_User` y cierre garantizado `killSession`).
+4. **Carga y Reindexación Dinámica en Caliente:** Endpoints y controles visuales para subir nuevos documentos PDF, reindexar la base vectorial y recargar la memoria sin reiniciar el servidor.
+5. **Interfaz Web Interactiva:** Cliente visual integrado con selectores de sede (*Barranquilla* y *Cúcuta*), atajos rápidos a procedimientos y chat en tiempo real.
 
 ---
 
 ## 🏛️ Estructura del Proyecto
 
 ```text
-importante/
+proyecto-chatbot/
 ├── app/
 │   ├── __init__.py
 │   ├── config.py             # Configuración centralizada con Pydantic Settings (.env)
-│   ├── main.py               # Punto de entrada FastAPI, CORS, Lifespans, Docs
+│   ├── main.py               # Punto de entrada FastAPI, CORS, Lifespans, Static Files
 │   ├── routers/
 │   │   ├── __init__.py
-│   │   └── chat.py           # Endpoint POST /api/chat y esquemas de datos Pydantic
-│   └── services/
-│       ├── __init__.py
-│       ├── glpi_service.py   # Cliente asíncrono con httpx para GLPI REST API
-│       ├── rag_service.py    # Cliente asíncrono para Ollama + Base de conocimiento USB
-│       └── router_logic.py   # Clasificador de intención, tipología y urgencia (1-5)
+│   │   └── chat.py           # Endpoints /api/chat, /api/admin/upload y /api/admin/reindex
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── glpi_service.py   # Cliente asíncrono para GLPI REST API (Tickets y Actores)
+│   │   ├── rag_service.py    # Pipeline RAG con ChromaDB, Embeddings y Ollama
+│   │   └── router_logic.py   # Clasificador de intención, categorías y urgencia (1-5)
+│   └── static/
+│       └── index.html        # Interfaz Web del Chatbot y panel de administración
+├── data/
+│   └── docs/                 # Carpeta de almacenamiento de procedimientos PDF
+├── chroma_db/                # Base de datos vectorial persistente (ChromaDB)
+├── scripts/
+│   └── ingest_docs.py        # Script de ingestión limpia, chunking y vectorización
 ├── .env                      # Variables de entorno activas
 ├── .env.example              # Plantilla de variables de entorno
 ├── requirements.txt          # Dependencias de Python
-├── setup.ps1                 # Script PowerShell de instalación y entorno (.venv)
 ├── run.ps1                   # Script PowerShell para iniciar Uvicorn
-└── README.md                 # Documentación completa del backend
+├── setup.ps1                 # Script PowerShell de instalación del entorno (.venv)
+├── test_rag.py               # Script de prueba del motor RAG
+├── test_glpi.py              # Script de prueba de creación de tickets en GLPI
+└── README.md                 # Documentación completa del proyecto
 ```
 
 ---
 
 ## ⚙️ Requisitos Previos
 
-- **Python 3.10+** instalado en el sistema.
-- **Ollama** (Opcional pero recomendado para respuestas de IA generativa con `llama3.1`):
+- **Python 3.10+** (recomendado Python 3.11 / 3.12 / 3.14).
+- **Ollama** con el modelo `llama3.1:8b` descargado:
   ```bash
-  ollama run llama3.1
+  ollama run llama3.1:8b
   ```
-  *(Si Ollama no está activo, el sistema incluye un mecanismo de contingencia institucional automático).*
+  *(Si Ollama no está activo o disponible, el sistema incluye un mecanismo de contingencia institucional automático con las guías de Unisimon).*
 
 ---
 
@@ -54,27 +65,35 @@ Ejecuta el script automatizado:
 .\setup.ps1
 ```
 Este script:
-- Verifica la presencia de Python.
 - Crea el entorno virtual en `.venv`.
-- Instala y actualiza todas las dependencias listadas en `requirements.txt`.
+- Instala todas las dependencias listadas en `requirements.txt`.
 - Inicializa el archivo `.env` a partir de `.env.example`.
 
-### 2. Iniciar el servidor FastAPI
+### 2. Ingestión y vectorización de documentos PDF
+Para procesar los PDFs institucionales ubicados en `./data/docs/`:
+```powershell
+.\.venv\Scripts\python.exe scripts/ingest_docs.py
+```
+
+### 3. Iniciar el servidor FastAPI
 Ejecuta:
 ```powershell
 .\run.ps1
 ```
+O directamente con el ejecutable del entorno virtual:
+```powershell
+.\.venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
 El servidor quedará disponible en:
-- **API Base:** `http://localhost:8000`
-- **Documentación Interactiva Swagger UI:** `http://localhost:8000/docs`
-- **Documentación ReDoc:** `http://localhost:8000/redoc`
-- **Health Check:** `http://localhost:8000/health`
+- **Interfaz Web del Chatbot:** [http://localhost:8000](http://localhost:8000)
+- **Documentación Interactiva Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Documentación ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
 
 ---
 
 ## 🔐 Variables de Entorno (`.env`)
-
-Las variables de configuración admitidas por la aplicación son:
 
 | Variable | Descripción | Valor Predeterminado / Ejemplo |
 | :--- | :--- | :--- |
@@ -84,26 +103,29 @@ Las variables de configuración admitidas por la aplicación son:
 | `GLPI_BASE_URL` | URL de la API REST de GLPI | `https://pruebas.us5.glpi-network.cloud/api.php/v1` |
 | `GLPI_APP_TOKEN` | Token de aplicación GLPI | *Configurado en `.env`* |
 | `GLPI_USER_TOKEN` | Token de usuario técnico GLPI | *Configurado en `.env`* |
-| `OLLAMA_BASE_URL` | URL del servidor local de Ollama | `http://localhost:11434` |
-| `LLM_MODEL` | Nombre del modelo LLM | `llama3.1` |
+| `OLLAMA_BASE_URL` | URL del servidor Ollama | `http://localhost:11434` |
+| `LLM_MODEL` | Modelo LLM en Ollama | `llama3.1:8b` |
+| `CHROMA_DB_DIR` | Ruta de almacenamiento ChromaDB | `./chroma_db` |
+| `DOCS_DIR` | Directorio de documentos PDF | `./data/docs` |
+| `EMBEDDING_MODEL` | Modelo de Embeddings | `intfloat/multilingual-e5-base` |
 
 ---
 
 ## 📡 Especificación de Endpoints
 
 ### 1. `POST /api/chat`
-Endpoint principal para interacción con el asistente virtual UniMon.
+Procesa el mensaje del usuario, evalúa la intención y responde vía RAG o radica un ticket en GLPI.
 
 #### **Cuerpo de la Petición (Request Body):**
 ```json
 {
-  "message": "No puedo conectarme a la red WiFi eduroam en el edificio MEM",
+  "message": "¿Cuáles son los canales oficiales de atención y soporte técnico en Barranquilla y Cúcuta?",
   "user_data": {
     "name": "Alejandro Hernández",
-    "email": "18-10000@usb.ve",
-    "usb_id": "18-10000",
-    "campus": "Sartenejas",
-    "role": "Estudiante"
+    "email": "ahernandez@unisimon.edu.co",
+    "usb_id": "1042500000",
+    "campus": "Barranquilla",
+    "role": "Docente"
   },
   "force_ticket": false
 }
@@ -113,35 +135,63 @@ Endpoint principal para interacción con el asistente virtual UniMon.
 ```json
 {
   "intent": "RAG_QUERY",
-  "reply": "Para conectarte a la red Wi-Fi institucional eduroam en la USB:\n• SSID: eduroam\n• Usuario: tu_usuario@usb.ve\n• Contraseña: Clave única de acceso...",
+  "reply": "Estimado Alejandro Hernández, según los procedimientos institucionales de TI de la Universidad Simón Bolívar, los canales de soporte autorizados son:\n\n• Sede Barranquilla: solicitudcomputo@unisimon.edu.co | Tel: 3444333 Ext. 8003/8004 | WhatsApp: 3172683922\n• Sede Cúcuta: helpdesk@unisimon.edu.co | Tel: 5827070 Ext. 129",
   "ticket_details": null,
-  "category": "Red WiFi USB / Eduroam / Conectividad",
-  "source": "ollama_llama3.1"
+  "category": "Soporte Técnico y Gestión de TI Unisimon",
+  "source": "ollama_llama3.1:8b",
+  "sources": [
+    "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+    "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf"
+  ]
 }
 ```
 
-#### **Ejemplo de Respuesta - Creación de Ticket (`CREATE_TICKET`):**
-Si el usuario describe una falla persistente (ej: *"El servidor del campus virtual no carga y tengo examen ahorita"*):
+#### **Ejemplo de Respuesta - Radicación de Ticket (`CREATE_TICKET`):**
+Si el usuario reporta una falla operativa (ej: *"El computador del laboratorio 204 no enciende y tiene pantalla negra"*):
 ```json
 {
   "intent": "CREATE_TICKET",
-  "reply": "Estimado/a Alejandro Hernández, he generado exitosamente su solicitud de soporte técnico.\n\n📌 Número de Ticket GLPI: #1042\n🏷️ Categoría: Campus Virtual / Moodle USB\n⚡ Nivel de Urgencia: 5/5...",
+  "reply": "Estimado/a Alejandro Hernández, he generado exitosamente su solicitud de soporte técnico.\n\n📌 **Número de Ticket GLPI:** #1042\n🏷️ **Categoría:** Mantenimiento y Fallas de Cómputo (P-GT-01)\n⚡ **Nivel de Urgencia:** 4/5\n📍 **Sede:** Barranquilla\n\nEl equipo de Soporte y Gestión de TI de la Universidad Simón Bolívar (Barranquilla) ha recibido su caso y procederá con la atención requerida.",
   "ticket_details": {
     "ticket_id": 1042,
-    "category": "Campus Virtual / Moodle USB",
-    "urgency": 5,
-    "impact": 4,
+    "category": "Mantenimiento y Fallas de Cómputo (P-GT-01)",
+    "urgency": 4,
+    "impact": 3,
     "status": "success",
     "tracking_url": null
   },
-  "category": "Campus Virtual / Moodle USB",
-  "source": "GLPI_REST_API"
+  "category": "Mantenimiento y Fallas de Cómputo (P-GT-01)",
+  "source": "GLPI_REST_API",
+  "sources": null
 }
 ```
 
 ---
 
-### 2. `GET /health`
+### 2. `POST /api/admin/upload`
+Permite subir un nuevo archivo PDF institucional en formato multipart (`file`), guardarlo en `./data/docs/`, reindexar ChromaDB automáticamente y recargar la memoria en caliente.
+
+#### **Ejemplo con cURL:**
+```bash
+curl -X POST "http://localhost:8000/api/admin/upload" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@./data/docs/Nuevo_Procedimiento.pdf"
+```
+
+---
+
+### 3. `POST /api/admin/reindex`
+Fuerza la reindexación de todos los PDFs existentes en `./data/docs/` y actualiza ChromaDB en memoria.
+
+#### **Ejemplo con cURL:**
+```bash
+curl -X POST "http://localhost:8000/api/admin/reindex"
+```
+
+---
+
+### 4. `GET /health`
 Verifica el estado y configuración de los servicios conectados.
 
 ```json
@@ -152,20 +202,24 @@ Verifica el estado y configuración de los servicios conectados.
   "environment": "development",
   "glpi_endpoint_configured": true,
   "ollama_endpoint": "http://localhost:11434",
-  "llm_model": "llama3.1"
+  "llm_model": "llama3.1:8b"
 }
 ```
 
 ---
 
-## 🏛️ Lógica Institucional de Soporte USB
+## 🏛️ Canales y Procedimientos Institucionales (Unisimon)
 
-- **Cálculo de Urgencia (1 a 5):** Evaluado dinámicamente según términos críticos como evaluaciones, exámenes, caídas masivas en laboratorios o inscripciones.
-- **Tipologías USB:**
-  1. `Campus Virtual / Moodle USB`
-  2. `Red WiFi USB / Eduroam / Conectividad`
-  3. `Correo Institucional (@usb.ve / Google Workspace)`
-  4. `Cuentas USB / Recuperación de Contraseñas / DTI`
-  5. `Equipos de Computación / Laboratorios USB`
-  6. `Soporte Técnico General USB`
-- **Garantía de Sesión GLPI:** El servicio utiliza bloques estructurados `try / finally` para asegurar que tras cualquier petición `initSession` se libere el token mediante `killSession`.
+- **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: `(605) 3444333` Ext. `8003` y `8004`.
+- **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: `(607) 5827070` Ext. `129`.
+- **Procedimientos TI Soportados:**
+  - `P-GT-01`: Mantenimiento de Equipos de Cómputo.
+  - `P-GT-02`: Gestión de Cuentas y Accesos a Sistemas de Información.
+  - `P-GT-07`: Protección de Código Malicioso (Antivirus / Malware).
+  - `P-GT-08`: Aseguramiento de Servicios en la Red.
+  - `P-GT-10`: Generación y Restauración de Backup de la Información.
+  - `P-GT-11`: Atención de Incidencias y Requerimientos Kactus y Seven.
+  - `P-GT-12`: Gestión de Cuentas de Usuario en Kactus o Seven.
+  - `P-GT-13`: Gestión de Requerimientos de Recursos y Soluciones Tecnológicas.
+  - `P-GT-14`: Gestión de Actualizaciones de Versiones en Kactus y Seven.
+
