@@ -7,7 +7,7 @@ async def test_chat():
         "message": "Falla de prueba: No funciona el punto de red cableada en laboratorio 103 de Sartenejas",
         "user_data": {
             "name": "Prueba USB",
-            "email": "18-00000@usb.ve",
+            "email": "xmmulpro@gmail.com",
             "usb_id": "18-00000",
             "campus": "Sartenejas",
             "role": "Estudiante"
