@@ -113,51 +113,34 @@ El servidor quedará disponible en:
 
 ## 📡 Especificación de Endpoints
 
-### 1. `POST /api/chat`
-Procesa el mensaje del usuario de forma 100% conversacional mediante una máquina de estados por `session_id`.
+### 1. `POST /api/chat` (Fase 4: Chatbot Nivel 1 Proactivo & Router)
+Procesa el mensaje del usuario de forma conversacional mediante una máquina de estados por `session_id`.
 
 #### **Cuerpo de la Petición (Request Body):**
 ```json
 {
   "session_id": "sess_user_12345",
-  "message": "¿Cuáles son los canales oficiales de atención y soporte técnico en Barranquilla y Cúcuta?"
+  "mensaje": "El proyector del auditorio no da video y parpadea"
 }
 ```
 
-#### **Ejemplo de Respuesta - Consulta RAG (`RAG_QUERY`):**
-```json
-{
-  "intent": "RAG_QUERY",
-  "reply": "Estimado usuario, según los procedimientos institucionales de TI de la Universidad Simón Bolívar, los canales de soporte autorizados son:\n\n• Sede Barranquilla: solicitudcomputo@unisimon.edu.co | Tel: 3444333 Ext. 8003/8004 | WhatsApp: 3172683922\n• Sede Cúcuta: helpdesk@unisimon.edu.co | Tel: 5827070 Ext. 129",
-  "ticket_details": null,
-  "category": "Soporte Técnico y Gestión de TI Unisimon",
-  "source": "ollama_llama3.1:8b",
-  "sources": [
-    "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
-    "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf"
-  ]
-}
-```
+#### **Esquema de Respuesta (`ChatResponse`):**
+| Campo | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `tipo` | `str` | Estado / Intención (`SALUDO`, `DIAGNOSTICO`, `SOLUCIONADO`, `RADICANDO_TICKET`, `TICKET_CREADO`, `ERROR`) |
+| `mensaje` | `str` | Respuesta en lenguaje natural generada por el bot |
+| `ticket_id` | `int \| null` | ID del ticket en GLPI una vez completada la radicación |
 
-#### **Ejemplo de Respuesta - Radicación de Ticket (`CREATE_TICKET`):**
-Si el usuario reporta una falla operativa (ej: *"El computador del laboratorio 204 no enciende y tiene pantalla negra"*):
-```json
-{
-  "intent": "CREATE_TICKET",
-  "reply": "Estimado/a Alejandro Hernández, he generado exitosamente su solicitud de soporte técnico.\n\n📌 **Número de Ticket GLPI:** #1042\n🏷️ **Categoría:** Mantenimiento y Fallas de Cómputo (P-GT-01)\n⚡ **Nivel de Urgencia:** 4/5\n📍 **Sede:** Barranquilla\n\nEl equipo de Soporte y Gestión de TI de la Universidad Simón Bolívar (Barranquilla) ha recibido su caso y procederá con la atención requerida.",
-  "ticket_details": {
-    "ticket_id": 1042,
-    "category": "Mantenimiento y Fallas de Cómputo (P-GT-01)",
-    "urgency": 4,
-    "impact": 3,
-    "status": "success",
-    "tracking_url": null
-  },
-  "category": "Mantenimiento y Fallas de Cómputo (P-GT-01)",
-  "source": "GLPI_REST_API",
-  "sources": null
-}
-```
+#### **Flujo Conversacional de Nivel 1:**
+1. **Diagnóstico Proactivo (`tipo: "DIAGNOSTICO"`):** El bot entrega de 2 a 3 pasos de descarte basados en RAG y pregunta si funcionó o si persiste.
+2. **Caso Solucionado (`tipo: "SOLUCIONADO"`):** Si el usuario indica que se arregló (*"gracias, ya funcionó"*), se limpia la sesión y se cierra cordialmente.
+3. **Falla Persiste y Slot-Filling (`tipo: "RADICANDO_TICKET"`):** Si el problema continúa, se solicita en orden:
+   - **Nombre completo**
+   - **Correo institucional**
+   - **Ubicación (Sede, Bloque, Sala o Laboratorio)**
+   - **Placa o Activo del equipo** (*permite "N/A"*)
+4. **Radicación Oficial (`tipo: "TICKET_CREADO"`):** Al completar los 4 datos, se crea el ticket en GLPI, se asocia al solicitante y se retorna el `ticket_id`.
+
 
 ---
 

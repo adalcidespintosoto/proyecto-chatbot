@@ -585,11 +585,13 @@
       // 2. Mostrar indicador de escritura
       showTypingIndicator();
 
-      // 3. Payload 100% conversacional: solo session_id y message (sin user_data precargado)
+      // 3. Payload conversacional de Nivel 1
       const payload = {
         session_id: sessionId,
+        mensaje: text,
         message: text
       };
+
 
       try {
         const response = await fetch('/api/chat', {
@@ -611,7 +613,8 @@
 
         const data = await response.json();
         
-        let metaInfo = `🤖 Intención: ${data.intent}`;
+        const tipoResp = data.tipo || data.intent || "INFO";
+        let metaInfo = `🤖 Estado/Tipo: ${tipoResp}`;
         if (data.source) {
           metaInfo += ` • Fuente: ${data.source}`;
         }
@@ -619,11 +622,14 @@
           metaInfo += ` • Refs: ${data.sources.join(', ')}`;
         }
 
+        const textoBot = data.mensaje || data.reply || "";
+        const detallesTicket = data.ticket_details || (data.ticket_id ? { ticket_id: data.ticket_id, category: "Soporte Técnico TI", urgency: 3, impact: 3 } : null);
+
         addMessage(
           'bot', 
-          formatText(data.reply), 
+          formatText(textoBot), 
           metaInfo, 
-          data.ticket_details
+          detallesTicket
         );
 
       } catch (err) {
@@ -633,6 +639,7 @@
         sendBtn.disabled = false;
         messageInput.focus();
       }
+
     }
 
     function sendQuickMessage(text) {
