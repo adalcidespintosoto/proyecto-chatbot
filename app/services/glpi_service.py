@@ -240,3 +240,30 @@ class GLPIService:
                 # 4. Cierre garantizado de la sesión
                 if session_token:
                     await self.kill_session(client, session_token)
+
+    async def crear_ticket(
+        self,
+        name: str,
+        content: str,
+        urgency: int = 3,
+        impact: int = 3,
+        itilcategories_id: Optional[int] = None,
+        type_ticket: int = 1,
+        requester_email: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Alias en español para create_ticket."""
+        return await self.create_ticket(
+            name=name,
+            content=content,
+            urgency=urgency,
+            impact=impact,
+            itilcategories_id=itilcategories_id,
+            type_ticket=type_ticket,
+            requester_email=requester_email
+        )
+
+
+# Instancia por defecto para importaciones limpias
+glpi_service = GLPIService()
+glpi_client = glpi_service
+

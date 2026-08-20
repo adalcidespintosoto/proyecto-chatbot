@@ -199,10 +199,6 @@ class RAGService:
             logger.warning(f"No se pudo conectar con el servidor Ollama ({exc}). Activando respuesta de contingencia.")
             return self._generate_fallback_response(question, user_name, sources)
 
-    async def query_llm(self, user_message: str, user_name: Optional[str] = None) -> Dict[str, Any]:
-        """Método de compatibilidad hacia atrás que redirige a query_rag."""
-        return await self.query_rag(question=user_message, user_name=user_name)
-
     def _generate_fallback_response(
         self,
         user_message: str,
@@ -247,17 +243,12 @@ class RAGService:
             )
         else:
             contenido = (
-                f"{saludo} Soy UniMon, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la **Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia)**.\n\n"
-                "Puedo orientarte según los procedimientos institucionales en:\n"
-                "1. **Mantenimiento y soporte de equipos de cómputo** (P-GT-01).\n"
-                "2. **Seguridad, antimalware y aseguramiento de redes** (P-GT-07 / P-GT-08).\n"
-                "3. **Políticas y gestión de Backups** (P-GT-10).\n"
-                "4. **Soporte de sistemas ERP Kactus y Seven** (P-GT-11 / P-GT-12).\n"
-                "5. **Radicación de tickets y solicitudes en GLPI**.\n\n"
-                "**Canales de atención directa:**\n"
-                "- Barranquilla: `solicitudcomputo@unisimon.edu.co` | Tel: 3444333 Ext. 8003/8004 | WhatsApp: 3172683922\n"
-                "- Cúcuta: `helpdesk@unisimon.edu.co` | Tel: 5827070 Ext. 129\n\n"
-                "¿En qué procedimiento o falla técnica puedo colaborarte?"
+                f"{saludo} Soy UniMon, tu asistente de Soporte Técnico de Nivel 1 de la Universidad Simón Bolívar.\n\n"
+                "Para ayudarte con este inconveniente, te sugiero realizar estos pasos iniciales de descarte:\n"
+                "1. Verifica que los cables de poder, red o video estén firmemente conectados.\n"
+                "2. Reinicia el equipo o dispositivo y verifica si el comportamiento persiste.\n"
+                "3. Si el inconveniente es en un aplicativo institucional (Kactus/Seven o correo), cierra sesión y vuelve a ingresar.\n\n"
+                "¿Alguno de estos pasos te funcionó o el problema continúa?"
             )
 
         return {
@@ -267,4 +258,32 @@ class RAGService:
             "model": "rule_based_institutional_unisimon",
             "retrieved_chunks": 0
         }
+
+    async def consultar(
+        self,
+        pregunta: str,
+        user_name: Optional[str] = None,
+        es_diagnostico: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Consulta al motor RAG de UniMon.
+        Si es_diagnostico=True, instruye a Llama 3.1 para actuar como técnico de Nivel 1:
+        proporciona de 2 a 3 pasos breves de descarte/solución y pregunta si funcionó o persiste.
+        """
+        if es_diagnostico:
+            instruccion_nivel1 = (
+                f"{pregunta}\n\n"
+                "[INSTRUCCIÓN DE SOPORTE NIVEL 1: Actúa como técnico de soporte TI de Nivel 1 de la Universidad Simón Bolívar. "
+                "Proporciona de 2 a 3 pasos breves y prácticos de descarte o solución rápida según los procedimientos del contexto. "
+                "Al finalizar tu respuesta, pregunta amablemente al usuario si alguno de estos pasos le funcionó o si el problema persiste.]"
+            )
+            return await self.query_rag(question=instruccion_nivel1, user_name=user_name)
+        else:
+            return await self.query_rag(question=pregunta, user_name=user_name)
+
+
+# Instancia por defecto para importaciones limpias
+rag_service = RAGService()
+
+
 
