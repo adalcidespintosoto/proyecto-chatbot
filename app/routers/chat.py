@@ -178,3 +178,92 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
         source=rag_result.get("source", "ollama_rag"),
         sources=rag_result.get("sources")
     )
+
+
+# ==========================================
+# Endpoints de Administración de Documentos RAG
+# ==========================================
+
+from fastapi import UploadFile, File
+from pathlib import Path
+from app.config import get_settings
+from scripts.ingest_docs import ingest_documents
+
+
+@router.post(
+    "/admin/upload",
+    tags=["Administración RAG"],
+    summary="Subir documento PDF e indexar automáticamente",
+    description="Recibe un archivo PDF, lo almacena en ./data/docs/ y ejecuta la reindexación automática inmediata en ChromaDB."
+)
+async def upload_document(
+    file: UploadFile = File(..., description="Archivo PDF institucional a incorporar")
+):
+    """
+    Guarda el archivo PDF subido y dispara la reindexación y recarga automática del vector store.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se admiten documentos en formato PDF (.pdf)."
+        )
+
+    settings = get_settings()
+    docs_dir = Path(settings.docs_dir)
+    docs_dir.mkdir(parents=True, exist_ok=True)
+
+    target_path = docs_dir / file.filename
+
+    # Guardar archivo en disco
+    try:
+        content = await file.read()
+        with open(target_path, "wb") as f:
+            f.write(content)
+        logger.info(f"Nuevo documento guardado en: {target_path} ({len(content) / 1024:.1f} KB)")
+    except Exception as exc:
+        logger.error(f"Error al escribir archivo en disco: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se pudo guardar el archivo: {str(exc)}"
+        )
+
+    # Reindexar automáticamente
+    success = ingest_documents()
+    if success:
+        rag_service.reload_vector_store()
+        return {
+            "status": "success",
+            "message": f"Documento '{file.filename}' subido e indexado exitosamente en ChromaDB.",
+            "filename": file.filename,
+            "size_kb": round(len(content) / 1024, 2)
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="El archivo se guardó, pero ocurrió un error durante la reindexación vectorial."
+        )
+
+
+@router.post(
+    "/admin/reindex",
+    tags=["Administración RAG"],
+    summary="Forzar reindexación completa de documentos",
+    description="Ejecuta la limpieza y reindexación de todos los PDFs en ./data/docs/ y recarga ChromaDB en memoria."
+)
+async def trigger_reindex():
+    """
+    Dispara manualmente el pipeline de ingestión y actualiza la base vectorial activa.
+    """
+    success = ingest_documents()
+    if success:
+        rag_service.reload_vector_store()
+        return {
+            "status": "success",
+            "message": "Base vectorial ChromaDB reindexada y recargada exitosamente."
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ocurrió un error al procesar la reindexación de documentos."
+        )
+

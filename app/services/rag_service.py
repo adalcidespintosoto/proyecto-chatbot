@@ -84,6 +84,14 @@ class RAGService:
                 self._vector_store = None
         return self._vector_store
 
+    def reload_vector_store(self) -> None:
+        """
+        Fuerza la recarga de ChromaDB en memoria para reflejar nuevos documentos indexados.
+        """
+        logger.info("Recargando instancia de ChromaDB en memoria...")
+        self._vector_store = None
+        _ = self.vector_store
+
     async def query_rag(self, question: str, user_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Ejecuta el pipeline RAG completo:

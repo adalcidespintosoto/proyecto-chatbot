@@ -496,25 +496,22 @@
       <hr style="border: 0; border-top: 1px solid var(--card-border);">
 
       <div>
-        <h2>⚡ Trámites y Consultas Rápidas</h2>
-        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Haz clic para consultar procedimientos o reportar fallas:</p>
+        <h2>📁 Carga de Nuevos Documentos (RAG)</h2>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Sube un PDF institucional para actualizar la base de conocimientos automáticamente:</p>
         
-        <div class="quick-prompts">
-          <button class="quick-btn" onclick="sendQuickMessage('¿Cuáles son los canales oficiales de atención y soporte TI en Barranquilla y Cúcuta?')">
-            📞 <span>Canales de Atención TI</span>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <input type="file" id="pdfUploadInput" accept=".pdf" style="display:none;" onchange="handleFileUpload(event)">
+          <button class="quick-btn" style="justify-content:center; background:rgba(0,163,255,0.08); border-color:rgba(0,163,255,0.3);" onclick="document.getElementById('pdfUploadInput').click()">
+            📤 <span>Seleccionar y Subir PDF</span>
           </button>
-          <button class="quick-btn" onclick="sendQuickMessage('¿Cuáles son las políticas y procedimientos para la generación de backups según P-GT-10?')">
-            💾 <span>Políticas de Backups (P-GT-10)</span>
+          <button class="quick-btn" style="justify-content:center; background:rgba(16,185,129,0.08); border-color:rgba(16,185,129,0.3);" onclick="handleManualReindex()">
+            🔄 <span>Reindexar Todos los Docs</span>
           </button>
-          <button class="quick-btn" onclick="sendQuickMessage('¿Cómo debo reportar un error o requerimiento en el sistema Kactus o Seven según P-GT-11?')">
-            🏢 <span>Soporte Kactus / Seven (P-GT-11)</span>
-          </button>
-          <button class="quick-btn" onclick="sendQuickMessage('El computador del laboratorio 204 no enciende y presenta pantalla negra, requiero soporte técnico.')">
-            🚨 <span>Reportar Falla de Equipos (Ticket GLPI)</span>
-          </button>
+          <div id="uploadStatus" style="font-size:0.75rem; color:var(--text-muted); min-height:16px;"></div>
         </div>
       </div>
     </aside>
+
 
     <!-- Ventana de Chat Principal -->
     <main class="chat-card">
@@ -709,7 +706,61 @@
       messageInput.value = text;
       handleChatSubmit();
     }
+
+    async function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const statusEl = document.getElementById('uploadStatus');
+      statusEl.innerHTML = `<span style="color:#38bdf8;">⏳ Subiendo e indexando ${file.name}...</span>`;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/admin/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          statusEl.innerHTML = `<span style="color:#34d399;">✅ Indexado con éxito (${data.filename})</span>`;
+          addMessage('bot', `<p>📄 <strong>Nuevo documento institucional indexado:</strong> Se ha integrado exitosamente <code>${data.filename}</code> a la base de conocimiento vectorial de UniMon.</p>`, `🤖 Ingestión RAG Completada`);
+        } else {
+          statusEl.innerHTML = `<span style="color:#ef4444;">❌ Error: ${data.detail || 'Fallo de subida'}</span>`;
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:#ef4444;">❌ Error de red: ${err.message}</span>`;
+      } finally {
+        event.target.value = '';
+        setTimeout(() => { statusEl.innerHTML = ''; }, 6000);
+      }
+    }
+
+    async function handleManualReindex() {
+      const statusEl = document.getElementById('uploadStatus');
+      statusEl.innerHTML = `<span style="color:#38bdf8;">⏳ Reindexando documentos...</span>`;
+
+      try {
+        const res = await fetch('/api/admin/reindex', {
+          method: 'POST'
+        });
+        const data = await res.json();
+        if (res.ok) {
+          statusEl.innerHTML = `<span style="color:#34d399;">✅ Base vectorial actualizada</span>`;
+          addMessage('bot', `<p>🔄 <strong>Reindexación completada:</strong> La base vectorial ChromaDB ha sido sincronizada y actualizada en memoria.</p>`, `🤖 Sincronización RAG`);
+        } else {
+          statusEl.innerHTML = `<span style="color:#ef4444;">❌ Error: ${data.detail}</span>`;
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:#ef4444;">❌ Error de red: ${err.message}</span>`;
+      } finally {
+        setTimeout(() => { statusEl.innerHTML = ''; }, 6000);
+      }
+    }
   </script>
 </body>
 </html>
+
 
