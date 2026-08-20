@@ -114,20 +114,13 @@ El servidor quedará disponible en:
 ## 📡 Especificación de Endpoints
 
 ### 1. `POST /api/chat`
-Procesa el mensaje del usuario, evalúa la intención y responde vía RAG o radica un ticket en GLPI.
+Procesa el mensaje del usuario de forma 100% conversacional mediante una máquina de estados por `session_id`.
 
 #### **Cuerpo de la Petición (Request Body):**
 ```json
 {
-  "message": "¿Cuáles son los canales oficiales de atención y soporte técnico en Barranquilla y Cúcuta?",
-  "user_data": {
-    "name": "Alejandro Hernández",
-    "email": "ahernandez@unisimon.edu.co",
-    "usb_id": "1042500000",
-    "campus": "Barranquilla",
-    "role": "Docente"
-  },
-  "force_ticket": false
+  "session_id": "sess_user_12345",
+  "message": "¿Cuáles son los canales oficiales de atención y soporte técnico en Barranquilla y Cúcuta?"
 }
 ```
 
@@ -135,7 +128,7 @@ Procesa el mensaje del usuario, evalúa la intención y responde vía RAG o radi
 ```json
 {
   "intent": "RAG_QUERY",
-  "reply": "Estimado Alejandro Hernández, según los procedimientos institucionales de TI de la Universidad Simón Bolívar, los canales de soporte autorizados son:\n\n• Sede Barranquilla: solicitudcomputo@unisimon.edu.co | Tel: 3444333 Ext. 8003/8004 | WhatsApp: 3172683922\n• Sede Cúcuta: helpdesk@unisimon.edu.co | Tel: 5827070 Ext. 129",
+  "reply": "Estimado usuario, según los procedimientos institucionales de TI de la Universidad Simón Bolívar, los canales de soporte autorizados son:\n\n• Sede Barranquilla: solicitudcomputo@unisimon.edu.co | Tel: 3444333 Ext. 8003/8004 | WhatsApp: 3172683922\n• Sede Cúcuta: helpdesk@unisimon.edu.co | Tel: 5827070 Ext. 129",
   "ticket_details": null,
   "category": "Soporte Técnico y Gestión de TI Unisimon",
   "source": "ollama_llama3.1:8b",
