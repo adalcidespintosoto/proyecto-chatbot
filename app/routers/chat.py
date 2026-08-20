@@ -26,20 +26,20 @@ router = APIRouter(
 
 class UserData(BaseModel):
     """
-    Datos de identificación del miembro de la comunidad USB.
+    Datos de identificación del miembro de la comunidad universitaria Unisimon.
     """
     name: Optional[str] = Field(default=None, description="Nombre completo del usuario", example="Alejandro Hernández")
-    email: Optional[str] = Field(default=None, description="Correo electrónico institucional o personal", example="18-10000@usb.ve")
-    usb_id: Optional[str] = Field(default=None, description="Carnet o identificación USB", example="18-10000")
-    campus: Optional[str] = Field(default="Sartenejas", description="Sede universitaria (Sartenejas o Litoral)", example="Sartenejas")
-    role: Optional[str] = Field(default="Estudiante", description="Rol en la USB (Estudiante, Profesor, Administrativo, Obrero)", example="Estudiante")
+    email: Optional[str] = Field(default=None, description="Correo electrónico institucional o personal", example="usuario@unisimon.edu.co")
+    usb_id: Optional[str] = Field(default=None, description="Identificación o código institucional", example="1042500000")
+    campus: Optional[str] = Field(default="Barranquilla", description="Sede universitaria (Barranquilla o Cúcuta)", example="Barranquilla")
+    role: Optional[str] = Field(default="Estudiante", description="Rol (Estudiante, Docente, Funcionario / Administrativo)", example="Estudiante")
 
 
 class ChatRequest(BaseModel):
     """
     Petición enviada al endpoint /api/chat.
     """
-    message: str = Field(..., min_length=1, description="Mensaje o descripción del problema técnico enviado por el usuario", example="No puedo conectarme a eduroam desde mi laptop en el edificio MEM.")
+    message: str = Field(..., min_length=1, description="Mensaje o descripción del problema técnico enviado por el usuario", example="El computador del laboratorio 204 en la sede Barranquilla no enciende y presenta pantalla negra.")
     user_data: Optional[UserData] = Field(default=None, description="Información del usuario solicitante")
     force_ticket: Optional[bool] = Field(default=False, description="Forzar la creación directa de un ticket en GLPI sin pasar por consulta informativa", example=False)
 
@@ -65,6 +65,7 @@ class ChatResponse(BaseModel):
     ticket_details: Optional[TicketDetails] = Field(default=None, description="Detalles del ticket si fue generado")
     category: Optional[str] = Field(default=None, description="Categoría temática del problema")
     source: Optional[str] = Field(default=None, description="Fuente de la respuesta (GLPI, Ollama, Base de Conocimiento)", example="GLPI_REST_API")
+    sources: Optional[List[str]] = Field(default=None, description="Fuentes documentales consultadas en RAG", example=["Guia_WiFi_Eduroam.pdf"])
 
 
 # ==========================================
@@ -115,15 +116,15 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
         # Construir asunto y contenido formal para el ticket en GLPI
         ticket_subject = f"[{category_name}] Reporte: {user_msg[:60]}..." if len(user_msg) > 60 else f"[{category_name}] Reporte: {user_msg}"
         ticket_content = (
-            f"<b>REPORTE DE INCIDENTE TÉCNICO - ASISTENTE UNIMON USB</b><br><br>"
+            f"<b>REPORTE DE INCIDENTE TÉCNICO - ASISTENTE UNIMON (UNISIMON COLOMBIA)</b><br><br>"
             f"<b>Usuario:</b> {user_display_name} ({user_role})<br>"
-            f"<b>Carnet/ID:</b> {user_id}<br>"
+            f"<b>ID / Código:</b> {user_id}<br>"
             f"<b>Correo de Contacto:</b> {email_display}<br>"
             f"<b>Sede:</b> {user_campus}<br>"
             f"<b>Categoría Asignada:</b> {category_name}<br>"
             f"<b>Nivel de Urgencia Calculado:</b> {urgency}/5<br><br>"
             f"<b>Descripción del problema:</b><br>{user_msg}<br><br>"
-            f"<i>Reporte generado automáticamente vía UniMon Backend.</i>"
+            f"<i>Reporte generado automáticamente vía UniMon Backend (Unisimon TI).</i>"
         )
 
         try:
@@ -142,7 +143,7 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
                 f"🏷️ **Categoría:** {category_name}\n"
                 f"⚡ **Nivel de Urgencia:** {urgency}/5\n"
                 f"📍 **Sede:** {user_campus}\n\n"
-                f"El equipo de soporte de la Dirección de Servicios Telemáticos / DTI ha sido notificado y atenderá su requerimiento a la brevedad."
+                f"El equipo de Soporte y Gestión de TI de la Universidad Simón Bolívar ({user_campus}) ha recibido su caso y procederá con la atención requerida."
             )
 
             return ChatResponse(
@@ -167,12 +168,13 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
             )
 
     # 3. Flujo de Consulta Informativa RAG (RAG_QUERY)
-    rag_result = await rag_service.query_llm(user_message=user_msg, user_name=user_info.name)
+    rag_result = await rag_service.query_rag(question=user_msg, user_name=user_info.name)
 
     return ChatResponse(
         intent=IntentType.RAG_QUERY.value,
         reply=rag_result["response"],
         ticket_details=None,
         category=category_name,
-        source=rag_result.get("source", "ollama_rag")
+        source=rag_result.get("source", "ollama_rag"),
+        sources=rag_result.get("sources")
     )

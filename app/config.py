@@ -28,8 +28,13 @@ class Settings(BaseSettings):
 
     # Configuración de Ollama (RAG / LLM)
     ollama_base_url: str = "http://localhost:11434"
-    llm_model: str = "llama3.1"
-    ollama_timeout: float = 30.0
+    llm_model: str = "llama3.1:8b"
+    ollama_timeout: float = 45.0
+
+    # Configuración de ChromaDB y Embeddings
+    chroma_db_dir: str = "./chroma_db"
+    docs_dir: str = "./data/docs"
+    embedding_model: str = "intfloat/multilingual-e5-base"
 
     model_config = SettingsConfigDict(
         env_file=".env",

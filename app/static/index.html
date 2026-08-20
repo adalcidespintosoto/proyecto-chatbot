@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UniMon - Asistente de Soporte Técnico USB</title>
+  <title>UniMon - Asistente de Soporte Técnico y Gestión TI (Unisimon)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -448,8 +448,8 @@
     <div class="brand">
       <div class="brand-logo">⚡</div>
       <div class="brand-text">
-        <h1>UniMon • Asistente Virtual USB</h1>
-        <p>Soporte Técnico GLPI & Base de Conocimiento Inteligente</p>
+        <h1>UniMon • Asistente Virtual TI Unisimon</h1>
+        <p>Soporte Técnico GLPI & Procedimientos Institucionales (Barranquilla y Cúcuta)</p>
       </div>
     </div>
     <div class="header-badges">
@@ -459,11 +459,11 @@
   </header>
 
   <div class="app-container">
-    <!-- Panel Lateral: Perfil de Usuario USB y Sugerencias -->
+    <!-- Panel Lateral: Perfil de Usuario y Sugerencias -->
     <aside class="sidebar">
       <div>
         <h2>👤 Datos del Usuario</h2>
-        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px;">Información para reportes y tickets en GLPI</p>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px;">Información institucional para radicación de tickets en GLPI</p>
         
         <div class="form-group" style="margin-bottom:10px;">
           <label for="userName">Nombre Completo</label>
@@ -471,15 +471,15 @@
         </div>
         
         <div class="form-group" style="margin-bottom:10px;">
-          <label for="userEmail">Correo USB</label>
-          <input type="email" id="userEmail" class="form-control" value="18-10000@usb.ve" placeholder="ejemplo@usb.ve">
+          <label for="userEmail">Correo Institucional</label>
+          <input type="email" id="userEmail" class="form-control" value="usuario@unisimon.edu.co" placeholder="usuario@unisimon.edu.co">
         </div>
         
         <div class="form-group" style="margin-bottom:10px;">
           <label for="userCampus">Sede</label>
           <select id="userCampus" class="form-control">
-            <option value="Sartenejas" selected>Sartenejas</option>
-            <option value="Litoral">Sede del Litoral</option>
+            <option value="Barranquilla" selected>Barranquilla</option>
+            <option value="Cúcuta">Cúcuta</option>
           </select>
         </div>
 
@@ -487,9 +487,8 @@
           <label for="userRole">Rol</label>
           <select id="userRole" class="form-control">
             <option value="Estudiante" selected>Estudiante</option>
-            <option value="Profesor">Profesor</option>
-            <option value="Administrativo">Personal Administrativo</option>
-            <option value="Obrero">Personal Obrero</option>
+            <option value="Docente">Docente</option>
+            <option value="Funcionario / Administrativo">Funcionario / Administrativo</option>
           </select>
         </div>
       </div>
@@ -497,21 +496,21 @@
       <hr style="border: 0; border-top: 1px solid var(--card-border);">
 
       <div>
-        <h2>⚡ Preguntas de Ejemplo</h2>
-        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Haz clic para probar respuestas o creación de tickets:</p>
+        <h2>⚡ Trámites y Consultas Rápidas</h2>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Haz clic para consultar procedimientos o reportar fallas:</p>
         
         <div class="quick-prompts">
-          <button class="quick-btn" onclick="sendQuickMessage('¿Cómo me conecto a la red eduroam en Sartenejas?')">
-            📶 <span>Configurar Wi-Fi Eduroam</span>
+          <button class="quick-btn" onclick="sendQuickMessage('¿Cuáles son los canales oficiales de atención y soporte TI en Barranquilla y Cúcuta?')">
+            📞 <span>Canales de Atención TI</span>
           </button>
-          <button class="quick-btn" onclick="sendQuickMessage('¿Cómo accedo al Campus Virtual de la USB?')">
-            🎓 <span>Acceso a Campus Virtual</span>
+          <button class="quick-btn" onclick="sendQuickMessage('¿Cuáles son las políticas y procedimientos para la generación de backups según P-GT-10?')">
+            💾 <span>Políticas de Backups (P-GT-10)</span>
           </button>
-          <button class="quick-btn" onclick="sendQuickMessage('No tengo internet en el edificio MEM, el cable de red está dañado y no hay señal.')">
-            🚨 <span>Reportar falla técnica (Ticket GLPI)</span>
+          <button class="quick-btn" onclick="sendQuickMessage('¿Cómo debo reportar un error o requerimiento en el sistema Kactus o Seven según P-GT-11?')">
+            🏢 <span>Soporte Kactus / Seven (P-GT-11)</span>
           </button>
-          <button class="quick-btn" onclick="sendQuickMessage('Olvidé la contraseña de mi correo institucional USB.')">
-            🔑 <span>Recuperar clave de correo</span>
+          <button class="quick-btn" onclick="sendQuickMessage('El computador del laboratorio 204 no enciende y presenta pantalla negra, requiero soporte técnico.')">
+            🚨 <span>Reportar Falla de Equipos (Ticket GLPI)</span>
           </button>
         </div>
       </div>
@@ -524,9 +523,9 @@
         <div class="message bot">
           <div class="avatar">⚡</div>
           <div class="bubble">
-            <p><strong>¡Hola! Soy UniMon</strong>, el Asistente Virtual de Soporte Técnico de la <strong>Universidad Simón Bolívar (USB)</strong>.</p>
-            <p>Puedo responder tus dudas sobre <strong>Wi-Fi eduroam</strong>, <strong>Campus Virtual</strong>, <strong>cuentas @usb.ve</strong> o generar automáticamente un ticket de atención técnica en <strong>GLPI</strong> si presentas una falla o problema técnico en el campus.</p>
-            <div class="meta-tag">🤖 UniMon USB • Base de Conocimiento Activa</div>
+            <p><strong>¡Hola! Soy UniMon</strong>, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la <strong>Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia)</strong>.</p>
+            <p>Puedo ayudarte a resolver dudas sobre los <strong>procedimientos institucionales de TI</strong> (mantenimiento de cómputo, antimalware, backups, ERP Kactus/Seven) o <strong>radicar un caso de soporte técnico en GLPI</strong> en caso de fallas.</p>
+            <div class="meta-tag">🤖 UniMon Unisimon • Procedimientos Oficiales TI</div>
           </div>
         </div>
       </div>
@@ -538,7 +537,7 @@
             type="text" 
             id="messageInput" 
             class="chat-input" 
-            placeholder="Escribe tu consulta o describe tu problema técnico..." 
+            placeholder="Escribe tu consulta sobre procedimientos TI o reporta una falla técnica..." 
             autocomplete="off"
             required
           >
@@ -564,7 +563,6 @@
 
     function formatText(text) {
       if (!text) return "";
-      // Convertir saltos de línea, negritas y viñetas simples
       let formatted = text
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;font-family:monospace;">$1</code>')
@@ -590,12 +588,12 @@
         ticketCard.className = 'ticket-badge';
         ticketCard.innerHTML = `
           <div class="ticket-header">
-            <span>🎫 Ticket GLPI Registrado</span>
+            <span>🎫 Ticket GLPI Radicado</span>
             <span class="ticket-id">#${ticketDetails.ticket_id}</span>
           </div>
           <div><strong>Categoría:</strong> ${ticketDetails.category}</div>
           <div><strong>Urgencia:</strong> ${ticketDetails.urgency}/5 | <strong>Impacto:</strong> ${ticketDetails.impact}/5</div>
-          <div style="font-size:0.75rem; color:#a7f3d0;">Estado: Creado exitosamente en el servidor GLPI USB</div>
+          <div style="font-size:0.75rem; color:#a7f3d0;">Estado: Radicado exitosamente en GLPI Soporte TI</div>
         `;
         bubble.appendChild(ticketCard);
       }
@@ -655,10 +653,10 @@
       const payload = {
         message: text,
         user_data: {
-          name: document.getElementById('userName').value || "Usuario USB",
-          email: document.getElementById('userEmail').value || "18-10000@usb.ve",
-          usb_id: document.getElementById('userEmail').value.split('@')[0] || "18-10000",
-          campus: document.getElementById('userCampus').value || "Sartenejas",
+          name: document.getElementById('userName').value || "Usuario Unisimon",
+          email: document.getElementById('userEmail').value || "usuario@unisimon.edu.co",
+          usb_id: document.getElementById('userEmail').value.split('@')[0] || "funcionario",
+          campus: document.getElementById('userCampus').value || "Barranquilla",
           role: document.getElementById('userRole').value || "Estudiante"
         }
       };
@@ -687,6 +685,9 @@
         if (data.source) {
           metaInfo += ` • Fuente: ${data.source}`;
         }
+        if (data.sources && data.sources.length > 0) {
+          metaInfo += ` • Refs: ${data.sources.join(', ')}`;
+        }
 
         addMessage(
           'bot', 
@@ -711,3 +712,4 @@
   </script>
 </body>
 </html>
+

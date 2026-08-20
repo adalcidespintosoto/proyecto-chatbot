@@ -4,13 +4,13 @@ import httpx
 
 async def test_chat():
     payload = {
-        "message": "Falla de prueba: No funciona el punto de red cableada en laboratorio 103 de Sartenejas",
+        "message": "Falla de prueba: No enciende el equipo del laboratorio 204 en la sede Barranquilla",
         "user_data": {
-            "name": "Prueba USB",
-            "email": "xmmulpro@gmail.com",
-            "usb_id": "18-00000",
-            "campus": "Sartenejas",
-            "role": "Estudiante"
+            "name": "Docente Unisimon",
+            "email": "docente@unisimon.edu.co",
+            "usb_id": "1042500000",
+            "campus": "Barranquilla",
+            "role": "Docente"
         },
         "force_ticket": True
     }
@@ -25,3 +25,4 @@ async def test_chat():
 
 if __name__ == "__main__":
     asyncio.run(test_chat())
+
