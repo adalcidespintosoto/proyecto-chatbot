@@ -121,25 +121,27 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
 from fastapi import UploadFile, File
 from pathlib import Path
 from app.config import get_settings
-from scripts.ingest_docs import ingest_documents
+from scripts.ingest_multimodal_docs import ingest_multimodal
 
 
 @router.post(
     "/admin/upload",
     tags=["Administración RAG"],
-    summary="Subir documento PDF e indexar automáticamente",
-    description="Recibe un archivo PDF, lo almacena en ./data/docs/ y ejecuta la reindexación automática inmediata en ChromaDB."
+    summary="Subir documento PDF o PPTX e indexar automáticamente",
+    description="Recibe un archivo PDF o PPTX, lo almacena en ./data/docs/ y ejecuta la reindexación multimodal automática inmediata en ChromaDB (con interpretación visual de imágenes si el Vision-LLM está disponible)."
 )
 async def upload_document(
-    file: UploadFile = File(..., description="Archivo PDF institucional a incorporar")
+    file: UploadFile = File(..., description="Archivo PDF o PPTX institucional a incorporar")
 ):
     """
-    Guarda el archivo PDF subido y dispara la reindexación y recarga automática del vector store.
+    Guarda el archivo subido y dispara la reindexación multimodal y recarga automática del vector store.
+    Soporta archivos PDF (.pdf) y PowerPoint (.pptx).
     """
-    if not file.filename.lower().endswith(".pdf"):
+    allowed_extensions = (".pdf", ".pptx")
+    if not file.filename.lower().endswith(allowed_extensions):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Solo se admiten documentos en formato PDF (.pdf)."
+            detail=f"Solo se admiten documentos en formato PDF (.pdf) o PowerPoint (.pptx)."
         )
 
     settings = get_settings()
@@ -161,13 +163,13 @@ async def upload_document(
             detail=f"No se pudo guardar el archivo: {str(exc)}"
         )
 
-    # Reindexar automáticamente
-    success = ingest_documents()
+    # Reindexar automáticamente con pipeline multimodal
+    success = ingest_multimodal()
     if success:
         rag_service.reload_vector_store()
         return {
             "status": "success",
-            "message": f"Documento '{file.filename}' subido e indexado exitosamente en ChromaDB.",
+            "message": f"Documento '{file.filename}' subido e indexado exitosamente en ChromaDB (pipeline multimodal).",
             "filename": file.filename,
             "size_kb": round(len(content) / 1024, 2)
         }
@@ -181,23 +183,24 @@ async def upload_document(
 @router.post(
     "/admin/reindex",
     tags=["Administración RAG"],
-    summary="Forzar reindexación completa de documentos",
-    description="Ejecuta la limpieza y reindexación de todos los PDFs en ./data/docs/ y recarga ChromaDB en memoria."
+    summary="Forzar reindexación multimodal completa de documentos",
+    description="Ejecuta la limpieza y reindexación multimodal de todos los PDFs y PPTX en ./data/docs/ con interpretación visual de imágenes y recarga ChromaDB en memoria."
 )
 async def trigger_reindex():
     """
-    Dispara manualmente el pipeline de ingestión y actualiza la base vectorial activa.
+    Dispara manualmente el pipeline de ingesta multimodal y actualiza la base vectorial activa.
     """
-    success = ingest_documents()
+    success = ingest_multimodal()
     if success:
         rag_service.reload_vector_store()
         return {
             "status": "success",
-            "message": "Base vectorial ChromaDB reindexada y recargada exitosamente."
+            "message": "Base vectorial ChromaDB reindexada con pipeline multimodal y recargada exitosamente."
         }
     else:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ocurrió un error al procesar la reindexación de documentos."
+            detail="Ocurrió un error al procesar la reindexación multimodal de documentos."
         )
+
 

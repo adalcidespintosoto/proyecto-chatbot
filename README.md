@@ -114,8 +114,10 @@ proyecto-chatbot/
 │   └── docs/                     # Repositorio de procedimientos institucionales en PDF (P-GT-*)
 ├── chroma_db/                    # Almacenamiento persistente de vectores (ChromaDB)
 ├── scripts/
-│   └── ingest_docs.py            # Pipeline de ingesta, segmentación (chunking) e indexación vectorial
+│   ├── ingest_docs.py            # Pipeline de ingesta simple (PDF plano)
+│   └── ingest_multimodal_docs.py # Pipeline de ingesta multimodal (PDF/PPTX + Visión LLM + Tablas + OCR)
 ├── test_phase4.py                # Suite de 12 pruebas automatizadas de integración y regresión
+├── test_multimodal.py            # Suite de pruebas para parseo PPTX/PDF y endpoints admin
 ├── .env                          # Variables de entorno activas
 ├── .env.example                  # Plantilla de variables de entorno
 ├── requirements.txt              # Dependencias de Python
@@ -179,15 +181,31 @@ Maneja la comunicación segura y transaccional con el servidor de GLPI.
 
 ---
 
-### 4. Ingestión y Vectorización (`ingest_docs.py`)
-Script ETL que procesa los procedimientos institucionales de la Dirección de TI:
+### 4. Ingestión Multimodal y Vectorización (`ingest_multimodal_docs.py`)
+Pipeline ETL de alta fidelidad que procesa los procedimientos institucionales en formatos PDF y PowerPoint (`.pptx`):
 
-1. **Lectura:** Carga los archivos `.pdf` ubicados en `./data/docs/` usando `PyPDFLoader`.
-2. **Segmentación (Chunking):** Aplica `RecursiveCharacterTextSplitter` con:
-   - `chunk_size = 800` caracteres.
-   - `chunk_overlap = 150` caracteres.
-   - Separadores: `["\n\n", "\n", " ", ""]`.
-3. **Indexación:** Genera embeddings vectoriales y los persiste en `./chroma_db`.
+1. **Parseo de PowerPoint (`.pptx`):**
+   - Extrae texto de todas las formas geométricas (`has_text_frame`).
+   - Convierte tablas estructuradas a formato tabular legible (`| Col 1 | Col 2 |`).
+   - Extrae e interpreta imágenes incrustadas (`MSO_SHAPE_TYPE.PICTURE`).
+   - Extrae notas del orador (`notes_slide.notes_text_frame`).
+   - Genera `Document` por diapositiva con metadatos (`slide_number`, `type: "presentation"`).
+
+2. **Parseo de PDF (`.pdf` con PyMuPDF):**
+   - Extrae texto seleccionable e imágenes incrustadas por página.
+   - Rasteriza páginas completas si son escaneadas o carecen de texto nativo.
+   - Genera `Document` por página con metadatos (`page_number`, `type: "pdf_document"`).
+
+3. **Interpretación Visual con Vision-LLM (Ollama):**
+   - Normaliza imágenes (máx 1024x1024, JPEG Q85) para no saturar VRAM.
+   - Describe técnicamente capturas de pantalla, diagramas de flujo y esquemas visuales.
+   - **Smoke Test & Fallback Automático:** Detecta disponibilidad de `llama3.2-vision:11b` y conmuta a `llava:7b` si la arquitectura no es compatible.
+   - Filtro de relevancia: descarta automáticamente iconos menores a 15 KB.
+
+4. **Segmentación y Persistencia Vectorial:**
+   - Aplica `RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)`.
+   - Genera embeddings con `intfloat/multilingual-e5-base` en GPU (`cuda`).
+   - Persiste la colección limpia en `./chroma_db`.
 
 ---
 
