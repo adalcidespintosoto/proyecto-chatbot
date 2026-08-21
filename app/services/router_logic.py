@@ -10,7 +10,7 @@ from typing import Dict, Any, Tuple, Optional
 from enum import Enum
 from pydantic import BaseModel, Field
 
-from app.services.rag_service import rag_service
+from app.services.rag_service import rag_service, is_out_of_domain_response
 from app.services.glpi_service import glpi_client, is_valid_email
 
 logger = logging.getLogger("unimon.router_logic")
@@ -61,23 +61,26 @@ GREETING_PATTERNS = [
 
 # Respuestas positivas que confirman que el diagnóstico de Nivel 1 funcionó
 SOLVED_PATTERNS = [
-    r"\b(gracias|ya funcion[oó]|listo|se solucion[oó]|qued[oó] bien|sirvi[oó]|excelente|perfecto|resuelto|ya qued[oó]|muchas gracias|se arregl[oó]|ya sirve|ya prendi[oó]|ya conect[oó])\b"
+    r"\b(gracias|grasias|gracia|ya funcion[oó]|ya funsion[oó]|listo|se solucion[oó]|se solusion[oó]|qued[oó] bien|sirvi[oó]|cirvi[oó]|excelente|perfecto|resuelto|ya qued[oó]|muchas gracias|se arregl[oó]|ya sirve|ya prendi[oó]|ya conect[oó]|ya dio video)\b"
 ]
 
 # Respuestas negativas que indican que el problema persiste o solicitan ticket
 PERSIST_PATTERNS = [
-    r"\b(no sirvi[oó]|sigue igual|no da|crear ticket|abrir ticket|radicar|no funcion[oó]|sigue fallando|persiste|continua|contin[uú]a|sigue el problema|no se solucion[oó]|no se arregl[oó]|no|nada|tampoco|no prende|sigue ca[ií]do|ayuda|escalar)\b"
+    r"\b(no sirvi[oó]|no sirbi[oó]|no cirvi[oó]|sigue igual|sige igual|no da|crear ticket|abrir ticket|radicar|no funcion[oó]|no funsion[oó]|sigue fallando|sige fallando|persiste|continua|contin[uú]a|sigue el problema|no se solucion[oó]|no se solusion[oó]|no se arregl[oó]|no|nada|tampoco|no prende|sigue ca[ií]do|ayuda|escalar)\b"
 ]
 
-# Palabras clave para identificar trámites de SOFTWARE / Cuentas / Accesos
+# Palabras clave para identificar trámites de SOFTWARE / Cuentas / Accesos (con tolerancia tipográfica)
 SOFTWARE_KEYWORDS = [
-    r"\bkactus\b", r"\bseven\b", r"\bpermiso\b", r"\bpermisos\b", r"\bacceso\b", r"\baccesos\b",
-    r"\bcuenta\b", r"\bcuentas\b", r"\bcontrase[ñn]a\b", r"\bclave\b", r"\bcorreo\b", r"\bemail\b",
-    r"\bteams\b", r"\bplataforma\b", r"\bportal\b", r"\baula\b", r"\bmoodle\b", r"\boffice\b",
-    r"\blicencia\b", r"\blicencias\b", r"\bbloqueo\b", r"\bdesbloquear\b", r"\busuario\b",
-    r"\bperfil\b", r"\bcredenciales\b", r"\bsoftware\b", r"\baplicativo\b", r"\bsistema\b",
-    r"\berp\b", r"\bn[oó]mina\b", r"\bautenticaci[oó]n\b", r"\brestablecer\b", r"\bolvid[eé]\b",
-    r"\blogin\b", r"\bsesi[oó]n\b"
+    r"\b(kactus|katuc|kaktu|caktus|katu)\b", r"\b(seven|seben)\b", r"\bpermiso[s]?\b", r"\bpermizo[s]?\b",
+    r"\bacceso[s]?\b", r"\baccezo[s]?\b", r"\bcuenta[s]?\b", r"\bcuanta[s]?\b",
+    r"\bcontrase[ñn]a[s]?\b", r"\bcontrace[ñn]a[s]?\b", r"\bclave[s]?\b", r"\bclabe[s]?\b",
+    r"\bcorreo[s]?\b", r"\bcoreo[s]?\b", r"\bemail\b", r"\bteams\b", r"\btims\b",
+    r"\bplataforma[s]?\b", r"\bportal\b", r"\baula\b", r"\b(moodle|modle|mudle)\b",
+    r"\b(office|ofis|ofice)\b", r"\blicencia[s]?\b", r"\bbloqueo\b", r"\bbloqeo\b",
+    r"\bdesbloquear\b", r"\bdesbloqear\b", r"\busuario[s]?\b", r"\bperfil\b",
+    r"\bcredenciales\b", r"\bsoftware\b", r"\baplicativo[s]?\b", r"\bsistema[s]?\b",
+    r"\berp\b", r"\bn[oó]mina\b", r"\bautenticaci[oó]n\b", r"\brestablecer\b",
+    r"\brestableser\b", r"\bolvid[eé]\b", r"\blogin\b", r"\bsesi[oó]n\b", r"\bceci[oó]n\b"
 ]
 
 # Regex estándar para extracción y validación de correo
@@ -379,7 +382,22 @@ class RouterLogic:
         # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.DIAGNOSTICO:
-            # Caso A: El usuario confirma que funcionó
+            # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
+            if cls.is_greeting(texto):
+                cls.reset_session(session_id)
+                greeting_reply = (
+                    "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar. "
+                    "¿En qué te puedo colaborar hoy? Puedes consultarme sobre procedimientos institucionales (backups, cuentas, antimalware, Seven/Kactus) "
+                    "o indicarme si presentas alguna falla con tus equipos o servicios para ayudarte."
+                )
+                return {
+                    "tipo": "SALUDO",
+                    "mensaje": greeting_reply,
+                    "ticket_id": None,
+                    "source": "UniMon_Assistant"
+                }
+
+            # Caso B: El usuario confirma que funcionó
             if cls.is_solved_confirmation(texto):
                 cls.reset_session(session_id)
                 solved_reply = (
@@ -393,7 +411,7 @@ class RouterLogic:
                     "source": "UniMon_Nivel1_Resolved"
                 }
 
-            # Caso B: El problema persiste o el usuario pide ticket
+            # Caso C: El problema persiste o el usuario pide ticket
             elif cls.is_persisting_or_ticket_request(texto):
                 session.estado = EstadoTicket.PIDIENDO_NOMBRE
                 prompt_msg = (
@@ -408,18 +426,30 @@ class RouterLogic:
                     "source": "UniMon_SlotFilling"
                 }
 
-            # Caso C: El usuario envía más información o reformula la duda
+            # Caso D: El usuario envía más información, otra duda o tema
             else:
+                rag_res = await rag_service.consultar(pregunta=texto, es_diagnostico=False)
+                resp_text = rag_res.get("response", "")
+
+                # Si el usuario cambió a una pregunta fuera de dominio, liberar sesión
+                if is_out_of_domain_response(resp_text):
+                    cls.reset_session(session_id)
+                    return {
+                        "tipo": "FUERA_DE_DOMINIO",
+                        "mensaje": resp_text,
+                        "ticket_id": None,
+                        "sources": rag_res.get("sources"),
+                        "source": rag_res.get("source", "ollama_rag")
+                    }
+
                 session.falla = f"{session.falla or ''} | {texto}".strip(" |")
-                # Reevaluar categoría con el contexto actualizado
                 cat, cat_name = cls.detect_category(session.falla)
                 session.categoria = cat
                 session.category_name = cat_name
 
-                rag_res = await rag_service.consultar(pregunta=session.falla, es_diagnostico=True)
                 return {
                     "tipo": "DIAGNOSTICO",
-                    "mensaje": rag_res["response"],
+                    "mensaje": resp_text,
                     "ticket_id": None,
                     "sources": rag_res.get("sources"),
                     "source": rag_res.get("source", "ollama_rag")
@@ -443,7 +473,22 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # 2. Inicio de diagnóstico proactivo de Nivel 1
+            # 2. Consultar RAG directamente con el mensaje del usuario
+            rag_res = await rag_service.consultar(pregunta=texto, es_diagnostico=False)
+            resp_text = rag_res.get("response", "")
+
+            # 3. Guardrail Fuera de Dominio (Out-of-Domain)
+            if is_out_of_domain_response(resp_text):
+                cls.reset_session(session_id)
+                return {
+                    "tipo": "FUERA_DE_DOMINIO",
+                    "mensaje": resp_text,
+                    "ticket_id": None,
+                    "sources": rag_res.get("sources"),
+                    "source": rag_res.get("source", "ollama_rag")
+                }
+
+            # 4. Caso dentro de dominio: Iniciar Diagnóstico de Nivel 1
             session.falla = texto
             cat, cat_name = cls.detect_category(texto)
             session.categoria = cat
@@ -451,11 +496,9 @@ class RouterLogic:
             session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
             session.estado = EstadoTicket.DIAGNOSTICO
 
-            rag_res = await rag_service.consultar(pregunta=texto, es_diagnostico=True)
-
             return {
                 "tipo": "DIAGNOSTICO",
-                "mensaje": rag_res["response"],
+                "mensaje": resp_text,
                 "ticket_id": None,
                 "sources": rag_res.get("sources"),
                 "source": rag_res.get("source", "ollama_rag")

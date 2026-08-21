@@ -140,8 +140,71 @@ async def run_tests():
         assert d_sw_cor.get("ticket_id") is not None
         assert "software" in d_sw_cor.get("mensaje", "").lower() or "cuentas" in d_sw_cor.get("mensaje", "").lower() or "radicado" in d_sw_cor.get("mensaje", "").lower()
 
+        # -------------------------------------------------------------
+        # TEST 5: GUARDRAIL FUERA DE DOMINIO (Out-of-Domain)
+        # -------------------------------------------------------------
         print("=" * 70)
-        print("¡TODAS LAS PRUEBAS (SALUDO, SOLUCIÓN, HARDWARE Y SOFTWARE) COMPLETADAS CON ÉXITO!")
+        print("TEST 5: GUARDRAIL FUERA DE DOMINIO ('¿cuál es la capital de Hungría?')")
+        print("=" * 70)
+        sess5 = "test_sess_out_of_domain_1"
+        res_ood1 = await client.post("/api/chat", json={"session_id": sess5, "mensaje": "¿cuál es la capital de Hungría?"})
+        d_ood1 = res_ood1.json()
+        print(f"Status: {res_ood1.status_code}")
+        print(f"Tipo: {d_ood1.get('tipo')}")
+        print(f"Mensaje Bot:\n{d_ood1.get('mensaje')}\n")
+        assert d_ood1.get("tipo") == "FUERA_DE_DOMINIO"
+        msg_ood1 = d_ood1.get("mensaje", "").lower()
+        assert "exclusivamente en soporte" in msg_ood1 or "institucionales de la universidad simón bolívar" in msg_ood1 or "tema tecnológico o institucional" in msg_ood1
+        # Verificar PROHIBICIÓN ESTRICTA: no mencionar GLPI ni pasos de descarte de hardware
+        assert "glpi" not in msg_ood1
+        assert "cable" not in msg_ood1
+        assert "reinicia" not in msg_ood1
+
+        # -------------------------------------------------------------
+        # TEST 6: GUARDRAIL FUERA DE DOMINIO ('Dame una receta para hacer arroz con pollo')
+        # -------------------------------------------------------------
+        print("=" * 70)
+        print("TEST 6: GUARDRAIL FUERA DE DOMINIO ('Dame una receta para hacer arroz con pollo')")
+        print("=" * 70)
+        sess6 = "test_sess_out_of_domain_2"
+        res_ood2 = await client.post("/api/chat", json={"session_id": sess6, "mensaje": "Dame una receta para hacer arroz con pollo"})
+        d_ood2 = res_ood2.json()
+        print(f"Status: {res_ood2.status_code}")
+        print(f"Tipo: {d_ood2.get('tipo')}")
+        print(f"Mensaje Bot:\n{d_ood2.get('mensaje')}\n")
+        assert d_ood2.get("tipo") == "FUERA_DE_DOMINIO"
+        assert "glpi" not in d_ood2.get("mensaje", "").lower()
+
+        # -------------------------------------------------------------
+        # TEST 7: TOLERANCIA ORTOGRÁFICA HARDWARE ('el proyestor no da video y la pantaya parpadea')
+        # -------------------------------------------------------------
+        print("=" * 70)
+        print("TEST 7: TOLERANCIA ORTOGRÁFICA HARDWARE ('proyestor' / 'pantaya')")
+        print("=" * 70)
+        sess7 = "test_sess_typo_hw"
+        res_hw_typo = await client.post("/api/chat", json={"session_id": sess7, "mensaje": "el proyestor no da video y la pantaya parpadea"})
+        d_hw_typo = res_hw_typo.json()
+        print(f"Status: {res_hw_typo.status_code}")
+        print(f"Tipo: {d_hw_typo.get('tipo')}")
+        print(f"Mensaje Bot:\n{d_hw_typo.get('mensaje')}\n")
+        assert d_hw_typo.get("tipo") == "DIAGNOSTICO"
+
+        # -------------------------------------------------------------
+        # TEST 8: TOLERANCIA ORTOGRÁFICA SOFTWARE ('no puedo entrar a katuc se me olvido la clabe')
+        # -------------------------------------------------------------
+        print("=" * 70)
+        print("TEST 8: TOLERANCIA ORTOGRÁFICA SOFTWARE ('katuc' / 'clabe')")
+        print("=" * 70)
+        sess8 = "test_sess_typo_sw"
+        res_sw_typo = await client.post("/api/chat", json={"session_id": sess8, "mensaje": "no puedo entrar a katuc se me olvido la clabe"})
+        d_sw_typo = res_sw_typo.json()
+        print(f"Status: {res_sw_typo.status_code}")
+        print(f"Tipo: {d_sw_typo.get('tipo')}")
+        print(f"Mensaje Bot:\n{d_sw_typo.get('mensaje')}\n")
+        assert d_sw_typo.get("tipo") == "DIAGNOSTICO"
+
+        print("=" * 70)
+        print("¡TODAS LAS PRUEBAS (SALUDO, SOLUCIÓN, HARDWARE, SOFTWARE, OUT-OF-DOMAIN Y TYPOS) COMPLETADAS CON ÉXITO!")
         print("=" * 70)
 
 
