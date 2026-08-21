@@ -229,10 +229,10 @@ async def run_tests():
         assert "contraseña" in msg_t2 or "contrasena" in msg_t2 or "kactus" in msg_t2 or "clave" in msg_t2 or "pasos" in msg_t2 or "portal" in msg_t2
 
         # -------------------------------------------------------------
-        # TEST 10: CANALES OFICIALES DE SOPORTE (GLPI vs Compras/Activos Fijos)
+        # TEST 10: CANALES OFICIALES DE SOPORTE (solicitudcomputo / helpdesk / chatbot SIN GLPI)
         # -------------------------------------------------------------
         print("=" * 70)
-        print("TEST 10: CANALES OFICIALES DE SOPORTE (GLPI / solicitudcomputo)")
+        print("TEST 10: CANALES OFICIALES DE SOPORTE (solicitudcomputo / PBX / Chatbot SIN GLPI)")
         print("=" * 70)
         sess10 = "test_sess_channels"
         res_chan = await client.post("/api/chat", json={"session_id": sess10, "mensaje": "¿Dónde debo reportar si un computador de mi oficina se dañó?"})
@@ -242,12 +242,52 @@ async def run_tests():
         print(f"Mensaje Bot:\n{d_chan.get('mensaje')}\n")
         assert d_chan.get("tipo") == "DIAGNOSTICO"
         msg_chan = d_chan.get("mensaje", "").lower()
-        assert "glpi" in msg_chan or "solicitudcomputo" in msg_chan or "8003" in msg_chan or "helpdesk" in msg_chan
+        # Verificar que NO se mencione GLPI ni compras
+        assert "glpi" not in msg_chan
         assert "compras" not in msg_chan
         assert "activos fijos" not in msg_chan
+        assert "unimon" in msg_chan or "chatbot" in msg_chan or "radicar" in msg_chan or "solicitudcomputo" in msg_chan or "8003" in msg_chan or "helpdesk" in msg_chan
+
+        # -------------------------------------------------------------
+        # TEST 11: SOLICITUD DE TÉCNICO EN DIAGNÓSTICO ('necesito a alguien que la revise')
+        # -------------------------------------------------------------
+        print("=" * 70)
+        print("TEST 11: SOLICITUD DE TÉCNICO EN DIAGNÓSTICO ('necesito a alguien que la revise')")
+        print("=" * 70)
+        sess11 = "test_sess_tech_request"
+        # Turno 1: Reporte
+        res_t11_1 = await client.post("/api/chat", json={"session_id": sess11, "mensaje": "la pantalla del salon no enciende"})
+        d_t11_1 = res_t11_1.json()
+        print(f"[Turno 1] Tipo: {d_t11_1.get('tipo')}")
+        assert d_t11_1.get("tipo") == "DIAGNOSTICO"
+
+        # Turno 2: Pide técnico
+        res_t11_2 = await client.post("/api/chat", json={"session_id": sess11, "mensaje": "necesito a alguien que la revise"})
+        d_t11_2 = res_t11_2.json()
+        print(f"[Turno 2] Tipo: {d_t11_2.get('tipo')}")
+        print(f"[Turno 2] Mensaje Bot:\n{d_t11_2.get('mensaje')}\n")
+        assert d_t11_2.get("tipo") == "RADICANDO_TICKET"
+        assert "nombre completo" in d_t11_2.get("mensaje", "").lower()
+        assert "glpi" not in d_t11_2.get("mensaje", "").lower()
+
+        # -------------------------------------------------------------
+        # TEST 12: SOLICITUD DIRECTA DE TÉCNICO EN MENSAJE INICIAL
+        # -------------------------------------------------------------
+        print("=" * 70)
+        print("TEST 12: SOLICITUD DIRECTA DE TÉCNICO EN MENSAJE INICIAL")
+        print("=" * 70)
+        sess12 = "test_sess_direct_tech"
+        res_t12 = await client.post("/api/chat", json={"session_id": sess12, "mensaje": "necesito que venga un tecnico a revisar el proyector"})
+        d_t12 = res_t12.json()
+        print(f"Status: {res_t12.status_code}")
+        print(f"Tipo: {d_t12.get('tipo')}")
+        print(f"Mensaje Bot:\n{d_t12.get('mensaje')}\n")
+        assert d_t12.get("tipo") == "RADICANDO_TICKET"
+        assert "nombre completo" in d_t12.get("mensaje", "").lower()
+        assert "glpi" not in d_t12.get("mensaje", "").lower()
 
         print("=" * 70)
-        print("¡TODAS LAS PRUEBAS (SALUDO, SOLUCIÓN, HARDWARE, SOFTWARE, OUT-OF-DOMAIN, TYPOS, CONTINUIDAD Y CANALES) COMPLETADAS CON ÉXITO!")
+        print("¡TODAS LAS PRUEBAS (SALUDO, SOLUCIÓN, HARDWARE, SOFTWARE, OUT-OF-DOMAIN, TYPOS, CONTINUIDAD, CANALES Y TÉCNICO) COMPLETADAS CON ÉXITO!")
         print("=" * 70)
 
 
