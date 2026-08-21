@@ -52,6 +52,9 @@ class TicketSession(BaseModel):
 # Almacén de sesiones en memoria indexado por session_id
 ticket_sessions: Dict[str, TicketSession] = {}
 
+# Almacén de historial conversacional en memoria indexado por session_id (últimos mensajes)
+session_history: Dict[str, List[Dict[str, str]]] = {}
+
 # Saludos simples y cortesía
 GREETING_PATTERNS = [
     r"^hola\b", r"^buenos d[ií]as\b", r"^buenas tardes\b", r"^buenas noches\b",
@@ -67,6 +70,11 @@ SOLVED_PATTERNS = [
 # Respuestas negativas que indican que el problema persiste o solicitan ticket
 PERSIST_PATTERNS = [
     r"\b(no sirvi[oó]|no sirbi[oó]|no cirvi[oó]|sigue igual|sige igual|no da|crear ticket|abrir ticket|radicar|no funcion[oó]|no funsion[oó]|sigue fallando|sige fallando|persiste|continua|contin[uú]a|sigue el problema|no se solucion[oó]|no se solusion[oó]|no se arregl[oó]|no|nada|tampoco|no prende|sigue ca[ií]do|ayuda|escalar)\b"
+]
+
+# Expresiones afirmativas y de continuación ("sí", "claro", "dale", "ok", "por favor", "muéstramelos")
+CONTINUATION_PATTERNS = [
+    r"^(s[ií]|ok|dale|claro|por favor|porfa|mu[eé]strame|mu[eé]stramelo[s]?|mu[eé]stramela[s]?|adelante|de acuerdo|s[ií] por favor|s[ií] claro|s[ií] dale|s[ií] expl[ií]camelo|expl[ií]came|s[ií] porfa|dime|cu[eé]ntame|procede|ay[uú]dame con eso)\b"
 ]
 
 # Palabras clave para identificar trámites de SOFTWARE / Cuentas / Accesos (con tolerancia tipográfica)
@@ -111,10 +119,34 @@ class RouterLogic:
         return ticket_sessions[session_id]
 
     @classmethod
-    def reset_session(cls, session_id: str) -> None:
+    def reset_session(cls, session_id: str, keep_history: bool = False) -> None:
         """Limpia y resetea la sesión del usuario a IDLE."""
         if session_id in ticket_sessions:
             ticket_sessions[session_id] = TicketSession(session_id=session_id)
+        if not keep_history and session_id in session_history:
+            session_history[session_id] = []
+
+    @classmethod
+    def get_history(cls, session_id: str) -> List[Dict[str, str]]:
+        """Obtiene el historial de conversación de la sesión."""
+        if session_id not in session_history:
+            session_history[session_id] = []
+        return session_history[session_id]
+
+    @classmethod
+    def add_history(cls, session_id: str, role: str, content: str) -> None:
+        """Agrega un mensaje al historial de la sesión (máximo 10 mensajes en buffer)."""
+        if session_id not in session_history:
+            session_history[session_id] = []
+        session_history[session_id].append({"role": role, "content": content})
+        if len(session_history[session_id]) > 10:
+            session_history[session_id] = session_history[session_id][-10:]
+
+    @classmethod
+    def clear_history(cls, session_id: str) -> None:
+        """Limpia el historial de conversación de la sesión."""
+        if session_id in session_history:
+            session_history[session_id] = []
 
     @classmethod
     def is_greeting(cls, text: str) -> bool:
@@ -138,6 +170,15 @@ class RouterLogic:
         """Detecta si el usuario indica que la falla continúa o pide ticket."""
         msg_clean = text.strip().lower()
         return any(re.search(pat, msg_clean) for pat in PERSIST_PATTERNS)
+
+    @classmethod
+    def is_continuation_affirmation(cls, text: str) -> bool:
+        """Detecta si el usuario envía una afirmación corta o solicitud de continuar explicando."""
+        msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ]", "", text.strip().lower())
+        words = msg_clean.split()
+        if len(words) <= 5:
+            return any(re.search(pat, msg_clean) for pat in CONTINUATION_PATTERNS)
+        return False
 
     @classmethod
     def detect_category(cls, text: str) -> Tuple[CategoriaSolicitud, str]:
@@ -381,6 +422,9 @@ class RouterLogic:
         # -------------------------------------------------------------
         # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
         # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
+        # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.DIAGNOSTICO:
             # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
             if cls.is_greeting(texto):
@@ -390,6 +434,8 @@ class RouterLogic:
                     "¿En qué te puedo colaborar hoy? Puedes consultarme sobre procedimientos institucionales (backups, cuentas, antimalware, Seven/Kactus) "
                     "o indicarme si presentas alguna falla con tus equipos o servicios para ayudarte."
                 )
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", greeting_reply)
                 return {
                     "tipo": "SALUDO",
                     "mensaje": greeting_reply,
@@ -398,12 +444,14 @@ class RouterLogic:
                 }
 
             # Caso B: El usuario confirma que funcionó
-            if cls.is_solved_confirmation(texto):
+            elif cls.is_solved_confirmation(texto):
                 cls.reset_session(session_id)
                 solved_reply = (
                     "¡Excelente! Me alegra saber que pudiste resolver el inconveniente con estos pasos iniciales. "
                     "Quedo a tu disposición si requieres apoyo con algún otro procedimiento o servicio institucional de TI en la Universidad Simón Bolívar. ¡Que tengas un excelente día!"
                 )
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", solved_reply)
                 return {
                     "tipo": "SOLUCIONADO",
                     "mensaje": solved_reply,
@@ -419,6 +467,8 @@ class RouterLogic:
                     if session.categoria == CategoriaSolicitud.SOFTWARE else
                     "Lamento que el problema continúe. Para radicar tu ticket ante la mesa de ayuda de soporte técnico, por favor indícame tu **nombre completo**:"
                 )
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", prompt_msg)
                 return {
                     "tipo": "RADICANDO_TICKET",
                     "mensaje": prompt_msg,
@@ -426,14 +476,53 @@ class RouterLogic:
                     "source": "UniMon_SlotFilling"
                 }
 
-            # Caso D: El usuario envía más información, otra duda o tema
+            # Caso D: Afirmación corta o confirmación de continuar ("sí", "claro", "dale", "ok", "por favor", "muéstramelos")
+            elif cls.is_continuation_affirmation(texto):
+                history = cls.get_history(session_id)
+                last_assistant_msg = ""
+                for m in reversed(history):
+                    if m.get("role") == "assistant":
+                        last_assistant_msg = m.get("content", "")
+                        break
+
+                falla_contexto = session.falla or last_assistant_msg or "procedimiento y soporte institucional Unisimon"
+                query_contextualizada = (
+                    f"El usuario responde afirmativamente ('{texto}') y solicita los pasos detallados o la explicación para: {falla_contexto}"
+                )
+
+                rag_res = await rag_service.consultar(
+                    pregunta=query_contextualizada,
+                    chat_history=history,
+                    es_diagnostico=False
+                )
+                resp_text = rag_res.get("response", "")
+
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
+
+                return {
+                    "tipo": "DIAGNOSTICO",
+                    "mensaje": resp_text,
+                    "ticket_id": None,
+                    "sources": rag_res.get("sources"),
+                    "source": rag_res.get("source", "ollama_rag")
+                }
+
+            # Caso E: El usuario envía más información, otra duda o tema
             else:
-                rag_res = await rag_service.consultar(pregunta=texto, es_diagnostico=False)
+                history = cls.get_history(session_id)
+                rag_res = await rag_service.consultar(
+                    pregunta=texto,
+                    chat_history=history,
+                    es_diagnostico=False
+                )
                 resp_text = rag_res.get("response", "")
 
                 # Si el usuario cambió a una pregunta fuera de dominio, liberar sesión
                 if is_out_of_domain_response(resp_text):
                     cls.reset_session(session_id)
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", resp_text)
                     return {
                         "tipo": "FUERA_DE_DOMINIO",
                         "mensaje": resp_text,
@@ -446,6 +535,9 @@ class RouterLogic:
                 cat, cat_name = cls.detect_category(session.falla)
                 session.categoria = cat
                 session.category_name = cat_name
+
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
 
                 return {
                     "tipo": "DIAGNOSTICO",
@@ -466,6 +558,8 @@ class RouterLogic:
                     "¿En qué te puedo colaborar hoy? Puedes consultarme sobre procedimientos institucionales (backups, cuentas, antimalware, Seven/Kactus) "
                     "o indicarme si presentas alguna falla con tus equipos o servicios para ayudarte."
                 )
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", greeting_reply)
                 return {
                     "tipo": "SALUDO",
                     "mensaje": greeting_reply,
@@ -473,13 +567,20 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # 2. Consultar RAG directamente con el mensaje del usuario
-            rag_res = await rag_service.consultar(pregunta=texto, es_diagnostico=False)
+            # 2. Consultar RAG con historial conversacional
+            history = cls.get_history(session_id)
+            rag_res = await rag_service.consultar(
+                pregunta=texto,
+                chat_history=history,
+                es_diagnostico=False
+            )
             resp_text = rag_res.get("response", "")
 
             # 3. Guardrail Fuera de Dominio (Out-of-Domain)
             if is_out_of_domain_response(resp_text):
                 cls.reset_session(session_id)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
                 return {
                     "tipo": "FUERA_DE_DOMINIO",
                     "mensaje": resp_text,
@@ -495,6 +596,9 @@ class RouterLogic:
             session.category_name = cat_name
             session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
             session.estado = EstadoTicket.DIAGNOSTICO
+
+            cls.add_history(session_id, "user", texto)
+            cls.add_history(session_id, "assistant", resp_text)
 
             return {
                 "tipo": "DIAGNOSTICO",

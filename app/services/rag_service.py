@@ -34,15 +34,20 @@ INSTRUCCIONES CLAVE DE ATENCIÓN:
 2. TOLERANCIA ORTOGRÁFICA:
    - Interpreta con flexibilidad cualquier error ortográfico o tipeo informal (ej: "proyestor" -> proyector, "pantaya" -> pantalla, "katuc" -> Kactus, "clabe" -> clave, "no prende", "interner" -> internet, etc.). Siempre brinda soporte a la intención técnica.
 
-3. GUARDRAIL FUERA DE DOMINIO (CONSULTAS AJENAS A TI):
-   - Si el usuario pregunta por temas completamente ajenos a tecnología y a la Universidad Simón Bolívar (ej: preguntas de cultura general como "¿cuál es la capital de Hungría?", geografía, historia, recetas de cocina, tareas de colegio no de TI, deportes, entretenimiento):
+3. CONTINUIDAD CONVERSACIONAL Y RESPUESTAS CORTAS ("SÍ", "CLARO", "DALE", "OK", "POR FAVOR"):
+   - Si el usuario responde afirmativamente a una pregunta de seguimiento previa (ej: "¿Deseas que te explique los pasos?" -> "sí", "dale", "ok", "claro", "por favor"), continúa la conversación explicando los pasos solicitados de manera clara y directa sin rechazar la consulta.
+
+4. CANALES OFICIALES DE SOPORTE EN UNISIMON:
+   - Plataforma oficial de atención y tickets: GLPI (https://glpi.unisimon.edu.co / Mesa de Ayuda).
+   - Sede Barranquilla: solicitudcomputo@unisimon.edu.co | WhatsApp: 3172683922 | Teléfono: 3444333 Ext. 8003 y 8004.
+   - Sede Cúcuta: helpdesk@unisimon.edu.co | Teléfono: 5827070 Ext. 129.
+   - PROHIBICIÓN ESTRICTA: NO indicar a los usuarios finales que reporten fallas técnicas a Compras, Activos Fijos o Almacén. Esas dependencias realizan trámites administrativos internos entre dependencias, no atención al usuario. Todo reporte de usuario debe radicarse en GLPI o a través de solicitudcomputo@unisimon.edu.co / helpdesk@unisimon.edu.co.
+
+5. GUARDRAIL FUERA DE DOMINIO (CONSULTAS AJENAS A TI):
+   - Si el usuario pregunta por temas completamente ajenos a tecnología y a la Universidad Simón Bolívar (ej: preguntas de cultura general como "¿cuál es la capital de Hungría?", geografía, recetas de cocina, deportes, tareas no de TI):
      * Responde de forma directa, educada y asertiva:
        "Soy un asistente enfocado exclusivamente en soporte técnico, gestión de TI y procedimientos institucionales de la Universidad Simón Bolívar. ¿En qué tema tecnológico o institucional de la universidad te puedo colaborar hoy?"
      * PROHIBICIÓN ESTRICTA: NO proporciones pasos de descarte de hardware ni menciones GLPI si la pregunta no es de soporte técnico o TI.
-
-4. CANALES OFICIALES DE SOPORTE EN UNISIMON COLOMBIA:
-   - Sede Barranquilla: solicitudcomputo@unisimon.edu.co | WhatsApp: 3172683922 | Teléfono: 3444333 Ext. 8003 y 8004.
-   - Sede Cúcuta: helpdesk@unisimon.edu.co | Teléfono: 5827070 Ext. 129.
 
 ============================================================
 CONTEXTO INSTITUCIONAL RECUPERADO:
@@ -143,17 +148,23 @@ class RAGService:
         self._vector_store = None
         _ = self.vector_store
 
-    async def query_rag(self, question: str, user_name: Optional[str] = None) -> Dict[str, Any]:
+    async def query_rag(
+        self,
+        question: str,
+        user_name: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
         """
         Ejecuta el pipeline RAG completo:
         1. Búsqueda por similitud en ChromaDB (k=4) usando intfloat/multilingual-e5-base.
         2. Extracción de fragmentos y nombres de fuentes.
-        3. Ensamblaje del System Prompt institucional estricto.
+        3. Ensamblaje del System Prompt institucional estricto e historial conversacional.
         4. Invocación asíncrona a Ollama (llama3.1:8b).
 
         Args:
             question: Pregunta o consulta del usuario.
             user_name: Nombre opcional del usuario para personalización cordial.
+            chat_history: Lista opcional de turnos previos [{"role": "user"/"assistant", "content": "..."}].
 
         Returns:
             Dict con:
@@ -201,18 +212,21 @@ class RAGService:
             )
             sources = ["Procedimientos Institucionales Unisimon"]
 
-        # 2. Ensamblar System Prompt estricto y User Prompt
+        # 2. Ensamblar System Prompt estricto, historial y User Prompt
         system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=context_text)
         user_greeting = f"El usuario se llama {user_name}. " if user_name else ""
         user_prompt = f"{user_greeting}Consulta del usuario: {question}"
 
+        messages = [{"role": "system", "content": system_prompt}]
+        if chat_history:
+            # Mantener los últimos 6 mensajes del historial (3 turnos)
+            messages.extend(chat_history[-6:])
+        messages.append({"role": "user", "content": user_prompt})
+
         # 3. Llamada asíncrona a Ollama API
         payload = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
+            "messages": messages,
             "stream": False,
             "options": {
                 "temperature": 0.1
@@ -324,13 +338,14 @@ class RAGService:
         self,
         pregunta: str,
         user_name: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, str]]] = None,
         es_diagnostico: bool = False
     ) -> Dict[str, Any]:
         """
-        Consulta al motor RAG de UniMon.
+        Consulta al motor RAG de UniMon con soporte para historial de conversación.
         Pasa la consulta del usuario directamente al LLM bajo el System Prompt institucional con guardrails y tolerancia ortográfica.
         """
-        return await self.query_rag(question=pregunta, user_name=user_name)
+        return await self.query_rag(question=pregunta, user_name=user_name, chat_history=chat_history)
 
 
 # Instancia por defecto para importaciones limpias
