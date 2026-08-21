@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     llm_model: str = "llama3.1:8b"
     ollama_timeout: float = 45.0
 
+    # Configuración de Vision-LLM (Ingesta Multimodal)
+    vision_model: str = "llama3.2-vision:11b"
+    vision_timeout: float = 120.0
+    vision_max_image_size: int = 1024
+    vision_min_image_kb: int = 15
+
     # Configuración de ChromaDB y Embeddings
     chroma_db_dir: str = "./chroma_db"
     docs_dir: str = "./data/docs"

@@ -8,7 +8,12 @@ langchain>=0.2.0
 langchain-community>=0.2.0
 langchain-chroma>=0.1.0
 langchain-huggingface>=0.0.1
+langchain-text-splitters
 chromadb>=0.5.0
 sentence-transformers>=2.6.0
 pypdf>=4.0.0
 python-multipart>=0.0.9
+python-pptx>=0.6.21
+pymupdf>=1.23.0
+Pillow>=10.0.0
+tqdm>=4.66.0
