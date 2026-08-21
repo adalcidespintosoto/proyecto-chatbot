@@ -149,7 +149,7 @@ Maneja la lógica de control del asistente utilizando una máquina de estados fi
       category_name: Optional[str] = "Soporte Técnico y Gestión de TI Unisimon"
   ```
 - **Buffer de Memoria Conversacional (`session_history`):**
-  Mantiene en memoria los últimos mensajes (`role: user` y `role: assistant`) por sesión. Al interactuar con el modelo LLM, el historial completo se inyecta en la carga útil de Ollama para mantener coherencia semántica en respuestas de continuación (*"sí"*, *"por favor"*, *"explícame"*).
+  Mantiene en memoria los últimos mensajes (`role: user` y `role: assistant`) por sesión. Al interactuar con el modelo LLM, el historial completo se inyecta en la carga útil de Ollama para man tener coherencia semántica en respuestas de continuación (*"sí"*, *"por favor"*, *"explícame"*).
 - **Extracción Heurística:**
   - `extract_email()`: Regex RFC-5322 para captura de correos institucionales.
   - `extract_name()`: Extractor contextual de nombres propios eliminando correos y palabras de parada.
