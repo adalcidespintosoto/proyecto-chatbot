@@ -39,6 +39,7 @@ class TicketSession(BaseModel):
     session_id: str
     estado: EstadoTicket = EstadoTicket.IDLE
     categoria: CategoriaSolicitud = CategoriaSolicitud.HARDWARE
+    intentos_diagnostico: int = 0  # Control de la Regla de 1 Descarte (Fail-Fast)
     falla: Optional[str] = None
     nombre: Optional[str] = None
     correo: Optional[str] = None
@@ -67,9 +68,16 @@ SOLVED_PATTERNS = [
     r"\b(gracias|grasias|gracia|ya funcion[oó]|ya funsion[oó]|listo|se solucion[oó]|se solusion[oó]|qued[oó] bien|sirvi[oó]|cirvi[oó]|excelente|perfecto|resuelto|ya qued[oó]|muchas gracias|se arregl[oó]|ya sirve|ya prendi[oó]|ya conect[oó]|ya dio video)\b"
 ]
 
-# Respuestas negativas que indican que el problema persiste o solicitan ticket
+# Solicitud directa y explícita de técnico / radicación humana (aplica en IDLE y DIAGNOSTICO)
+DIRECT_TECH_PATTERNS = [
+    r"\b(crear ticket|abrir ticket|radicar( caso)?|necesito (a alguien|un t[eé]cnico|ayuda presencial|soporte presencial)|que (lo|la|los|las|el equipo) revisen|que venga un t[eé]cnico|que venga alguien|manda(r)? un t[eé]cnico|manda(r)? a alguien|alguien para que (lo|la) arregle|visita t[eé]cnica|t[eé]cnico presencial|soporte presencial|revisi[oó]n t[eé]cnica)\b"
+]
+
+# Respuestas en medio de diagnóstico que indican que la solución previa no funcionó o persiste la falla
 PERSIST_PATTERNS = [
-    r"\b(no sirvi[oó]|no sirbi[oó]|no cirvi[oó]|sigue igual|sige igual|no da|crear ticket|abrir ticket|radicar|no funcion[oó]|no funsion[oó]|sigue fallando|sige fallando|persiste|continua|contin[uú]a|sigue el problema|no se solucion[oó]|no se solusion[oó]|no se arregl[oó]|no|nada|tampoco|no prende|sigue ca[ií]do|ayuda|escalar)\b"
+    r"\b(no sirvi[oó]|no sirbi[oó]|no cirvi[oó]|sigue igual|sige igual|no funcion[oó]|no funsion[oó]|sigue fallando|sige fallando|sigue bloquead[oa]|sigue el error|sigue sin funcionar|sigue sin servir|persiste|continua|contin[uú]a|sigue el problema|no se solucion[oó]|no se solusion[oó]|no se arregl[oó]|tampoco funcion[oó]|escalar)\b",
+    r"\b(no me deja (entrar|ingresar|acceder|iniciar)|no pude (entrar|ingresar|acceder|iniciar)|no me funciona|no puedo solucionarlo|no pude solucionarlo)\b",
+    r"^(no|nada|tampoco|sigue ca[ií]do)$"
 ]
 
 # Expresiones afirmativas y de continuación ("sí", "claro", "dale", "ok", "por favor", "muéstramelos")
@@ -161,15 +169,21 @@ class RouterLogic:
     def is_solved_confirmation(cls, text: str) -> bool:
         """Detecta si el usuario indica que la sugerencia resolvió el problema."""
         msg_clean = text.strip().lower()
-        if any(neg in msg_clean for neg in ["no funcion", "no sirv", "no se", "sigue"]):
+        if any(neg in msg_clean for neg in ["no funcion", "no sirv", "no se", "sigue", "no me deja"]):
             return False
         return any(re.search(pat, msg_clean) for pat in SOLVED_PATTERNS)
 
     @classmethod
-    def is_persisting_or_ticket_request(cls, text: str) -> bool:
-        """Detecta si el usuario indica que la falla continúa o pide ticket."""
+    def is_direct_tech_request(cls, text: str) -> bool:
+        """Detecta si el usuario pide explícitamente un técnico, visita o radicación directa."""
         msg_clean = text.strip().lower()
-        return any(re.search(pat, msg_clean) for pat in PERSIST_PATTERNS)
+        return any(re.search(pat, msg_clean) for pat in DIRECT_TECH_PATTERNS)
+
+    @classmethod
+    def is_persisting_or_ticket_request(cls, text: str) -> bool:
+        """Detecta si el usuario indica que la falla continúa tras el diagnóstico o pide técnico/ticket."""
+        msg_clean = text.strip().lower()
+        return any(re.search(pat, msg_clean) for pat in PERSIST_PATTERNS) or cls.is_direct_tech_request(text)
 
     @classmethod
     def is_continuation_affirmation(cls, text: str) -> bool:
@@ -264,8 +278,8 @@ class RouterLogic:
                 f"<i>Caso escalado y radicado tras descarte de Nivel 1 en UniMon Chatbot.</i>"
             )
             confirmacion_msg = (
-                f"¡Tu caso de soporte de software/cuentas ha sido radicado exitosamente en GLPI con el número **#{'{ticket_id}'}**! "
-                f"Un técnico de soporte revisará tu solicitud y te contactará a través de **{correo_sol}**."
+                f"✅ Se ha radicado exitosamente tu solicitud de soporte técnico con el radicado **#{'{ticket_id}'}**. "
+                f"Un técnico de la Dirección de TI revisará tu caso y se pondrá en contacto a través de tu correo institucional (**{correo_sol}**)."
             )
         else:
             ubicacion_sol = session.ubicacion or "Sede Unisimon"
@@ -282,8 +296,8 @@ class RouterLogic:
                 f"<i>Caso escalado y radicado tras descarte de Nivel 1 en UniMon Chatbot.</i>"
             )
             confirmacion_msg = (
-                f"¡Tu caso ha sido radicado exitosamente en GLPI con el número **#{'{ticket_id}'}**! "
-                f"Un técnico de soporte revisará tu requerimiento en **{ubicacion_sol}** y te contactará a través de **{correo_sol}**."
+                f"✅ Se ha radicado exitosamente tu solicitud de soporte técnico con el radicado **#{'{ticket_id}'}**. "
+                f"Un técnico de la Dirección de TI revisará tu caso en **{ubicacion_sol}** y se pondrá en contacto a través de tu correo institucional (**{correo_sol}**)."
             )
 
         try:
@@ -425,6 +439,9 @@ class RouterLogic:
         # -------------------------------------------------------------
         # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
         # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
+        # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.DIAGNOSTICO:
             # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
             if cls.is_greeting(texto):
@@ -459,25 +476,9 @@ class RouterLogic:
                     "source": "UniMon_Nivel1_Resolved"
                 }
 
-            # Caso C: El problema persiste o el usuario pide ticket
-            elif cls.is_persisting_or_ticket_request(texto):
-                session.estado = EstadoTicket.PIDIENDO_NOMBRE
-                prompt_msg = (
-                    "Lamento que el problema continúe. Para radicar tu solicitud ante la mesa de ayuda de soporte técnico, por favor indícame tu **nombre completo**:"
-                    if session.categoria == CategoriaSolicitud.SOFTWARE else
-                    "Lamento que el problema continúe. Para radicar tu ticket ante la mesa de ayuda de soporte técnico, por favor indícame tu **nombre completo**:"
-                )
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", prompt_msg)
-                return {
-                    "tipo": "RADICANDO_TICKET",
-                    "mensaje": prompt_msg,
-                    "ticket_id": None,
-                    "source": "UniMon_SlotFilling"
-                }
-
-            # Caso D: Afirmación corta o confirmación de continuar ("sí", "claro", "dale", "ok", "por favor", "muéstramelos")
-            elif cls.is_continuation_affirmation(texto):
+            # Caso C: Afirmación corta o confirmación de continuar ("sí", "claro", "dale", "ok", "por favor", "muéstramelos")
+            elif cls.is_continuation_affirmation(texto) and session.intentos_diagnostico <= 1:
+                session.intentos_diagnostico += 1
                 history = cls.get_history(session_id)
                 last_assistant_msg = ""
                 for m in reversed(history):
@@ -508,7 +509,8 @@ class RouterLogic:
                     "source": rag_res.get("source", "ollama_rag")
                 }
 
-            # Caso E: El usuario envía más información, otra duda o tema
+            # Caso D: Regla de 1 Descarte (Fail-Fast)
+            # Si el usuario indica que persiste, pide técnico, o envía cualquier duda tras el descarte inicial -> Radicación inmediata
             else:
                 history = cls.get_history(session_id)
                 rag_res = await rag_service.consultar(
@@ -531,20 +533,18 @@ class RouterLogic:
                         "source": rag_res.get("source", "ollama_rag")
                     }
 
-                session.falla = f"{session.falla or ''} | {texto}".strip(" |")
-                cat, cat_name = cls.detect_category(session.falla)
-                session.categoria = cat
-                session.category_name = cat_name
-
+                # Radicación directa sin bucles repetitivos
+                session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                prompt_msg = (
+                    "Con gusto puedo ayudarte a radicar el caso con el equipo de soporte técnico. Para iniciar, por favor indícame tu **nombre completo**:"
+                )
                 cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", resp_text)
-
+                cls.add_history(session_id, "assistant", prompt_msg)
                 return {
-                    "tipo": "DIAGNOSTICO",
-                    "mensaje": resp_text,
+                    "tipo": "RADICANDO_TICKET",
+                    "mensaje": prompt_msg,
                     "ticket_id": None,
-                    "sources": rag_res.get("sources"),
-                    "source": rag_res.get("source", "ollama_rag")
+                    "source": "UniMon_SlotFilling"
                 }
 
         # -------------------------------------------------------------
@@ -567,7 +567,27 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # 2. Consultar RAG con historial conversacional
+            # 2. Solicitud directa de técnico / radicación en mensaje inicial
+            if cls.is_direct_tech_request(texto):
+                session.falla = texto
+                cat, cat_name = cls.detect_category(texto)
+                session.categoria = cat
+                session.category_name = cat_name
+                session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
+                session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                prompt_msg = (
+                    "Con gusto puedo ayudarte a radicar el caso con el equipo de soporte técnico. Para iniciar, por favor indícame tu **nombre completo**:"
+                )
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", prompt_msg)
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "mensaje": prompt_msg,
+                    "ticket_id": None,
+                    "source": "UniMon_SlotFilling"
+                }
+
+            # 3. Consultar RAG con historial conversacional
             history = cls.get_history(session_id)
             rag_res = await rag_service.consultar(
                 pregunta=texto,
@@ -576,7 +596,7 @@ class RouterLogic:
             )
             resp_text = rag_res.get("response", "")
 
-            # 3. Guardrail Fuera de Dominio (Out-of-Domain)
+            # 4. Guardrail Fuera de Dominio (Out-of-Domain)
             if is_out_of_domain_response(resp_text):
                 cls.reset_session(session_id)
                 cls.add_history(session_id, "user", texto)
@@ -589,12 +609,13 @@ class RouterLogic:
                     "source": rag_res.get("source", "ollama_rag")
                 }
 
-            # 4. Caso dentro de dominio: Iniciar Diagnóstico de Nivel 1
+            # 5. Caso dentro de dominio: Iniciar Diagnóstico de Nivel 1 (1 intento)
             session.falla = texto
             cat, cat_name = cls.detect_category(texto)
             session.categoria = cat
             session.category_name = cat_name
             session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
+            session.intentos_diagnostico = 1
             session.estado = EstadoTicket.DIAGNOSTICO
 
             cls.add_history(session_id, "user", texto)
