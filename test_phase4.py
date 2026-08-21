@@ -203,8 +203,51 @@ async def run_tests():
         print(f"Mensaje Bot:\n{d_sw_typo.get('mensaje')}\n")
         assert d_sw_typo.get("tipo") == "DIAGNOSTICO"
 
+        # -------------------------------------------------------------
+        # TEST 9: CONTINUIDAD CONVERSACIONAL CON RESPUESTAS CORTAS ('si', 'dale', 'por favor')
+        # -------------------------------------------------------------
         print("=" * 70)
-        print("¡TODAS LAS PRUEBAS (SALUDO, SOLUCIÓN, HARDWARE, SOFTWARE, OUT-OF-DOMAIN Y TYPOS) COMPLETADAS CON ÉXITO!")
+        print("TEST 9: CONTINUIDAD CONVERSACIONAL (Pregunta -> 'si' -> Pasos detallados)")
+        print("=" * 70)
+        sess9 = "test_sess_continuity"
+        # Turno 1: Usuario consulta
+        res_t1 = await client.post("/api/chat", json={"session_id": sess9, "mensaje": "no puedo entrar a katuc se me olvido la clabe"})
+        d_t1 = res_t1.json()
+        print(f"[Turno 1] Tipo: {d_t1.get('tipo')}")
+        print(f"[Turno 1] Mensaje Bot:\n{d_t1.get('mensaje')}\n")
+        assert d_t1.get("tipo") == "DIAGNOSTICO"
+
+        # Turno 2: Usuario responde únicamente 'si'
+        res_t2 = await client.post("/api/chat", json={"session_id": sess9, "mensaje": "si"})
+        d_t2 = res_t2.json()
+        print(f"[Turno 2] Tipo: {d_t2.get('tipo')}")
+        print(f"[Turno 2] Mensaje Bot:\n{d_t2.get('mensaje')}\n")
+        assert d_t2.get("tipo") == "DIAGNOSTICO"
+        msg_t2 = d_t2.get("mensaje", "").lower()
+        # Verificar que NO sea un rechazo ni respuesta vacía y mantenga la solución de contraseña/kactus
+        assert len(msg_t2) > 30
+        assert "contraseña" in msg_t2 or "contrasena" in msg_t2 or "kactus" in msg_t2 or "clave" in msg_t2 or "pasos" in msg_t2 or "portal" in msg_t2
+
+        # -------------------------------------------------------------
+        # TEST 10: CANALES OFICIALES DE SOPORTE (GLPI vs Compras/Activos Fijos)
+        # -------------------------------------------------------------
+        print("=" * 70)
+        print("TEST 10: CANALES OFICIALES DE SOPORTE (GLPI / solicitudcomputo)")
+        print("=" * 70)
+        sess10 = "test_sess_channels"
+        res_chan = await client.post("/api/chat", json={"session_id": sess10, "mensaje": "¿Dónde debo reportar si un computador de mi oficina se dañó?"})
+        d_chan = res_chan.json()
+        print(f"Status: {res_chan.status_code}")
+        print(f"Tipo: {d_chan.get('tipo')}")
+        print(f"Mensaje Bot:\n{d_chan.get('mensaje')}\n")
+        assert d_chan.get("tipo") == "DIAGNOSTICO"
+        msg_chan = d_chan.get("mensaje", "").lower()
+        assert "glpi" in msg_chan or "solicitudcomputo" in msg_chan or "8003" in msg_chan or "helpdesk" in msg_chan
+        assert "compras" not in msg_chan
+        assert "activos fijos" not in msg_chan
+
+        print("=" * 70)
+        print("¡TODAS LAS PRUEBAS (SALUDO, SOLUCIÓN, HARDWARE, SOFTWARE, OUT-OF-DOMAIN, TYPOS, CONTINUIDAD Y CANALES) COMPLETADAS CON ÉXITO!")
         print("=" * 70)
 
 
