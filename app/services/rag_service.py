@@ -16,27 +16,73 @@ from app.config import get_settings
 
 logger = logging.getLogger("unimon.rag_service")
 
-# Prompt del sistema institucional empático y profesional
-STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia).
-Tu objetivo es resolver inquietudes de estudiantes, docentes y funcionarios con calidez, claridad y empatía, basándote en los procedimientos institucionales suministrados en el contexto (mantenimiento de cómputo P-GT-01, protección antimalware P-GT-07, aseguramiento de redes P-GT-08, backups P-GT-10, incidencias ERP Kactus/Seven P-GT-11 y gestión tecnológica P-GT-13).
+# Prompt del sistema institucional empático y profesional con guardrails estrictos y tolerancia ortográfica
+STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, Asistente Oficial de Soporte TI de la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia).
 
-Pautas y Reglas de Respuesta:
-1. Tono de comunicación: Empático, servicial, conciso y profesional en español.
-2. Canales oficiales de soporte en Unisimon Colombia:
+INSTRUCCIONES CLAVE DE ATENCIÓN:
+
+1. DOMINIO DE TI Y SOPORTE NIVEL 1 (CONSULTAS DENTRO DE DOMINIO):
+   - Atiendes problemas y dudas técnicas de:
+     * Equipos físicos y hardware (computadores, portátiles, monitores, pantallas, proyectores/video beam, mouse, teclado, impresoras, cables de video/poder).
+     * Conectividad y redes (cableada, wifi institucional, internet).
+     * Software, cuentas y plataformas (ERP Kactus, Seven, Teams, Office 365, Moodle, correo institucional, restablecimiento de contraseñas y cuentas).
+     * Procedimientos institucionales de TI (P-GT-01, P-GT-07, P-GT-08, P-GT-10, P-GT-11, P-GT-13).
+   - Para estas consultas de TI:
+     * Brinda de 2 a 3 pasos breves, claros y prácticos de solución o descarte inicial.
+     * Al finalizar, pregunta amablemente si alguno de estos pasos le sirvió o si el inconveniente continúa.
+
+2. TOLERANCIA ORTOGRÁFICA:
+   - Interpreta con flexibilidad cualquier error ortográfico o tipeo informal (ej: "proyestor" -> proyector, "pantaya" -> pantalla, "katuc" -> Kactus, "clabe" -> clave, "no prende", "interner" -> internet, etc.). Siempre brinda soporte a la intención técnica.
+
+3. GUARDRAIL FUERA DE DOMINIO (CONSULTAS AJENAS A TI):
+   - Si el usuario pregunta por temas completamente ajenos a tecnología y a la Universidad Simón Bolívar (ej: preguntas de cultura general como "¿cuál es la capital de Hungría?", geografía, historia, recetas de cocina, tareas de colegio no de TI, deportes, entretenimiento):
+     * Responde de forma directa, educada y asertiva:
+       "Soy un asistente enfocado exclusivamente en soporte técnico, gestión de TI y procedimientos institucionales de la Universidad Simón Bolívar. ¿En qué tema tecnológico o institucional de la universidad te puedo colaborar hoy?"
+     * PROHIBICIÓN ESTRICTA: NO proporciones pasos de descarte de hardware ni menciones GLPI si la pregunta no es de soporte técnico o TI.
+
+4. CANALES OFICIALES DE SOPORTE EN UNISIMON COLOMBIA:
    - Sede Barranquilla: solicitudcomputo@unisimon.edu.co | WhatsApp: 3172683922 | Teléfono: 3444333 Ext. 8003 y 8004.
    - Sede Cúcuta: helpdesk@unisimon.edu.co | Teléfono: 5827070 Ext. 129.
-3. Tratamiento de ambigüedad o falta de información en el contexto:
-   - Evita frases excesivamente negativas o defensivas como "Lo siento, no tengo información".
-   - Si la consulta es muy ambigua o general, orienta amablemente al usuario:
-     "Para brindarte la información exacta según las guías técnicas de la Universidad Simón Bolívar, ¿podrías especificar si tu consulta es sobre mantenimiento de equipos, asignación de cuentas, backups o reporte de incidentes?"
-   - Si se trata de un trámite no documentado, invítalo cordialmente a contactar a los canales oficiales o solicitar la radicación de un ticket en GLPI.
-4. Identidad estricta: No hagas referencia a entidades o sedes externas ajenas a la Universidad Simón Bolívar de Colombia.
 
 ============================================================
 CONTEXTO INSTITUCIONAL RECUPERADO:
 {context}
 ============================================================
 """
+
+
+def is_out_of_domain_response(response_text: str) -> bool:
+    """
+    Detecta si la respuesta generada corresponde a un rechazo fuera de dominio (Guardrail institucional).
+    """
+    text_lower = response_text.lower()
+
+    # Si contiene pasos de descarte técnico o solución guiada, está dentro de dominio
+    if any(m in text_lower for m in ["paso 1", "paso 2", "1.", "2.", "restablecer", "restablece", "proyector", "kactus", "descarte"]):
+        # A menos que sea explícitamente un rechazo
+        if "exclusivamente en soporte" not in text_lower and "no puedo proporcionar" not in text_lower and "cultura general" not in text_lower:
+            return False
+
+    guardrail_markers = [
+        "exclusivamente en soporte",
+        "tema tecnológico o institucional",
+        "no se relaciona con",
+        "no está relacionada con",
+        "no esta relacionada con",
+        "fuera de mi dominio",
+        "fuera de nuestro dominio",
+        "no puedo proporcionar recetas",
+        "no puedo proporcionar información sobre",
+        "no puedo proporcionar informacion sobre",
+        "cultura general",
+        "geografía",
+        "geografia",
+        "capital de hungría",
+        "capital de hungria",
+        "asistente enfocado exclusivamente"
+    ]
+    return any(marker in text_lower for marker in guardrail_markers)
+
 
 
 
@@ -169,7 +215,7 @@ class RAGService:
             ],
             "stream": False,
             "options": {
-                "temperature": 0.2
+                "temperature": 0.1
             }
         }
 
@@ -207,6 +253,7 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Generador de respuesta institucional de contingencia cuando Ollama no está disponible.
+        Aplica guardrails institucionales para no forzar pasos de hardware a temas no relacionados.
         """
         saludo = f"¡Hola {user_name}!" if user_name else "¡Hola!"
         msg_lower = user_message.lower()
@@ -229,26 +276,40 @@ class RAGService:
                 "• La Universidad realiza copias de seguridad periódicas y programadas de los sistemas y bases de datos institucionales.\n"
                 "• Para solicitudes de restauración de información o requerimientos de respaldo específico, comunícate con el área de TI o radica un ticket de servicio."
             )
-        elif any(w in msg_lower for w in ["kactus", "seven", "erp", "nómina", "nomina"]):
+        elif any(w in msg_lower for w in [
+            "kactus", "katuc", "kaktu", "seven", "seben", "erp", "nómina", "nomina",
+            "contraseña", "contrasena", "clave", "clabe", "bloqueo", "desbloquear", "login"
+        ]):
             contenido = (
                 f"{saludo} Para soporte en los sistemas institucionales **Kactus / Seven** (Procedimiento **P-GT-11** y **P-GT-12**):\n\n"
                 "• Las incidencias y requerimientos deben ser radicados indicando el módulo afectado, captura de pantalla del error y usuario solicitante.\n"
-                "• El equipo de soporte de aplicaciones gestionará el requerimiento conforme a los acuerdos de nivel de servicio (SLA)."
+                "• El equipo de soporte de aplicaciones gestionará el requerimiento conforme a los acuerdos de nivel de servicio (SLA).\n\n"
+                "¿Deseas ayuda con los pasos de recuperación de clave o requieres radicar un ticket?"
             )
-        elif any(w in msg_lower for w in ["virus", "malware", "antivirus", "amenaza"]):
+        elif any(w in msg_lower for w in ["virus", "malware", "antivirus", "amenaza", "infectado"]):
             contenido = (
                 f"{saludo} Según el procedimiento **P-GT-07** (*Protección de Código Malicioso*):\n\n"
                 "• Todo equipo institucional debe contar con la solución de protección antimalware corporativa activa y actualizada.\n"
                 "• Ante sospecha de infección, desconecta el equipo de la red y notifica inmediatamente a Soporte TI."
             )
-        else:
+        elif any(w in msg_lower for w in [
+            "computador", "conputador", "portatil", "portátil", "pantalla", "pantaya",
+            "monitor", "proyector", "proyestor", "mouse", "mause", "teclado", "cable",
+            "hdmi", "red", "wifi", "internet", "interner", "no prende", "parpadea", "falla"
+        ]):
             contenido = (
                 f"{saludo} Soy UniMon, tu asistente de Soporte Técnico de Nivel 1 de la Universidad Simón Bolívar.\n\n"
-                "Para ayudarte con este inconveniente, te sugiero realizar estos pasos iniciales de descarte:\n"
+                "Para ayudarte con este inconveniente técnico, te sugiero realizar estos pasos iniciales de descarte:\n"
                 "1. Verifica que los cables de poder, red o video estén firmemente conectados.\n"
                 "2. Reinicia el equipo o dispositivo y verifica si el comportamiento persiste.\n"
-                "3. Si el inconveniente es en un aplicativo institucional (Kactus/Seven o correo), cierra sesión y vuelve a ingresar.\n\n"
+                "3. Si el inconveniente es en un aplicativo institucional, cierra sesión y vuelve a ingresar.\n\n"
                 "¿Alguno de estos pasos te funcionó o el problema continúa?"
+            )
+        else:
+            # Guardrail institucional para consultas fuera de dominio
+            contenido = (
+                "Soy un asistente enfocado exclusivamente en soporte técnico, gestión de TI y procedimientos institucionales de la Universidad Simón Bolívar. "
+                "¿En qué tema tecnológico o institucional de la universidad te puedo colaborar hoy?"
             )
 
         return {
@@ -263,23 +324,13 @@ class RAGService:
         self,
         pregunta: str,
         user_name: Optional[str] = None,
-        es_diagnostico: bool = True
+        es_diagnostico: bool = False
     ) -> Dict[str, Any]:
         """
         Consulta al motor RAG de UniMon.
-        Si es_diagnostico=True, instruye a Llama 3.1 para actuar como técnico de Nivel 1:
-        proporciona de 2 a 3 pasos breves de descarte/solución y pregunta si funcionó o persiste.
+        Pasa la consulta del usuario directamente al LLM bajo el System Prompt institucional con guardrails y tolerancia ortográfica.
         """
-        if es_diagnostico:
-            instruccion_nivel1 = (
-                f"{pregunta}\n\n"
-                "[INSTRUCCIÓN DE SOPORTE NIVEL 1: Actúa como técnico de soporte TI de Nivel 1 de la Universidad Simón Bolívar. "
-                "Proporciona de 2 a 3 pasos breves y prácticos de descarte o solución rápida según los procedimientos del contexto. "
-                "Al finalizar tu respuesta, pregunta amablemente al usuario si alguno de estos pasos le funcionó o si el problema persiste.]"
-            )
-            return await self.query_rag(question=instruccion_nivel1, user_name=user_name)
-        else:
-            return await self.query_rag(question=pregunta, user_name=user_name)
+        return await self.query_rag(question=pregunta, user_name=user_name)
 
 
 # Instancia por defecto para importaciones limpias
