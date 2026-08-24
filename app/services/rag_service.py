@@ -1,7 +1,8 @@
 """
 Servicio RAG Local con ChromaDB, Embeddings Multilingües y Ollama (Llama 3.1:8B).
-Provee respuestas estrictas de soporte técnico para la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia)
-basadas en documentos y procedimientos institucionales indexados.
+Provee respuestas conversacionales de soporte técnico y gestión de TI para la Universidad Simón Bolívar
+(Sedes Barranquilla y Cúcuta, Colombia) basadas en documentos y procedimientos institucionales indexados
+con filtrado por umbral de relevancia (relevance_score >= 0.68).
 """
 
 import logging
@@ -16,47 +17,24 @@ from app.config import get_settings
 
 logger = logging.getLogger("unimon.rag_service")
 
-# Prompt del sistema institucional empático y profesional con guardrails estrictos y tolerancia ortográfica
-STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, Asistente Oficial de Soporte TI de la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia).
+# Umbral mínimo de similitud para considerar relevante un fragmento recuperado
+MIN_RELEVANCE_SCORE_THRESHOLD = 0.68
 
-INSTRUCCIONES CLAVE DE ATENCIÓN:
+# Prompt del sistema institucional estándar restaurado
+STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta).
+Tu función es asistir y guiar a la comunidad universitaria (estudiantes, docentes, administrativos) respondiendo dudas sobre procedimientos institucionales, plataformas (Seven, Kactus, Portal de Bienestar, Aula Extendida, Correo Institucional, carnetización/App Unisimon) y trámites de TI utilizando los documentos provistos.
 
-1. DOMINIO DE TI Y SOPORTE NIVEL 1 (CONSULTAS DENTRO DE DOMINIO):
-   - Atiendes TODOS los problemas y dudas técnicas de hardware, redes y software de la universidad (en cualquier sede, oficina, salón o laboratorio):
-     * Equipos físicos y hardware (computadores, portátiles, monitores, pantallas, proyectores/video beam, mouse, teclado, impresoras, cables de video/poder).
-     * Conectividad y redes (cableada, wifi institucional, internet).
-     * Software, cuentas y plataformas (ERP Kactus, Seven, Teams, Office 365, Moodle, correo institucional, restablecimiento de contraseñas y cuentas).
-     * Procedimientos institucionales de TI (P-GT-01, P-GT-07, P-GT-08, P-GT-10, P-GT-11, P-GT-13).
-   - Para estas consultas de TI:
-     * Brinda de 2 a 3 pasos breves, claros y prácticos de solución o descarte inicial.
-     * Al finalizar, pregunta amablemente si alguno de estos pasos le sirvió o si el inconveniente continúa.
-   - REGLA: Toda consulta sobre fallas de equipos, pantallas, proyecciones o software en la universidad ESTÁ DENTRO DE TU DOMINIO. Nunca la rechaces.
+Instrucciones:
+1. Responde de manera clara, amable, profesional y orientada a la solución, utilizando el contexto de los documentos institucionales.
+2. Si el usuario reporta un problema, guía paso a paso con los procedimientos institucionales correspondientes.
+3. Si el procedimiento requiere validación de una dependencia, indica los pasos o canales de atención pertinentes (solicitudcomputo@unisimon.edu.co / helpdesk@unisimon.edu.co).
+4. No menciones términos inventados como 'Canal 1' o 'Canal 2'.
 
-2. TOLERANCIA ORTOGRÁFICA:
-   - Interpreta con flexibilidad cualquier error ortográfico o tipeo informal (ej: "proyestor" -> proyector, "pantaya" -> pantalla, "katuc" -> Kactus, "clabe" -> clave, "no prende", "interner" -> internet, etc.). Siempre brinda soporte a la intención técnica.
-
-3. CONTINUIDAD CONVERSACIONAL Y RESPUESTAS CORTAS ("SÍ", "CLARO", "DALE", "OK", "POR FAVOR"):
-   - Si el usuario responde afirmativamente a una pregunta de seguimiento previa (ej: "¿Deseas que te explique los pasos?" -> "sí", "dale", "ok", "claro", "por favor"), continúa la conversación explicando los pasos solicitados de manera clara y directa sin rechazar la consulta.
-
-4. CANALES OFICIALES DE SOPORTE Y ESCALAMIENTO:
-   - Canal 1 (Directo por este Chatbot): Tú mismo como asistente UniMon puedes tomar los datos del usuario y radicar su caso directamente ante el equipo técnico de TI.
-   - Canal 2 (Mesa de Ayuda por Correo y Teléfono):
-     * Sede Barranquilla: solicitudcomputo@unisimon.edu.co | PBX: 3444333 Ext. 8003 y 8004.
-     * Sede Cúcuta: helpdesk@unisimon.edu.co | PBX: 5827070 Ext. 129.
-   - PROHIBICIÓN ABSOLUTA: NUNCA menciones la palabra "GLPI", ni direcciones URL a GLPI (https://glpi.unisimon.edu.co), ni des instructivos de "crear tickets en GLPI". GLPI es una herramienta interna exclusiva del personal de TI; los usuarios no tienen acceso a ella. Si el usuario requiere soporte presencial o técnico humano, indícale que tú mismo puedes radicar la solicitud por aquí o que puede escribir a solicitudcomputo@unisimon.edu.co.
-   - PROHIBICIÓN ESTRICTA: NO indicar a los usuarios finales que reporten fallas técnicas a Compras, Activos Fijos o Almacén. Todo caso se radica por este chatbot o por los correos oficiales de soporte TI.
-
-5. GUARDRAIL FUERA DE DOMINIO (CONSULTAS AJENAS A TI):
-   - Si el usuario pregunta por temas completamente ajenos a tecnología y a la Universidad Simón Bolívar (ej: preguntas de cultura general como "¿cuál es la capital de Hungría?", geografía, recetas de cocina, deportes, tareas no de TI):
-     * Responde de forma directa, educada y asertiva:
-       "Soy un asistente enfocado exclusivamente en soporte técnico, gestión de TI y procedimientos institucionales de la Universidad Simón Bolívar. ¿En qué tema tecnológico o institucional de la universidad te puedo colaborar hoy?"
-     * PROHIBICIÓN ESTRICTA: NO proporciones pasos de descarte de hardware ni ofrezcas radicación si la pregunta no es de soporte técnico o TI.
-
-============================================================
-CONTEXTO INSTITUCIONAL RECUPERADO:
+Contexto documental:
 {context}
-============================================================
-"""
+
+Pregunta del usuario: {query}
+Respuesta:"""
 
 
 def is_out_of_domain_response(response_text: str) -> bool:
@@ -97,8 +75,6 @@ def is_out_of_domain_response(response_text: str) -> bool:
     return any(marker in text_lower for marker in guardrail_markers)
 
 
-
-
 class RAGService:
     """
     Servicio RAG local para recuperación de contexto con ChromaDB y generación con Ollama.
@@ -109,7 +85,8 @@ class RAGService:
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         chroma_db_dir: Optional[str] = None,
-        embedding_model: Optional[str] = None
+        embedding_model: Optional[str] = None,
+        min_relevance_score: float = MIN_RELEVANCE_SCORE_THRESHOLD
     ):
         settings = get_settings()
         self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
@@ -117,6 +94,7 @@ class RAGService:
         self.timeout = settings.ollama_timeout
         self.chroma_db_dir = Path(chroma_db_dir or settings.chroma_db_dir)
         self.embedding_model_name = embedding_model or settings.embedding_model
+        self.min_relevance_score = min_relevance_score
 
         self._embeddings = None
         self._vector_store = None
@@ -164,36 +142,24 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Ejecuta el pipeline RAG completo:
-        1. Búsqueda por similitud en ChromaDB (k=4) usando intfloat/multilingual-e5-base.
-        2. Extracción de fragmentos y nombres de fuentes.
-        3. Ensamblaje del System Prompt institucional estricto e historial conversacional.
+        1. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=4, umbral >= 0.68).
+        2. Filtrado estricto por umbral: si ningún fragmento supera 0.68, usa la información institucional base.
+        3. Ensamblaje del System Prompt institucional e historial conversacional.
         4. Invocación asíncrona a Ollama (llama3.1:8b).
-
-        Args:
-            question: Pregunta o consulta del usuario.
-            user_name: Nombre opcional del usuario para personalización cordial.
-            chat_history: Lista opcional de turnos previos [{"role": "user"/"assistant", "content": "..."}].
-
-        Returns:
-            Dict con:
-                - 'response': Texto de respuesta generado por el LLM o fallback.
-                - 'sources': Lista de nombres de archivos fuentes recuperados.
-                - 'source': Identificador de la fuente ('ollama_rag' o 'fallback').
-                - 'model': Modelo LLM utilizado.
-                - 'retrieved_chunks': Número de fragmentos recuperados.
         """
         retrieved_docs = []
         sources: List[str] = []
         context_parts = []
 
-        # 1. Búsqueda por similitud en ChromaDB (k=4)
+        # 1. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=4)
         if self.vector_store is not None:
             try:
-                logger.info(f"Buscando fragmentos relevantes en ChromaDB (k=4) para: '{question[:50]}...'")
-                docs = self.vector_store.similarity_search(question, k=4)
-                if docs:
-                    retrieved_docs = docs
-                    for doc in docs:
+                logger.info(f"Buscando fragmentos en ChromaDB (k=4, umbral >= {self.min_relevance_score}) para: '{question[:50]}...'")
+                docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(question, k=4)
+                
+                for doc, score in docs_with_scores:
+                    if score is not None and score >= self.min_relevance_score:
+                        retrieved_docs.append(doc)
                         source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                         source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
                         if source_filename not in sources:
@@ -202,10 +168,13 @@ class RAGService:
                         page_num = doc.metadata.get("page", None)
                         page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
                         context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
+                    else:
+                        score_val = f"{score:.4f}" if score is not None else "None"
+                        logger.info(f"Fragmento descartado por baja similitud ({score_val} < {self.min_relevance_score})")
             except Exception as exc:
                 logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
 
-        # Si no se recuperaron fragmentos de documentos, usar contexto base de procedimientos Unisimon
+        # 2. Si no se recuperaron fragmentos que superen el umbral, usar contexto base institucional y NO incluir fuentes irrelevantes
         if context_parts:
             context_text = "\n\n---\n\n".join(context_parts)
         else:
@@ -218,20 +187,19 @@ class RAGService:
                 "P-GT-08 (Aseguramiento de Redes), P-GT-10 (Backups de Información), P-GT-11 (Incidencias Kactus/Seven), "
                 "P-GT-13 (Gestión de Requerimientos y Soluciones Tecnológicas)."
             )
-            sources = ["Procedimientos Institucionales Unisimon"]
+            sources = []
 
-        # 2. Ensamblar System Prompt estricto, historial y User Prompt
-        system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=context_text)
+        # 3. Ensamblar System Prompt institucional, historial y User Prompt
+        system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=context_text, query=question)
         user_greeting = f"El usuario se llama {user_name}. " if user_name else ""
         user_prompt = f"{user_greeting}Consulta del usuario: {question}"
 
         messages = [{"role": "system", "content": system_prompt}]
         if chat_history:
-            # Mantener los últimos 6 mensajes del historial (3 turnos)
             messages.extend(chat_history[-6:])
         messages.append({"role": "user", "content": user_prompt})
 
-        # 3. Llamada asíncrona a Ollama API
+        # 4. Llamada asíncrona a Ollama API
         payload = {
             "model": self.model,
             "messages": messages,
@@ -275,7 +243,6 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Generador de respuesta institucional de contingencia cuando Ollama no está disponible.
-        Aplica guardrails institucionales para no forzar pasos de hardware a temas no relacionados.
         """
         saludo = f"¡Hola {user_name}!" if user_name else "¡Hola!"
         msg_lower = user_message.lower()
@@ -328,15 +295,14 @@ class RAGService:
                 "¿Alguno de estos pasos te funcionó o el problema continúa?"
             )
         else:
-            # Guardrail institucional para consultas fuera de dominio
             contenido = (
-                "Soy un asistente enfocado exclusivamente en soporte técnico, gestión de TI y procedimientos institucionales de la Universidad Simón Bolívar. "
+                "Soy un asistente enfocado en soporte técnico, gestión de TI y procedimientos institucionales de la Universidad Simón Bolívar. "
                 "¿En qué tema tecnológico o institucional de la universidad te puedo colaborar hoy?"
             )
 
         return {
             "response": contenido,
-            "sources": sources or ["Procedimientos Institucionales Unisimon"],
+            "sources": sources if sources is not None else [],
             "source": "knowledge_base_fallback",
             "model": "rule_based_institutional_unisimon",
             "retrieved_chunks": 0
@@ -351,13 +317,9 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Consulta al motor RAG de UniMon con soporte para historial de conversación.
-        Pasa la consulta del usuario directamente al LLM bajo el System Prompt institucional con guardrails y tolerancia ortográfica.
         """
         return await self.query_rag(question=pregunta, user_name=user_name, chat_history=chat_history)
 
 
 # Instancia por defecto para importaciones limpias
 rag_service = RAGService()
-
-
-
