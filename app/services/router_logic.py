@@ -186,9 +186,14 @@ ADMIN_PERMISSIONS_PATTERNS = [
     r"\b(cambio\s+de\s+permisos|autorizar\s+permisos|asignar\s+permisos|compra\s+de|adquisici[oó]n|inventario|revisi[oó]n\s+f[ií]sica|dar\s+de\s+baja|mantenimiento\s+preventivo\s+f[ií]sico)\b"
 ]
 
-# Expresiones afirmativas y de confirmación de radicación / continuación
+# Expresiones afirmativas y de confirmación de radicación / aceptación
 AFFIRMATIVE_PATTERNS = [
-    r"^(s[ií]|ok|dale|claro|por favor|porfa|adelante|de acuerdo|s[ií] por favor|s[ií] claro|s[ií] dale|rad[ií]calo|radicar|hazlo|procede|ay[uú]dame|por ti|radicarlo|s[ií]\s+ay[uú]dame|bueno)\b"
+    r"^(s[ií]|si por favor|s[ií] por favor|por favor|porfa|por fa|dale|claro|de una|ay[uú]dame|ayudame|rad[ií]calo|radicar|hazlo|haz el reporte|crear ticket|crea el ticket|solicito soporte|que si ayudame|que si ay[uú]dame|ayudame con el reporte|ay[uú]dame con el reporte|radica el caso|radica el ticket|bueno|ok|s[ií] claro|s[ií] dale|s[ií] ay[uú]dame|adelante|de acuerdo|procede)$"
+]
+
+# Patrones de solicitud de reporte y radicación directa
+REPORT_PATTERNS = [
+    r"\b(vamos a reportar|reportar|reportalo|reportarlo|radicar|radica|radicarlo|radicarla|crear ticket|crea ticket|crea el ticket|abrir caso|abre un caso|ayudame a reportar|ay[uú]dame a reportar|haz el reporte|si|sí|por favor|porfa|por fa|dale|de una|ayúdame|ayudame|solicito soporte)\b"
 ]
 
 # Palabras de control/afirmación que NUNCA deben aceptarse como partes de un nombre
@@ -386,12 +391,27 @@ class RouterLogic:
 
     @classmethod
     def is_affirmative(cls, text: str) -> bool:
-        """Detecta si el usuario envía una afirmación corta ('sí', 'claro', 'dale', 'por favor', 'radícalo', 'bueno', 'ayúdame')."""
-        msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ]", "", text.strip().lower())
+        """Detecta si el usuario envía una afirmación ('sí', 'por favor', 'ayúdame', 'radícalo', etc.)."""
+        msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ]", " ", text.strip().lower())
+        msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
         words = msg_clean.split()
-        if len(words) <= 6:
-            return any(re.search(pat, msg_clean) for pat in AFFIRMATIVE_PATTERNS)
+        if len(words) <= 7:
+            for pat in AFFIRMATIVE_PATTERNS:
+                if re.search(pat, msg_clean):
+                    return True
         return False
+
+    @classmethod
+    def is_report_request(cls, text: str) -> bool:
+        """
+        Detecta si el usuario solicita explícitamente reportar, escalar o radicar el caso,
+        o responde afirmativamente para iniciar la radicación.
+        """
+        msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ]", " ", text.strip().lower())
+        msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
+        if cls.is_affirmative(msg_clean) or cls.is_direct_tech_request(msg_clean):
+            return True
+        return any(re.search(pat, msg_clean) for pat in REPORT_PATTERNS)
 
     @classmethod
     def detect_category(cls, text: str) -> Tuple[CategoriaSolicitud, str]:
@@ -714,14 +734,14 @@ class RouterLogic:
         # ESTADO: OFRECIENDO_RADICACION (Canal de Correo + Plantilla entregados)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.OFRECIENDO_RADICACION:
-            # 1. Si el usuario confirma ("sí", "si ayudame", "por favor", "radícalo", "dale", "ayúdame"):
+            # 1. Si el usuario confirma o pide reportar ("sí", "vamos a reportar", "radicar", "por favor", "ayúdame", etc.):
             # NUNCA guardar la afirmación como nombre; transicionar limpiamente a PIDIENDO_NOMBRE.
-            if cls.is_affirmative(texto) or cls.is_direct_tech_request(texto):
+            if cls.is_report_request(texto):
                 session.nombre = None
                 session.correo = None
                 session.descripcion = None
                 session.estado = EstadoTicket.PIDIENDO_NOMBRE
-                prompt_msg = "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:"
+                prompt_msg = "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:"
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", prompt_msg)
                 return {
@@ -788,7 +808,7 @@ class RouterLogic:
                 }
 
         # -------------------------------------------------------------
-        # ESTADO: DIAGNOSTICO (Multi-turno: 2 a 3 intentos)
+        # ESTADO: DIAGNOSTICO (Diagnóstico continuo e ilimitado)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.DIAGNOSTICO:
             # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
@@ -821,8 +841,24 @@ class RouterLogic:
                     "source": "UniMon_SolicitudEquipos"
                 }
 
-            # Caso C: Solicitud explícita de técnico / radicación directa o trámite administrativo durante diagnóstico
-            if cls.is_direct_tech_request(texto) or cls.is_physical_or_admin_request(texto):
+            # Caso C: Solicitud explícita de radicación, reporte o afirmación en diagnóstico -> Iniciar Slot-Filling de inmediato (SIN invocar Ollama ni plantillas intermedias)
+            if cls.is_report_request(texto):
+                session.nombre = None
+                session.correo = None
+                session.descripcion = None
+                session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                prompt_msg = "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:"
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", prompt_msg)
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "mensaje": prompt_msg,
+                    "ticket_id": None,
+                    "source": "UniMon_SlotFilling"
+                }
+
+            # Caso D: Solicitud de trámite administrativo presencial durante diagnóstico
+            if cls.is_physical_or_admin_request(texto):
                 session.estado = EstadoTicket.OFRECIENDO_RADICACION
                 support_msg = cls.build_support_channel_message(session.falla or texto)
                 cls.add_history(session_id, "user", texto)
@@ -834,77 +870,63 @@ class RouterLogic:
                     "source": "UniMon_CanalSoporte"
                 }
 
-            # Caso D: Evaluación de intentos multi-turno (hasta max_intentos_diagnostico = 3)
-            if session.intentos_diagnostico < session.max_intentos_diagnostico:
-                session.intentos_diagnostico += 1
-                history = cls.get_history(session_id)
+            # Caso E: Diagnóstico continuo e ilimitado (sin límite de turnos)
+            session.intentos_diagnostico += 1
+            history = cls.get_history(session_id)
 
-                # Contextualizar la consulta con la falla y el último turno si es afirmación o reporte de persistencia
-                falla_ctx = session.falla or "soporte técnico institucional"
-                if cls.is_affirmative(texto) or cls.is_persisting_or_ticket_request(texto):
-                    query_ctx = f"El usuario indica sobre la falla '{falla_ctx}': '{texto}'. Proporciona el siguiente paso de diagnóstico o alternativa de solución técnica institucional."
-                else:
-                    query_ctx = texto
+            # Contextualizar la consulta con la falla si es reporte de persistencia
+            falla_ctx = session.falla or "soporte técnico institucional"
+            if cls.is_persisting_or_ticket_request(texto):
+                query_ctx = f"El usuario indica sobre la falla '{falla_ctx}': '{texto}'. Proporciona el siguiente paso de diagnóstico o alternativa de solución técnica institucional."
+            else:
+                query_ctx = texto
 
-                rag_res = await rag_service.answer_query(
-                    query=query_ctx,
-                    user_role=session.user_role,
-                    chat_history=history
-                )
-                resp_text = rag_res.get("response", "")
+            rag_res = await rag_service.answer_query(
+                query=query_ctx,
+                user_role=session.user_role,
+                chat_history=history
+            )
+            resp_text = rag_res.get("response", "")
 
-                # Si el RAG confiesa no tener documentación relevante, forzar de inmediato OFRECIENDO_RADICACION
-                if rag_res.get("has_context") is False or \
-                   resp_text == MENSAJE_NO_DOCUMENTADO or \
-                   "No dispongo de un procedimiento documentado" in resp_text or \
-                   "No dispongo de un instructivo" in resp_text:
-                    session.estado = EstadoTicket.OFRECIENDO_RADICACION
-                    cls.add_history(session_id, "user", texto)
-                    cls.add_history(session_id, "assistant", resp_text)
-                    return {
-                        "tipo": "OFRECIENDO_RADICACION",
-                        "mensaje": resp_text,
-                        "ticket_id": None,
-                        "sources": rag_res.get("sources", []),
-                        "source": "UniMon_SinDocumentacion"
-                    }
-
-                # Si el usuario cambió a una pregunta fuera de dominio, liberar sesión
-                if is_out_of_domain_response(resp_text):
-                    cls.reset_session(session_id)
-                    cls.add_history(session_id, "user", texto)
-                    cls.add_history(session_id, "assistant", resp_text)
-                    return {
-                        "tipo": "FUERA_DE_DOMINIO",
-                        "mensaje": resp_text,
-                        "ticket_id": None,
-                        "sources": rag_res.get("sources"),
-                        "source": rag_res.get("source", "ollama_rag")
-                    }
-
+            # Si el RAG confiesa no tener documentación relevante, forzar de inmediato OFRECIENDO_RADICACION
+            if rag_res.get("has_context") is False or \
+               resp_text == MENSAJE_NO_DOCUMENTADO or \
+               "No dispongo de un procedimiento documentado" in resp_text or \
+               "No dispongo de un instructivo" in resp_text:
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", resp_text)
-
                 return {
-                    "tipo": "DIAGNOSTICO",
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "mensaje": resp_text,
+                    "ticket_id": None,
+                    "sources": rag_res.get("sources", []),
+                    "source": "UniMon_SinDocumentacion"
+                }
+
+            # Si el usuario cambió a una pregunta fuera de dominio, liberar sesión
+            if is_out_of_domain_response(resp_text):
+                cls.reset_session(session_id)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
+                return {
+                    "tipo": "FUERA_DE_DOMINIO",
                     "mensaje": resp_text,
                     "ticket_id": None,
                     "sources": rag_res.get("sources"),
                     "source": rag_res.get("source", "ollama_rag")
                 }
 
-            # Caso E: Intentos de diagnóstico agotados (>= 3 intentos) -> Ofrecer canal oficial de correo + plantilla + radicación directa
-            else:
-                session.estado = EstadoTicket.OFRECIENDO_RADICACION
-                support_msg = cls.build_support_channel_message(session.falla or texto)
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", support_msg)
-                return {
-                    "tipo": "OFRECIENDO_RADICACION",
-                    "mensaje": support_msg,
-                    "ticket_id": None,
-                    "source": "UniMon_CanalSoporte"
-                }
+            cls.add_history(session_id, "user", texto)
+            cls.add_history(session_id, "assistant", resp_text)
+
+            return {
+                "tipo": "DIAGNOSTICO",
+                "mensaje": resp_text,
+                "ticket_id": None,
+                "sources": rag_res.get("sources"),
+                "source": rag_res.get("source", "ollama_rag")
+            }
 
         # -------------------------------------------------------------
         # ESTADO: IDLE (Mensaje Inicial)

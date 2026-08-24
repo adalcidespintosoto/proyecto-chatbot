@@ -31,21 +31,23 @@ MENSAJE_NO_DOCUMENTADO = (
     "¿O prefieres que radique el caso de soporte técnico directamente en GLPI por ti ahora mismo?"
 )
 
-# Prompt del sistema institucional para soporte y gestión de TI
-STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar.
+# Prompt del sistema institucional para soporte técnico N1 directo
+STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Agente Oficial de Soporte Técnico N1 de la Universidad Simón Bolívar.
 
-DIRECTRICES DE RESPUESTA:
-1. Responde utilizando la información presente en el contexto documental institucional.
-2. Si el usuario reporta dificultades de acceso (datos incorrectos, olvido de contraseña, bloqueo de usuario, problemas para entrar al portal o correo) y el contexto incluye guías de restablecimiento de clave, ingreso a portales o activación de cuentas, UTILIZA esos pasos para guiar al usuario.
-3. Si el contexto contiene los pasos o canales de solución, redacta una respuesta clara, estructurada y orientada al paso a paso institucional.
-4. Solo si el contexto no guarda NINGUNA relación con la consulta o carece de pasos aplicables, responde:
-   "No dispongo de un procedimiento documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un ticket en GLPI por ti."
+REGLAS DE ORO OBLIGATORIAS:
+1. PROHIBICIÓN TOTAL DE REFERENCIAR MANUALES AL USUARIO: NUNCA le digas al usuario "revisa el instructivo", "consulta el PDF", "dirígete a la presentación" o "sigue los pasos del documento X". Tú eres el soporte: extrae los pasos del contexto y redacta la solución directa en tu mensaje.
+2. GUÍA ACCIONABLE PASO A PASO: Explica con claridad qué debe hacer el usuario (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
+3. Si el contexto menciona una opción (como "Mis bloqueos" o "Recuperar contraseña"), indícale exactamente dónde hacer clic y qué seleccionar según lo que describe el documento.
+4. Finaliza siempre preguntando:
+   "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico en GLPI por ti?"
+5. Si el contexto NO contiene los pasos de solución, responde únicamente:
+   "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un ticket en GLPI por ti."
 
-Contexto institucional:
+Contexto institucional provisto:
 {context}
 
 Pregunta del usuario: {query}
-Respuesta:"""
+Respuesta directa de soporte:"""
 
 
 def is_out_of_domain_response(response_text: str) -> bool:
@@ -209,20 +211,21 @@ class RAGService:
                         k=6
                     )
                 
-                for doc, score in docs_with_scores:
+                for idx, (doc, score) in enumerate(docs_with_scores, 1):
+                    score_val = f"{score:.4f}" if score is not None else "N/A"
+                    source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                    source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                    page_num = doc.metadata.get("page", None)
+                    page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+
                     if score is not None and score >= self.min_relevance_score:
                         retrieved_docs.append(doc)
-                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
-                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
                         if source_filename not in sources:
                             sources.append(source_filename)
-
-                        page_num = doc.metadata.get("page", None)
-                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
                         context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
+                        logger.info(f"  [Chunk #{idx} VÁLIDO] Score: {score_val} | Fuente: {source_filename}{page_info} | Texto: '{doc.page_content.strip()[:100]}...'")
                     else:
-                        score_val = f"{score:.4f}" if score is not None else "None"
-                        logger.info(f"Fragmento descartado por baja similitud ({score_val} < {self.min_relevance_score})")
+                        logger.info(f"  [Chunk #{idx} DESCARTADO] Score: {score_val} < {self.min_relevance_score} | Fuente: {source_filename}{page_info}")
             except Exception as exc:
                 logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
 
