@@ -6,6 +6,7 @@ Aplica normalización léxica y expansión de sinónimos para asertividad >= 90%
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import httpx
@@ -28,7 +29,7 @@ MENSAJE_NO_DOCUMENTADO = (
     "Puedes comunicarte directamente con los canales oficiales de soporte técnico:\n"
     "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
     "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n"
-    "¿O prefieres que radique el caso de soporte técnico directamente en GLPI por ti ahora mismo?"
+    "¿O prefieres que radique un caso de soporte técnico por ti ahora mismo?"
 )
 
 # Prompt del sistema institucional para soporte técnico N1 directo
@@ -39,15 +40,33 @@ REGLAS DE ORO OBLIGATORIAS:
 2. GUÍA ACCIONABLE PASO A PASO: Explica con claridad qué debe hacer el usuario (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
 3. Si el contexto menciona una opción (como "Mis bloqueos" o "Recuperar contraseña"), indícale exactamente dónde hacer clic y qué seleccionar según lo que describe el documento.
 4. Finaliza siempre preguntando:
-   "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico en GLPI por ti?"
+   "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico por ti?"
 5. Si el contexto NO contiene los pasos de solución, responde únicamente:
-   "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un ticket en GLPI por ti."
+   "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un caso de soporte técnico por ti."
 
 Contexto institucional provisto:
 {context}
 
 Pregunta del usuario: {query}
 Respuesta directa de soporte:"""
+
+
+OUT_OF_DOMAIN_QUERY_PATTERNS = [
+    r"\b(receta|recetas|cocinar|arroz con pollo|pastel|comida|capital de|geograf[ií]a|poema|poemas|chiste|chistes|qui[eé]n gan[oó] el mundial|qui[eé]n es el presidente)\b"
+]
+
+MENSAJE_FUERA_DE_DOMINIO = (
+    "Soy UniMon, tu asistente virtual enfocado exclusivamente en soporte técnico y procedimientos institucionales de la Universidad Simón Bolívar. "
+    "No puedo ayudarte con consultas de cultura general, recetas u otros temas no tecnológicos ni institucionales."
+)
+
+
+def is_out_of_domain_query(query_text: str) -> bool:
+    """
+    Detecta si la consulta del usuario corresponde a temas manifiestamente fuera de dominio.
+    """
+    q_lower = query_text.lower().strip()
+    return any(re.search(pat, q_lower) for pat in OUT_OF_DOMAIN_QUERY_PATTERNS)
 
 
 def is_out_of_domain_response(response_text: str) -> bool:
@@ -151,53 +170,31 @@ class RAGService:
 
     def _build_role_filter(self, user_role: Optional[str]) -> Optional[Dict[str, Any]]:
         """
-        Construye la condición de filtrado en ChromaDB según el rol del usuario
-        y la taxonomía documental (doc_type + audience):
-        
-        - 'estudiante': Solo autoservicio dirigido a estudiante o general.
-        - 'funcionario' / 'docente' / 'profesor': Autoservicio + gestión interna
-          para funcionario, profesor o general (excluye admin_ti).
-        - 'admin_ti': Sin filtro (ve todo, incluyendo gestión interna administrativa).
-        - None / otros: Solo autoservicio para cualquier audiencia (excluye gestion_interna).
+        Construye la condición de filtrado en ChromaDB según el rol del usuario:
+        - Funcionarios / Profesores / Docentes: Acceden a documentos de audiencia general, funcionario, profesor y admin_ti.
+        - Estudiantes / Otros: Acceden exclusivamente a guías de autoservicio y normativa para estudiantes y generales.
         """
         if not user_role:
-            # Usuario sin rol: mostrar solo autoservicio y normativa
             return {
                 "$and": [
                     {"doc_type": {"$in": ["autoservicio", "normativa"]}},
-                    {"audience": {"$in": ["general", "estudiante", "profesor", "funcionario"]}}
+                    {"audience": {"$in": ["general", "estudiante"]}}
                 ]
             }
 
         role_lower = user_role.strip().lower()
 
-        if role_lower == "admin_ti":
-            # Administrador de TI: acceso completo, sin filtros
-            return None
-
-        if role_lower == "estudiante":
+        if role_lower in ["funcionario", "docente", "profesor", "administrativo", "admin_ti"]:
+            return {
+                "audience": {"$in": ["general", "funcionario", "profesor", "admin_ti"]}
+            }
+        else:
             return {
                 "$and": [
                     {"doc_type": {"$in": ["autoservicio", "normativa"]}},
-                    {"audience": {"$in": ["estudiante", "general"]}}
+                    {"audience": {"$in": ["general", "estudiante"]}}
                 ]
             }
-
-        if role_lower in ["funcionario", "docente", "profesor", "administrativo"]:
-            return {
-                "$and": [
-                    {"doc_type": {"$in": ["autoservicio", "gestion_interna", "normativa"]}},
-                    {"audience": {"$in": ["funcionario", "profesor", "general"]}}
-                ]
-            }
-
-        # Rol desconocido: autoservicio general
-        return {
-            "$and": [
-                {"doc_type": {"$in": ["autoservicio", "normativa"]}},
-                {"audience": {"$in": ["general", "estudiante"]}}
-            ]
-        }
 
     async def query_rag(
         self,

@@ -14,7 +14,7 @@ REGLAS DE ORO OBLIGATORIAS:
 2. GUÍA ACCIONABLE PASO A PASO: Explica con claridad qué debe hacer el usuario (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
 3. Si el contexto menciona una opción (como "Mis bloqueos" o "Recuperar contraseña"), indícale exactamente dónde hacer clic y qué seleccionar según lo que describe el documento.
 4. Finaliza siempre preguntando:
-   "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico en GLPI por ti?"
+   "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico por ti?"
 5. Si el contexto NO contiene los pasos de solución, responde únicamente:
-   "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un ticket en GLPI por ti."
+   "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un caso de soporte técnico por ti."
 """

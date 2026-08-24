@@ -410,7 +410,7 @@
       <div class="brand-logo">⚡</div>
       <div class="brand-text">
         <h1>UniMon • Asistente Virtual TI Unisimon</h1>
-        <p>Soporte Técnico GLPI & Procedimientos Institucionales (Barranquilla y Cúcuta)</p>
+        <p>Soporte Técnico & Procedimientos Institucionales (Barranquilla y Cúcuta)</p>
       </div>
     </div>
     <div class="header-actions">
@@ -443,7 +443,7 @@
           🏢 Soporte Kactus/Seven (P-GT-11)
         </button>
         <button class="quick-chip" onclick="sendQuickMessage('Quiero radicar un ticket por un equipo dañado en el laboratorio')">
-          🚨 Radicar Ticket GLPI
+          🚨 Radicar Solicitud de Soporte
         </button>
       </div>
 
@@ -453,7 +453,7 @@
           <div class="avatar">⚡</div>
           <div class="bubble">
             <p><strong>¡Hola! Soy UniMon</strong>, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la <strong>Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta)</strong>.</p>
-            <p>Puedo ayudarte a resolver dudas sobre los <strong>procedimientos institucionales de TI</strong> (mantenimiento, backups, antimalware, Seven/Kactus) o <strong>radicar directamente un caso de soporte técnico en GLPI</strong>.</p>
+            <p>Puedo ayudarte a resolver dudas sobre los <strong>procedimientos institucionales de TI</strong> (mantenimiento, backups, antimalware, Seven/Kactus) o <strong>radicar directamente una solicitud de soporte técnico</strong>.</p>
             <div class="meta-tag">🤖 UniMon Unisimon • Soporte Conversacional Directo</div>
           </div>
         </div>
@@ -524,12 +524,12 @@
         ticketCard.className = 'ticket-badge';
         ticketCard.innerHTML = `
           <div class="ticket-header">
-            <span>🎫 Ticket GLPI Radicado</span>
+            <span>🎫 Solicitud de Soporte Radicada</span>
             <span class="ticket-id">#${ticketDetails.ticket_id}</span>
           </div>
           <div><strong>Categoría:</strong> ${ticketDetails.category}</div>
           <div><strong>Urgencia:</strong> ${ticketDetails.urgency}/5 | <strong>Impacto:</strong> ${ticketDetails.impact}/5</div>
-          <div style="font-size:0.75rem; color:#a7f3d0;">Estado: Radicado exitosamente en GLPI Soporte TI</div>
+          <div style="font-size:0.75rem; color:#a7f3d0;">Estado: Radicado exitosamente en Mesa de Ayuda TI</div>
         `;
         bubble.appendChild(ticketCard);
       }

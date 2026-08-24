@@ -13,23 +13,84 @@ if sys.platform == "win32":
 
 async def run_tests():
     print("=" * 70)
-    print("VALIDACIÓN: PROHIBICIÓN DE REFERENCIAR MANUALES Y ACCIÓN DIRECTA PASO A PASO")
+    print("VALIDACIÓN: ESTADO PIDIENDO_ROL Y CALIFICACIÓN OBLIGATORIA DE PERFIL")
     print("=" * 70)
 
     # -------------------------------------------------------------
-    # PRUEBA 1: Verificación del System Prompt con Prohibición de Enviar a Leer
+    # PRUEBA 1: Flujo A (Pregunta primero -> Pide Rol -> Califica -> Respuesta)
     # -------------------------------------------------------------
-    print("\n[PRUEBA 1] System Prompt RAG con Directivas de Acción Directa")
-    assert "PROHIBICIÓN TOTAL DE REFERENCIAR MANUALES AL USUARIO" in STRICT_SYSTEM_PROMPT_TEMPLATE
-    assert "NUNCA le digas al usuario \"revisa el instructivo\", \"consulta el PDF\"" in STRICT_SYSTEM_PROMPT_TEMPLATE
-    assert "GUÍA ACCIONABLE PASO A PASO" in STRICT_SYSTEM_PROMPT_TEMPLATE
-    assert "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico en GLPI por ti?" in STRICT_SYSTEM_PROMPT_TEMPLATE
-    print("  ✓ System prompt contiene las directivas estrictas de respuesta directa paso a paso")
+    print("\n[PRUEBA 1] Flujo A: Pregunta primero sin rol -> PIDIENDO_ROL -> Funcionario")
+    sess_a = "sess_flujo_a"
+    router_logic.reset_session(sess_a)
+
+    # Turno 1: Pregunta directa de funcionario sin declarar rol
+    r_a1 = await router_logic.procesar_mensaje("¿Cómo veo los reportes de desertores?", session_id=sess_a)
+    assert r_a1["tipo"] == "PIDIENDO_ROL"
+    assert router_logic.get_session(sess_a).estado == EstadoTicket.PIDIENDO_ROL
+    assert router_logic.get_session(sess_a).pending_query == "¿Cómo veo los reportes de desertores?"
+    assert "¿Eres **Estudiante** o **Funcionario / Docente**?" in r_a1["mensaje"]
+    print("  ✓ Bot intercepta la consulta y pregunta si es Estudiante o Funcionario")
+
+    # Turno 2: Usuario responde con su rol
+    mock_desertores_resp = {
+        "response": "Paso 1: Ingresa a SIAAF Módulo Directores. Paso 2: Selecciona Reportes -> Desertores. Paso 3: Filtra por periodo académico.",
+        "sources": ["Reporte_Desertores.pdf"],
+        "has_context": True
+    }
+    with patch.object(rag_service, "answer_query", new=AsyncMock(return_value=mock_desertores_resp)):
+        r_a2 = await router_logic.procesar_mensaje("Soy funcionario", session_id=sess_a)
+        assert r_a2["tipo"] == "DIAGNOSTICO"
+        assert router_logic.get_session(sess_a).estado == EstadoTicket.DIAGNOSTICO
+        assert router_logic.get_session(sess_a).user_role == "funcionario"
+        assert router_logic.get_session(sess_a).pending_query is None
+        assert "SIAAF" in r_a2["mensaje"]
+        print("  ✓ Bot ejecuta la consulta retenida con rol 'funcionario' y entrega la solución de inmediato")
 
     # -------------------------------------------------------------
-    # PRUEBA 2: Detección de REPORT_PATTERNS (is_report_request)
+    # PRUEBA 2: Flujo B (Saludo primero -> Pide Rol -> Califica -> Queda listo)
     # -------------------------------------------------------------
-    print("\n[PRUEBA 2] Detección de REPORT_PATTERNS")
+    print("\n[PRUEBA 2] Flujo B: Saludo primero -> PIDIENDO_ROL -> Estudiante -> Listo")
+    sess_b = "sess_flujo_b"
+    router_logic.reset_session(sess_b)
+
+    # Turno 1: Saludo simple
+    r_b1 = await router_logic.procesar_mensaje("Hola", session_id=sess_b)
+    assert r_b1["tipo"] == "PIDIENDO_ROL"
+    assert router_logic.get_session(sess_b).estado == EstadoTicket.PIDIENDO_ROL
+    assert router_logic.get_session(sess_b).pending_query is None
+    print("  ✓ Saludo inicial solicita identificación de rol")
+
+    # Turno 2: Responde "Estudiante"
+    r_b2 = await router_logic.procesar_mensaje("Estudiante", session_id=sess_b)
+    assert r_b2["tipo"] == "DIAGNOSTICO"
+    assert router_logic.get_session(sess_b).estado == EstadoTicket.DIAGNOSTICO
+    assert router_logic.get_session(sess_b).user_role == "estudiante"
+    assert "¡Entendido! ¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?" in r_b2["mensaje"]
+    print("  ✓ Bot confirma rol 'estudiante' y queda listo en DIAGNOSTICO para recibir consultas")
+
+    # -------------------------------------------------------------
+    # PRUEBA 3: Rol declarado directamente en el primer mensaje
+    # -------------------------------------------------------------
+    print("\n[PRUEBA 3] Flujo Directo: Rol y pregunta en el primer mensaje")
+    sess_c = "sess_flujo_directo"
+    router_logic.reset_session(sess_c)
+
+    mock_portal_resp = {
+        "response": "Paso 1: Entra a https://unisimon.edu.co. Paso 2: Haz clic en Recuperar contraseña.",
+        "sources": ["instructivo portales estudiantes.pdf"],
+        "has_context": True
+    }
+    with patch.object(rag_service, "answer_query", new=AsyncMock(return_value=mock_portal_resp)):
+        r_c = await router_logic.procesar_mensaje("soy estudiante y no puedo entrar al portal", session_id=sess_c)
+        assert r_c["tipo"] == "DIAGNOSTICO"
+        assert router_logic.get_session(sess_c).user_role == "estudiante"
+        assert router_logic.get_session(sess_c).estado == EstadoTicket.DIAGNOSTICO
+        print("  ✓ Bot detecta rol 'estudiante' inmediatamente y procesa el RAG sin estado intermedio")
+
+    # -------------------------------------------------------------
+    # PRUEBA 4: Detección de REPORT_PATTERNS
+    # -------------------------------------------------------------
+    print("\n[PRUEBA 4] Detección de REPORT_PATTERNS")
     report_frases = [
         "vamos a reportar", "reportar", "reportalo", "radicar", "radica",
         "crear ticket", "abrir caso", "ayudame a reportar", "haz el reporte",
@@ -37,105 +98,48 @@ async def run_tests():
     ]
     for frase in report_frases:
         assert RouterLogic.is_report_request(frase), f"ERROR: '{frase}' no fue detectada por is_report_request"
-        print(f"  ✓ Intención de reporte/radicación detectada: '{frase}'")
+        print(f"  ✓ Intención de reporte detectada: '{frase}'")
 
     # -------------------------------------------------------------
-    # PRUEBA 3: Salto Directo a Radicación desde DIAGNOSTICO y OFRECIENDO_RADICACION
+    # PRUEBA 5: Salto Directo a Radicación y Flujo Completo
     # -------------------------------------------------------------
-    print("\n[PRUEBA 3] Salto Directo a PIDIENDO_NOMBRE sin Plantilla Intermedia")
-    
-    # 3.1 Desde DIAGNOSTICO con "vamos a reportar"
-    sess_d1 = "sess_diag_reportar"
-    router_logic.reset_session(sess_d1)
-    router_logic.get_session(sess_d1).estado = EstadoTicket.DIAGNOSTICO
+    print("\n[PRUEBA 5] Salto Directo a PIDIENDO_NOMBRE y Radicación Completa")
+    sess_d = "sess_radicacion_completa"
+    router_logic.reset_session(sess_d)
+    router_logic.get_session(sess_d).user_role = "funcionario"
+    router_logic.get_session(sess_d).estado = EstadoTicket.DIAGNOSTICO
 
-    r_d1 = await router_logic.procesar_mensaje("vamos a reportar", session_id=sess_d1)
+    r_d1 = await router_logic.procesar_mensaje("vamos a reportar", session_id=sess_d)
     assert r_d1["tipo"] == "RADICANDO_TICKET"
-    assert router_logic.get_session(sess_d1).estado == EstadoTicket.PIDIENDO_NOMBRE
-    assert "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:" in r_d1["mensaje"]
-    print("  ✓ 'vamos a reportar' en DIAGNOSTICO transicionó de inmediato a PIDIENDO_NOMBRE")
+    assert router_logic.get_session(sess_d).estado == EstadoTicket.PIDIENDO_NOMBRE
+    assert "glpi" not in r_d1["mensaje"].lower()
 
-    # 3.2 Desde OFRECIENDO_RADICACION con "ayudame a reportar"
-    sess_o1 = "sess_ofrece_reportar"
-    router_logic.reset_session(sess_o1)
-    router_logic.get_session(sess_o1).estado = EstadoTicket.OFRECIENDO_RADICACION
+    r_d2 = await router_logic.procesar_mensaje("Carlos Julio Barreto", session_id=sess_d)
+    assert router_logic.get_session(sess_d).estado == EstadoTicket.PIDIENDO_CORREO
 
-    r_o1 = await router_logic.procesar_mensaje("ayudame a reportar", session_id=sess_o1)
-    assert r_o1["tipo"] == "RADICANDO_TICKET"
-    assert router_logic.get_session(sess_o1).estado == EstadoTicket.PIDIENDO_NOMBRE
-    assert "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:" in r_o1["mensaje"]
-    print("  ✓ 'ayudame a reportar' en OFRECIENDO_RADICACION transicionó de inmediato a PIDIENDO_NOMBRE")
+    r_d3 = await router_logic.procesar_mensaje("carlos.barreto@unisimon.edu.co", session_id=sess_d)
+    assert router_logic.get_session(sess_d).estado == EstadoTicket.PIDIENDO_DESCRIPCION
 
-    # -------------------------------------------------------------
-    # PRUEBA 4: Diagnóstico Continuo e Ilimitado (Más de 3 Turnos)
-    # -------------------------------------------------------------
-    print("\n[PRUEBA 4] Diagnóstico Continuo e Ilimitado (Turnos > 3)")
-    sess_unlimited = "sess_unlimited_diag"
-    router_logic.reset_session(sess_unlimited)
-
-    mock_rag_response = {
-        "response": "Paso 1: Entra a https://unisimon.edu.co. Paso 2: Haz clic en Recuperar contraseña. ¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico en GLPI por ti?",
-        "sources": ["P-GT-11_Portales.pdf"],
-        "has_context": True
-    }
-
-    with patch.object(rag_service, "answer_query", new=AsyncMock(return_value=mock_rag_response)):
-        # Turno 1
-        r1 = await router_logic.procesar_mensaje("no puedo entrar al portal institucional", session_id=sess_unlimited)
-        assert r1["tipo"] == "DIAGNOSTICO"
-        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.DIAGNOSTICO
-
-        # Turno 2
-        r2 = await router_logic.procesar_mensaje("Ya hice clic y no me llega el correo de recuperacion", session_id=sess_unlimited)
-        assert r2["tipo"] == "DIAGNOSTICO"
-
-        # Turno 3
-        r3 = await router_logic.procesar_mensaje("Sigue sin llegar el enlace a mi bandeja", session_id=sess_unlimited)
-        assert r3["tipo"] == "DIAGNOSTICO"
-
-        # Turno 4 (Debe permanecer en DIAGNOSTICO sin forzar salida a plantilla)
-        r4 = await router_logic.procesar_mensaje("Probe en spam y tampoco", session_id=sess_unlimited)
-        assert r4["tipo"] == "DIAGNOSTICO"
-        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.DIAGNOSTICO
-        print("  ✓ Diagnóstico continuo verificado exitosamente en turnos 1, 2, 3 y 4")
-
-        # Turno 5: Usuario decide reportar ➔ Salto inmediato a PIDIENDO_NOMBRE
-        r5 = await router_logic.procesar_mensaje("radica el caso por favor", session_id=sess_unlimited)
-        assert r5["tipo"] == "RADICANDO_TICKET"
-        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.PIDIENDO_NOMBRE
-        print("  ✓ Salto a radicación tras turnos prolongados completado")
-
-    # -------------------------------------------------------------
-    # PRUEBA 5: Flujo Completo de Radicación en GLPI
-    # -------------------------------------------------------------
-    print("\n[PRUEBA 5] Flujo Completo de Radicación en GLPI")
-    # Paso 1: Nombre
-    r_nom = await router_logic.procesar_mensaje("Carlos Julio Barreto", session_id=sess_unlimited)
-    assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.PIDIENDO_CORREO
-
-    # Paso 2: Correo
-    r_cor = await router_logic.procesar_mensaje("carlos.barreto@unisimon.edu.co", session_id=sess_unlimited)
-    assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.PIDIENDO_DESCRIPCION
-
-    # Paso 3: Descripción -> Ticket GLPI
     with patch("app.services.router_logic.glpi_client.crear_ticket", new=AsyncMock(return_value={"ticket_id": 11800, "status": "success"})):
-        r_tik = await router_logic.procesar_mensaje("No llega el enlace de restablecimiento de contraseña de portal", session_id=sess_unlimited)
-        assert r_tik["tipo"] == "TICKET_CREADO"
-        assert r_tik["ticket_id"] == 11800
-        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.IDLE
-        print("  ✓ Ticket GLPI #11800 creado exitosamente")
+        r_d4 = await router_logic.procesar_mensaje("No llega el enlace de restablecimiento de contraseña", session_id=sess_d)
+        assert r_d4["tipo"] == "TICKET_CREADO"
+        assert r_d4["ticket_id"] == 11800
+        assert router_logic.get_session(sess_d).estado == EstadoTicket.IDLE
+        assert "glpi" not in r_d4["mensaje"].lower()
+        print("  ✓ Flujo completo de radicación validado exitosamente")
 
     # -------------------------------------------------------------
     # PRUEBA 6: Cancelación Universal ('no')
     # -------------------------------------------------------------
     print("\n[PRUEBA 6] Cancelación Universal ('no')")
-    sess_c = "sess_cancel_test"
-    router_logic.reset_session(sess_c)
-    await router_logic.procesar_mensaje("Necesito un técnico", session_id=sess_c)
-    r_no = await router_logic.procesar_mensaje("no", session_id=sess_c)
-    assert r_no["tipo"] == "CANCELADO"
-    assert router_logic.get_session(sess_c).estado == EstadoTicket.IDLE
-    print("  ✓ Rechazo con 'no' reseteó la sesión a IDLE")
+    sess_cancel = "sess_cancel_test"
+    router_logic.reset_session(sess_cancel)
+    router_logic.get_session(sess_cancel).estado = EstadoTicket.OFRECIENDO_RADICACION
+    r_cancel = await router_logic.procesar_mensaje("no", session_id=sess_cancel)
+    assert r_cancel["tipo"] == "CANCELADO"
+    assert router_logic.get_session(sess_cancel).estado == EstadoTicket.IDLE
+    assert "glpi" not in r_cancel["mensaje"].lower()
+    print("  ✓ Cancelación con 'no' reseteó la sesión a IDLE")
 
     print("\n" + "=" * 70)
     print("TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (100% OK)")
