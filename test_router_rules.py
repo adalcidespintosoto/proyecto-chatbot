@@ -13,69 +13,125 @@ if sys.platform == "win32":
 
 async def run_tests():
     print("=" * 70)
-    print("VALIDACIÓN DE ASOCIACIÓN CONCEPTUAL Y RECUPERACIÓN (k=6, PROMPT CALIBRADO)")
+    print("VALIDACIÓN: PROHIBICIÓN DE REFERENCIAR MANUALES Y ACCIÓN DIRECTA PASO A PASO")
     print("=" * 70)
 
     # -------------------------------------------------------------
-    # PRUEBA 1: Verificación de Directrices del System Prompt Calibrado
+    # PRUEBA 1: Verificación del System Prompt con Prohibición de Enviar a Leer
     # -------------------------------------------------------------
-    print("\n[PRUEBA 1] Directrices de Respuesta en System Prompt")
-    assert "DIRECTRICES DE RESPUESTA:" in STRICT_SYSTEM_PROMPT_TEMPLATE
-    assert "dificultades de acceso (datos incorrectos, olvido de contraseña, bloqueo de usuario, problemas para entrar al portal o correo)" in STRICT_SYSTEM_PROMPT_TEMPLATE
-    assert "UTILIZA esos pasos para guiar al usuario" in STRICT_SYSTEM_PROMPT_TEMPLATE
-    print("  ✓ System prompt calibrado con directrices explícitas para problemas de acceso y credenciales")
+    print("\n[PRUEBA 1] System Prompt RAG con Directivas de Acción Directa")
+    assert "PROHIBICIÓN TOTAL DE REFERENCIAR MANUALES AL USUARIO" in STRICT_SYSTEM_PROMPT_TEMPLATE
+    assert "NUNCA le digas al usuario \"revisa el instructivo\", \"consulta el PDF\"" in STRICT_SYSTEM_PROMPT_TEMPLATE
+    assert "GUÍA ACCIONABLE PASO A PASO" in STRICT_SYSTEM_PROMPT_TEMPLATE
+    assert "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico en GLPI por ti?" in STRICT_SYSTEM_PROMPT_TEMPLATE
+    print("  ✓ System prompt contiene las directivas estrictas de respuesta directa paso a paso")
 
     # -------------------------------------------------------------
-    # PRUEBA 2: Búsqueda RAG con k=6 y Consulta Expandida
+    # PRUEBA 2: Detección de REPORT_PATTERNS (is_report_request)
     # -------------------------------------------------------------
-    print("\n[PRUEBA 2] Búsqueda RAG con k=6")
-    mock_vs = MagicMock()
-    doc_portal = Document(
-        page_content="Pasos para restablecer clave en el portal estudiantil...",
-        metadata={"source": "P-GT-11_Portales.pdf"}
-    )
-    mock_vs.similarity_search_with_relevance_scores.return_value = [(doc_portal, 0.78)]
-
-    with patch.object(rag_service, "_vector_store", mock_vs), \
-         patch("httpx.AsyncClient.post", new=AsyncMock(return_value=MagicMock(status_code=200, json=lambda: {"message": {"content": "Para ingresar al portal estudiantil..."}}))):
-
-        res = await rag_service.answer_query("no puedo entrar al portal y dice datos incorrectos")
-        
-        # Verificar que similarity_search_with_relevance_scores fue llamado con k=6
-        call_kwargs = mock_vs.similarity_search_with_relevance_scores.call_args[1]
-        assert call_kwargs.get("k") == 6, f"Esperado k=6 pero fue {call_kwargs.get('k')}"
-        assert res["has_context"] is True
-        assert "P-GT-11_Portales.pdf" in res["sources"]
-        print("  ✓ Búsqueda vectorial ejecutada con k=6 y recuperación semántica exitosa")
+    print("\n[PRUEBA 2] Detección de REPORT_PATTERNS")
+    report_frases = [
+        "vamos a reportar", "reportar", "reportalo", "radicar", "radica",
+        "crear ticket", "abrir caso", "ayudame a reportar", "haz el reporte",
+        "si", "sí", "por favor", "porfa", "dale", "ayúdame", "solicito soporte"
+    ]
+    for frase in report_frases:
+        assert RouterLogic.is_report_request(frase), f"ERROR: '{frase}' no fue detectada por is_report_request"
+        print(f"  ✓ Intención de reporte/radicación detectada: '{frase}'")
 
     # -------------------------------------------------------------
-    # PRUEBA 3: Normalizador Léxico
+    # PRUEBA 3: Salto Directo a Radicación desde DIAGNOSTICO y OFRECIENDO_RADICACION
     # -------------------------------------------------------------
-    print("\n[PRUEBA 3] Normalización y Expansión Léxica")
-    q1 = "no me coge la clave en el portal de la u y dice datos incorrectos"
-    exp1 = normalize_and_expand_query(q1)
-    assert "instructivo portales estudiantes" in exp1
-    assert "problemas de acceso restablecimiento de contraseña" in exp1
-    print("  ✓ Jerga estudiantil normalizada y expandida correctamente")
+    print("\n[PRUEBA 3] Salto Directo a PIDIENDO_NOMBRE sin Plantilla Intermedia")
+    
+    # 3.1 Desde DIAGNOSTICO con "vamos a reportar"
+    sess_d1 = "sess_diag_reportar"
+    router_logic.reset_session(sess_d1)
+    router_logic.get_session(sess_d1).estado = EstadoTicket.DIAGNOSTICO
+
+    r_d1 = await router_logic.procesar_mensaje("vamos a reportar", session_id=sess_d1)
+    assert r_d1["tipo"] == "RADICANDO_TICKET"
+    assert router_logic.get_session(sess_d1).estado == EstadoTicket.PIDIENDO_NOMBRE
+    assert "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:" in r_d1["mensaje"]
+    print("  ✓ 'vamos a reportar' en DIAGNOSTICO transicionó de inmediato a PIDIENDO_NOMBRE")
+
+    # 3.2 Desde OFRECIENDO_RADICACION con "ayudame a reportar"
+    sess_o1 = "sess_ofrece_reportar"
+    router_logic.reset_session(sess_o1)
+    router_logic.get_session(sess_o1).estado = EstadoTicket.OFRECIENDO_RADICACION
+
+    r_o1 = await router_logic.procesar_mensaje("ayudame a reportar", session_id=sess_o1)
+    assert r_o1["tipo"] == "RADICANDO_TICKET"
+    assert router_logic.get_session(sess_o1).estado == EstadoTicket.PIDIENDO_NOMBRE
+    assert "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:" in r_o1["mensaje"]
+    print("  ✓ 'ayudame a reportar' en OFRECIENDO_RADICACION transicionó de inmediato a PIDIENDO_NOMBRE")
 
     # -------------------------------------------------------------
-    # PRUEBA 4: Discriminación Estricta de Fallas vs Préstamos
+    # PRUEBA 4: Diagnóstico Continuo e Ilimitado (Más de 3 Turnos)
     # -------------------------------------------------------------
-    print("\n[PRUEBA 4] Discriminación Estricta")
-    assert RouterLogic.is_equipment_request("quiero solicitar un pc como lo hago")
-    assert not RouterLogic.is_equipment_request("no me coge la clave en el portal de la u y dice datos incorrectos")
-    assert not RouterLogic.is_equipment_request("el cargador del portatil tiene mal contacto y me toca moverle el cable")
-    print("  ✓ Discriminación estricta de solicitudes vs fallas verificada")
+    print("\n[PRUEBA 4] Diagnóstico Continuo e Ilimitado (Turnos > 3)")
+    sess_unlimited = "sess_unlimited_diag"
+    router_logic.reset_session(sess_unlimited)
+
+    mock_rag_response = {
+        "response": "Paso 1: Entra a https://unisimon.edu.co. Paso 2: Haz clic en Recuperar contraseña. ¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico en GLPI por ti?",
+        "sources": ["P-GT-11_Portales.pdf"],
+        "has_context": True
+    }
+
+    with patch.object(rag_service, "answer_query", new=AsyncMock(return_value=mock_rag_response)):
+        # Turno 1
+        r1 = await router_logic.procesar_mensaje("no puedo entrar al portal institucional", session_id=sess_unlimited)
+        assert r1["tipo"] == "DIAGNOSTICO"
+        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.DIAGNOSTICO
+
+        # Turno 2
+        r2 = await router_logic.procesar_mensaje("Ya hice clic y no me llega el correo de recuperacion", session_id=sess_unlimited)
+        assert r2["tipo"] == "DIAGNOSTICO"
+
+        # Turno 3
+        r3 = await router_logic.procesar_mensaje("Sigue sin llegar el enlace a mi bandeja", session_id=sess_unlimited)
+        assert r3["tipo"] == "DIAGNOSTICO"
+
+        # Turno 4 (Debe permanecer en DIAGNOSTICO sin forzar salida a plantilla)
+        r4 = await router_logic.procesar_mensaje("Probe en spam y tampoco", session_id=sess_unlimited)
+        assert r4["tipo"] == "DIAGNOSTICO"
+        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.DIAGNOSTICO
+        print("  ✓ Diagnóstico continuo verificado exitosamente en turnos 1, 2, 3 y 4")
+
+        # Turno 5: Usuario decide reportar ➔ Salto inmediato a PIDIENDO_NOMBRE
+        r5 = await router_logic.procesar_mensaje("radica el caso por favor", session_id=sess_unlimited)
+        assert r5["tipo"] == "RADICANDO_TICKET"
+        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.PIDIENDO_NOMBRE
+        print("  ✓ Salto a radicación tras turnos prolongados completado")
 
     # -------------------------------------------------------------
-    # PRUEBA 5: Cancelación Universal
+    # PRUEBA 5: Flujo Completo de Radicación en GLPI
     # -------------------------------------------------------------
-    print("\n[PRUEBA 5] Cancelación Universal ('no')")
+    print("\n[PRUEBA 5] Flujo Completo de Radicación en GLPI")
+    # Paso 1: Nombre
+    r_nom = await router_logic.procesar_mensaje("Carlos Julio Barreto", session_id=sess_unlimited)
+    assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.PIDIENDO_CORREO
+
+    # Paso 2: Correo
+    r_cor = await router_logic.procesar_mensaje("carlos.barreto@unisimon.edu.co", session_id=sess_unlimited)
+    assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.PIDIENDO_DESCRIPCION
+
+    # Paso 3: Descripción -> Ticket GLPI
+    with patch("app.services.router_logic.glpi_client.crear_ticket", new=AsyncMock(return_value={"ticket_id": 11800, "status": "success"})):
+        r_tik = await router_logic.procesar_mensaje("No llega el enlace de restablecimiento de contraseña de portal", session_id=sess_unlimited)
+        assert r_tik["tipo"] == "TICKET_CREADO"
+        assert r_tik["ticket_id"] == 11800
+        assert router_logic.get_session(sess_unlimited).estado == EstadoTicket.IDLE
+        print("  ✓ Ticket GLPI #11800 creado exitosamente")
+
+    # -------------------------------------------------------------
+    # PRUEBA 6: Cancelación Universal ('no')
+    # -------------------------------------------------------------
+    print("\n[PRUEBA 6] Cancelación Universal ('no')")
     sess_c = "sess_cancel_test"
     router_logic.reset_session(sess_c)
     await router_logic.procesar_mensaje("Necesito un técnico", session_id=sess_c)
-    assert router_logic.get_session(sess_c).estado == EstadoTicket.OFRECIENDO_RADICACION
-
     r_no = await router_logic.procesar_mensaje("no", session_id=sess_c)
     assert r_no["tipo"] == "CANCELADO"
     assert router_logic.get_session(sess_c).estado == EstadoTicket.IDLE

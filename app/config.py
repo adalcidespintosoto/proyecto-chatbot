@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Configuración de Ollama (RAG / LLM)
     ollama_base_url: str = "http://localhost:11434"
-    llm_model: str = "llama3.1:8b"
+    llm_model: str = "unimon:8b"
     ollama_timeout: float = 45.0
 
     # Configuración de Vision-LLM (Ingesta Multimodal)
