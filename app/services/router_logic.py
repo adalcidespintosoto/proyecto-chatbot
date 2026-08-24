@@ -1,9 +1,10 @@
 """
 Lógica de Enrutamiento, Clasificación de Intenciones y Chatbot Proactivo de Nivel 1 para UniMon (USB).
-Maneja el ciclo de diagnóstico multi-turno de Nivel 1 (hasta 3 intentos), detección inmediata de solicitudes
-físicas y préstamos de equipos (sin bucles de diagnóstico ni consultas al LLM), flujo universal de cancelación,
-entrega de canal oficial por correo con plantilla estructurada y radicación por Slot-Filling universal simplificado
-en secuencia estricta de 3 pasos (Nombre Completo -> Correo Electrónico -> Descripción Detallada del Requerimiento/Problema).
+Maneja el ciclo de diagnóstico multi-turno de Nivel 1 (hasta 3 intentos), discriminación estricta de fallas técnicas
+vs. solicitudes de préstamos de equipos físicos, detección y asignación de rol del usuario (Estudiante / Docente / Funcionario),
+cero alucinaciones con transición a OFRECIENDO_RADICACION ante falta de documentación relevante, flujo universal de
+cancelación, entrega de canal oficial por correo con plantilla estructurada y radicación por Slot-Filling
+universal simplificado en secuencia estricta de 3 pasos (Nombre Completo -> Correo Electrónico -> Descripción Detallada).
 """
 
 import logging
@@ -12,7 +13,7 @@ from typing import Dict, Any, Tuple, Optional, List
 from enum import Enum
 from pydantic import BaseModel, Field
 
-from app.services.rag_service import rag_service, is_out_of_domain_response
+from app.services.rag_service import rag_service, is_out_of_domain_response, MENSAJE_NO_DOCUMENTADO
 from app.services.glpi_service import glpi_client, is_valid_email
 
 logger = logging.getLogger("unimon.router_logic")
@@ -46,6 +47,7 @@ class TicketSession(BaseModel):
     categoria: CategoriaSolicitud = CategoriaSolicitud.HARDWARE
     intentos_diagnostico: int = 0
     max_intentos_diagnostico: int = 3  # Diagnóstico multi-turno (2 a 3 intentos)
+    user_role: Optional[str] = None    # Rol del usuario: 'estudiante', 'funcionario', 'docente', etc.
     falla: Optional[str] = None
     descripcion: Optional[str] = None
     nombre: Optional[str] = None
@@ -83,11 +85,26 @@ CANCEL_REGEX = [
 
 MENSAJE_CANCELACION = "Entendido, he cancelado el proceso de radicación. ¿Hay algo más sobre los procedimientos de TI en lo que te pueda colaborar?"
 
-# Palabras clave para Requerimiento de Equipos y Préstamos
-EQUIPMENT_REQUEST_PATTERNS = [
-    "prestamo", "préstamo", "prestar", "solicitar", "microfono", "micrófono", 
-    "tablet", "portatil", "portátil", "computador", "laptop", 
-    "videobeam", "video beam", "proyector", "sala", "pantalla", "auditorio"
+# Términos que identifican fallas técnicas, daños o problemas de soporte (NUNCA deben tratarse como préstamos)
+FAILURE_AND_SUPPORT_TERMS = [
+    "problema", "dañado", "dañada", "daño", "falla", "fallando", "solucionar",
+    "ayuda", "no prende", "no funciona", "no enciende", "lento", "lenta",
+    "pantalla azul", "bloqueado", "bloqueada", "parpadea", "error",
+    "no da video", "se apaga", "se reinicia", "reparar", "reparacion", "reparación",
+    "revisar", "arreglo", "arreglar", "soporte", "descompuesto", "descompuesta",
+    "intermitente", "luz roja", "desconectado", "desconectada", "sin internet",
+    "sin red", "sin sonido", "no escucha", "no suena", "no proyecta", "se trabó",
+    "se congela", "pantalla negra", "no da señal"
+]
+
+# Verbos y raíces de solicitud o reserva de préstamo físico
+LOAN_REQUEST_VERBS = [
+    r"\b(prest\w+|pr[eé]st\w+|solicit\w+|asign\w+|apart\w+|reserv\w+|alquil\w+)\b"
+]
+
+# Nombres de recursos y equipos físicos institucionales
+EQUIPMENT_NOUNS = [
+    r"\b(micr[oó]fono|micr[oó]fonos|tablet|tablets|port[aá]til|port[aá]tiles|computador|computadores|computadora|computadoras|laptop|laptops|video\s*beam|videobeam|proyector|proyectores|sala|auditorio|pantalla|pantallas)\b"
 ]
 
 # Mensaje estructurado directo para solicitudes de préstamo / asignación de equipos
@@ -141,7 +158,7 @@ SOLVED_PATTERNS = [
     r"\bno\s+ya\s+resolv[ií]\b",
 ]
 
-# Patrones explícitos de falla / persistencia
+# Patrones explícitos de persistencia de fallas en diagnóstico
 EXPLICIT_FAIL_PATTERNS = [
     r"\bno\s+(me\s+)?(funcion[oó]|funsion[oó]|sirvi[oó]|sirbi[oó]|cirvi[oó]|sirve|sirbe|cirve|vale)\b",
     r"\bno\s+se\s+(solucion[oó]|solusion[oó]|arregl[oó]|pudo)\b",
@@ -257,6 +274,21 @@ class RouterLogic:
             session_history[session_id] = []
 
     @classmethod
+    def detect_user_role(cls, text: str) -> Optional[str]:
+        """
+        Detecta si el usuario menciona su rol en la comunidad universitaria.
+        Retorna 'estudiante' o 'funcionario' / 'docente'.
+        """
+        msg_lower = text.lower()
+        if re.search(r"\b(soy|como|es para un|es para una)\s+(estudiante|alumno|alumna|aspirante)\b", msg_lower) or \
+           re.search(r"\b(estudiante|alumno|alumna|aspirante)\b", msg_lower):
+            return "estudiante"
+        elif re.search(r"\b(soy|como)\s+(profesor|profesora|docente|funcionario|funcionaria|administrativo|administrativa|empleado|empleada)\b", msg_lower) or \
+             re.search(r"\b(profesor|profesora|docente|funcionario|funcionaria|administrativo|administrativa)\b", msg_lower):
+            return "funcionario"
+        return None
+
+    @classmethod
     def is_greeting(cls, text: str) -> bool:
         """Detecta si el mensaje es únicamente un saludo de cortesía."""
         msg_clean = re.sub(r"[^\w\s\?¿]", "", text.strip().lower())
@@ -280,27 +312,26 @@ class RouterLogic:
     @classmethod
     def is_equipment_request(cls, text: str) -> bool:
         """
-        Detecta directamente si el mensaje corresponde a una solicitud de préstamo o asignación de equipos
-        (micrófonos, tablets, portátiles, proyectores, videobeam, computadores, etc.).
+        Detecta si el mensaje corresponde estrictamente a una solicitud o reserva de préstamo físico
+        de equipos (micrófonos, tablets, portátiles, proyectores, salas, etc.).
+
+        Reglas estrictas de discriminación:
+        1. Si contiene cualquier término de falla técnica, daño o soporte ('problema', 'dañado', 'falla', 'lento', etc.),
+           retorna FALSE para dar paso al diagnóstico técnico de Nivel 1 / RAG.
+        2. Requiere la presencia obligatoria de un verbo de préstamo/reserva COMBINADO con un sustantivo de equipo físico.
         """
         msg_clean = text.strip().lower()
 
-        # 1. Palabras explícitas de préstamo/asignación
-        if any(p in msg_clean for p in ["prestamo", "préstamo", "prestar", "préstame", "prestame", "prestan", "alquiler", "alquilar"]):
+        # Regla 1: Si describe falla técnica, daño, error o petición de soporte, NUNCA es préstamo
+        if any(term in msg_clean for term in FAILURE_AND_SUPPORT_TERMS):
+            return False
+
+        # Regla 2: Intención explícita de préstamo/reserva + equipo físico
+        has_loan_verb = any(re.search(pat, msg_clean) for pat in LOAN_REQUEST_VERBS)
+        has_equipment_noun = any(re.search(pat, msg_clean) for pat in EQUIPMENT_NOUNS)
+
+        if has_loan_verb and has_equipment_noun:
             return True
-
-        # 2. Combinación de verbos de solicitud con palabras clave de equipos físicos
-        request_verbs = ["solicitar", "solicito", "solicitud", "pedir", "pido", "requiero", "necesito", "asignacion", "asignación", "reserva", "reservar", "quiero"]
-        equipment_nouns = ["microfono", "micrófono", "tablet", "tablets", "portatil", "portátil", "portatiles", "portátiles", "computador", "computadores", "laptop", "laptops", "videobeam", "video beam", "proyector", "proyectores", "sala", "pantalla", "auditorio", "equipo", "equipos"]
-
-        has_verb = any(v in msg_clean for v in request_verbs)
-        has_equipment = any(eq in msg_clean for eq in equipment_nouns)
-
-        if has_verb and has_equipment:
-            # Descartar si se trata de un reporte de falla técnica para no interrumpir el diagnóstico
-            failure_words = ["no prende", "no funciona", "no enciende", "parpadea", "dañado", "dañada", "roto", "rota", "fallando", "bloqueado", "bloqueada", "lento", "lenta", "error", "pantalla azul", "no da video", "se apaga"]
-            if not any(f in msg_clean for f in failure_words):
-                return True
 
         return False
 
@@ -532,11 +563,13 @@ class RouterLogic:
         """
         Procesa el mensaje del usuario de acuerdo a la máquina de estados conversacional de Nivel 1.
         Aplica:
-        1. Flujo de Cancelación Universal en cualquier estado de radicación.
-        2. Detección inmediata de solicitudes de préstamos/asignación de equipos (sin bucles de diagnóstico ni consultas al LLM).
-        3. Detección de cierre ("no ya", "ya no necesito", "ya pude", "ya funcionó", "listo").
-        4. Diagnóstico multi-turno (hasta max_intentos_diagnostico = 3 intentos).
-        5. Secuencia estricta de 3 pasos para Slot-Filling:
+        1. Detección y propagación del rol del usuario (Estudiante / Docente / Funcionario).
+        2. Flujo de Cancelación Universal en cualquier estado de radicación.
+        3. Discriminación estricta de solicitudes de préstamos/asignación de equipos físicos vs. fallas técnicas.
+        4. Cero alucinaciones: Si no hay documentación que supere el umbral RAG (0.68), transiciona a OFRECIENDO_RADICACION.
+        5. Detección de cierre ("no ya", "ya no necesito", "ya pude", "ya funcionó", "listo").
+        6. Diagnóstico multi-turno (hasta max_intentos_diagnostico = 3 intentos) con RAG filtrado por rol.
+        7. Secuencia estricta de 3 pasos para Slot-Filling:
            Paso 1: Nombre Completo (Validación estricta, soporte cancelación)
            Paso 2: Correo Electrónico (Validación, soporte cancelación)
            Paso 3: Descripción Detallada del Requerimiento/Problema (Soporte cancelación)
@@ -546,7 +579,16 @@ class RouterLogic:
         session = cls.get_session(session_id)
         estado_actual = session.estado
 
-        logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje: '{texto[:50]}'")
+        # -------------------------------------------------------------
+        # DETECCIÓN DE ROL DEL USUARIO
+        # Si el usuario menciona su rol, guardarlo en la sesión
+        # -------------------------------------------------------------
+        detected_role = cls.detect_user_role(texto)
+        if detected_role:
+            session.user_role = detected_role
+            logger.info(f"[Session: {session_id}] Rol detectado y asignado: '{session.user_role}'")
+
+        logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Rol: {session.user_role} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje ({len(texto)} chars): '{texto}'")
 
         # -------------------------------------------------------------
         # REGLA GLOBAL 1: Flujo de Cancelación Universal
@@ -701,12 +743,31 @@ class RouterLogic:
 
             # 3. Cualquier otra respuesta en este estado: reiniciar diagnóstico para la nueva pregunta
             else:
+                history = cls.get_history(session_id)
+                rag_res = await rag_service.answer_query(
+                    query=texto,
+                    user_role=session.user_role,
+                    chat_history=history
+                )
+                resp_text = rag_res.get("response", "")
+
+                # Si no hay documentación para la nueva pregunta, mantener en OFRECIENDO_RADICACION
+                if rag_res.get("has_context") is False or resp_text == MENSAJE_NO_DOCUMENTADO:
+                    session.falla = texto
+                    session.estado = EstadoTicket.OFRECIENDO_RADICACION
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", resp_text)
+                    return {
+                        "tipo": "OFRECIENDO_RADICACION",
+                        "mensaje": resp_text,
+                        "ticket_id": None,
+                        "sources": [],
+                        "source": "UniMon_SinDocumentacion"
+                    }
+
                 session.estado = EstadoTicket.DIAGNOSTICO
                 session.intentos_diagnostico = 1
                 session.falla = texto
-                history = cls.get_history(session_id)
-                rag_res = await rag_service.consultar(pregunta=texto, chat_history=history, es_diagnostico=False)
-                resp_text = rag_res.get("response", "")
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", resp_text)
                 return {
@@ -776,12 +837,25 @@ class RouterLogic:
                 else:
                     query_ctx = texto
 
-                rag_res = await rag_service.consultar(
-                    pregunta=query_ctx,
-                    chat_history=history,
-                    es_diagnostico=False
+                rag_res = await rag_service.answer_query(
+                    query=query_ctx,
+                    user_role=session.user_role,
+                    chat_history=history
                 )
                 resp_text = rag_res.get("response", "")
+
+                # Si no hay documentación relevante, ofrecer radicación de inmediato
+                if rag_res.get("has_context") is False or resp_text == MENSAJE_NO_DOCUMENTADO:
+                    session.estado = EstadoTicket.OFRECIENDO_RADICACION
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", resp_text)
+                    return {
+                        "tipo": "OFRECIENDO_RADICACION",
+                        "mensaje": resp_text,
+                        "ticket_id": None,
+                        "sources": [],
+                        "source": "UniMon_SinDocumentacion"
+                    }
 
                 # Si el usuario cambió a una pregunta fuera de dominio, liberar sesión
                 if is_out_of_domain_response(resp_text):
@@ -841,6 +915,7 @@ class RouterLogic:
                 }
 
             # 2. Solicitud Directa de Préstamos / Asignación de Equipos (Sin consulta al RAG ni al LLM)
+            # Aplica discriminación estricta: si contiene términos de falla técnica o daño, retorna False
             if cls.is_equipment_request(texto):
                 session.falla = texto
                 session.categoria = CategoriaSolicitud.HARDWARE
@@ -875,16 +950,34 @@ class RouterLogic:
                     "source": "UniMon_CanalSoporte"
                 }
 
-            # 4. Consultar RAG con historial conversacional
+            # 4. Consultar RAG con historial conversacional y rol de usuario
             history = cls.get_history(session_id)
-            rag_res = await rag_service.consultar(
-                pregunta=texto,
-                chat_history=history,
-                es_diagnostico=False
+            rag_res = await rag_service.answer_query(
+                query=texto,
+                user_role=session.user_role,
+                chat_history=history
             )
             resp_text = rag_res.get("response", "")
 
-            # 5. Guardrail Fuera de Dominio (Out-of-Domain)
+            # 5. Cero Alucinaciones: Si no hay documentación relevante en ChromaDB
+            if rag_res.get("has_context") is False or resp_text == MENSAJE_NO_DOCUMENTADO:
+                session.falla = texto
+                cat, cat_name = cls.detect_category(texto)
+                session.categoria = cat
+                session.category_name = cat_name
+                session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
+                return {
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "mensaje": resp_text,
+                    "ticket_id": None,
+                    "sources": [],
+                    "source": "UniMon_SinDocumentacion"
+                }
+
+            # 6. Guardrail Fuera de Dominio (Out-of-Domain)
             if is_out_of_domain_response(resp_text):
                 cls.reset_session(session_id)
                 cls.add_history(session_id, "user", texto)
@@ -897,7 +990,7 @@ class RouterLogic:
                     "source": rag_res.get("source", "ollama_rag")
                 }
 
-            # 6. Caso dentro de dominio: Iniciar Diagnóstico Multi-Turno (Intento 1 de 3)
+            # 7. Caso dentro de dominio con contexto documentado: Iniciar Diagnóstico Multi-Turno (Intento 1 de 3)
             session.falla = texto
             cat, cat_name = cls.detect_category(texto)
             session.categoria = cat
