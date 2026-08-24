@@ -141,6 +141,39 @@ async def run_tests():
     assert "glpi" not in r_cancel["mensaje"].lower()
     print("  ✓ Cancelación con 'no' reseteó la sesión a IDLE")
 
+    # -------------------------------------------------------------
+    # PRUEBA 7: Política TTL de Expiración de Sesiones Inactivas
+    # -------------------------------------------------------------
+    print("\n[PRUEBA 7] Control Temporal (TTL) y Limpieza de Sesiones Inactivas")
+    from datetime import datetime, timezone, timedelta
+    sess_ttl = "sess_ttl_expired"
+    router_logic.reset_session(sess_ttl)
+    s = router_logic.get_session(sess_ttl)
+    s.estado = EstadoTicket.PIDIENDO_NOMBRE
+    s.pending_query = "Consulta antigua"
+    # Simular inactividad de 30 minutos
+    s.last_interaction = datetime.now(timezone.utc) - timedelta(minutes=30)
+
+    # 7.1 Limpieza explícita
+    cleaned = RouterLogic.clean_inactive_sessions(ttl_minutes=20)
+    assert cleaned >= 1
+    assert router_logic.get_session(sess_ttl).estado == EstadoTicket.IDLE
+    assert router_logic.get_session(sess_ttl).pending_query is None
+    print("  ✓ RouterLogic.clean_inactive_sessions() restableció la sesión inactiva a IDLE")
+
+    # 7.2 Expiración al recibir mensaje tras inactividad
+    sess_ttl2 = "sess_ttl_expired2"
+    router_logic.reset_session(sess_ttl2)
+    s2 = router_logic.get_session(sess_ttl2)
+    s2.estado = EstadoTicket.PIDIENDO_ROL
+    s2.pending_query = "¿Cómo cambio mi clave?"
+    s2.last_interaction = datetime.now(timezone.utc) - timedelta(minutes=25)
+
+    # Al llegar nuevo mensaje, debe detectar la expiración y reiniciar
+    r_ttl = await router_logic.procesar_mensaje("Hola", session_id=sess_ttl2)
+    assert r_ttl["tipo"] == "PIDIENDO_ROL"
+    print("  ✓ Mensaje tras inactividad >20 min reinició sesión y procedió con flujo limpio")
+
     print("\n" + "=" * 70)
     print("TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (100% OK)")
     print("=" * 70)

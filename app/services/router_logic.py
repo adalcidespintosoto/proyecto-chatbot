@@ -9,6 +9,7 @@ radicación por Slot-Filling universal simplificado en secuencia estricta de 3 p
 
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional, List
 from enum import Enum
 from pydantic import BaseModel, Field
@@ -58,6 +59,9 @@ class TicketSession(BaseModel):
     max_intentos_diagnostico: int = 3  # Diagnóstico multi-turno (2 a 3 intentos)
     user_role: Optional[str] = None    # Rol del usuario: 'estudiante', 'funcionario', 'docente', etc.
     pending_query: Optional[str] = None # Pregunta retenida antes de calificar su perfil
+    last_user_query: Optional[str] = None # Última consulta técnica o requerimiento del usuario
+    intentos_fallidos: int = 0
+    last_interaction: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     falla: Optional[str] = None
     descripcion: Optional[str] = None
     nombre: Optional[str] = None
@@ -299,6 +303,26 @@ class RouterLogic:
         """Limpia el historial de conversación de la sesión."""
         if session_id in session_history:
             session_history[session_id] = []
+
+    @classmethod
+    def clean_inactive_sessions(cls, ttl_minutes: int = 20) -> int:
+        """Reinicia a IDLE o purga las sesiones inactivas que superen el TTL."""
+        now = datetime.now(timezone.utc)
+        cleaned_count = 0
+        for session_id, session in list(ticket_sessions.items()):
+            inactive_seconds = (now - session.last_interaction).total_seconds()
+            if inactive_seconds > (ttl_minutes * 60):
+                if session.estado != EstadoTicket.IDLE or session.pending_query is not None:
+                    session.estado = EstadoTicket.IDLE
+                    session.pending_query = None
+                    session.intentos_fallidos = 0
+                    session.falla = None
+                    session.descripcion = None
+                    session.nombre = None
+                    session.correo = None
+                    cleaned_count += 1
+                    logger.info(f"Sesión {session_id} expirada por TTL ({ttl_minutes} min). Reiniciada a IDLE.")
+        return cleaned_count
 
     @classmethod
     def detect_user_role(cls, text: str) -> Optional[str]:
@@ -618,6 +642,24 @@ class RouterLogic:
         """
         texto = mensaje.strip()
         session = cls.get_session(session_id)
+        now = datetime.now(timezone.utc)
+
+        # -------------------------------------------------------------
+        # CONTROL TEMPORAL (TTL): Expiración de sesión por inactividad (>20 min)
+        # -------------------------------------------------------------
+        inactive_seconds = (now - session.last_interaction).total_seconds()
+        if inactive_seconds > (20 * 60):
+            if session.estado != EstadoTicket.IDLE or session.pending_query is not None:
+                logger.info(f"[Session: {session_id}] Sesión expirada por inactividad ({inactive_seconds:.0f}s > 1200s). Reiniciando a IDLE.")
+                session.estado = EstadoTicket.IDLE
+                session.pending_query = None
+                session.intentos_fallidos = 0
+                session.falla = None
+                session.descripcion = None
+                session.nombre = None
+                session.correo = None
+
+        session.last_interaction = now
         estado_actual = session.estado
 
         # -------------------------------------------------------------

@@ -3,6 +3,7 @@ Punto de entrada principal para la aplicación FastAPI del Asistente Virtual Uni
 Configura middlewares de CORS, eventos de ciclo de vida (lifespan), endpoints de salud y documentación.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
@@ -13,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
 from app.routers import chat
+from app.services.router_logic import RouterLogic
 
 # Configuración básica de logging estructurado
 logging.basicConfig(
@@ -35,7 +37,29 @@ async def lifespan(app: FastAPI):
     logger.info(f"Entorno: {settings.environment} | GLPI URL: {settings.glpi_base_url}")
     logger.info(f"Ollama URL: {settings.ollama_base_url} | Modelo: {settings.llm_model}")
     logger.info("=============================================================")
+
+    # Tarea en segundo plano para limpieza periódica de sesiones inactivas (TTL)
+    async def cleanup_loop():
+        while True:
+            try:
+                await asyncio.sleep(300)  # Cada 5 minutos
+                cleaned = RouterLogic.clean_inactive_sessions(ttl_minutes=20)
+                if cleaned > 0:
+                    logger.info(f"[TTL Background] {cleaned} sesiones inactivas reiniciadas a IDLE.")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[TTL Background] Error en tarea de limpieza: {e}")
+
+    cleanup_task = asyncio.create_task(cleanup_loop())
+
     yield
+
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
     logger.info("Deteniendo el servicio UniMon Backend...")
 
 
