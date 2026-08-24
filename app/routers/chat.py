@@ -89,7 +89,7 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
 
     session_id = request.session_id or "default_session"
 
-    logger.info(f"Procesando mensaje para session_id '{session_id}': '{texto[:50]}'")
+    logger.info(f"Procesando mensaje para session_id '{session_id}' (longitud: {len(texto)} chars): '{texto}'")
 
     # Invocar lógica conversacional del router de intenciones
     resultado = await router_logic.procesar_mensaje(mensaje=texto, session_id=session_id)
