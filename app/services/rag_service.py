@@ -151,21 +151,53 @@ class RAGService:
 
     def _build_role_filter(self, user_role: Optional[str]) -> Optional[Dict[str, Any]]:
         """
-        Construye la condición de filtrado en ChromaDB según el rol del usuario:
-        - 'estudiante': documentos para estudiante o generales.
-        - 'funcionario' / 'docente' / 'profesor': documentos para funcionario o generales.
-        - None / otros: sin filtro de audiencia.
+        Construye la condición de filtrado en ChromaDB según el rol del usuario
+        y la taxonomía documental (doc_type + audience):
+        
+        - 'estudiante': Solo autoservicio dirigido a estudiante o general.
+        - 'funcionario' / 'docente' / 'profesor': Autoservicio + gestión interna
+          para funcionario, profesor o general (excluye admin_ti).
+        - 'admin_ti': Sin filtro (ve todo, incluyendo gestión interna administrativa).
+        - None / otros: Solo autoservicio para cualquier audiencia (excluye gestion_interna).
         """
         if not user_role:
-            return None
+            # Usuario sin rol: mostrar solo autoservicio y normativa
+            return {
+                "$and": [
+                    {"doc_type": {"$in": ["autoservicio", "normativa"]}},
+                    {"audience": {"$in": ["general", "estudiante", "profesor", "funcionario"]}}
+                ]
+            }
 
         role_lower = user_role.strip().lower()
-        if role_lower == "estudiante":
-            return {"audience": {"$in": ["estudiante", "general"]}}
-        elif role_lower in ["funcionario", "docente", "profesor", "administrativo"]:
-            return {"audience": {"$in": ["funcionario", "general"]}}
 
-        return None
+        if role_lower == "admin_ti":
+            # Administrador de TI: acceso completo, sin filtros
+            return None
+
+        if role_lower == "estudiante":
+            return {
+                "$and": [
+                    {"doc_type": {"$in": ["autoservicio", "normativa"]}},
+                    {"audience": {"$in": ["estudiante", "general"]}}
+                ]
+            }
+
+        if role_lower in ["funcionario", "docente", "profesor", "administrativo"]:
+            return {
+                "$and": [
+                    {"doc_type": {"$in": ["autoservicio", "gestion_interna", "normativa"]}},
+                    {"audience": {"$in": ["funcionario", "profesor", "general"]}}
+                ]
+            }
+
+        # Rol desconocido: autoservicio general
+        return {
+            "$and": [
+                {"doc_type": {"$in": ["autoservicio", "normativa"]}},
+                {"audience": {"$in": ["general", "estudiante"]}}
+            ]
+        }
 
     async def query_rag(
         self,
