@@ -13,7 +13,13 @@ from typing import Dict, Any, Tuple, Optional, List
 from enum import Enum
 from pydantic import BaseModel, Field
 
-from app.services.rag_service import rag_service, is_out_of_domain_response, MENSAJE_NO_DOCUMENTADO
+from app.services.rag_service import (
+    rag_service,
+    is_out_of_domain_response,
+    is_out_of_domain_query,
+    MENSAJE_NO_DOCUMENTADO,
+    MENSAJE_FUERA_DE_DOMINIO
+)
 from app.services.glpi_service import glpi_client, is_valid_email
 
 logger = logging.getLogger("unimon.router_logic")
@@ -21,11 +27,14 @@ logger = logging.getLogger("unimon.router_logic")
 
 class EstadoTicket(str, Enum):
     IDLE = "IDLE"
+    PIDIENDO_ROL = "PIDIENDO_ROL"
     DIAGNOSTICO = "DIAGNOSTICO"
     OFRECIENDO_RADICACION = "OFRECIENDO_RADICACION"
     PIDIENDO_NOMBRE = "PIDIENDO_NOMBRE"
     PIDIENDO_CORREO = "PIDIENDO_CORREO"
     PIDIENDO_DESCRIPCION = "PIDIENDO_DESCRIPCION"
+    SOLUCIONADO = "SOLUCIONADO"
+    CANCELADO = "CANCELADO"
     # Campos de compatibilidad hacia atrás
     PIDIENDO_UBICACION = "PIDIENDO_UBICACION"
     PIDIENDO_ACTIVO = "PIDIENDO_ACTIVO"
@@ -48,6 +57,7 @@ class TicketSession(BaseModel):
     intentos_diagnostico: int = 0
     max_intentos_diagnostico: int = 3  # Diagnóstico multi-turno (2 a 3 intentos)
     user_role: Optional[str] = None    # Rol del usuario: 'estudiante', 'funcionario', 'docente', etc.
+    pending_query: Optional[str] = None # Pregunta retenida antes de calificar su perfil
     falla: Optional[str] = None
     descripcion: Optional[str] = None
     nombre: Optional[str] = None
@@ -64,6 +74,13 @@ ticket_sessions: Dict[str, TicketSession] = {}
 
 # Almacén de historial conversacional en memoria indexado por session_id (últimos mensajes)
 session_history: Dict[str, List[Dict[str, str]]] = {}
+
+# Mensaje de Calificación de Rol Obligatoria
+MENSAJE_PIDIENDO_ROL = (
+    "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar.\n\n"
+    "Para brindarte la información exacta y los instructivos correctos correspondientes a tu perfil:\n"
+    "¿Eres **Estudiante** o **Funcionario / Docente**?"
+)
 
 # Saludos simples y cortesía
 GREETING_PATTERNS = [
@@ -125,7 +142,7 @@ MENSAJE_SOLICITUD_EQUIPOS = (
     "  - **Motivo / Evento académico:** [Descripción breve]\n"
     "  - **Fecha y Horario requerido:** [Fecha y rango de horas]\n"
     "  - **Ubicación / Aula:** [Sede, Bloque, Salón]\n\n"
-    "¿Deseas que radique este requerimiento de servicio directamente en GLPI por ti ahora mismo?"
+    "¿Deseas que radique este requerimiento de servicio directamente por ti ahora mismo?"
 )
 
 # Respuestas de resolución / cierre ("no ya", "ya no", "ya no necesito", "ya pude", "ya funcionó", "listo", etc.)
@@ -287,14 +304,12 @@ class RouterLogic:
     def detect_user_role(cls, text: str) -> Optional[str]:
         """
         Detecta si el usuario menciona su rol en la comunidad universitaria.
-        Retorna 'estudiante' o 'funcionario' / 'docente'.
+        Retorna 'estudiante' o 'funcionario'.
         """
         msg_lower = text.lower()
-        if re.search(r"\b(soy|como|es para un|es para una)\s+(estudiante|alumno|alumna|aspirante)\b", msg_lower) or \
-           re.search(r"\b(estudiante|alumno|alumna|aspirante)\b", msg_lower):
+        if re.search(r"\b(soy|como|es para un|es para una)?\s*(estudiante|estudiantes|alumno|alumna|alumnos|alumnas|pregrado|posgrado|aspirante|aspirantes)\b", msg_lower):
             return "estudiante"
-        elif re.search(r"\b(soy|como)\s+(profesor|profesora|docente|funcionario|funcionaria|administrativo|administrativa|empleado|empleada)\b", msg_lower) or \
-             re.search(r"\b(profesor|profesora|docente|funcionario|funcionaria|administrativo|administrativa)\b", msg_lower):
+        elif re.search(r"\b(soy|como|es para un|es para una)?\s*(profesor|profesora|profesores|profesoras|docente|docentes|funcionario|funcionaria|funcionarios|funcionarias|administrativo|administrativos|administrativa|administrativas|colaborador|colaboradora|colaboradores|trabajador|trabajadora|trabajadores|empleado|empleada|empleados)\b", msg_lower):
             return "funcionario"
         return None
 
@@ -579,7 +594,7 @@ class RouterLogic:
             cls.reset_session(session_id)
             return {
                 "tipo": "ERROR",
-                "mensaje": f"Ocurrió un inconveniente al radicar el ticket en GLPI ({exc}). Por favor contacta a solicitudcomputo@unisimon.edu.co o helpdesk@unisimon.edu.co.",
+                "mensaje": f"Ocurrió un inconveniente al procesar la solicitud ({exc}). Por favor contacta a solicitudcomputo@unisimon.edu.co o helpdesk@unisimon.edu.co.",
                 "ticket_id": None,
                 "source": "GLPI_ERROR"
             }
@@ -731,6 +746,110 @@ class RouterLogic:
                 }
 
         # -------------------------------------------------------------
+        # ESTADO: PIDIENDO_ROL (Calificación Previa Obligatoria de Perfil)
+        # -------------------------------------------------------------
+        elif estado_actual == EstadoTicket.PIDIENDO_ROL:
+            detected = cls.detect_user_role(texto)
+            if not detected:
+                t_lower = texto.lower().strip()
+                if re.search(r"\b(estudiante|estudiantes|alumno|alumna|alumnos|alumnas|pregrado|posgrado|aspirante|aspirantes|1|uno)\b", t_lower):
+                    detected = "estudiante"
+                elif re.search(r"\b(funcionario|funcionaria|funcionarios|funcionarias|docente|docentes|profesor|profesora|profesores|profesoras|administrativo|administrativos|administrativa|administrativas|colaborador|colaboradora|colaboradores|trabajador|trabajadora|trabajadores|empleado|empleada|empleados|2|dos)\b", t_lower):
+                    detected = "funcionario"
+
+            if not detected:
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", MENSAJE_PIDIENDO_ROL)
+                return {
+                    "tipo": "PIDIENDO_ROL",
+                    "mensaje": MENSAJE_PIDIENDO_ROL,
+                    "ticket_id": None,
+                    "source": "UniMon_PidiendoRol"
+                }
+
+            session.user_role = detected
+            logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
+
+            # Si el usuario formuló una pregunta antes de calificar su rol:
+            if session.pending_query:
+                query_to_run = session.pending_query
+                session.pending_query = None
+
+                # Consultar RAG con el rol confirmado y filtrar chunks
+                history = cls.get_history(session_id)
+                rag_res = await rag_service.answer_query(
+                    query=query_to_run,
+                    user_role=session.user_role,
+                    chat_history=history
+                )
+                resp_text = rag_res.get("response", "")
+
+                # Guardrail Fuera de Dominio
+                if is_out_of_domain_response(resp_text):
+                    cls.reset_session(session_id)
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", resp_text)
+                    return {
+                        "tipo": "FUERA_DE_DOMINIO",
+                        "mensaje": resp_text,
+                        "ticket_id": None,
+                        "sources": rag_res.get("sources"),
+                        "source": rag_res.get("source", "ollama_rag")
+                    }
+
+                # Cero Alucinaciones / Sin Documentación
+                if rag_res.get("has_context") is False or \
+                   resp_text == MENSAJE_NO_DOCUMENTADO or \
+                   "No dispongo de un procedimiento documentado" in resp_text or \
+                   "No dispongo de un instructivo" in resp_text:
+                    session.falla = query_to_run
+                    cat, cat_name = cls.detect_category(query_to_run)
+                    session.categoria = cat
+                    session.category_name = cat_name
+                    session.urgency, session.impact = cls.calculate_urgency_and_impact(query_to_run)
+                    session.estado = EstadoTicket.OFRECIENDO_RADICACION
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", resp_text)
+                    return {
+                        "tipo": "OFRECIENDO_RADICACION",
+                        "mensaje": resp_text,
+                        "ticket_id": None,
+                        "sources": rag_res.get("sources", []),
+                        "source": "UniMon_SinDocumentacion"
+                    }
+
+                # Respuesta técnica documentada -> DIAGNOSTICO
+                session.falla = query_to_run
+                cat, cat_name = cls.detect_category(query_to_run)
+                session.categoria = cat
+                session.category_name = cat_name
+                session.urgency, session.impact = cls.calculate_urgency_and_impact(query_to_run)
+                session.intentos_diagnostico = 1
+                session.estado = EstadoTicket.DIAGNOSTICO
+
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
+                return {
+                    "tipo": "DIAGNOSTICO",
+                    "mensaje": resp_text,
+                    "ticket_id": None,
+                    "sources": rag_res.get("sources"),
+                    "source": rag_res.get("source", "ollama_rag")
+                }
+            else:
+                # No había pregunta previa (saludo inicial o calificación limpia)
+                session.estado = EstadoTicket.DIAGNOSTICO
+                ready_msg = "¡Entendido! ¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?"
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", ready_msg)
+                return {
+                    "tipo": "DIAGNOSTICO",
+                    "mensaje": ready_msg,
+                    "ticket_id": None,
+                    "source": "UniMon_Assistant"
+                }
+
+        # -------------------------------------------------------------
         # ESTADO: OFRECIENDO_RADICACION (Canal de Correo + Plantilla entregados)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.OFRECIENDO_RADICACION:
@@ -741,7 +860,7 @@ class RouterLogic:
                 session.correo = None
                 session.descripcion = None
                 session.estado = EstadoTicket.PIDIENDO_NOMBRE
-                prompt_msg = "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:"
+                prompt_msg = "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:"
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", prompt_msg)
                 return {
@@ -847,7 +966,7 @@ class RouterLogic:
                 session.correo = None
                 session.descripcion = None
                 session.estado = EstadoTicket.PIDIENDO_NOMBRE
-                prompt_msg = "Con gusto te ayudo a radicar el caso en GLPI. Para iniciar, por favor indícame tu **Nombre Completo**:"
+                prompt_msg = "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:"
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", prompt_msg)
                 return {
@@ -929,13 +1048,62 @@ class RouterLogic:
             }
 
         # -------------------------------------------------------------
-        # ESTADO: IDLE (Mensaje Inicial)
+        # ESTADO: IDLE (Mensaje Inicial / Nueva Conversación)
         # -------------------------------------------------------------
         else:
-            # 1. Saludo simple
+            # 1. Guardrail rápido de Fuera de Dominio (Out-of-Domain)
+            if is_out_of_domain_query(texto):
+                cls.reset_session(session_id)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", MENSAJE_FUERA_DE_DOMINIO)
+                return {
+                    "tipo": "FUERA_DE_DOMINIO",
+                    "mensaje": MENSAJE_FUERA_DE_DOMINIO,
+                    "ticket_id": None,
+                    "source": "UniMon_Guardrail"
+                }
+
+            # 2. Si el usuario NO tiene rol asignado en la sesión:
+            if not session.user_role:
+                detected_role = cls.detect_user_role(texto)
+                if detected_role:
+                    session.user_role = detected_role
+                    logger.info(f"[Session: {session_id}] Rol identificado en primer mensaje: '{session.user_role}'")
+                    # Si el mensaje era solo declarar el rol o saludo con rol (ej: "soy estudiante", "hola soy profesor")
+                    if cls.is_greeting(texto) or len(texto.split()) <= 4:
+                        session.estado = EstadoTicket.DIAGNOSTICO
+                        greeting_reply = (
+                            "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar. "
+                            "¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?"
+                        )
+                        cls.add_history(session_id, "user", texto)
+                        cls.add_history(session_id, "assistant", greeting_reply)
+                        return {
+                            "tipo": "SALUDO",
+                            "mensaje": greeting_reply,
+                            "ticket_id": None,
+                            "source": "UniMon_Assistant"
+                        }
+                    # Si vino con pregunta (ej: "soy estudiante y no puedo entrar al portal"), continuará hacia el RAG abajo
+                else:
+                    # El usuario no especificó su rol -> Calificación de rol obligatoria
+                    if not cls.is_greeting(texto):
+                        session.pending_query = texto
+                    session.estado = EstadoTicket.PIDIENDO_ROL
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", MENSAJE_PIDIENDO_ROL)
+                    return {
+                        "tipo": "PIDIENDO_ROL",
+                        "mensaje": MENSAJE_PIDIENDO_ROL,
+                        "ticket_id": None,
+                        "source": "UniMon_Assistant"
+                    }
+
+            # Si ya tiene rol en la sesión:
+            # 3. Saludo simple
             if cls.is_greeting(texto):
                 greeting_reply = (
-                    "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar. "
+                    "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar. "
                     "¿En qué te puedo colaborar hoy? Puedes consultarme sobre procedimientos institucionales (backups, cuentas, antimalware, Seven/Kactus) "
                     "o indicarme si presentas alguna falla con tus equipos o servicios para ayudarte."
                 )
@@ -948,8 +1116,7 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # 2. Solicitud Directa de Préstamos / Asignación de Equipos (Sin consulta al RAG ni al LLM)
-            # Aplica discriminación estricta: si contiene términos de falla técnica o daño, retorna False
+            # 4. Solicitud Directa de Préstamos / Asignación de Equipos (Sin consulta al RAG ni al LLM)
             if cls.is_equipment_request(texto):
                 session.falla = texto
                 session.categoria = CategoriaSolicitud.HARDWARE
@@ -966,7 +1133,7 @@ class RouterLogic:
                     "source": "UniMon_SolicitudEquipos"
                 }
 
-            # 3. Solicitud de Trámites Administrativos o Técnico Directo (Sin diagnóstico simulado)
+            # 5. Solicitud de Trámites Administrativos o Técnico Directo (Sin diagnóstico simulado)
             if cls.is_physical_or_admin_request(texto) or cls.is_direct_tech_request(texto):
                 session.falla = texto
                 cat, cat_name = cls.detect_category(texto)
@@ -984,7 +1151,7 @@ class RouterLogic:
                     "source": "UniMon_CanalSoporte"
                 }
 
-            # 4. Consultar RAG con historial conversacional y rol de usuario
+            # 6. Consultar RAG con historial conversacional y rol de usuario
             history = cls.get_history(session_id)
             rag_res = await rag_service.answer_query(
                 query=texto,
@@ -993,7 +1160,20 @@ class RouterLogic:
             )
             resp_text = rag_res.get("response", "")
 
-            # 5. Cero Alucinaciones / Falta de Documentación: Forzar OFRECIENDO_RADICACION
+            # 7. Guardrail Fuera de Dominio según respuesta generada
+            if is_out_of_domain_response(resp_text):
+                cls.reset_session(session_id)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
+                return {
+                    "tipo": "FUERA_DE_DOMINIO",
+                    "mensaje": resp_text,
+                    "ticket_id": None,
+                    "sources": rag_res.get("sources"),
+                    "source": rag_res.get("source", "ollama_rag")
+                }
+
+            # 8. Cero Alucinaciones / Falta de Documentación: Forzar OFRECIENDO_RADICACION
             if rag_res.get("has_context") is False or \
                resp_text == MENSAJE_NO_DOCUMENTADO or \
                "No dispongo de un procedimiento documentado" in resp_text or \
@@ -1014,20 +1194,7 @@ class RouterLogic:
                     "source": "UniMon_SinDocumentacion"
                 }
 
-            # 6. Guardrail Fuera de Dominio (Out-of-Domain)
-            if is_out_of_domain_response(resp_text):
-                cls.reset_session(session_id)
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", resp_text)
-                return {
-                    "tipo": "FUERA_DE_DOMINIO",
-                    "mensaje": resp_text,
-                    "ticket_id": None,
-                    "sources": rag_res.get("sources"),
-                    "source": rag_res.get("source", "ollama_rag")
-                }
-
-            # 7. Caso dentro de dominio con contexto documentado: Iniciar Diagnóstico Multi-Turno (Intento 1 de 3)
+            # 9. Caso dentro de dominio con contexto documentado: Iniciar Diagnóstico Multi-Turno (Intento 1 de 3)
             session.falla = texto
             cat, cat_name = cls.detect_category(texto)
             session.categoria = cat
