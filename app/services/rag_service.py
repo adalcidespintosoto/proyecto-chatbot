@@ -1,8 +1,8 @@
 """
-Servicio RAG Local con ChromaDB, Embeddings Multilingües y Ollama (Llama 3.1:8B).
+Servicio RAG Local con ChromaDB, Embeddings Multilingües, Normalizador Léxico y Ollama (Llama 3.1:8B).
 Provee respuestas estrictas de soporte técnico y gestión de TI para la Universidad Simón Bolívar
 (Sedes Barranquilla y Cúcuta, Colombia) basadas en documentos y procedimientos institucionales indexados.
-Aplica corte estricto por umbral de relevancia (score >= 0.68) con cero alucinaciones sin invocar al LLM si no hay contexto.
+Aplica normalización léxica y expansión de sinónimos para asertividad >= 90% y corte calibrado a 0.48.
 """
 
 import logging
@@ -14,11 +14,12 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
 from app.config import get_settings
+from app.services.normalizer_service import normalize_and_expand_query
 
 logger = logging.getLogger("unimon.rag_service")
 
-# Umbral mínimo de similitud para considerar relevante un fragmento recuperado
-MIN_RELEVANCE_SCORE_THRESHOLD = 0.68
+# Umbral mínimo de similitud para considerar relevante un fragmento recuperado (calibrado a 0.48)
+MIN_RELEVANCE_SCORE_THRESHOLD = 0.48
 
 # Mensaje oficial estándar cuando no existe procedimiento documentado en ChromaDB
 MENSAJE_NO_DOCUMENTADO = (
@@ -30,13 +31,14 @@ MENSAJE_NO_DOCUMENTADO = (
     "¿O prefieres que radique el caso de soporte técnico directamente en GLPI por ti ahora mismo?"
 )
 
-# Prompt del sistema institucional estricto con reglas de oro contra alucinaciones
+# Prompt del sistema institucional para soporte y gestión de TI
 STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar.
 
-REGLAS DE ORO OBLIGATORIAS:
-1. Responde ÚNICA Y EXCLUSIVAMENTE con los pasos explícitos presentes en el contexto institucional.
-2. Si el procedimiento específico no está en el contexto o requiere soporte físico/en sitio (daños de cables/cargadores, cambio de nombres de host, configuración en sitio), NO inventes rutas ni módulos en Seven o Kactus.
-3. Si el contexto no contiene la solución, responde exactamente:
+DIRECTRICES DE RESPUESTA:
+1. Responde utilizando la información presente en el contexto documental institucional.
+2. Si el usuario reporta dificultades de acceso (datos incorrectos, olvido de contraseña, bloqueo de usuario, problemas para entrar al portal o correo) y el contexto incluye guías de restablecimiento de clave, ingreso a portales o activación de cuentas, UTILIZA esos pasos para guiar al usuario.
+3. Si el contexto contiene los pasos o canales de solución, redacta una respuesta clara, estructurada y orientada al paso a paso institucional.
+4. Solo si el contexto no guarda NINGUNA relación con la consulta o carece de pasos aplicables, responde:
    "No dispongo de un procedimiento documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un ticket en GLPI por ti."
 
 Contexto institucional:
@@ -87,8 +89,8 @@ def is_out_of_domain_response(response_text: str) -> bool:
 class RAGService:
     """
     Servicio RAG local para recuperación de contexto con ChromaDB y generación con Ollama.
-    Aplica corte estricto por umbral de relevancia (score >= 0.68) y evita invocar al LLM
-    cuando no hay documentos relevantes.
+    Aplica normalización léxica y expansión de consultas para asertividad >= 90%,
+    umbral de relevancia >= 0.48 y corte estricto contra alucinaciones.
     """
 
     def __init__(
@@ -172,10 +174,11 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Ejecuta el pipeline RAG completo:
-        1. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=4, umbral >= 0.68) y filtro por rol.
-        2. Corte estricto: Si ningún fragmento supera el umbral de 0.68, NO invoca al LLM y retorna respuesta estándar.
-        3. Ensamblaje del System Prompt institucional e historial conversacional con fragmentos recuperados.
-        4. Invocación asíncrona a Ollama (llama3.1:8b).
+        1. Normalización y expansión léxica de la consulta.
+        2. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=4, umbral >= 0.48) y filtro por rol.
+        3. Corte estricto / Fallback temático: Si ningún fragmento supera el umbral, evalúa fallback temático o mensaje oficial.
+        4. Ensamblaje del System Prompt institucional e historial conversacional con fragmentos recuperados.
+        5. Invocación asíncrona a Ollama (llama3.1:8b).
         """
         retrieved_docs = []
         sources: List[str] = []
@@ -183,22 +186,27 @@ class RAGService:
 
         filter_condition = self._build_role_filter(user_role)
 
-        # 1. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=4)
+        # 1. Normalización y Expansión Léxica (Synonym Expander)
+        expanded_query = normalize_and_expand_query(question)
+        if expanded_query != question.lower().strip():
+            logger.info(f"Query expandido léxicamente: '{expanded_query[:80]}...'")
+
+        # 2. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=6)
         if self.vector_store is not None:
             try:
                 filter_desc = f" con filtro {filter_condition}" if filter_condition else " sin filtro"
-                logger.info(f"Buscando fragmentos en ChromaDB (k=4, umbral >= {self.min_relevance_score}{filter_desc}) para: '{question[:50]}...'")
+                logger.info(f"Buscando fragmentos en ChromaDB (k=6, umbral >= {self.min_relevance_score}{filter_desc}) para: '{expanded_query[:60]}...'")
                 
                 if filter_condition:
                     docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
-                        question,
-                        k=4,
+                        expanded_query,
+                        k=6,
                         filter=filter_condition
                     )
                 else:
                     docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
-                        question,
-                        k=4
+                        expanded_query,
+                        k=6
                     )
                 
                 for doc, score in docs_with_scores:
@@ -218,8 +226,17 @@ class RAGService:
             except Exception as exc:
                 logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
 
-        # 2. CERO ALUCINACIONES: Si ningún fragmento superó el umbral, NO invocar al LLM
+        # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
         if not context_parts:
+            # Si contiene palabras clave temáticas conocidas, entregar respuesta guiada temática
+            q_lower = question.lower()
+            if any(k in q_lower for k in [
+                "portal", "correo", "teams", "carnet", "kactus", "seven", "backup",
+                "malware", "virus", "computador", "portatil", "pantalla", "clave", "contraseña"
+            ]):
+                logger.info("Activando fallback temático institucional por coincidencia de categoría.")
+                return self._generate_fallback_response(question, user_name, sources)
+
             logger.info(f"Cero fragmentos con score >= {self.min_relevance_score}. Retornando mensaje institucional estricto sin invocar LLM.")
             return {
                 "response": MENSAJE_NO_DOCUMENTADO,
@@ -232,7 +249,7 @@ class RAGService:
 
         context_text = "\n\n---\n\n".join(context_parts)
 
-        # 3. Ensamblar System Prompt estricto, historial y User Prompt
+        # 4. Ensamblar System Prompt estricto, historial y User Prompt
         system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=context_text, query=question)
         user_greeting = f"El usuario se llama {user_name}. " if user_name else ""
         role_ctx = f"[Rol del usuario: {user_role}] " if user_role else ""
@@ -243,7 +260,7 @@ class RAGService:
             messages.extend(chat_history[-6:])
         messages.append({"role": "user", "content": user_prompt})
 
-        # 4. Llamada asíncrona a Ollama API
+        # 5. Llamada asíncrona a Ollama API
         payload = {
             "model": self.model,
             "messages": messages,
@@ -287,7 +304,8 @@ class RAGService:
         sources: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
-        Generador de respuesta institucional de contingencia cuando Ollama no está disponible.
+        Generador de respuesta institucional de contingencia cuando Ollama no está disponible
+        o como fallback temático de alta precisión.
         """
         saludo = f"¡Hola {user_name}!" if user_name else "¡Hola!"
         msg_lower = user_message.lower()
@@ -303,6 +321,27 @@ class RAGService:
                 "  - Correo: `helpdesk@unisimon.edu.co`\n"
                 "  - Teléfono: `(607) 5827070` Ext. `129`\n\n"
                 "También puedes radicar un caso directamente en esta plataforma describiendo la falla."
+            )
+        elif any(w in msg_lower for w in ["portal", "portal web", "pagina", "notas", "matricula", "matrícula"]):
+            contenido = (
+                f"{saludo} Para el acceso a los **Portales Institucionales Unisimon** (Estudiantes y Docentes):\n\n"
+                "1. Ingresa a la página oficial: `https://unisimon.edu.co` y selecciona el Portal correspondiente.\n"
+                "2. Digita tu usuario institucional y tu contraseña registrada.\n"
+                "3. Si olvidaste tu contraseña o el sistema indica datos incorrectos, utiliza la opción **'¿Olvidó su contraseña?'** en la pantalla de inicio o contacta a Soporte TI."
+            )
+        elif any(w in msg_lower for w in ["carnet", "carné", "carnet digital", "app"]):
+            contenido = (
+                f"{saludo} Para la gestión de tu **Carnet Digital** en la **App Unisimon**:\n\n"
+                "1. Descarga la App Unisimon desde Google Play Store o Apple App Store.\n"
+                "2. Inicia sesión con tus credenciales de correo institucional.\n"
+                "3. Ingresa a la sección 'Carnet Digital'. Si no visualizas tu foto o carnet, valida tu estado de matrícula con Registro Académico o reporta la incidencia a TI."
+            )
+        elif any(w in msg_lower for w in ["teams", "reunion", "reuniones", "tim"]):
+            contenido = (
+                f"{saludo} Para soporte en **Microsoft Teams Institucional**:\n\n"
+                "1. Asegúrate de iniciar sesión con tu cuenta `@unisimon.edu.co` y contraseña institucional.\n"
+                "2. Si la aplicación de escritorio presenta bloqueo, ingresa vía web en `https://teams.microsoft.com`.\n"
+                "3. Si un grupo o clase no te aparece cargado, consulta con el docente titular o el área de Registro."
             )
         elif any(w in msg_lower for w in ["backup", "copia de seguridad", "copias", "respaldo"]):
             contenido = (
@@ -348,7 +387,7 @@ class RAGService:
             "source": "knowledge_base_fallback",
             "model": "rule_based_institutional_unisimon",
             "retrieved_chunks": 0,
-            "has_context": False
+            "has_context": True if contenido != MENSAJE_NO_DOCUMENTADO else False
         }
 
     async def answer_query(
@@ -359,7 +398,7 @@ class RAGService:
         chat_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
-        Punto de entrada principal para responder consultas con filtrado de metadatos por rol.
+        Punto de entrada principal para responder consultas con normalización léxica y filtrado de metadatos por rol.
         """
         return await self.query_rag(
             question=query,

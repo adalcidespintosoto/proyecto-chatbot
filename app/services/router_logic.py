@@ -2,9 +2,9 @@
 Lógica de Enrutamiento, Clasificación de Intenciones y Chatbot Proactivo de Nivel 1 para UniMon (USB).
 Maneja el ciclo de diagnóstico multi-turno de Nivel 1 (hasta 3 intentos), discriminación estricta de fallas técnicas
 vs. solicitudes de préstamos de equipos físicos, detección y asignación de rol del usuario (Estudiante / Docente / Funcionario),
-cero alucinaciones con transición a OFRECIENDO_RADICACION ante falta de documentación relevante, flujo universal de
-cancelación, entrega de canal oficial por correo con plantilla estructurada y radicación por Slot-Filling
-universal simplificado en secuencia estricta de 3 pasos (Nombre Completo -> Correo Electrónico -> Descripción Detallada).
+cero alucinaciones con transición forzada a OFRECIENDO_RADICACION ante falta de documentación relevante, flujo universal de
+cancelación y rechazo explícito ("no", "cancelar"), entrega de canal oficial por correo con plantilla estructurada y
+radicación por Slot-Filling universal simplificado en secuencia estricta de 3 pasos (Nombre -> Correo -> Descripción).
 """
 
 import logging
@@ -72,18 +72,18 @@ GREETING_PATTERNS = [
     r"^[¿?]?qu[eé] tal\b", r"^buen d[ií]a\b", r"^hi\b", r"^hello\b"
 ]
 
-# Patrones de Cancelación Universal durante el flujo de radicación
+# Patrones de Cancelación Universal y Rechazo durante el flujo de radicación
 CANCEL_PATTERNS = [
     "cancelar", "cancela", "ya no", "no gracias", "olvidalo", "olvídalo",
-    "dejalo asi", "déjalo así", "no quiero", "no deseo", "cancelar radicación",
-    "cancelar radicacion", "cancelar ticket"
+    "dejalo asi", "déjalo así", "no quiero", "no deseo", "no", "nop", "noup",
+    "cancelar radicación", "cancelar radicacion", "cancelar ticket", "rechazar"
 ]
 
 CANCEL_REGEX = [
-    r"\b(cancelar|cancela|ya\s+no|no\s+gracias|olvidalo|olv[ií]dalo|dejalo\s+asi|d[eé]jalo\s+as[ií]|no\s+quiero|no\s+deseo|cancelar\s+ticket|cancelar\s+radicaci[oó]n)\b"
+    r"\b(cancelar|cancela|ya\s+no|no\s+gracias|olvidalo|olv[ií]dalo|dejalo\s+asi|d[eé]jalo\s+as[ií]|no\s+quiero|no\s+deseo|cancelar\s+ticket|cancelar\s+radicaci[oó]n|no\s+lo\s+radiques|no\s+radiques)\b"
 ]
 
-MENSAJE_CANCELACION = "Entendido, he cancelado el proceso de radicación. ¿Hay algo más sobre los procedimientos de TI en lo que te pueda colaborar?"
+MENSAJE_CANCELACION = "Entendido, he cancelado el proceso. Si necesitas ayuda con otro tema, aquí estaré."
 
 # Términos que identifican fallas técnicas, daños o problemas de soporte (NUNCA deben tratarse como préstamos)
 FAILURE_AND_SUPPORT_TERMS = [
@@ -94,17 +94,22 @@ FAILURE_AND_SUPPORT_TERMS = [
     "revisar", "arreglo", "arreglar", "soporte", "descompuesto", "descompuesta",
     "intermitente", "luz roja", "desconectado", "desconectada", "sin internet",
     "sin red", "sin sonido", "no escucha", "no suena", "no proyecta", "se trabó",
-    "se congela", "pantalla negra", "no da señal"
+    "se congela", "se cuelga", "pantalla negra", "no da señal", "mal contacto",
+    "no carga", "mover el cable", "moverle el cable", "se traba", "datos incorrectos",
+    "clave incorrecta", "no me deja entrar", "no entra", "clave invalida",
+    "datos invalidos", "no me coge la clave", "se cierra solo", "bota error",
+    "arroja error", "suspendido", "no sincroniza", "esta caido", "está caído",
+    "sin wifi", "cable pelado", "no arranca", "muerto"
 ]
 
 # Verbos y raíces de solicitud o reserva de préstamo físico
 LOAN_REQUEST_VERBS = [
-    r"\b(prest\w+|pr[eé]st\w+|solicit\w+|asign\w+|apart\w+|reserv\w+|alquil\w+)\b"
+    r"\b(prest\w+|pr[eé]st\w+|solicit\w+|asign\w+|apart\w+|reserv\w+|alquil\w+|pedir|pido|necesito\s+que\s+me\s+den|requiero\s+que\s+me\s+presten|como\s+hago\s+para\s+tener|quiero\s+solicitar)\b"
 ]
 
 # Nombres de recursos y equipos físicos institucionales
 EQUIPMENT_NOUNS = [
-    r"\b(micr[oó]fono|micr[oó]fonos|tablet|tablets|port[aá]til|port[aá]tiles|computador|computadores|computadora|computadoras|laptop|laptops|video\s*beam|videobeam|proyector|proyectores|sala|auditorio|pantalla|pantallas)\b"
+    r"\b(pc|pcs|compu|computador|computadores|computadora|computadoras|port[aá]til|port[aá]tiles|laptop|laptops|ordenador|torre|pantalla|pantallas|monitor|monitores|display|micr[oó]fono|micr[oó]fonos|diadema|diademas|aud[ií]fonos|auriculares|parlante|parlantes|altavoz|altavoces|tablet|tablets|tableta|tabletas|ipad|ipads|video\s*beam|videobeam|proyector|proyectores|beamer|canon|cañ[oó]n|sala|sala\s+de\s+c[oó]mputo|auditorio|laboratorio|cargador|fuente|cable\s+de\s+poder)\b"
 ]
 
 # Mensaje estructurado directo para solicitudes de préstamo / asignación de equipos
@@ -300,12 +305,13 @@ class RouterLogic:
     @classmethod
     def is_cancellation(cls, text: str) -> bool:
         """
-        Detecta si el usuario solicita cancelar el proceso de radicación
-        ('cancelar', 'cancela', 'ya no', 'no gracias', 'olvidalo', 'dejalo asi', 'no quiero').
+        Detecta si el usuario solicita cancelar el proceso de radicación o rechaza la oferta
+        ('cancelar', 'cancela', 'ya no', 'no gracias', 'olvidalo', 'dejalo asi', 'no quiero', 'no', 'nop').
         """
         msg_clean = re.sub(r"[^\w\s]", " ", text.strip().lower())
         msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
-        if any(msg_clean == pat for pat in CANCEL_PATTERNS):
+        words = msg_clean.split()
+        if msg_clean in CANCEL_PATTERNS or (len(words) == 1 and words[0] in ["no", "nop", "noup", "none"]):
             return True
         return any(re.search(pat, msg_clean) for pat in CANCEL_REGEX)
 
@@ -564,9 +570,9 @@ class RouterLogic:
         Procesa el mensaje del usuario de acuerdo a la máquina de estados conversacional de Nivel 1.
         Aplica:
         1. Detección y propagación del rol del usuario (Estudiante / Docente / Funcionario).
-        2. Flujo de Cancelación Universal en cualquier estado de radicación.
+        2. Flujo de Cancelación Universal y Rechazo ("no", "cancelar") en cualquier estado de radicación.
         3. Discriminación estricta de solicitudes de préstamos/asignación de equipos físicos vs. fallas técnicas.
-        4. Cero alucinaciones: Si no hay documentación que supere el umbral RAG (0.68), transiciona a OFRECIENDO_RADICACION.
+        4. Cero alucinaciones con transición forzada a OFRECIENDO_RADICACION cuando no hay documentación relevante.
         5. Detección de cierre ("no ya", "ya no necesito", "ya pude", "ya funcionó", "listo").
         6. Diagnóstico multi-turno (hasta max_intentos_diagnostico = 3 intentos) con RAG filtrado por rol.
         7. Secuencia estricta de 3 pasos para Slot-Filling:
@@ -591,8 +597,8 @@ class RouterLogic:
         logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Rol: {session.user_role} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje ({len(texto)} chars): '{texto}'")
 
         # -------------------------------------------------------------
-        # REGLA GLOBAL 1: Flujo de Cancelación Universal
-        # Si el usuario desea cancelar en cualquier estado de radicación
+        # REGLA GLOBAL 1: Flujo de Cancelación Universal y Rechazo ("no", "cancelar")
+        # Si el usuario rechaza la oferta o desea cancelar en cualquier estado de radicación
         # -------------------------------------------------------------
         if estado_actual in [
             EstadoTicket.OFRECIENDO_RADICACION,
@@ -741,7 +747,7 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # 3. Cualquier otra respuesta en este estado: reiniciar diagnóstico para la nueva pregunta
+            # 3. Cualquier otra respuesta en este estado: evaluar nueva pregunta
             else:
                 history = cls.get_history(session_id)
                 rag_res = await rag_service.answer_query(
@@ -751,8 +757,11 @@ class RouterLogic:
                 )
                 resp_text = rag_res.get("response", "")
 
-                # Si no hay documentación para la nueva pregunta, mantener en OFRECIENDO_RADICACION
-                if rag_res.get("has_context") is False or resp_text == MENSAJE_NO_DOCUMENTADO:
+                # Si no hay documentación para la nueva pregunta, forzar permanencia en OFRECIENDO_RADICACION
+                if rag_res.get("has_context") is False or \
+                   resp_text == MENSAJE_NO_DOCUMENTADO or \
+                   "No dispongo de un procedimiento documentado" in resp_text or \
+                   "No dispongo de un instructivo" in resp_text:
                     session.falla = texto
                     session.estado = EstadoTicket.OFRECIENDO_RADICACION
                     cls.add_history(session_id, "user", texto)
@@ -844,8 +853,11 @@ class RouterLogic:
                 )
                 resp_text = rag_res.get("response", "")
 
-                # Si no hay documentación relevante, ofrecer radicación de inmediato
-                if rag_res.get("has_context") is False or resp_text == MENSAJE_NO_DOCUMENTADO:
+                # Si el RAG confiesa no tener documentación relevante, forzar de inmediato OFRECIENDO_RADICACION
+                if rag_res.get("has_context") is False or \
+                   resp_text == MENSAJE_NO_DOCUMENTADO or \
+                   "No dispongo de un procedimiento documentado" in resp_text or \
+                   "No dispongo de un instructivo" in resp_text:
                     session.estado = EstadoTicket.OFRECIENDO_RADICACION
                     cls.add_history(session_id, "user", texto)
                     cls.add_history(session_id, "assistant", resp_text)
@@ -853,7 +865,7 @@ class RouterLogic:
                         "tipo": "OFRECIENDO_RADICACION",
                         "mensaje": resp_text,
                         "ticket_id": None,
-                        "sources": [],
+                        "sources": rag_res.get("sources", []),
                         "source": "UniMon_SinDocumentacion"
                     }
 
@@ -959,8 +971,11 @@ class RouterLogic:
             )
             resp_text = rag_res.get("response", "")
 
-            # 5. Cero Alucinaciones: Si no hay documentación relevante en ChromaDB
-            if rag_res.get("has_context") is False or resp_text == MENSAJE_NO_DOCUMENTADO:
+            # 5. Cero Alucinaciones / Falta de Documentación: Forzar OFRECIENDO_RADICACION
+            if rag_res.get("has_context") is False or \
+               resp_text == MENSAJE_NO_DOCUMENTADO or \
+               "No dispongo de un procedimiento documentado" in resp_text or \
+               "No dispongo de un instructivo" in resp_text:
                 session.falla = texto
                 cat, cat_name = cls.detect_category(texto)
                 session.categoria = cat
@@ -973,7 +988,7 @@ class RouterLogic:
                     "tipo": "OFRECIENDO_RADICACION",
                     "mensaje": resp_text,
                     "ticket_id": None,
-                    "sources": [],
+                    "sources": rag_res.get("sources", []),
                     "source": "UniMon_SinDocumentacion"
                 }
 
