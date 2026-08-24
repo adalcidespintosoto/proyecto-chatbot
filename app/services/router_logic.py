@@ -1,12 +1,14 @@
 """
-Lógica de Enrutamiento, Clasificación de Intenciones y Chatbot Proactivo de Nivel 1 para UniMon.
-Maneja el ciclo de diagnóstico de Nivel 1 y radicación por Slot-Filling dinámico en GLPI por sesión.
-Distingue automáticamente entre solicitudes de SOFTWARE (solo Nombre y Correo) y HARDWARE (Nombre, Correo, Ubicación y Placa).
+Lógica de Enrutamiento, Clasificación de Intenciones y Chatbot Proactivo de Nivel 1 para UniMon (USB).
+Maneja el ciclo de diagnóstico multi-turno de Nivel 1 (hasta 3 intentos), detección inmediata de solicitudes
+físicas y préstamos de equipos (sin bucles de diagnóstico ni consultas al LLM), flujo universal de cancelación,
+entrega de canal oficial por correo con plantilla estructurada y radicación por Slot-Filling universal simplificado
+en secuencia estricta de 3 pasos (Nombre Completo -> Correo Electrónico -> Descripción Detallada del Requerimiento/Problema).
 """
 
 import logging
 import re
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 from enum import Enum
 from pydantic import BaseModel, Field
 
@@ -19,8 +21,11 @@ logger = logging.getLogger("unimon.router_logic")
 class EstadoTicket(str, Enum):
     IDLE = "IDLE"
     DIAGNOSTICO = "DIAGNOSTICO"
+    OFRECIENDO_RADICACION = "OFRECIENDO_RADICACION"
     PIDIENDO_NOMBRE = "PIDIENDO_NOMBRE"
     PIDIENDO_CORREO = "PIDIENDO_CORREO"
+    PIDIENDO_DESCRIPCION = "PIDIENDO_DESCRIPCION"
+    # Campos de compatibilidad hacia atrás
     PIDIENDO_UBICACION = "PIDIENDO_UBICACION"
     PIDIENDO_ACTIVO = "PIDIENDO_ACTIVO"
 
@@ -39,8 +44,10 @@ class TicketSession(BaseModel):
     session_id: str
     estado: EstadoTicket = EstadoTicket.IDLE
     categoria: CategoriaSolicitud = CategoriaSolicitud.HARDWARE
-    intentos_diagnostico: int = 0  # Control de la Regla de 1 Descarte (Fail-Fast)
+    intentos_diagnostico: int = 0
+    max_intentos_diagnostico: int = 3  # Diagnóstico multi-turno (2 a 3 intentos)
     falla: Optional[str] = None
+    descripcion: Optional[str] = None
     nombre: Optional[str] = None
     correo: Optional[str] = None
     ubicacion: Optional[str] = None
@@ -63,29 +70,117 @@ GREETING_PATTERNS = [
     r"^[¿?]?qu[eé] tal\b", r"^buen d[ií]a\b", r"^hi\b", r"^hello\b"
 ]
 
-# Respuestas positivas que confirman que el diagnóstico de Nivel 1 funcionó
+# Patrones de Cancelación Universal durante el flujo de radicación
+CANCEL_PATTERNS = [
+    "cancelar", "cancela", "ya no", "no gracias", "olvidalo", "olvídalo",
+    "dejalo asi", "déjalo así", "no quiero", "no deseo", "cancelar radicación",
+    "cancelar radicacion", "cancelar ticket"
+]
+
+CANCEL_REGEX = [
+    r"\b(cancelar|cancela|ya\s+no|no\s+gracias|olvidalo|olv[ií]dalo|dejalo\s+asi|d[eé]jalo\s+as[ií]|no\s+quiero|no\s+deseo|cancelar\s+ticket|cancelar\s+radicaci[oó]n)\b"
+]
+
+MENSAJE_CANCELACION = "Entendido, he cancelado el proceso de radicación. ¿Hay algo más sobre los procedimientos de TI en lo que te pueda colaborar?"
+
+# Palabras clave para Requerimiento de Equipos y Préstamos
+EQUIPMENT_REQUEST_PATTERNS = [
+    "prestamo", "préstamo", "prestar", "solicitar", "microfono", "micrófono", 
+    "tablet", "portatil", "portátil", "computador", "laptop", 
+    "videobeam", "video beam", "proyector", "sala", "pantalla", "auditorio"
+]
+
+# Mensaje estructurado directo para solicitudes de préstamo / asignación de equipos
+MENSAJE_SOLICITUD_EQUIPOS = (
+    "Para solicitar préstamos o asignación de equipos de cómputo y recursos físicos (micrófonos, tablets, portátiles, proyectores), debes tramitar la solicitud con la Dirección de TI a través de los canales oficiales:\n\n"
+    "📧 **Canales de Atención:**\n"
+    "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
+    "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n"
+    "📋 **Plantilla sugerida para tu correo:**\n"
+    "• **Asunto:** Solicitud de Préstamo de [Equipo] - [Tu Nombre]\n"
+    "• **Cuerpo del mensaje:**\n"
+    "  - **Equipo solicitado y cantidad:** [Ej: 1 Micrófono inalámbrico]\n"
+    "  - **Motivo / Evento académico:** [Descripción breve]\n"
+    "  - **Fecha y Horario requerido:** [Fecha y rango de horas]\n"
+    "  - **Ubicación / Aula:** [Sede, Bloque, Salón]\n\n"
+    "¿Deseas que radique este requerimiento de servicio directamente en GLPI por ti ahora mismo?"
+)
+
+# Respuestas de resolución / cierre ("no ya", "ya no", "ya no necesito", "ya pude", "ya funcionó", "listo", etc.)
 SOLVED_PATTERNS = [
-    r"\b(gracias|grasias|gracia|ya funcion[oó]|ya funsion[oó]|listo|se solucion[oó]|se solusion[oó]|qued[oó] bien|sirvi[oó]|cirvi[oó]|excelente|perfecto|resuelto|ya qued[oó]|muchas gracias|se arregl[oó]|ya sirve|ya prendi[oó]|ya conect[oó]|ya dio video)\b"
+    r"\bno\s+ya\b",
+    r"\bya\s+no\b",
+    r"\bya\s+no\s+necesito\b",
+    r"\bya\s+no\s+es\s+necesario\b",
+    r"\bya\s+pude\b",
+    r"\bya\s+pudo\b",
+    r"\bya\s+funcion[oó]\b",
+    r"\bya\s+funsion[oó]\b",
+    r"\bya\s+sirve\b",
+    r"\bya\s+sirvi[oó]\b",
+    r"\bya\s+cirvi[oó]\b",
+    r"\blisto\b",
+    r"\bse\s+solucion[oó]\b",
+    r"\bse\s+solusion[oó]\b",
+    r"\bsolucionado\b",
+    r"\bresuelto\b",
+    r"\bqued[oó]\s+bien\b",
+    r"\bya\s+qued[oó]\b",
+    r"\bse\s+arregl[oó]\b",
+    r"\bmuchas\s+gracias\b",
+    r"\bgracias\b",
+    r"\bgrasias\b",
+    r"\bexcelente\b",
+    r"\bperfecto\b",
+    r"\bya\s+prendi[oó]\b",
+    r"\bya\s+conect[oó]\b",
+    r"\bya\s+dio\s+video\b",
+    r"\btodo\s+bien\b",
+    r"\btodo\s+en\s+orden\b",
+    r"\bya\s+resolv[ií]\b",
+    r"\bno\s+ya\s+resolv[ií]\b",
 ]
 
-# Solicitud directa y explícita de técnico / radicación humana (aplica en IDLE y DIAGNOSTICO)
-DIRECT_TECH_PATTERNS = [
-    r"\b(crear ticket|abrir ticket|radicar( caso)?|necesito (a alguien|un t[eé]cnico|ayuda presencial|soporte presencial)|que (lo|la|los|las|el equipo) revisen|que venga un t[eé]cnico|que venga alguien|manda(r)? un t[eé]cnico|manda(r)? a alguien|alguien para que (lo|la) arregle|visita t[eé]cnica|t[eé]cnico presencial|soporte presencial|revisi[oó]n t[eé]cnica)\b"
-]
-
-# Respuestas en medio de diagnóstico que indican que la solución previa no funcionó o persiste la falla
-PERSIST_PATTERNS = [
-    r"\b(no sirvi[oó]|no sirbi[oó]|no cirvi[oó]|sigue igual|sige igual|no funcion[oó]|no funsion[oó]|sigue fallando|sige fallando|sigue bloquead[oa]|sigue el error|sigue sin funcionar|sigue sin servir|persiste|continua|contin[uú]a|sigue el problema|no se solucion[oó]|no se solusion[oó]|no se arregl[oó]|tampoco funcion[oó]|escalar)\b",
-    r"\b(no me deja (entrar|ingresar|acceder|iniciar)|no pude (entrar|ingresar|acceder|iniciar)|no me funciona|no puedo solucionarlo|no pude solucionarlo)\b",
+# Patrones explícitos de falla / persistencia
+EXPLICIT_FAIL_PATTERNS = [
+    r"\bno\s+(me\s+)?(funcion[oó]|funsion[oó]|sirvi[oó]|sirbi[oó]|cirvi[oó]|sirve|sirbe|cirve|vale)\b",
+    r"\bno\s+se\s+(solucion[oó]|solusion[oó]|arregl[oó]|pudo)\b",
+    r"\b(sigue|sige)\s+(igual|fallando|bloquead[oa]|el\s+error|sin\s+funcionar|sin\s+servir|el\s+problema|ca[ií]do)\b",
+    r"\bno\s+me\s+deja\b",
+    r"\bno\s+pude\s+(entrar|ingresar|acceder|iniciar|solucionarlo)\b",
+    r"\bno\s+puedo\s+(entrar|ingresar|acceder|iniciar|solucionarlo|arreglarlo)\b",
+    r"\b(persiste|continua|contin[uú]a)\b",
+    r"\btampoco\s+(funcion[oó]|sirvi[oó]|sirve)\b",
     r"^(no|nada|tampoco|sigue ca[ií]do)$"
 ]
 
-# Expresiones afirmativas y de continuación ("sí", "claro", "dale", "ok", "por favor", "muéstramelos")
-CONTINUATION_PATTERNS = [
-    r"^(s[ií]|ok|dale|claro|por favor|porfa|mu[eé]strame|mu[eé]stramelo[s]?|mu[eé]stramela[s]?|adelante|de acuerdo|s[ií] por favor|s[ií] claro|s[ií] dale|s[ií] expl[ií]camelo|expl[ií]came|s[ií] porfa|dime|cu[eé]ntame|procede|ay[uú]dame con eso)\b"
+# Solicitud directa y explícita de técnico / radicación humana / soporte oficial
+DIRECT_TECH_PATTERNS = [
+    r"\b(crear(\s+un)?\s+ticket|abrir(\s+un)?\s+ticket|generar(\s+un)?\s+ticket|solicitar(\s+un)?\s+ticket|radicar(\s+un)?\s+ticket|radicar(\s+el)?(\s+caso)?|radicarlo|radicarla|necesito(\s+un|\s+a\s+un|\s+a\s+alguien|\s+ayuda|\s+soporte)?\s+(t[eé]cnico|presencial|soporte)|que\s+(lo|la|los|las|el\s+equipo|la\s+\w+|el\s+\w+|un\s+\w+)?\s*revisen|que\s+revisen|que\s+venga\s+un\s+t[eé]cnico|manda(r)?\s+un\s+t[eé]cnico|visita\s+t[eé]cnica|soporte\s+presencial|revisi[oó]n\s+t[eé]cnica|escalar(\s+el)?(\s+caso)?|atenci[oó]n\s+humana)\b"
 ]
 
-# Palabras clave para identificar trámites de SOFTWARE / Cuentas / Accesos (con tolerancia tipográfica)
+# Trámites administrativos, cambios de permisos o compras (sin diagnóstico simulado)
+ADMIN_PERMISSIONS_PATTERNS = [
+    r"\b(cambio\s+de\s+permisos|autorizar\s+permisos|asignar\s+permisos|compra\s+de|adquisici[oó]n|inventario|revisi[oó]n\s+f[ií]sica|dar\s+de\s+baja|mantenimiento\s+preventivo\s+f[ií]sico)\b"
+]
+
+# Expresiones afirmativas y de confirmación de radicación / continuación
+AFFIRMATIVE_PATTERNS = [
+    r"^(s[ií]|ok|dale|claro|por favor|porfa|adelante|de acuerdo|s[ií] por favor|s[ií] claro|s[ií] dale|rad[ií]calo|radicar|hazlo|procede|ay[uú]dame|por ti|radicarlo|s[ií]\s+ay[uú]dame|bueno)\b"
+]
+
+# Palabras de control/afirmación que NUNCA deben aceptarse como partes de un nombre
+NON_NAME_WORDS = {
+    "si", "sí", "claro", "ok", "ayudame", "ayúdame", "dale", "bueno", "por", "favor",
+    "porfa", "procede", "radica", "radicar", "radícalo", "radícala", "radicarlo", "radicarla",
+    "ticket", "tickets", "caso", "casos", "hola", "buenas", "buenos", "dias", "días",
+    "tardes", "noches", "soporte", "falla", "problema", "hazlo", "gracias", "grasias",
+    "necesito", "ayuda", "tecnico", "técnico", "un", "una", "el", "la", "los", "las",
+    "crear", "abrir", "generar", "solicitar", "mi", "correo", "es", "para", "que", "y",
+    "cancelar", "cancela", "olvidalo", "olvídalo", "dejalo", "déjalo", "no"
+}
+
+# Palabras clave para identificar trámites de SOFTWARE / Cuentas / Accesos
 SOFTWARE_KEYWORDS = [
     r"\b(kactus|katuc|kaktu|caktus|katu)\b", r"\b(seven|seben)\b", r"\bpermiso[s]?\b", r"\bpermizo[s]?\b",
     r"\bacceso[s]?\b", r"\baccezo[s]?\b", r"\bcuenta[s]?\b", r"\bcuanta[s]?\b",
@@ -113,10 +208,15 @@ MEDIUM_TRIGGERS = [
     r"requiero hoy", r"lento"
 ]
 
+DESPEDIDA_INSTITUCIONAL = (
+    "¡Excelente! Me alegra saber que pudiste resolver el inconveniente. "
+    "Quedo a tu disposición si requieres apoyo con algún otro procedimiento o servicio institucional de TI en la Universidad Simón Bolívar. ¡Que tengas un excelente día! 🎓"
+)
+
 
 class RouterLogic:
     """
-    Motor de análisis conversacional de Nivel 1 y orquestación dinámica de tickets.
+    Motor de análisis conversacional de Nivel 1 y orquestación de tickets para UniMon.
     """
 
     @classmethod
@@ -166,11 +266,70 @@ class RouterLogic:
         return False
 
     @classmethod
-    def is_solved_confirmation(cls, text: str) -> bool:
-        """Detecta si el usuario indica que la sugerencia resolvió el problema."""
+    def is_cancellation(cls, text: str) -> bool:
+        """
+        Detecta si el usuario solicita cancelar el proceso de radicación
+        ('cancelar', 'cancela', 'ya no', 'no gracias', 'olvidalo', 'dejalo asi', 'no quiero').
+        """
+        msg_clean = re.sub(r"[^\w\s]", " ", text.strip().lower())
+        msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
+        if any(msg_clean == pat for pat in CANCEL_PATTERNS):
+            return True
+        return any(re.search(pat, msg_clean) for pat in CANCEL_REGEX)
+
+    @classmethod
+    def is_equipment_request(cls, text: str) -> bool:
+        """
+        Detecta directamente si el mensaje corresponde a una solicitud de préstamo o asignación de equipos
+        (micrófonos, tablets, portátiles, proyectores, videobeam, computadores, etc.).
+        """
         msg_clean = text.strip().lower()
-        if any(neg in msg_clean for neg in ["no funcion", "no sirv", "no se", "sigue", "no me deja"]):
-            return False
+
+        # 1. Palabras explícitas de préstamo/asignación
+        if any(p in msg_clean for p in ["prestamo", "préstamo", "prestar", "préstame", "prestame", "prestan", "alquiler", "alquilar"]):
+            return True
+
+        # 2. Combinación de verbos de solicitud con palabras clave de equipos físicos
+        request_verbs = ["solicitar", "solicito", "solicitud", "pedir", "pido", "requiero", "necesito", "asignacion", "asignación", "reserva", "reservar", "quiero"]
+        equipment_nouns = ["microfono", "micrófono", "tablet", "tablets", "portatil", "portátil", "portatiles", "portátiles", "computador", "computadores", "laptop", "laptops", "videobeam", "video beam", "proyector", "proyectores", "sala", "pantalla", "auditorio", "equipo", "equipos"]
+
+        has_verb = any(v in msg_clean for v in request_verbs)
+        has_equipment = any(eq in msg_clean for eq in equipment_nouns)
+
+        if has_verb and has_equipment:
+            # Descartar si se trata de un reporte de falla técnica para no interrumpir el diagnóstico
+            failure_words = ["no prende", "no funciona", "no enciende", "parpadea", "dañado", "dañada", "roto", "rota", "fallando", "bloqueado", "bloqueada", "lento", "lenta", "error", "pantalla azul", "no da video", "se apaga"]
+            if not any(f in msg_clean for f in failure_words):
+                return True
+
+        return False
+
+    @classmethod
+    def is_physical_or_admin_request(cls, text: str) -> bool:
+        """
+        Detecta si la consulta involucra trámites administrativos, cambios de permisos, compras o inventario.
+        """
+        msg_clean = text.strip().lower()
+        return any(re.search(pat, msg_clean) for pat in ADMIN_PERMISSIONS_PATTERNS)
+
+    @classmethod
+    def is_solved_confirmation(cls, text: str) -> bool:
+        """
+        Detecta si el usuario indica que la sugerencia resolvió el problema o da cierre al caso
+        ("no ya", "ya no", "ya no necesito", "ya pude", "ya funcionó", "listo", etc.).
+        """
+        msg_clean = re.sub(r"[^\w\s]", " ", text.strip().lower())
+        msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
+
+        # Comprobar si hay patrones explícitos de falla (ej: "no funcionó", "sigue igual", "no pude entrar")
+        for pat in EXPLICIT_FAIL_PATTERNS:
+            if re.search(pat, msg_clean):
+                # A menos que sea explícitamente una frase de cierre positivo como "no ya", "ya funcionó", "ya pude"
+                if not any(re.search(pos, msg_clean) for pos in [
+                    r"\bno\s+ya\b", r"\bya\s+no\b", r"\bya\s+funcion[oó]\b", r"\bya\s+pude\b", r"\bya\s+sirvi[oó]\b"
+                ]):
+                    return False
+
         return any(re.search(pat, msg_clean) for pat in SOLVED_PATTERNS)
 
     @classmethod
@@ -182,16 +341,19 @@ class RouterLogic:
     @classmethod
     def is_persisting_or_ticket_request(cls, text: str) -> bool:
         """Detecta si el usuario indica que la falla continúa tras el diagnóstico o pide técnico/ticket."""
-        msg_clean = text.strip().lower()
-        return any(re.search(pat, msg_clean) for pat in PERSIST_PATTERNS) or cls.is_direct_tech_request(text)
+        if cls.is_solved_confirmation(text) or cls.is_cancellation(text):
+            return False
+        msg_clean = re.sub(r"[^\w\s]", " ", text.strip().lower())
+        msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
+        return any(re.search(pat, msg_clean) for pat in EXPLICIT_FAIL_PATTERNS) or cls.is_direct_tech_request(text)
 
     @classmethod
-    def is_continuation_affirmation(cls, text: str) -> bool:
-        """Detecta si el usuario envía una afirmación corta o solicitud de continuar explicando."""
+    def is_affirmative(cls, text: str) -> bool:
+        """Detecta si el usuario envía una afirmación corta ('sí', 'claro', 'dale', 'por favor', 'radícalo', 'bueno', 'ayúdame')."""
         msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ]", "", text.strip().lower())
         words = msg_clean.split()
-        if len(words) <= 5:
-            return any(re.search(pat, msg_clean) for pat in CONTINUATION_PATTERNS)
+        if len(words) <= 6:
+            return any(re.search(pat, msg_clean) for pat in AFFIRMATIVE_PATTERNS)
         return False
 
     @classmethod
@@ -215,30 +377,51 @@ class RouterLogic:
 
     @classmethod
     def extract_name(cls, text: str, email: Optional[str] = None) -> Optional[str]:
-        """Extrae heurísticamente el nombre completo del solicitante."""
+        """
+        Extrae y valida estrictamente el nombre completo del solicitante.
+        Requiere al menos 2 palabras válidas y descarta palabras afirmativas, de control o de cancelación.
+        """
         cleaned = text
         if email:
             cleaned = cleaned.replace(email, "")
 
-        name_patterns = [
-            r"(?:mi nombre es|me llamo|soy|nombre:)\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]{2,}(?:\s+[A-Za-zÁÉÍÓÚáéíóúñÑ]{2,})+)",
-            r"^([A-Za-zÁÉÍÓÚáéíóúñÑ]{2,}(?:\s+[A-Za-zÁÉÍÓÚáéíóúñÑ]{2,})+)"
+        cleaned_no_punct = re.sub(r"[^\w\sÁÉÍÓÚáéíóúñÑ]", " ", cleaned).strip()
+
+        # Si todo el mensaje es una frase afirmativa o de cancelación
+        if cls.is_affirmative(cleaned_no_punct) or cls.is_cancellation(cleaned_no_punct):
+            return None
+
+        # Patrones con prefijo "Mi nombre es...", "Me llamo...", "Soy..."
+        name_prefix_patterns = [
+            r"(?:mi nombre es|me llamo|soy|nombre:)\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]{2,}(?:\s+[A-Za-zÁÉÍÓÚáéíóúñÑ]{2,})+)"
         ]
 
-        for pat in name_patterns:
+        for pat in name_prefix_patterns:
             m = re.search(pat, cleaned, re.IGNORECASE)
             if m:
                 cand = m.group(1).strip()
-                if not any(w in cand.lower() for w in ["un ticket", "soporte", "la falla", "el problema", "hola", "buenos dias"]):
-                    return cand
+                cand_words = [w.lower() for w in cand.split() if w.isalpha()]
+                if len(cand_words) >= 2 and not any(w in NON_NAME_WORDS for w in cand_words):
+                    return " ".join([w.capitalize() for w in cand.split()])
 
-        words = [w for w in cleaned.strip().split() if w.isalpha()]
-        if 2 <= len(words) <= 4:
-            cand = " ".join(words)
-            if not any(w in cand.lower() for w in ["ticket", "falla", "problema", "soporte", "hola"]):
-                return cand
+        # Evaluación directa de tokens
+        words = [w for w in cleaned_no_punct.split() if w.isalpha()]
 
-        return None
+        # Debe tener al menos 2 palabras (Nombre y Apellido) y máximo 6
+        if len(words) < 2 or len(words) > 6:
+            return None
+
+        words_lower = [w.lower() for w in words]
+
+        # Ninguna palabra puede ser una palabra de control/afirmación/cancelación
+        if any(w in NON_NAME_WORDS for w in words_lower):
+            return None
+
+        # Cada palabra debe tener al menos 2 caracteres
+        if any(len(w) < 2 for w in words):
+            return None
+
+        return " ".join(words).title()
 
     @classmethod
     def calculate_urgency_and_impact(cls, message: str) -> Tuple[int, int]:
@@ -254,51 +437,49 @@ class RouterLogic:
         return urgency, impact
 
     @classmethod
+    def build_support_channel_message(cls, falla: Optional[str] = None) -> str:
+        """
+        Construye la plantilla estructurada tipo formulario guiado para el correo de soporte
+        y la pregunta de radicación directa.
+        """
+        asunto_sugerido = (falla[:50].strip() if falla and len(falla.strip()) > 5 else "Reporte de falla técnica o requerimiento")
+
+        return (
+            "Si el inconveniente persiste o requiere un trámite administrativo/físico, puedes comunicarte directamente con los canales oficiales de soporte técnico de la Universidad Simón Bolívar:\n\n"
+            "📧 **Canales Oficiales de Atención TI:**\n"
+            "- **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | Tel: (605) 3444333 Ext. 8003/8004\n"
+            "- **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: (607) 5827070 Ext. 129\n\n"
+            "📋 **Plantilla guiada para redactar tu correo:**\n"
+            f"- **Asunto:** [Soporte TI] {asunto_sugerido}\n"
+            "- **Cuerpo del mensaje:**\n"
+            "  • **Nombre del Solicitante:** [Tu nombre completo]\n"
+            "  • **Ubicación:** [Sede, Bloque, Piso, Oficina o Laboratorio]\n"
+            "  • **Equipo / Servicio Afectado:** [Computador, Red, Plataforma, etc.]\n"
+            "  • **Descripción Detallada:** [Indica paso a paso qué ocurre, mensajes de error y qué pruebas realizaste]\n\n"
+            "¿O prefieres que radique el caso directamente por ti ahora mismo?"
+        )
+
+    @classmethod
     async def _radicar_ticket_en_glpi(cls, session_id: str, session: TicketSession) -> Dict[str, Any]:
         """
-        Genera el ticket en GLPI según la categoría (SOFTWARE o HARDWARE) y limpia la sesión.
+        Genera el ticket en GLPI con el Slot-Filling universal simplificado
+        (Nombre Completo, Correo Electrónico y Descripción Detallada del Requerimiento/Problema) y limpia la sesión.
         """
-        falla_desc = session.falla or "Requerimiento de soporte reportado por el usuario"
+        falla_desc = session.descripcion or session.falla or "Requerimiento de soporte reportado por el usuario"
         nombre_sol = session.nombre or "Usuario Unisimon"
         correo_sol = session.correo or "solicitudcomputo@unisimon.edu.co"
+        category_name = session.category_name or "Soporte Técnico y Gestión de TI Unisimon"
 
-        if session.categoria == CategoriaSolicitud.SOFTWARE:
-            session.ubicacion = "Plataforma Digital / Remoto"
-            session.activo = "N/A"
-            asunto_ticket = f"[Soporte Software USB] {falla_desc[:50]}"
-            contenido_ticket = (
-                f"<b>REPORTE DE INCIDENTE TÉCNICO - MESA DE AYUDA UNISIMON (SOFTWARE / ACCESOS)</b><br><br>"
-                f"<b>Solicitante:</b> {nombre_sol}<br>"
-                f"<b>Correo Electrónico:</b> {correo_sol}<br>"
-                f"<b>Tipo de Trámite:</b> Soporte de Software, Cuentas o Plataformas Digitales<br>"
-                f"<b>Ubicación:</b> {session.ubicacion}<br>"
-                f"<b>Placa / Activo:</b> {session.activo}<br>"
-                f"<b>Nivel de Urgencia:</b> {session.urgency}/5<br><br>"
-                f"<b>Descripción del Requerimiento:</b><br>{falla_desc}<br><br>"
-                f"<i>Caso escalado y radicado tras descarte de Nivel 1 en UniMon Chatbot.</i>"
-            )
-            confirmacion_msg = (
-                f"✅ Se ha radicado exitosamente tu solicitud de soporte técnico con el radicado **#{'{ticket_id}'}**. "
-                f"Un técnico de la Dirección de TI revisará tu caso y se pondrá en contacto a través de tu correo institucional (**{correo_sol}**)."
-            )
-        else:
-            ubicacion_sol = session.ubicacion or "Sede Unisimon"
-            activo_sol = session.activo or "N/A"
-            asunto_ticket = f"[Soporte TI Unisimon] {falla_desc[:45]} - {ubicacion_sol}"
-            contenido_ticket = (
-                f"<b>REPORTE DE INCIDENTE TÉCNICO - MESA DE AYUDA UNISIMON</b><br><br>"
-                f"<b>Solicitante:</b> {nombre_sol}<br>"
-                f"<b>Correo Electrónico:</b> {correo_sol}<br>"
-                f"<b>Ubicación:</b> {ubicacion_sol}<br>"
-                f"<b>Placa / Activo:</b> {activo_sol}<br>"
-                f"<b>Nivel de Urgencia:</b> {session.urgency}/5<br><br>"
-                f"<b>Descripción de la Falla Técnica:</b><br>{falla_desc}<br><br>"
-                f"<i>Caso escalado y radicado tras descarte de Nivel 1 en UniMon Chatbot.</i>"
-            )
-            confirmacion_msg = (
-                f"✅ Se ha radicado exitosamente tu solicitud de soporte técnico con el radicado **#{'{ticket_id}'}**. "
-                f"Un técnico de la Dirección de TI revisará tu caso en **{ubicacion_sol}** y se pondrá en contacto a través de tu correo institucional (**{correo_sol}**)."
-            )
+        asunto_ticket = f"[Soporte TI Unisimon] {falla_desc[:50]}"
+        contenido_ticket = (
+            f"<b>REPORTE DE INCIDENTE / REQUERIMIENTO TÉCNICO - MESA DE AYUDA UNISIMON</b><br><br>"
+            f"<b>Solicitante:</b> {nombre_sol}<br>"
+            f"<b>Correo Electrónico:</b> {correo_sol}<br>"
+            f"<b>Categoría:</b> {category_name}<br>"
+            f"<b>Nivel de Urgencia:</b> {session.urgency}/5<br><br>"
+            f"<b>Detalle del Requerimiento / Problema:</b><br>{falla_desc}<br><br>"
+            f"<i>Caso escalado y radicado tras descarte de Nivel 1 en UniMon Chatbot.</i>"
+        )
 
         try:
             ticket_res = await glpi_client.crear_ticket(
@@ -310,14 +491,20 @@ class RouterLogic:
             )
 
             ticket_id = ticket_res.get("ticket_id")
-            category_name = session.category_name
             cls.reset_session(session_id)
 
-            reply_final = confirmacion_msg.replace("{ticket_id}", str(ticket_id))
+            confirmacion_msg = (
+                f"✅ Se ha radicado exitosamente tu solicitud de soporte técnico con el radicado **#{ticket_id}**.\n\n"
+                f"📋 **Resumen del Caso:**\n"
+                f"- **Solicitante:** {nombre_sol}\n"
+                f"- **Correo:** {correo_sol}\n"
+                f"- **Descripción:** {falla_desc}\n\n"
+                f"Un técnico de la Dirección de TI revisará tu caso y se pondrá en contacto a través de tu correo institucional (**{correo_sol}**)."
+            )
 
             return {
                 "tipo": "TICKET_CREADO",
-                "mensaje": reply_final,
+                "mensaje": confirmacion_msg,
                 "ticket_id": ticket_id,
                 "ticket_details": {
                     "ticket_id": ticket_id,
@@ -335,7 +522,7 @@ class RouterLogic:
             cls.reset_session(session_id)
             return {
                 "tipo": "ERROR",
-                "mensaje": f"Ocurrió un inconveniente al radicar el ticket en GLPI ({exc}). Por favor contacta a solicitudcomputo@unisimon.edu.co.",
+                "mensaje": f"Ocurrió un inconveniente al radicar el ticket en GLPI ({exc}). Por favor contacta a solicitudcomputo@unisimon.edu.co o helpdesk@unisimon.edu.co.",
                 "ticket_id": None,
                 "source": "GLPI_ERROR"
             }
@@ -344,103 +531,194 @@ class RouterLogic:
     async def procesar_mensaje(cls, mensaje: str, session_id: str = "default_session") -> Dict[str, Any]:
         """
         Procesa el mensaje del usuario de acuerdo a la máquina de estados conversacional de Nivel 1.
-        Aplica Slot-Filling dinámico: solo Nombre y Correo para SOFTWARE; Nombre, Correo, Ubicación y Placa para HARDWARE.
+        Aplica:
+        1. Flujo de Cancelación Universal en cualquier estado de radicación.
+        2. Detección inmediata de solicitudes de préstamos/asignación de equipos (sin bucles de diagnóstico ni consultas al LLM).
+        3. Detección de cierre ("no ya", "ya no necesito", "ya pude", "ya funcionó", "listo").
+        4. Diagnóstico multi-turno (hasta max_intentos_diagnostico = 3 intentos).
+        5. Secuencia estricta de 3 pasos para Slot-Filling:
+           Paso 1: Nombre Completo (Validación estricta, soporte cancelación)
+           Paso 2: Correo Electrónico (Validación, soporte cancelación)
+           Paso 3: Descripción Detallada del Requerimiento/Problema (Soporte cancelación)
+           Paso 4: Radicación en GLPI (Ticket Creado)
         """
         texto = mensaje.strip()
         session = cls.get_session(session_id)
         estado_actual = session.estado
 
-        logger.info(f"[Session: {session_id}] Estado actual: {estado_actual} | Categoría: {session.categoria} | Mensaje: '{texto[:50]}'")
+        logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje: '{texto[:50]}'")
 
         # -------------------------------------------------------------
-        # ESTADO 1: PIDIENDO_ACTIVO (Último slot para HARDWARE)
+        # REGLA GLOBAL 1: Flujo de Cancelación Universal
+        # Si el usuario desea cancelar en cualquier estado de radicación
         # -------------------------------------------------------------
-        if estado_actual == EstadoTicket.PIDIENDO_ACTIVO:
-            activo_resp = texto
-            session.activo = activo_resp if activo_resp.lower() not in ["na", "n/a", "no", "ninguno", "ninguna", "no tiene"] else "N/A"
-            return await cls._radicar_ticket_en_glpi(session_id, session)
-
-        # -------------------------------------------------------------
-        # ESTADO 2: PIDIENDO_UBICACION (Solo para HARDWARE)
-        # -------------------------------------------------------------
-        elif estado_actual == EstadoTicket.PIDIENDO_UBICACION:
-            session.ubicacion = texto
-            session.estado = EstadoTicket.PIDIENDO_ACTIVO
+        if estado_actual in [
+            EstadoTicket.OFRECIENDO_RADICACION,
+            EstadoTicket.PIDIENDO_NOMBRE,
+            EstadoTicket.PIDIENDO_CORREO,
+            EstadoTicket.PIDIENDO_DESCRIPCION
+        ] and cls.is_cancellation(texto):
+            cls.reset_session(session_id)
+            cls.add_history(session_id, "user", texto)
+            cls.add_history(session_id, "assistant", MENSAJE_CANCELACION)
             return {
-                "tipo": "RADICANDO_TICKET",
-                "mensaje": "Por favor indícame el **número de activo o placa del equipo institucional** (si no aplica o no la conoces, puedes responder **N/A**):",
+                "tipo": "CANCELADO",
+                "mensaje": MENSAJE_CANCELACION,
                 "ticket_id": None,
-                "source": "UniMon_SlotFilling"
+                "source": "UniMon_Cancelacion"
             }
 
         # -------------------------------------------------------------
-        # ESTADO 3: PIDIENDO_CORREO (Slot 2)
+        # REGLA GLOBAL 2: Detección de Cierre / Solucionado en IDLE/DIAGNOSTICO
+        # Responder de inmediato con despedida institucional y NUNCA activar radicación.
+        # -------------------------------------------------------------
+        if cls.is_solved_confirmation(texto):
+            cls.reset_session(session_id)
+            cls.add_history(session_id, "user", texto)
+            cls.add_history(session_id, "assistant", DESPEDIDA_INSTITUCIONAL)
+            return {
+                "tipo": "SOLUCIONADO",
+                "mensaje": DESPEDIDA_INSTITUCIONAL,
+                "ticket_id": None,
+                "source": "UniMon_Nivel1_Resolved"
+            }
+
+        # -------------------------------------------------------------
+        # ESTADO: PIDIENDO_DESCRIPCION (Paso 3 de Slot-Filling)
+        # Recibe la descripción detallada del requerimiento o problema y guarda el texto exacto
+        # -------------------------------------------------------------
+        if estado_actual == EstadoTicket.PIDIENDO_DESCRIPCION:
+            session.descripcion = texto
+            session.falla = texto
+            return await cls._radicar_ticket_en_glpi(session_id, session)
+
+        # -------------------------------------------------------------
+        # ESTADO: PIDIENDO_CORREO (Paso 2 de Slot-Filling)
+        # Valida el correo y transiciona SIEMPRE a PIDIENDO_DESCRIPCION
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.PIDIENDO_CORREO:
             ext_email = cls.extract_email(texto)
             if ext_email and is_valid_email(ext_email):
                 session.correo = ext_email
-
-                # Si es trámite de SOFTWARE -> Radicación inmediata sin pedir ubicación ni placa
-                if session.categoria == CategoriaSolicitud.SOFTWARE:
-                    return await cls._radicar_ticket_en_glpi(session_id, session)
-
-                # Si es HARDWARE -> Continuar pidiendo ubicación
-                session.estado = EstadoTicket.PIDIENDO_UBICACION
+                session.estado = EstadoTicket.PIDIENDO_DESCRIPCION
+                prompt_desc = "Por favor describe detalladamente la situación o requerimiento que presentas:"
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", prompt_desc)
                 return {
                     "tipo": "RADICANDO_TICKET",
-                    "mensaje": "Entendido. Ahora por favor indícame tu **ubicación exacta** donde se presenta la falla (Sede, Bloque, Piso, Laboratorio o Sala):",
+                    "mensaje": prompt_desc,
                     "ticket_id": None,
                     "source": "UniMon_SlotFilling"
                 }
             else:
+                prompt_err = "El correo ingresado no parece ser válido. Por favor ingresa un correo electrónico institucional o de contacto válido (ej: usuario@unisimon.edu.co):"
                 return {
                     "tipo": "RADICANDO_TICKET",
-                    "mensaje": "El correo ingresado no parece ser válido. Por favor ingresa un correo electrónico institucional o de contacto válido (ej: usuario@unisimon.edu.co):",
+                    "mensaje": prompt_err,
                     "ticket_id": None,
                     "source": "UniMon_SlotFilling"
                 }
 
         # -------------------------------------------------------------
-        # ESTADO 4: PIDIENDO_NOMBRE (Slot 1)
+        # ESTADO: PIDIENDO_NOMBRE (Paso 1 de Slot-Filling)
+        # Validación estricta: mínimo 2 palabras, sin afirmaciones ni stopwords
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.PIDIENDO_NOMBRE:
             ext_email = cls.extract_email(texto)
             ext_name = cls.extract_name(texto, ext_email)
 
-            session.nombre = ext_name if ext_name else texto.strip()
+            if not ext_name:
+                prompt_invalido = "Por favor indícame tu **nombre y apellido completos** (ej: Juan Pérez):"
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "mensaje": prompt_invalido,
+                    "ticket_id": None,
+                    "source": "UniMon_SlotFilling"
+                }
+
+            session.nombre = ext_name
 
             if ext_email and is_valid_email(ext_email):
                 session.correo = ext_email
-                # Si es SOFTWARE y ya tenemos correo -> Radicar de inmediato
-                if session.categoria == CategoriaSolicitud.SOFTWARE:
-                    return await cls._radicar_ticket_en_glpi(session_id, session)
-
-                # Si es HARDWARE -> Pasar a ubicación
-                session.estado = EstadoTicket.PIDIENDO_UBICACION
+                session.estado = EstadoTicket.PIDIENDO_DESCRIPCION
+                prompt_desc = f"Gracias, **{session.nombre}**. Por favor describe detalladamente la situación o requerimiento que presentas:"
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", prompt_desc)
                 return {
                     "tipo": "RADICANDO_TICKET",
-                    "mensaje": f"Gracias, **{session.nombre}**. Ahora por favor indícame tu **ubicación exacta** donde se presenta la falla (Sede, Bloque, Piso, Laboratorio o Sala):",
+                    "mensaje": prompt_desc,
                     "ticket_id": None,
                     "source": "UniMon_SlotFilling"
                 }
             else:
                 session.estado = EstadoTicket.PIDIENDO_CORREO
+                prompt_correo = f"Gracias, **{session.nombre}**. Ahora por favor indícame tu **correo electrónico institucional o de contacto** (ej: usuario@unisimon.edu.co):"
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", prompt_correo)
                 return {
                     "tipo": "RADICANDO_TICKET",
-                    "mensaje": f"Gracias, **{session.nombre}**. Ahora por favor indícame tu **correo electrónico institucional** (ej: usuario@unisimon.edu.co):",
+                    "mensaje": prompt_correo,
                     "ticket_id": None,
                     "source": "UniMon_SlotFilling"
                 }
 
         # -------------------------------------------------------------
-        # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
+        # ESTADO: OFRECIENDO_RADICACION (Canal de Correo + Plantilla entregados)
         # -------------------------------------------------------------
+        elif estado_actual == EstadoTicket.OFRECIENDO_RADICACION:
+            # 1. Si el usuario confirma ("sí", "si ayudame", "por favor", "radícalo", "dale", "ayúdame"):
+            # NUNCA guardar la afirmación como nombre; transicionar limpiamente a PIDIENDO_NOMBRE.
+            if cls.is_affirmative(texto) or cls.is_direct_tech_request(texto):
+                session.nombre = None
+                session.correo = None
+                session.descripcion = None
+                session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                prompt_msg = "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:"
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", prompt_msg)
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "mensaje": prompt_msg,
+                    "ticket_id": None,
+                    "source": "UniMon_SlotFilling"
+                }
+
+            # 2. Si el usuario responde con un saludo de cortesía
+            elif cls.is_greeting(texto):
+                cls.reset_session(session_id)
+                greeting_reply = (
+                    "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar. "
+                    "¿En qué te puedo colaborar hoy?"
+                )
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", greeting_reply)
+                return {
+                    "tipo": "SALUDO",
+                    "mensaje": greeting_reply,
+                    "ticket_id": None,
+                    "source": "UniMon_Assistant"
+                }
+
+            # 3. Cualquier otra respuesta en este estado: reiniciar diagnóstico para la nueva pregunta
+            else:
+                session.estado = EstadoTicket.DIAGNOSTICO
+                session.intentos_diagnostico = 1
+                session.falla = texto
+                history = cls.get_history(session_id)
+                rag_res = await rag_service.consultar(pregunta=texto, chat_history=history, es_diagnostico=False)
+                resp_text = rag_res.get("response", "")
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", resp_text)
+                return {
+                    "tipo": "DIAGNOSTICO",
+                    "mensaje": resp_text,
+                    "ticket_id": None,
+                    "sources": rag_res.get("sources"),
+                    "source": rag_res.get("source", "ollama_rag")
+                }
+
         # -------------------------------------------------------------
-        # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
-        # -------------------------------------------------------------
-        # -------------------------------------------------------------
-        # ESTADO 5: DIAGNOSTICO (Evaluación de descarte de Nivel 1)
+        # ESTADO: DIAGNOSTICO (Multi-turno: 2 a 3 intentos)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.DIAGNOSTICO:
             # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
@@ -460,61 +738,46 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # Caso B: El usuario confirma que funcionó
-            elif cls.is_solved_confirmation(texto):
-                cls.reset_session(session_id)
-                solved_reply = (
-                    "¡Excelente! Me alegra saber que pudiste resolver el inconveniente con estos pasos iniciales. "
-                    "Quedo a tu disposición si requieres apoyo con algún otro procedimiento o servicio institucional de TI en la Universidad Simón Bolívar. ¡Que tengas un excelente día!"
-                )
+            # Caso B: Solicitud de préstamo de equipos en medio de diagnóstico -> Mensaje directo estructurado
+            if cls.is_equipment_request(texto):
+                session.falla = texto
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
                 cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", solved_reply)
+                cls.add_history(session_id, "assistant", MENSAJE_SOLICITUD_EQUIPOS)
                 return {
-                    "tipo": "SOLUCIONADO",
-                    "mensaje": solved_reply,
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "mensaje": MENSAJE_SOLICITUD_EQUIPOS,
                     "ticket_id": None,
-                    "source": "UniMon_Nivel1_Resolved"
+                    "source": "UniMon_SolicitudEquipos"
                 }
 
-            # Caso C: Afirmación corta o confirmación de continuar ("sí", "claro", "dale", "ok", "por favor", "muéstramelos")
-            elif cls.is_continuation_affirmation(texto) and session.intentos_diagnostico <= 1:
+            # Caso C: Solicitud explícita de técnico / radicación directa o trámite administrativo durante diagnóstico
+            if cls.is_direct_tech_request(texto) or cls.is_physical_or_admin_request(texto):
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
+                support_msg = cls.build_support_channel_message(session.falla or texto)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", support_msg)
+                return {
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "mensaje": support_msg,
+                    "ticket_id": None,
+                    "source": "UniMon_CanalSoporte"
+                }
+
+            # Caso D: Evaluación de intentos multi-turno (hasta max_intentos_diagnostico = 3)
+            if session.intentos_diagnostico < session.max_intentos_diagnostico:
                 session.intentos_diagnostico += 1
                 history = cls.get_history(session_id)
-                last_assistant_msg = ""
-                for m in reversed(history):
-                    if m.get("role") == "assistant":
-                        last_assistant_msg = m.get("content", "")
-                        break
 
-                falla_contexto = session.falla or last_assistant_msg or "procedimiento y soporte institucional Unisimon"
-                query_contextualizada = (
-                    f"El usuario responde afirmativamente ('{texto}') y solicita los pasos detallados o la explicación para: {falla_contexto}"
-                )
+                # Contextualizar la consulta con la falla y el último turno si es afirmación o reporte de persistencia
+                falla_ctx = session.falla or "soporte técnico institucional"
+                if cls.is_affirmative(texto) or cls.is_persisting_or_ticket_request(texto):
+                    query_ctx = f"El usuario indica sobre la falla '{falla_ctx}': '{texto}'. Proporciona el siguiente paso de diagnóstico o alternativa de solución técnica institucional."
+                else:
+                    query_ctx = texto
 
                 rag_res = await rag_service.consultar(
-                    pregunta=query_contextualizada,
-                    chat_history=history,
-                    es_diagnostico=False
-                )
-                resp_text = rag_res.get("response", "")
-
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", resp_text)
-
-                return {
-                    "tipo": "DIAGNOSTICO",
-                    "mensaje": resp_text,
-                    "ticket_id": None,
-                    "sources": rag_res.get("sources"),
-                    "source": rag_res.get("source", "ollama_rag")
-                }
-
-            # Caso D: Regla de 1 Descarte (Fail-Fast)
-            # Si el usuario indica que persiste, pide técnico, o envía cualquier duda tras el descarte inicial -> Radicación inmediata
-            else:
-                history = cls.get_history(session_id)
-                rag_res = await rag_service.consultar(
-                    pregunta=texto,
+                    pregunta=query_ctx,
                     chat_history=history,
                     es_diagnostico=False
                 )
@@ -533,22 +796,32 @@ class RouterLogic:
                         "source": rag_res.get("source", "ollama_rag")
                     }
 
-                # Radicación directa sin bucles repetitivos
-                session.estado = EstadoTicket.PIDIENDO_NOMBRE
-                prompt_msg = (
-                    "Con gusto puedo ayudarte a radicar el caso con el equipo de soporte técnico. Para iniciar, por favor indícame tu **nombre completo**:"
-                )
                 cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", prompt_msg)
+                cls.add_history(session_id, "assistant", resp_text)
+
                 return {
-                    "tipo": "RADICANDO_TICKET",
-                    "mensaje": prompt_msg,
+                    "tipo": "DIAGNOSTICO",
+                    "mensaje": resp_text,
                     "ticket_id": None,
-                    "source": "UniMon_SlotFilling"
+                    "sources": rag_res.get("sources"),
+                    "source": rag_res.get("source", "ollama_rag")
+                }
+
+            # Caso E: Intentos de diagnóstico agotados (>= 3 intentos) -> Ofrecer canal oficial de correo + plantilla + radicación directa
+            else:
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
+                support_msg = cls.build_support_channel_message(session.falla or texto)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", support_msg)
+                return {
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "mensaje": support_msg,
+                    "ticket_id": None,
+                    "source": "UniMon_CanalSoporte"
                 }
 
         # -------------------------------------------------------------
-        # ESTADO 6: IDLE (Mensaje Inicial)
+        # ESTADO: IDLE (Mensaje Inicial)
         # -------------------------------------------------------------
         else:
             # 1. Saludo simple
@@ -567,27 +840,42 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # 2. Solicitud directa de técnico / radicación en mensaje inicial
-            if cls.is_direct_tech_request(texto):
+            # 2. Solicitud Directa de Préstamos / Asignación de Equipos (Sin consulta al RAG ni al LLM)
+            if cls.is_equipment_request(texto):
+                session.falla = texto
+                session.categoria = CategoriaSolicitud.HARDWARE
+                session.category_name = "Mantenimiento y Fallas de Cómputo (P-GT-01)"
+                session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
+
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", MENSAJE_SOLICITUD_EQUIPOS)
+                return {
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "mensaje": MENSAJE_SOLICITUD_EQUIPOS,
+                    "ticket_id": None,
+                    "source": "UniMon_SolicitudEquipos"
+                }
+
+            # 3. Solicitud de Trámites Administrativos o Técnico Directo (Sin diagnóstico simulado)
+            if cls.is_physical_or_admin_request(texto) or cls.is_direct_tech_request(texto):
                 session.falla = texto
                 cat, cat_name = cls.detect_category(texto)
                 session.categoria = cat
                 session.category_name = cat_name
                 session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
-                session.estado = EstadoTicket.PIDIENDO_NOMBRE
-                prompt_msg = (
-                    "Con gusto puedo ayudarte a radicar el caso con el equipo de soporte técnico. Para iniciar, por favor indícame tu **nombre completo**:"
-                )
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
+                support_msg = cls.build_support_channel_message(session.falla)
                 cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", prompt_msg)
+                cls.add_history(session_id, "assistant", support_msg)
                 return {
-                    "tipo": "RADICANDO_TICKET",
-                    "mensaje": prompt_msg,
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "mensaje": support_msg,
                     "ticket_id": None,
-                    "source": "UniMon_SlotFilling"
+                    "source": "UniMon_CanalSoporte"
                 }
 
-            # 3. Consultar RAG con historial conversacional
+            # 4. Consultar RAG con historial conversacional
             history = cls.get_history(session_id)
             rag_res = await rag_service.consultar(
                 pregunta=texto,
@@ -596,7 +884,7 @@ class RouterLogic:
             )
             resp_text = rag_res.get("response", "")
 
-            # 4. Guardrail Fuera de Dominio (Out-of-Domain)
+            # 5. Guardrail Fuera de Dominio (Out-of-Domain)
             if is_out_of_domain_response(resp_text):
                 cls.reset_session(session_id)
                 cls.add_history(session_id, "user", texto)
@@ -609,7 +897,7 @@ class RouterLogic:
                     "source": rag_res.get("source", "ollama_rag")
                 }
 
-            # 5. Caso dentro de dominio: Iniciar Diagnóstico de Nivel 1 (1 intento)
+            # 6. Caso dentro de dominio: Iniciar Diagnóstico Multi-Turno (Intento 1 de 3)
             session.falla = texto
             cat, cat_name = cls.detect_category(texto)
             session.categoria = cat
@@ -632,6 +920,3 @@ class RouterLogic:
 
 # Instancia por defecto
 router_logic = RouterLogic()
-
-
-
