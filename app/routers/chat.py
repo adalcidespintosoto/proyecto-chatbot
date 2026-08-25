@@ -71,6 +71,9 @@ from app.services.rag_service import rag_service
 # Endpoint Principal: POST /api/chat
 # ==========================================
 
+import time
+from app.services.telemetry_service import log_interaction, update_session_status
+
 @router.post(
     "/chat",
     response_model=ChatResponse,
@@ -82,6 +85,7 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
     """
     Endpoint principal para interacción con el Asistente Virtual UniMon.
     Conecta directamente con router_logic.procesar_mensaje(mensaje, session_id).
+    Registra métricas y telemetría de rendimiento y resolución en segundo plano.
     """
     texto = request.get_texto()
     if not texto:
@@ -94,12 +98,50 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
 
     logger.info(f"Procesando mensaje para session_id '{session_id}' (longitud: {len(texto)} chars): '{texto}'")
 
-    # Invocar lógica conversacional del router de intenciones
+    # Medir tiempo de procesamiento (latencia)
+    t0 = time.time()
     resultado = await router_logic.procesar_mensaje(mensaje=texto, session_id=session_id)
+    latency_ms = (time.time() - t0) * 1000
 
     tipo = resultado.get("tipo", "DIAGNOSTICO")
+    state = resultado.get("state", tipo)
     mensaje_resp = resultado.get("mensaje", "")
     ticket_id = resultado.get("ticket_id")
+    source = resultado.get("source", "UniMon")
+    sources = resultado.get("sources") or []
+    prompt_tokens = resultado.get("prompt_tokens", 0) or 0
+    eval_tokens = resultado.get("eval_tokens", 0) or 0
+
+    # Obtener rol del usuario registrado en la sesión
+    session_obj = router_logic.get_session(session_id)
+    user_role = getattr(session_obj, "user_role", "general") or "general"
+
+    # Registrar telemetría de la interacción
+    try:
+        log_interaction(
+            session_id=session_id,
+            role=user_role,
+            query=texto,
+            intent=tipo,
+            source=source,
+            docs=sources,
+            latency_ms=round(latency_ms, 2),
+            prompt_tokens=prompt_tokens,
+            eval_tokens=eval_tokens,
+            feedback=resultado.get("feedback", "NONE")
+        )
+
+        # Actualizar estado de resolución / escalado
+        if tipo in ["FINALIZADO", "SOLUCIONADO"] or state in ["FINALIZADO", "SOLUCIONADO"]:
+            update_session_status(session_id, "FINALIZADO", escalated=False)
+        elif tipo in ["TICKET_CREADO"] or ticket_id is not None:
+            update_session_status(session_id, "TICKET_CREADO", escalated=True)
+        elif tipo in ["RADICANDO_TICKET"] or state in ["RADICANDO_TICKET", "PIDIENDO_NOMBRE"]:
+            update_session_status(session_id, "RADICANDO_TICKET", escalated=True)
+        elif tipo in ["CANCELADO"] or state in ["CANCELADO"]:
+            update_session_status(session_id, "CANCELADO", escalated=False)
+    except Exception as e:
+        logger.warning(f"Error al registrar telemetría: {e}")
 
     return ChatResponse(
         tipo=tipo,
@@ -107,13 +149,13 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
         ticket_id=ticket_id,
         intent=tipo,
         reply=mensaje_resp,
-        state=resultado.get("state", tipo),
+        state=state,
         response=mensaje_resp,
         quick_replies=resultado.get("quick_replies", []),
         ticket_details=resultado.get("ticket_details"),
         category=resultado.get("category"),
-        source=resultado.get("source"),
-        sources=resultado.get("sources")
+        source=source,
+        sources=sources
     )
 
 

@@ -331,7 +331,9 @@ class RAGService:
                 if response.status_code == 200:
                     data = response.json()
                     bot_message = data.get("message", {}).get("content", "").strip()
-                    logger.info("Respuesta generada exitosamente por Ollama.")
+                    prompt_tokens = data.get("prompt_eval_count", 0) or 0
+                    eval_tokens = data.get("eval_count", 0) or 0
+                    logger.info("Respuesta generada exitosamente por Ollama (tokens: %s prompt, %s eval).", prompt_tokens, eval_tokens)
 
                     # Sanitizar placeholders y menciones a GLPI
                     clean_msg = re.sub(r"\[(?:URL|Link|Enlace)?\s*(?:del?|al?)?\s*GLPI\]", "la Mesa de Ayuda TI", bot_message, flags=re.IGNORECASE)
@@ -349,7 +351,9 @@ class RAGService:
                         "model": self.model,
                         "retrieved_chunks": len(retrieved_docs),
                         "has_context": True,
-                        "quick_replies": QUICK_REPLIES_DIAGNOSTICO
+                        "quick_replies": QUICK_REPLIES_DIAGNOSTICO,
+                        "prompt_tokens": prompt_tokens,
+                        "eval_tokens": eval_tokens
                     }
                 else:
                     logger.warning(f"Ollama respondió con código {response.status_code}: {response.text}")

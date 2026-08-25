@@ -442,6 +442,211 @@
       border-color: rgba(255, 255, 255, 0.1);
       color: var(--text-muted);
     }
+
+    /* Modal de Analítica y KPIs */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 7, 13, 0.8);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+      animation: modalFadeIn 0.25s ease-out;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-card {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 163, 255, 0.15);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 1.2rem 1.5rem;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    .modal-header h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+    }
+
+    .modal-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .modal-close-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #ffffff;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi-card {
+      background: rgba(30, 41, 59, 0.45);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent-glow);
+    }
+
+    .kpi-card.success::before { background: #10b981; }
+    .kpi-card.warning::before { background: #f59e0b; }
+    .kpi-card.purple::before { background: #8b5cf6; }
+
+    .kpi-title {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kpi-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #ffffff;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .kpi-subtext {
+      font-size: 0.74rem;
+      color: #94a3b8;
+    }
+
+    .kpi-details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .kpi-details-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .kpi-panel {
+      background: rgba(30, 41, 59, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .kpi-panel h3 {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kpi-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .kpi-list-item {
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .kpi-badge {
+      background: rgba(0, 163, 255, 0.15);
+      color: #93c5fd;
+      border: 1px solid rgba(0, 163, 255, 0.3);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -455,6 +660,9 @@
       </div>
     </div>
     <div class="header-actions">
+      <button class="action-btn" onclick="openAnalyticsModal()" title="Ver Dashboard de Métricas y KPIs de UniMon">
+        📊 Métricas & KPIs
+      </button>
       <input type="file" id="pdfUploadInput" accept=".pdf" style="display:none;" onchange="handleFileUpload(event)">
       <button class="action-btn" onclick="document.getElementById('pdfUploadInput').click()" title="Subir nuevo PDF de procedimiento">
         📤 Subir PDF
@@ -520,6 +728,89 @@
         </button>
       </form>
     </main>
+  </div>
+
+  <!-- Modal de Analítica y KPIs de UniMon -->
+  <div class="modal-backdrop" id="analyticsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>📊 Observabilidad & KPIs • UniMon</h2>
+        <div class="modal-header-actions">
+          <button class="action-btn" id="kpiRefreshBtn" onclick="fetchKPIs()" title="Recargar métricas">
+            🔄 Actualizar
+          </button>
+          <button class="modal-close-btn" onclick="closeAnalyticsModal()" title="Cerrar ventana">
+            ✕
+          </button>
+        </div>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Grid de Tarjetas KPI -->
+        <div class="kpi-grid">
+          <div class="kpi-card success">
+            <div class="kpi-title">🎯 Tasa Resolución Nivel 1</div>
+            <div class="kpi-value" id="kpiTasaResolucion">0%</div>
+            <div class="kpi-subtext" id="kpiResolucionSubtext">0 sesiones resueltas</div>
+          </div>
+
+          <div class="kpi-card warning">
+            <div class="kpi-title">🎫 Tasa Escalado a Soporte</div>
+            <div class="kpi-value" id="kpiTasaEscalado">0%</div>
+            <div class="kpi-subtext" id="kpiEscaladoSubtext">0 transferidas a soporte</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-title">⚡ Latencia Promedio</div>
+            <div class="kpi-value" id="kpiLatencia">0 ms</div>
+            <div class="kpi-subtext">Tiempo de respuesta global</div>
+          </div>
+
+          <div class="kpi-card purple">
+            <div class="kpi-title">🧠 Tokens Consumidos</div>
+            <div class="kpi-value" id="kpiTokens">0</div>
+            <div class="kpi-subtext" id="kpiTokensSubtext">Prompt / Generación</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-title">👥 Sesiones Totales</div>
+            <div class="kpi-value" id="kpiTotalSesiones">0</div>
+            <div class="kpi-subtext">Histórico de conversaciones</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-title">💬 Consultas Procesadas</div>
+            <div class="kpi-value" id="kpiTotalConsultas">0</div>
+            <div class="kpi-subtext">Mensajes analizados</div>
+          </div>
+        </div>
+
+        <!-- Paneles de Detalle -->
+        <div class="kpi-details-grid">
+          <div class="kpi-panel">
+            <h3>🎓 Distribución de Consultas por Rol</h3>
+            <ul class="kpi-list" id="kpiRolesContainer">
+              <li class="kpi-list-item" style="color:var(--text-muted)">Cargando roles...</li>
+            </ul>
+          </div>
+
+          <div class="kpi-panel">
+            <h3>📄 Top 5 Procedimientos / Docs Consultados</h3>
+            <ul class="kpi-list" id="kpiTopDocs">
+              <li class="kpi-list-item" style="color:var(--text-muted)">Cargando documentos...</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="kpi-panel">
+          <h3>❓ Top 5 Preguntas Más Frecuentes</h3>
+          <ul class="kpi-list" id="kpiTopQueries">
+            <li class="kpi-list-item" style="color:var(--text-muted)">Cargando preguntas frecuentes...</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
   </div>
 
   <script>
@@ -757,6 +1048,143 @@
         }
       } catch (err) {
         addMessage('bot', `<p style="color:var(--danger)">❌ <strong>Error de red:</strong> ${err.message}</p>`);
+      }
+    }
+
+    // ==========================================
+    // Módulo de Analítica y KPIs de UniMon
+    // ==========================================
+    function openAnalyticsModal() {
+      const modal = document.getElementById('analyticsModal');
+      if (modal) {
+        modal.classList.add('active');
+        fetchKPIs();
+      }
+    }
+
+    function closeAnalyticsModal() {
+      const modal = document.getElementById('analyticsModal');
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    }
+
+    // Cerrar modal al hacer clic en el backdrop o presionar Escape
+    window.addEventListener('click', (e) => {
+      const modal = document.getElementById('analyticsModal');
+      if (modal && e.target === modal) {
+        closeAnalyticsModal();
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeAnalyticsModal();
+      }
+    });
+
+    async function fetchKPIs() {
+      const refreshBtn = document.getElementById('kpiRefreshBtn');
+      if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerText = "⏳ Cargando...";
+      }
+
+      try {
+        const res = await fetch('/api/analytics/kpis');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const kpis = json.data || {};
+
+        // 1. Métricas Principales
+        const elTotalSes = document.getElementById('kpiTotalSesiones');
+        if (elTotalSes) elTotalSes.innerText = kpis.total_sesiones ?? 0;
+
+        const elTasaRes = document.getElementById('kpiTasaResolucion');
+        if (elTasaRes) elTasaRes.innerText = `${kpis.tasa_resolucion_n1_pct ?? 0}%`;
+
+        const elTasaEsc = document.getElementById('kpiTasaEscalado');
+        if (elTasaEsc) elTasaEsc.innerText = `${kpis.tasa_escalado_tickets_pct ?? 0}%`;
+
+        const elLat = document.getElementById('kpiLatencia');
+        if (elLat) elLat.innerText = `${kpis.latencia_promedio_ms ?? 0} ms`;
+
+        const elTok = document.getElementById('kpiTokens');
+        if (elTok) elTok.innerText = (kpis.total_tokens_gastados ?? 0).toLocaleString();
+
+        const elTotCon = document.getElementById('kpiTotalConsultas');
+        if (elTotCon) elTotCon.innerText = kpis.total_consultas ?? 0;
+
+        // Subtextos
+        const elResSub = document.getElementById('kpiResolucionSubtext');
+        if (elResSub) elResSub.innerText = `${kpis.sesiones_resueltas ?? 0} sesiones resueltas en Nivel 1`;
+
+        const elEscSub = document.getElementById('kpiEscaladoSubtext');
+        if (elEscSub) elEscSub.innerText = `${kpis.sesiones_escaladas ?? 0} transferidas a soporte`;
+
+        const elTokSub = document.getElementById('kpiTokensSubtext');
+        if (elTokSub) elTokSub.innerText = `${(kpis.total_prompt_tokens ?? 0).toLocaleString()} in / ${(kpis.total_eval_tokens ?? 0).toLocaleString()} out`;
+
+        // 2. Roles
+        const rolesContainer = document.getElementById('kpiRolesContainer');
+        if (rolesContainer) {
+          rolesContainer.innerHTML = '';
+          const roles = kpis.distribucion_roles || {};
+          const roleKeys = Object.keys(roles);
+          if (roleKeys.length === 0) {
+            rolesContainer.innerHTML = '<li class="kpi-list-item" style="color:var(--text-muted)">Sin sesiones registradas aún</li>';
+          } else {
+            roleKeys.forEach(role => {
+              const li = document.createElement('li');
+              li.className = 'kpi-list-item';
+              const roleName = role === 'docente' ? '👨‍🏫 Docente / Profesor' : role === 'estudiante' ? '🎓 Estudiante' : role === 'funcionario' ? '🏢 Funcionario / Admin' : '👤 ' + role;
+              li.innerHTML = `<span>${roleName}</span> <span class="kpi-badge">${roles[role]} ses.</span>`;
+              rolesContainer.appendChild(li);
+            });
+          }
+        }
+
+        // 3. Top Documentos
+        const docsContainer = document.getElementById('kpiTopDocs');
+        if (docsContainer) {
+          docsContainer.innerHTML = '';
+          const docs = kpis.top_documentos_referenciados || [];
+          if (docs.length === 0) {
+            docsContainer.innerHTML = '<li class="kpi-list-item" style="color:var(--text-muted)">No hay consultas con documentos aún</li>';
+          } else {
+            docs.forEach(d => {
+              const li = document.createElement('li');
+              li.className = 'kpi-list-item';
+              li.innerHTML = `<span>📄 <code>${d.referenced_docs}</code></span> <span class="kpi-badge">${d.count} veces</span>`;
+              docsContainer.appendChild(li);
+            });
+          }
+        }
+
+        // 4. Top Preguntas
+        const queriesContainer = document.getElementById('kpiTopQueries');
+        if (queriesContainer) {
+          queriesContainer.innerHTML = '';
+          const queries = kpis.top_preguntas_frecuentes || [];
+          if (queries.length === 0) {
+            queriesContainer.innerHTML = '<li class="kpi-list-item" style="color:var(--text-muted)">No hay consultas registradas aún</li>';
+          } else {
+            queries.forEach(q => {
+              const li = document.createElement('li');
+              li.className = 'kpi-list-item';
+              li.innerHTML = `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:80%;" title="${q.user_query}">💬 "${q.user_query}"</span> <span class="kpi-badge">${q.count}</span>`;
+              queriesContainer.appendChild(li);
+            });
+          }
+        }
+
+      } catch (err) {
+        console.error("Error al cargar KPIs:", err);
+      } finally {
+        if (refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerText = "🔄 Actualizar";
+        }
       }
     }
   </script>

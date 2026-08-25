@@ -13,8 +13,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
-from app.routers import chat
+from app.routers import chat, analytics
 from app.services.router_logic import RouterLogic
+from app.services.telemetry_service import init_telemetry_db
 
 # Configuración básica de logging estructurado
 logging.basicConfig(
@@ -37,6 +38,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"Entorno: {settings.environment} | GLPI URL: {settings.glpi_base_url}")
     logger.info(f"Ollama URL: {settings.ollama_base_url} | Modelo: {settings.llm_model}")
     logger.info("=============================================================")
+
+    # Inicializar Base de Datos de Telemetría
+    init_telemetry_db()
 
     # Tarea en segundo plano para limpieza periódica de sesiones inactivas (TTL)
     async def cleanup_loop():
@@ -85,6 +89,7 @@ app.add_middleware(
 
 # Inclusión de Routers
 app.include_router(chat.router)
+app.include_router(analytics.router)
 
 # Ruta estática para la interfaz gráfica del Chatbot
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
