@@ -23,6 +23,8 @@ from app.services.rag_service import (
 )
 from app.services.glpi_service import glpi_client, is_valid_email
 
+from app.services.router_service import handle_feedback_transition, RESOLVED_INTENTS, TICKET_INTENTS
+
 logger = logging.getLogger("unimon.router_logic")
 
 
@@ -36,6 +38,8 @@ class EstadoTicket(str, Enum):
     PIDIENDO_DESCRIPCION = "PIDIENDO_DESCRIPCION"
     SOLUCIONADO = "SOLUCIONADO"
     CANCELADO = "CANCELADO"
+    FINALIZADO = "FINALIZADO"
+    RADICANDO_TICKET = "RADICANDO_TICKET"
     # Campos de compatibilidad hacia atrás
     PIDIENDO_UBICACION = "PIDIENDO_UBICACION"
     PIDIENDO_ACTIVO = "PIDIENDO_ACTIVO"
@@ -873,10 +877,17 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", resp_text)
                 return {
                     "tipo": "DIAGNOSTICO",
+                    "state": "DIAGNOSTICO",
                     "mensaje": resp_text,
+                    "response": resp_text,
+                    "reply": resp_text,
                     "ticket_id": None,
                     "sources": rag_res.get("sources"),
-                    "source": rag_res.get("source", "ollama_rag")
+                    "source": rag_res.get("source", "ollama_rag"),
+                    "quick_replies": rag_res.get("quick_replies", [
+                        {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
+                        {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
+                    ])
                 }
             else:
                 # No había pregunta previa (saludo inicial o calificación limpia)
@@ -886,15 +897,55 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", ready_msg)
                 return {
                     "tipo": "DIAGNOSTICO",
+                    "state": "DIAGNOSTICO",
                     "mensaje": ready_msg,
+                    "response": ready_msg,
+                    "reply": ready_msg,
                     "ticket_id": None,
-                    "source": "UniMon_Assistant"
+                    "source": "UniMon_Assistant",
+                    "quick_replies": []
                 }
 
         # -------------------------------------------------------------
         # ESTADO: OFRECIENDO_RADICACION (Canal de Correo + Plantilla entregados)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.OFRECIENDO_RADICACION:
+            # 0. Si el usuario envía payload de feedback
+            if texto.upper() in ["RESOLVED", "CREATE_TICKET"]:
+                feedback_res = handle_feedback_transition(texto, "OFRECIENDO_RADICACION", session)
+                if feedback_res:
+                    if feedback_res.get("state") == "FINALIZADO":
+                        cls.reset_session(session_id)
+                        cls.add_history(session_id, "user", texto)
+                        cls.add_history(session_id, "assistant", feedback_res["response"])
+                        return {
+                            "tipo": "FINALIZADO",
+                            "state": "FINALIZADO",
+                            "mensaje": feedback_res["response"],
+                            "response": feedback_res["response"],
+                            "reply": feedback_res["response"],
+                            "ticket_id": None,
+                            "source": "UniMon_Feedback_Success",
+                            "quick_replies": []
+                        }
+                    elif feedback_res.get("state") == "RADICANDO_TICKET":
+                        session.nombre = None
+                        session.correo = None
+                        session.descripcion = None
+                        session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                        cls.add_history(session_id, "user", texto)
+                        cls.add_history(session_id, "assistant", feedback_res["response"])
+                        return {
+                            "tipo": "RADICANDO_TICKET",
+                            "state": "RADICANDO_TICKET",
+                            "mensaje": feedback_res["response"],
+                            "response": feedback_res["response"],
+                            "reply": feedback_res["response"],
+                            "ticket_id": None,
+                            "source": "UniMon_SlotFilling",
+                            "quick_replies": []
+                        }
+
             # 1. Si el usuario confirma o pide reportar ("sí", "vamos a reportar", "radicar", "por favor", "ayúdame", etc.):
             # NUNCA guardar la afirmación como nombre; transicionar limpiamente a PIDIENDO_NOMBRE.
             if cls.is_report_request(texto):
@@ -907,9 +958,13 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", prompt_msg)
                 return {
                     "tipo": "RADICANDO_TICKET",
+                    "state": "RADICANDO_TICKET",
                     "mensaje": prompt_msg,
+                    "response": prompt_msg,
+                    "reply": prompt_msg,
                     "ticket_id": None,
-                    "source": "UniMon_SlotFilling"
+                    "source": "UniMon_SlotFilling",
+                    "quick_replies": []
                 }
 
             # 2. Si el usuario responde con un saludo de cortesía
@@ -923,9 +978,13 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", greeting_reply)
                 return {
                     "tipo": "SALUDO",
+                    "state": "SALUDO",
                     "mensaje": greeting_reply,
+                    "response": greeting_reply,
+                    "reply": greeting_reply,
                     "ticket_id": None,
-                    "source": "UniMon_Assistant"
+                    "source": "UniMon_Assistant",
+                    "quick_replies": []
                 }
 
             # 3. Cualquier otra respuesta en este estado: evaluar nueva pregunta
@@ -949,10 +1008,14 @@ class RouterLogic:
                     cls.add_history(session_id, "assistant", resp_text)
                     return {
                         "tipo": "OFRECIENDO_RADICACION",
+                        "state": "OFRECIENDO_RADICACION",
                         "mensaje": resp_text,
+                        "response": resp_text,
+                        "reply": resp_text,
                         "ticket_id": None,
                         "sources": [],
-                        "source": "UniMon_SinDocumentacion"
+                        "source": "UniMon_SinDocumentacion",
+                        "quick_replies": []
                     }
 
                 session.estado = EstadoTicket.DIAGNOSTICO
@@ -962,16 +1025,58 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", resp_text)
                 return {
                     "tipo": "DIAGNOSTICO",
+                    "state": "DIAGNOSTICO",
                     "mensaje": resp_text,
+                    "response": resp_text,
+                    "reply": resp_text,
                     "ticket_id": None,
                     "sources": rag_res.get("sources"),
-                    "source": rag_res.get("source", "ollama_rag")
+                    "source": rag_res.get("source", "ollama_rag"),
+                    "quick_replies": rag_res.get("quick_replies", [
+                        {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
+                        {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
+                    ])
                 }
 
         # -------------------------------------------------------------
         # ESTADO: DIAGNOSTICO (Diagnóstico continuo e ilimitado)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.DIAGNOSTICO:
+            # Caso 0: Desambiguación de Feedback del usuario (Sí funcionó / No funcionó / Ticket)
+            feedback_res = handle_feedback_transition(texto, "DIAGNOSTICO", session)
+            if feedback_res:
+                if feedback_res.get("state") == "FINALIZADO" or feedback_res.get("tipo") == "FINALIZADO":
+                    cls.reset_session(session_id)
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", feedback_res["response"])
+                    return {
+                        "tipo": "FINALIZADO",
+                        "state": "FINALIZADO",
+                        "mensaje": feedback_res["response"],
+                        "response": feedback_res["response"],
+                        "reply": feedback_res["response"],
+                        "ticket_id": None,
+                        "source": feedback_res.get("source", "UniMon_Feedback_Success"),
+                        "quick_replies": []
+                    }
+                elif feedback_res.get("state") == "RADICANDO_TICKET" or feedback_res.get("tipo") == "RADICANDO_TICKET":
+                    session.nombre = None
+                    session.correo = None
+                    session.descripcion = None
+                    session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", feedback_res["response"])
+                    return {
+                        "tipo": "RADICANDO_TICKET",
+                        "state": "RADICANDO_TICKET",
+                        "mensaje": feedback_res["response"],
+                        "response": feedback_res["response"],
+                        "reply": feedback_res["response"],
+                        "ticket_id": None,
+                        "source": feedback_res.get("source", "UniMon_SlotFilling"),
+                        "quick_replies": []
+                    }
+
             # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
             if cls.is_greeting(texto):
                 cls.reset_session(session_id)
@@ -984,9 +1089,13 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", greeting_reply)
                 return {
                     "tipo": "SALUDO",
+                    "state": "SALUDO",
                     "mensaje": greeting_reply,
+                    "response": greeting_reply,
+                    "reply": greeting_reply,
                     "ticket_id": None,
-                    "source": "UniMon_Assistant"
+                    "source": "UniMon_Assistant",
+                    "quick_replies": []
                 }
 
             # Caso B: Solicitud de préstamo de equipos en medio de diagnóstico -> Mensaje directo estructurado
@@ -997,12 +1106,16 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", MENSAJE_SOLICITUD_EQUIPOS)
                 return {
                     "tipo": "OFRECIENDO_RADICACION",
+                    "state": "OFRECIENDO_RADICACION",
                     "mensaje": MENSAJE_SOLICITUD_EQUIPOS,
+                    "response": MENSAJE_SOLICITUD_EQUIPOS,
+                    "reply": MENSAJE_SOLICITUD_EQUIPOS,
                     "ticket_id": None,
-                    "source": "UniMon_SolicitudEquipos"
+                    "source": "UniMon_SolicitudEquipos",
+                    "quick_replies": []
                 }
 
-            # Caso C: Solicitud explícita de radicación, reporte o afirmación en diagnóstico -> Iniciar Slot-Filling de inmediato (SIN invocar Ollama ni plantillas intermedias)
+            # Caso C: Solicitud explícita de radicación, reporte o afirmación en diagnóstico -> Iniciar Slot-Filling de inmediato
             if cls.is_report_request(texto):
                 session.nombre = None
                 session.correo = None
@@ -1013,9 +1126,13 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", prompt_msg)
                 return {
                     "tipo": "RADICANDO_TICKET",
+                    "state": "RADICANDO_TICKET",
                     "mensaje": prompt_msg,
+                    "response": prompt_msg,
+                    "reply": prompt_msg,
                     "ticket_id": None,
-                    "source": "UniMon_SlotFilling"
+                    "source": "UniMon_SlotFilling",
+                    "quick_replies": []
                 }
 
             # Caso D: Solicitud de trámite administrativo presencial durante diagnóstico
@@ -1026,9 +1143,13 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", support_msg)
                 return {
                     "tipo": "OFRECIENDO_RADICACION",
+                    "state": "OFRECIENDO_RADICACION",
                     "mensaje": support_msg,
+                    "response": support_msg,
+                    "reply": support_msg,
                     "ticket_id": None,
-                    "source": "UniMon_CanalSoporte"
+                    "source": "UniMon_CanalSoporte",
+                    "quick_replies": []
                 }
 
             # Caso E: Diagnóstico continuo e ilimitado (sin límite de turnos)
@@ -1059,10 +1180,14 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", resp_text)
                 return {
                     "tipo": "OFRECIENDO_RADICACION",
+                    "state": "OFRECIENDO_RADICACION",
                     "mensaje": resp_text,
+                    "response": resp_text,
+                    "reply": resp_text,
                     "ticket_id": None,
                     "sources": rag_res.get("sources", []),
-                    "source": "UniMon_SinDocumentacion"
+                    "source": "UniMon_SinDocumentacion",
+                    "quick_replies": []
                 }
 
             # Si el usuario cambió a una pregunta fuera de dominio, liberar sesión
@@ -1072,10 +1197,14 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", resp_text)
                 return {
                     "tipo": "FUERA_DE_DOMINIO",
+                    "state": "FUERA_DE_DOMINIO",
                     "mensaje": resp_text,
+                    "response": resp_text,
+                    "reply": resp_text,
                     "ticket_id": None,
                     "sources": rag_res.get("sources"),
-                    "source": rag_res.get("source", "ollama_rag")
+                    "source": rag_res.get("source", "ollama_rag"),
+                    "quick_replies": []
                 }
 
             cls.add_history(session_id, "user", texto)
@@ -1083,10 +1212,17 @@ class RouterLogic:
 
             return {
                 "tipo": "DIAGNOSTICO",
+                "state": "DIAGNOSTICO",
                 "mensaje": resp_text,
+                "response": resp_text,
+                "reply": resp_text,
                 "ticket_id": None,
                 "sources": rag_res.get("sources"),
-                "source": rag_res.get("source", "ollama_rag")
+                "source": rag_res.get("source", "ollama_rag"),
+                "quick_replies": rag_res.get("quick_replies", [
+                    {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
+                    {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
+                ])
             }
 
         # -------------------------------------------------------------
@@ -1250,10 +1386,17 @@ class RouterLogic:
 
             return {
                 "tipo": "DIAGNOSTICO",
+                "state": "DIAGNOSTICO",
                 "mensaje": resp_text,
+                "response": resp_text,
+                "reply": resp_text,
                 "ticket_id": None,
                 "sources": rag_res.get("sources"),
-                "source": rag_res.get("source", "ollama_rag")
+                "source": rag_res.get("source", "ollama_rag"),
+                "quick_replies": rag_res.get("quick_replies", [
+                    {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
+                    {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
+                ])
             }
 
 

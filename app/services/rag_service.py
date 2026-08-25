@@ -22,6 +22,18 @@ logger = logging.getLogger("unimon.rag_service")
 # Umbral mínimo de similitud para considerar relevante un fragmento recuperado (calibrado a 0.48)
 MIN_RELEVANCE_SCORE_THRESHOLD = 0.48
 
+# Pregunta estandarizada de cierre para diagnósticos y quick replies
+CLOSING_FEEDBACK_QUESTION = (
+    "\n\n¿Pudiste resolver tu problema con estos pasos?\n"
+    "- Selecciona o escribe **Sí** si te funcionó.\n"
+    "- Selecciona o escribe **No** para radicar un ticket de soporte en GLPI."
+)
+
+QUICK_REPLIES_DIAGNOSTICO = [
+    {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
+    {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
+]
+
 # Mensaje oficial estándar cuando no existe procedimiento documentado en ChromaDB
 MENSAJE_NO_DOCUMENTADO = (
     "No dispongo de un instructivo o procedimiento institucional documentado para responder a tu solicitud, "
@@ -40,7 +52,9 @@ REGLAS DE ORO OBLIGATORIAS:
 2. GUÍA ACCIONABLE PASO A PASO: Explica con claridad qué debe hacer el usuario (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
 3. Si el contexto menciona una opción (como "Mis bloqueos" o "Recuperar contraseña"), indícale exactamente dónde hacer clic y qué seleccionar según lo que describe el documento.
 4. Finaliza siempre preguntando:
-   "¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico por ti?"
+   "¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para radicar un ticket de soporte en GLPI."
 5. Si el contexto NO contiene los pasos de solución, responde únicamente:
    "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un caso de soporte técnico por ti."
 
@@ -313,13 +327,18 @@ class RAGService:
                     data = response.json()
                     bot_message = data.get("message", {}).get("content", "").strip()
                     logger.info("Respuesta generada exitosamente por Ollama.")
+                    
+                    if "¿pudiste resolver tu problema con estos pasos?" not in bot_message.lower() and "¿te sirvieron estos pasos" not in bot_message.lower():
+                        bot_message = bot_message.rstrip() + CLOSING_FEEDBACK_QUESTION
+
                     return {
                         "response": bot_message,
                         "sources": sources,
                         "source": f"ollama_{self.model}",
                         "model": self.model,
                         "retrieved_chunks": len(retrieved_docs),
-                        "has_context": True
+                        "has_context": True,
+                        "quick_replies": QUICK_REPLIES_DIAGNOSTICO
                     }
                 else:
                     logger.warning(f"Ollama respondió con código {response.status_code}: {response.text}")
@@ -388,8 +407,7 @@ class RAGService:
             contenido = (
                 f"{saludo} Para soporte en los sistemas institucionales **Kactus / Seven** (Procedimiento **P-GT-11** y **P-GT-12**):\n\n"
                 "• Las incidencias y requerimientos deben ser radicados indicando el módulo afectado, captura de pantalla del error y usuario solicitante.\n"
-                "• El equipo de soporte de aplicaciones gestionará el requerimiento conforme a los acuerdos de nivel de servicio (SLA).\n\n"
-                "¿Deseas ayuda con los pasos de recuperación de clave o requieres radicar un ticket?"
+                "• El equipo de soporte de aplicaciones gestionará el requerimiento conforme a los acuerdos de nivel de servicio (SLA)."
             )
         elif any(w in msg_lower for w in ["virus", "malware", "antivirus", "amenaza", "infectado"]):
             contenido = (
@@ -407,11 +425,14 @@ class RAGService:
                 "Para ayudarte con este inconveniente técnico, te sugiero realizar estos pasos iniciales de descarte:\n"
                 "1. Verifica que los cables de poder, red o video estén firmemente conectados.\n"
                 "2. Reinicia el equipo o dispositivo y verifica si el comportamiento persiste.\n"
-                "3. Si el inconveniente es en un aplicativo institucional, cierra sesión y vuelve a ingresar.\n\n"
-                "¿Alguno de estos pasos te funcionó o el problema continúa?"
+                "3. Si el inconveniente es en un aplicativo institucional, cierra sesión y vuelve a ingresar."
             )
         else:
             contenido = MENSAJE_NO_DOCUMENTADO
+
+        is_doc = (contenido != MENSAJE_NO_DOCUMENTADO)
+        if is_doc and "¿pudiste resolver tu problema con estos pasos?" not in contenido.lower():
+            contenido = contenido.rstrip() + CLOSING_FEEDBACK_QUESTION
 
         return {
             "response": contenido,
@@ -419,7 +440,8 @@ class RAGService:
             "source": "knowledge_base_fallback",
             "model": "rule_based_institutional_unisimon",
             "retrieved_chunks": 0,
-            "has_context": True if contenido != MENSAJE_NO_DOCUMENTADO else False
+            "has_context": is_doc,
+            "quick_replies": QUICK_REPLIES_DIAGNOSTICO if is_doc else []
         }
 
     async def answer_query(

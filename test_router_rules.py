@@ -174,6 +174,39 @@ async def run_tests():
     assert r_ttl["tipo"] == "PIDIENDO_ROL"
     print("  ✓ Mensaje tras inactividad >20 min reinició sesión y procedió con flujo limpio")
 
+    # -------------------------------------------------------------
+    # PRUEBA 8: Desambiguación de Feedback ("sí", "gracias", "RESOLVED" vs "no", "CREATE_TICKET")
+    # -------------------------------------------------------------
+    print("\n[PRUEBA 8] Desambiguación de Feedback tras DIAGNOSTICO")
+    
+    # 8.1 Caso Resuelto ("si me sirvio", "sí", "gracias", "RESOLVED")
+    for pos_reply in ["si me sirvio", "sí", "gracias", "RESOLVED", "si me funcionó"]:
+        sess_pos = f"sess_feedback_pos_{pos_reply.replace(' ', '_')}"
+        router_logic.reset_session(sess_pos)
+        router_logic.get_session(sess_pos).user_role = "estudiante"
+        router_logic.get_session(sess_pos).estado = EstadoTicket.DIAGNOSTICO
+        router_logic.get_session(sess_pos).falla = "problema portal"
+
+        r_pos = await router_logic.procesar_mensaje(pos_reply, session_id=sess_pos)
+        assert r_pos["tipo"] in ["FINALIZADO", "SOLUCIONADO"], f"Esperaba FINALIZADO para '{pos_reply}', obtuvo {r_pos['tipo']}"
+        assert router_logic.get_session(sess_pos).estado in [EstadoTicket.IDLE, EstadoTicket.FINALIZADO]
+        assert "nombre" not in r_pos["mensaje"].lower()
+        print(f"  ✓ Feedback positivo '{pos_reply}' finalizó el caso sin pedir nombre")
+
+    # 8.2 Caso No Funcionó / Radicar ("no", "no me sirvio", "CREATE_TICKET", "no pude")
+    for neg_reply in ["no", "no me funciono", "CREATE_TICKET", "no me sirvió", "radicar"]:
+        sess_neg = f"sess_feedback_neg_{neg_reply.replace(' ', '_')}"
+        router_logic.reset_session(sess_neg)
+        router_logic.get_session(sess_neg).user_role = "funcionario"
+        router_logic.get_session(sess_neg).estado = EstadoTicket.DIAGNOSTICO
+        router_logic.get_session(sess_neg).falla = "problema seven"
+
+        r_neg = await router_logic.procesar_mensaje(neg_reply, session_id=sess_neg)
+        assert r_neg["tipo"] == "RADICANDO_TICKET", f"Esperaba RADICANDO_TICKET para '{neg_reply}', obtuvo {r_neg['tipo']}"
+        assert router_logic.get_session(sess_neg).estado == EstadoTicket.PIDIENDO_NOMBRE
+        assert "nombre" in r_neg["mensaje"].lower()
+        print(f"  ✓ Feedback negativo '{neg_reply}' pasó a RADICANDO_TICKET solicitando Nombre Completo")
+
     print("\n" + "=" * 70)
     print("TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (100% OK)")
     print("=" * 70)
