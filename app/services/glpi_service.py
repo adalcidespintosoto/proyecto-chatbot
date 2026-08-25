@@ -233,7 +233,7 @@ class GLPIService:
                     "actor_associated": actor_associated,
                     "raw_response": res_data,
                     "actor_response": actor_data,
-                    "message": f"Ticket #{ticket_id} registrado exitosamente en el sistema de soporte GLPI de la USB."
+                    "message": f"Ticket #{ticket_id} registrado exitosamente en la Mesa de Ayuda TI de la Universidad Simón Bolívar."
                 }
 
             finally:

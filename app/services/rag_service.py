@@ -26,12 +26,13 @@ MIN_RELEVANCE_SCORE_THRESHOLD = 0.48
 CLOSING_FEEDBACK_QUESTION = (
     "\n\n¿Pudiste resolver tu problema con estos pasos?\n"
     "- Selecciona o escribe **Sí** si te funcionó.\n"
-    "- Selecciona o escribe **No** para radicar un ticket de soporte en GLPI."
+    "- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
 )
 
 QUICK_REPLIES_DIAGNOSTICO = [
     {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
-    {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
+    {"label": "🔄 No me funcionó", "payload": "RETRY_DIAGNOSIS"},
+    {"label": "🎫 Generar reporte", "payload": "CREATE_TICKET"}
 ]
 
 # Mensaje oficial estándar cuando no existe procedimiento documentado en ChromaDB
@@ -49,13 +50,17 @@ STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Agente Oficial de Soporte Té
 
 REGLAS DE ORO OBLIGATORIAS:
 1. PROHIBICIÓN TOTAL DE REFERENCIAR MANUALES AL USUARIO: NUNCA le digas al usuario "revisa el instructivo", "consulta el PDF", "dirígete a la presentación" o "sigue los pasos del documento X". Tú eres el soporte: extrae los pasos del contexto y redacta la solución directa en tu mensaje.
-2. GUÍA ACCIONABLE PASO A PASO: Explica con claridad qué debe hacer el usuario (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
-3. Si el contexto menciona una opción (como "Mis bloqueos" o "Recuperar contraseña"), indícale exactamente dónde hacer clic y qué seleccionar según lo que describe el documento.
-4. Finaliza siempre preguntando:
+2. PROHIBICIÓN TOTAL DE PLACEHOLDERS Y ENLACES FALSOS: NUNCA inventes placeholders como "[URL del GLPI]", "[Enlace]", "[Link]", "[URL]", "[Insertar URL]". NUNCA le digas al usuario que ingrese a GLPI ni que se asigne tickets manualmente. Solo usa URLs completas si aparecen textualmente en el contexto provisto (ej: https://unisimon.edu.co).
+3. GUÍA ACCIONABLE PASO A PASO: Si el procedimiento es de autoservicio digital (portales, claves, teams, office, carnet, siaaf, kactus, seven), explica con claridad qué debe hacer el usuario (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
+4. SOPORTE DE HARDWARE, REDES FÍSICAS O DAÑOS DE EQUIPOS: Si la consulta es una falla física (pantalla rota o sin video, cable dañado, puerto dañado, pc no enciende o red cableada) que requiere atención presencial de TI:
+   - Proporciona únicamente 1 o 2 descartes básicos (verificar cables conectados y encendido).
+   - Informa los canales oficiales de soporte (solicitudcomputo@unisimon.edu.co en Barranquilla / helpdesk@unisimon.edu.co en Cúcuta).
+   - Pregunta si desea que se radique el reporte de soporte técnico.
+5. Finaliza siempre preguntando:
    "¿Pudiste resolver tu problema con estos pasos?
 - Selecciona o escribe **Sí** si te funcionó.
-- Selecciona o escribe **No** para radicar un ticket de soporte en GLPI."
-5. Si el contexto NO contiene los pasos de solución, responde únicamente:
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
+6. Si el contexto NO contiene los pasos de solución, responde únicamente:
    "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un caso de soporte técnico por ti."
 
 Contexto institucional provisto:
@@ -327,6 +332,12 @@ class RAGService:
                     data = response.json()
                     bot_message = data.get("message", {}).get("content", "").strip()
                     logger.info("Respuesta generada exitosamente por Ollama.")
+
+                    # Sanitizar placeholders y menciones a GLPI
+                    clean_msg = re.sub(r"\[(?:URL|Link|Enlace)?\s*(?:del?|al?)?\s*GLPI\]", "la Mesa de Ayuda TI", bot_message, flags=re.IGNORECASE)
+                    clean_msg = re.sub(r"\bGLPI\b", "Mesa de Ayuda TI", clean_msg)
+                    clean_msg = re.sub(r"\[(?:URL|Enlace|Link|Insertar URL)\]", "", clean_msg, flags=re.IGNORECASE)
+                    bot_message = clean_msg.strip()
                     
                     if "¿pudiste resolver tu problema con estos pasos?" not in bot_message.lower() and "¿te sirvieron estos pasos" not in bot_message.lower():
                         bot_message = bot_message.rstrip() + CLOSING_FEEDBACK_QUESTION
