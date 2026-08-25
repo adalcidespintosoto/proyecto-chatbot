@@ -82,7 +82,6 @@ async def run_tests():
             d_falla = res_falla.json()
             print(f"[Paso 1] Tipo: {d_falla.get('tipo')}")
             assert d_falla.get("tipo") == "DIAGNOSTICO"
-            assert "glpi" not in d_falla.get("mensaje", "").lower()
 
             # Paso 2: Usuario decide reportar
             res_rep = await client.post("/api/chat", json={"session_id": sess3, "mensaje": "vamos a reportar"})

@@ -43,13 +43,16 @@ class ChatResponse(BaseModel):
     """
     Respuesta generada por UniMon según la máquina de estados de Nivel 1 y GLPI.
     """
-    tipo: str = Field(..., description="Tipo de respuesta (SALUDO, DIAGNOSTICO, SOLUCIONADO, RADICANDO_TICKET, TICKET_CREADO, ERROR)", example="DIAGNOSTICO")
+    tipo: str = Field(..., description="Tipo de respuesta (SALUDO, DIAGNOSTICO, SOLUCIONADO, FINALIZADO, RADICANDO_TICKET, TICKET_CREADO, ERROR)", example="DIAGNOSTICO")
     mensaje: str = Field(..., description="Mensaje de respuesta en lenguaje natural para el usuario en español")
     ticket_id: Optional[Any] = Field(default=None, description="ID del ticket en GLPI si fue generado", example=1042)
 
-    # Campos de compatibilidad para clientes web existentes
+    # Campos de compatibilidad para clientes web y quick replies
     intent: Optional[str] = Field(default=None, description="Alias de compatibilidad para tipo")
     reply: Optional[str] = Field(default=None, description="Alias de compatibilidad para mensaje")
+    state: Optional[str] = Field(default=None, description="Estado de la sesión conversacional")
+    response: Optional[str] = Field(default=None, description="Alias de respuesta")
+    quick_replies: Optional[List[Dict[str, str]]] = Field(default_factory=list, description="Botones de respuesta rápida")
     ticket_details: Optional[Dict[str, Any]] = Field(default=None, description="Detalles del ticket si fue generado")
     category: Optional[str] = Field(default=None, description="Categoría temática del problema")
     source: Optional[str] = Field(default=None, description="Fuente de la respuesta (GLPI, Ollama, Base de Conocimiento)", example="GLPI_REST_API")
@@ -104,6 +107,9 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
         ticket_id=ticket_id,
         intent=tipo,
         reply=mensaje_resp,
+        state=resultado.get("state", tipo),
+        response=mensaje_resp,
+        quick_replies=resultado.get("quick_replies", []),
         ticket_details=resultado.get("ticket_details"),
         category=resultado.get("category"),
         source=resultado.get("source"),

@@ -78,8 +78,24 @@ VISION_PROMPT = (
 
 
 # =============================================================================
-# UTILIDADES DE IMAGEN
+# UTILIDADES Y METADATOS
 # =============================================================================
+
+def get_metadata_from_path(file_path: Path) -> dict:
+    """Mapea automáticamente los metadatos institucionales según la ubicación del archivo."""
+    path_str = str(file_path).lower()
+    if "1_estudiantes" in path_str:
+        return {"audience": "estudiante", "doc_type": "autoservicio", "source": file_path.name}
+    elif "2_profesores" in path_str:
+        return {"audience": "profesor", "doc_type": "autoservicio", "source": file_path.name}
+    elif "3_funcionarios_gestion" in path_str:
+        return {"audience": "funcionario", "doc_type": "gestion_interna", "source": file_path.name}
+    elif "4_general_normativa" in path_str:
+        return {"audience": "general", "doc_type": "normativa", "source": file_path.name}
+    elif "5_admin_ti" in path_str:
+        return {"audience": "admin_ti", "doc_type": "gestion_interna", "source": file_path.name}
+    return {"audience": "general", "doc_type": "autoservicio", "source": file_path.name}
+
 
 def normalize_image(image_bytes: bytes, max_size: int = 1024, quality: int = 85) -> bytes:
     """
@@ -300,15 +316,16 @@ def process_pptx(
 
         full_content = "\n\n".join(parts).strip()
         if full_content:
+            meta = get_metadata_from_path(filepath)
+            meta.update({
+                "slide_number": slide_idx,
+                "total_slides": total_slides,
+                "type": "presentation",
+                "has_images": len(slide_images_descriptions) > 0
+            })
             doc = Document(
                 page_content=full_content,
-                metadata={
-                    "source": source_name,
-                    "slide_number": slide_idx,
-                    "total_slides": total_slides,
-                    "type": "presentation",
-                    "has_images": len(slide_images_descriptions) > 0
-                }
+                metadata=meta
             )
             documents.append(doc)
             stats["slides_extracted"] += 1
@@ -406,15 +423,16 @@ def process_pdf(
 
         full_content = "\n\n".join(parts).strip()
         if full_content:
+            meta = get_metadata_from_path(filepath)
+            meta.update({
+                "page_number": page_idx + 1,
+                "total_pages": total_pages,
+                "type": "pdf_document",
+                "has_images": len(page_images_descriptions) > 0
+            })
             doc = Document(
                 page_content=full_content,
-                metadata={
-                    "source": source_name,
-                    "page_number": page_idx + 1,
-                    "total_pages": total_pages,
-                    "type": "pdf_document",
-                    "has_images": len(page_images_descriptions) > 0
-                }
+                metadata=meta
             )
             documents.append(doc)
             stats["pages_extracted"] += 1
@@ -430,7 +448,7 @@ def process_pdf(
 def ingest_multimodal(docs_path: str = None, chroma_path: str = None, model_name: str = None) -> bool:
     """
     Pipeline completo de ingesta multimodal:
-    1. Escanea ./data/docs/ buscando .pdf y .pptx
+    1. Escanea ./data/docs/ recursivamente buscando .pdf y .pptx
     2. Procesa cada archivo con interpretación visual (Vision-LLM)
     3. Aplica chunking con solapamiento
     4. Genera embeddings en GPU y persiste en ChromaDB
@@ -464,21 +482,25 @@ def ingest_multimodal(docs_path: str = None, chroma_path: str = None, model_name
         logger.info(f"Creando directorio de documentos: {docs_dir}")
         docs_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. Escanear archivos soportados (.pdf y .pptx)
-    pdf_files = sorted(docs_dir.glob("*.pdf"))
-    pptx_files = sorted(docs_dir.glob("*.pptx"))
-    all_files = pdf_files + pptx_files
+    # 2. Escanear archivos soportados (.pdf y .pptx) recursivamente
+    pdf_files = sorted(docs_dir.rglob("*.pdf"))
+    pptx_files = sorted(docs_dir.rglob("*.pptx"))
+    all_files = sorted(pdf_files + pptx_files)
 
     if not all_files:
         logger.warning(
-            f"[!] No se encontraron archivos PDF ni PPTX en '{docs_dir}'.\n"
+            f"[!] No se encontraron archivos PDF ni PPTX en '{docs_dir}' ni en sus subcarpetas.\n"
             f"Asegúrate de colocar los documentos institucionales en '{docs_dir}'."
         )
         return False
 
     logger.info(f"Archivos encontrados: {len(pdf_files)} PDF(s) + {len(pptx_files)} PPTX = {len(all_files)} total")
     for idx, f in enumerate(all_files, 1):
-        logger.info(f"  [{idx}/{len(all_files)}] {f.name} ({f.stat().st_size / 1024:.1f} KB)")
+        try:
+            rel_path = f.relative_to(docs_dir)
+        except ValueError:
+            rel_path = f.name
+        logger.info(f"  [{idx}/{len(all_files)}] {rel_path} ({f.stat().st_size / 1024:.1f} KB)")
 
     # 3. Verificar disponibilidad del modelo de visión (con smoke test y fallback automático)
     use_vision, active_vision_model = check_vision_model_available(ollama_url, vision_model)

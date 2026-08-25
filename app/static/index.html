@@ -401,6 +401,47 @@
       0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
       40% { transform: translateY(-6px); opacity: 1; }
     }
+
+    /* Quick Replies debajo del mensaje del bot */
+    .quick-replies-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .quick-reply-btn {
+      background: rgba(0, 163, 255, 0.12);
+      border: 1px solid rgba(0, 163, 255, 0.35);
+      color: #93c5fd;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.84rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .quick-reply-btn:hover:not(:disabled) {
+      background: rgba(0, 163, 255, 0.25);
+      border-color: #00d2ff;
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 0 12px rgba(0, 163, 255, 0.3);
+    }
+
+    .quick-reply-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      border-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+    }
   </style>
 </head>
 <body>
@@ -507,7 +548,12 @@
       return `<p>${formatted}</p>`;
     }
 
-    function addMessage(sender, htmlContent, meta = null, ticketDetails = null) {
+    function sendMessage(text) {
+      messageInput.value = text;
+      handleChatSubmit();
+    }
+
+    function addMessage(sender, htmlContent, meta = null, ticketDetails = null, quickReplies = null) {
       const messageDiv = document.createElement('div');
       messageDiv.className = `message ${sender}`;
 
@@ -532,6 +578,26 @@
           <div style="font-size:0.75rem; color:#a7f3d0;">Estado: Radicado exitosamente en Mesa de Ayuda TI</div>
         `;
         bubble.appendChild(ticketCard);
+      }
+
+      // Renderizar botones de respuesta rápida debajo del mensaje del bot
+      if (quickReplies && quickReplies.length > 0) {
+        const quickRepliesContainer = document.createElement('div');
+        quickRepliesContainer.className = 'quick-replies-container';
+
+        quickReplies.forEach(btn => {
+          const button = document.createElement('button');
+          button.className = 'quick-reply-btn';
+          button.innerText = btn.label;
+          button.onclick = () => {
+            // Deshabilitar botones tras hacer clic
+            quickRepliesContainer.querySelectorAll('button').forEach(b => b.disabled = true);
+            // Enviar el payload como mensaje
+            sendMessage(btn.payload);
+          };
+          quickRepliesContainer.appendChild(button);
+        });
+        bubble.appendChild(quickRepliesContainer);
       }
 
       if (meta) {
@@ -629,7 +695,8 @@
           'bot', 
           formatText(textoBot), 
           metaInfo, 
-          detallesTicket
+          detallesTicket,
+          data.quick_replies
         );
 
       } catch (err) {
