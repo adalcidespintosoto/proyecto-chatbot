@@ -959,6 +959,8 @@ class RouterLogic:
                     "ticket_id": None,
                     "sources": rag_res.get("sources"),
                     "source": rag_res.get("source", "ollama_rag"),
+                    "prompt_tokens": rag_res.get("prompt_tokens", 0),
+                    "eval_tokens": rag_res.get("eval_tokens", 0),
                     "quick_replies": rag_res.get("quick_replies", [
                         {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
                         {"label": "🔄 No me funcionó", "payload": "RETRY_DIAGNOSIS"},
@@ -1338,6 +1340,8 @@ class RouterLogic:
                 "ticket_id": None,
                 "sources": rag_res.get("sources"),
                 "source": rag_res.get("source", "ollama_rag"),
+                "prompt_tokens": rag_res.get("prompt_tokens", 0),
+                "eval_tokens": rag_res.get("eval_tokens", 0),
                 "quick_replies": rag_res.get("quick_replies", [
                     {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
                     {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
@@ -1553,6 +1557,8 @@ class RouterLogic:
                 "ticket_id": None,
                 "sources": rag_res.get("sources"),
                 "source": rag_res.get("source", "ollama_rag"),
+                "prompt_tokens": rag_res.get("prompt_tokens", 0),
+                "eval_tokens": rag_res.get("eval_tokens", 0),
                 "quick_replies": rag_res.get("quick_replies", [
                     {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
                     {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
