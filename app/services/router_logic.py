@@ -23,7 +23,17 @@ from app.services.rag_service import (
 )
 from app.services.glpi_service import glpi_client, is_valid_email
 
-from app.services.router_service import handle_feedback_transition, RESOLVED_INTENTS, RETRY_INTENTS, TICKET_EXPLICIT_INTENTS, TICKET_INTENTS
+from app.services.router_service import (
+    handle_feedback_transition, 
+    RESOLVED_INTENTS, 
+    RETRY_INTENTS, 
+    TICKET_EXPLICIT_INTENTS, 
+    TICKET_INTENTS,
+    PROMPT_HARDWARE_DIRECT,
+    classify_request_intent,
+    classify_request_intent_async,
+    is_physical_hardware_request
+)
 
 logger = logging.getLogger("unimon.router_logic")
 
@@ -109,7 +119,12 @@ CANCEL_REGEX = [
     r"\b(cancelar|cancela|ya\s+no|no\s+gracias|olvidalo|olv[ií]dalo|dejalo\s+asi|d[eé]jalo\s+as[ií]|no\s+quiero|no\s+deseo|cancelar\s+ticket|cancelar\s+radicaci[oó]n|no\s+lo\s+radiques|no\s+radiques)\b"
 ]
 
-MENSAJE_CANCELACION = "Entendido, he cancelado el proceso. Si necesitas ayuda con otro tema, aquí estaré."
+MENSAJE_CANCELACION = (
+    "Entendido, he cancelado el proceso. Si prefieres comunicarte directamente con los canales oficiales de soporte técnico TI:\n\n"
+    "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333` Ext. 8003/8004\n"
+    "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070` Ext. 129\n\n"
+    "Si necesitas ayuda con otro procedimiento o falla técnica, aquí estaré. 👋"
+)
 
 # Términos que identifican fallas técnicas, daños o problemas de soporte (NUNCA deben tratarse como préstamos)
 FAILURE_AND_SUPPORT_TERMS = [
@@ -350,6 +365,21 @@ class RouterLogic:
         if len(words) <= 5:
             return any(re.search(pat, msg_clean) for pat in GREETING_PATTERNS)
         return False
+
+    @classmethod
+    async def classify_intent(cls, text: str, role: str = "general") -> str:
+        """
+        Clasifica semánticamente la intención con LLM ('AUTOSERVICIO' vs 'SOPORTE_FISICO').
+        """
+        return await classify_request_intent_async(text, role)
+
+    @classmethod
+    def is_physical_hardware_request(cls, text: str, role: str = "general") -> bool:
+        """
+        Determina semánticamente si el mensaje corresponde a una falla física, daño de hardware,
+        cableado, punto de red, revisión en sitio o mantenimiento de equipos.
+        """
+        return is_physical_hardware_request(text, role)
 
     @classmethod
     def is_cancellation(cls, text: str) -> bool:
@@ -831,6 +861,30 @@ class RouterLogic:
                 query_to_run = session.pending_query
                 session.pending_query = None
 
+                # ENRUTAMIENTO SEMÁNTICO: Fallas físicas / Hardware / Soporte en sitio
+                intent_cat = await cls.classify_intent(query_to_run, session.user_role or "general")
+                if intent_cat == "SOPORTE_FISICO":
+                    session.falla = query_to_run
+                    session.descripcion = query_to_run
+                    session.categoria = CategoriaSolicitud.HARDWARE
+                    session.category_name = "Mantenimiento Preventivo y Correctivo de Equipos y Redes"
+                    session.urgency, session.impact = cls.calculate_urgency_and_impact(query_to_run)
+                    session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                    session.nombre = None
+                    session.correo = None
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
+                    return {
+                        "tipo": "RADICANDO_TICKET",
+                        "state": "RADICANDO_TICKET",
+                        "mensaje": PROMPT_HARDWARE_DIRECT,
+                        "response": PROMPT_HARDWARE_DIRECT,
+                        "reply": PROMPT_HARDWARE_DIRECT,
+                        "ticket_id": None,
+                        "source": "UniMon_SemanticRouter_Hardware",
+                        "quick_replies": []
+                    }
+
                 # Consultar RAG con el rol confirmado y filtrar chunks
                 history = cls.get_history(session_id)
                 rag_res = await rag_service.answer_query(
@@ -1193,6 +1247,30 @@ class RouterLogic:
                     "quick_replies": []
                 }
 
+            # Caso D.1: Fallas físicas / Hardware / Solicitud de técnico en sitio
+            intent_cat = await cls.classify_intent(texto, session.user_role or "general")
+            if intent_cat == "SOPORTE_FISICO":
+                session.falla = texto
+                session.descripcion = texto
+                session.categoria = CategoriaSolicitud.HARDWARE
+                session.category_name = "Mantenimiento Preventivo y Correctivo de Equipos y Redes"
+                session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
+                session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                session.nombre = None
+                session.correo = None
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "state": "RADICANDO_TICKET",
+                    "mensaje": PROMPT_HARDWARE_DIRECT,
+                    "response": PROMPT_HARDWARE_DIRECT,
+                    "reply": PROMPT_HARDWARE_DIRECT,
+                    "ticket_id": None,
+                    "source": "UniMon_SemanticRouter_Hardware",
+                    "quick_replies": []
+                }
+
             # Caso E: Diagnóstico continuo e ilimitado (sin límite de turnos)
             session.intentos_diagnostico += 1
             history = cls.get_history(session_id)
@@ -1365,7 +1443,31 @@ class RouterLogic:
                     "source": "UniMon_SolicitudEquipos"
                 }
 
-            # 5. Solicitud de Trámites Administrativos o Técnico Directo (Sin diagnóstico simulado)
+            # 5. ENRUTAMIENTO SEMÁNTICO: Fallas físicas / Hardware / Soporte en sitio
+            intent_cat = await cls.classify_intent(texto, session.user_role or "general")
+            if intent_cat == "SOPORTE_FISICO":
+                session.falla = texto
+                session.descripcion = texto
+                session.categoria = CategoriaSolicitud.HARDWARE
+                session.category_name = "Mantenimiento Preventivo y Correctivo de Equipos y Redes"
+                session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
+                session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                session.nombre = None
+                session.correo = None
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "state": "RADICANDO_TICKET",
+                    "mensaje": PROMPT_HARDWARE_DIRECT,
+                    "response": PROMPT_HARDWARE_DIRECT,
+                    "reply": PROMPT_HARDWARE_DIRECT,
+                    "ticket_id": None,
+                    "source": "UniMon_SemanticRouter_Hardware",
+                    "quick_replies": []
+                }
+
+            # 6. Solicitud de Trámites Administrativos o Técnico Directo (Sin diagnóstico simulado)
             if cls.is_physical_or_admin_request(texto) or cls.is_direct_tech_request(texto):
                 session.falla = texto
                 cat, cat_name = cls.detect_category(texto)
@@ -1378,12 +1480,16 @@ class RouterLogic:
                 cls.add_history(session_id, "assistant", support_msg)
                 return {
                     "tipo": "OFRECIENDO_RADICACION",
+                    "state": "OFRECIENDO_RADICACION",
                     "mensaje": support_msg,
+                    "response": support_msg,
+                    "reply": support_msg,
                     "ticket_id": None,
-                    "source": "UniMon_CanalSoporte"
+                    "source": "UniMon_CanalSoporte",
+                    "quick_replies": []
                 }
 
-            # 6. Consultar RAG con historial conversacional y rol de usuario
+            # 7. Consultar RAG con historial conversacional y rol de usuario
             history = cls.get_history(session_id)
             rag_res = await rag_service.answer_query(
                 query=texto,
