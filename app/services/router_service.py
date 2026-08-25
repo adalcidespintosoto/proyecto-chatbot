@@ -1,11 +1,124 @@
 """
-Servicio de Clasificación de Intenciones y Feedback para UniMon.
-Maneja la desambiguación de respuestas del usuario tras diagnósticos e instructivos (Nivel 1),
+Servicio de Clasificación de Intenciones, Enrutamiento Semántico y Feedback para UniMon.
+Maneja la clasificación semántica con LLM (AUTOSERVICIO vs SOPORTE_FISICO),
+la desambiguación de respuestas del usuario tras diagnósticos e instructivos (Nivel 1),
 ciclos de reintento/aclaración antes de escalar y transición a toma de datos para reporte.
 """
 
 import re
+import json
+import logging
+import httpx
 from typing import Optional, Dict, Any, Union
+
+from app.config import Settings
+
+logger = logging.getLogger("unimon.router_service")
+
+# Configuración de Ollama para el Router Semántico
+try:
+    _settings = Settings()
+    OLLAMA_URL = f"{_settings.ollama_base_url.rstrip('/')}/api/generate"
+    MODEL_NAME = _settings.llm_model
+except Exception:
+    OLLAMA_URL = "http://localhost:11434/api/generate"
+    MODEL_NAME = "unimon:8b"
+
+SYSTEM_ROUTER_PROMPT = """Eres el clasificador de intenciones de soporte de TI de la Universidad Simón Bolívar.
+Tu labor es clasificar el mensaje del usuario en UNA de dos categorías:
+
+1. AUTOSERVICIO: Trámites en plataformas web, SIAAF, Teams, Portal Estudiantes, Kactus, Seven, subida de notas, registro de inasistencias ("fallas a clase"), consulta de calificaciones, restablecimiento de contraseñas, certificados o directrices institucionales.
+2. SOPORTE_FISICO: Averías de hardware, periféricos rotos (mouse, teclado, monitor), cables de red dañados, puntos de red sin servicio, computadores que no prenden/sin video, impresoras atascadas o solicitudes de revisión técnica presencial en oficina/laboratorio.
+
+REGLA CLAVE: "Fallas a clase", "reportar fallas", "subir notas" o "calificaciones" son SIEMPRE de tipo AUTOSERVICIO.
+
+Responde ÚNICAMENTE un objeto JSON válido con la clave 'categoria':
+{"categoria": "AUTOSERVICIO"} o {"categoria": "SOPORTE_FISICO"}"""
+
+PROMPT_HARDWARE_DIRECT = (
+    "Entendido. Al tratarse de una revisión técnica o falla física en tu equipo/red, "
+    "generaré de inmediato una solicitud de soporte para que el equipo de TI atienda tu caso en sitio.\n\n"
+    "Por favor, indícame tu **Nombre Completo**:"
+)
+
+
+async def classify_request_intent_async(user_message: str, user_role: str = "general") -> str:
+    """
+    Clasificador semántico asíncrono con LLM local para determinar AUTOSERVICIO vs SOPORTE_FISICO.
+    """
+    prompt = f"Rol de usuario: {user_role}\nConsulta del usuario: \"{user_message}\"\nClasificación JSON:"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                OLLAMA_URL,
+                json={
+                    "model": MODEL_NAME,
+                    "prompt": prompt,
+                    "system": SYSTEM_ROUTER_PROMPT,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.0,
+                        "num_predict": 20
+                    },
+                    "format": "json"
+                },
+                timeout=5.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                raw_resp = data.get("response", "{}")
+                result = json.loads(raw_resp)
+                categoria = result.get("categoria", "AUTOSERVICIO").strip().upper()
+                if categoria in ["AUTOSERVICIO", "SOPORTE_FISICO"]:
+                    return categoria
+    except Exception as e:
+        logger.warning(f"Error en clasificador semántico LLM async ({e}). Fallback por defecto a AUTOSERVICIO.")
+        
+    return "AUTOSERVICIO"
+
+
+def classify_request_intent(user_message: str, user_role: str = "general") -> str:
+    """
+    Clasificador semántico síncrono con LLM local para determinar AUTOSERVICIO vs SOPORTE_FISICO.
+    """
+    prompt = f"Rol de usuario: {user_role}\nConsulta del usuario: \"{user_message}\"\nClasificación JSON:"
+    
+    try:
+        response = httpx.post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "prompt": prompt,
+                "system": SYSTEM_ROUTER_PROMPT,
+                "stream": False,
+                "options": {
+                    "temperature": 0.0,
+                    "num_predict": 20
+                },
+                "format": "json"
+            },
+            timeout=5.0
+        )
+        if response.status_code == 200:
+            data = response.json()
+            raw_resp = data.get("response", "{}")
+            result = json.loads(raw_resp)
+            categoria = result.get("categoria", "AUTOSERVICIO").strip().upper()
+            if categoria in ["AUTOSERVICIO", "SOPORTE_FISICO"]:
+                return categoria
+    except Exception as e:
+        logger.warning(f"Error en clasificador semántico LLM ({e}). Fallback por defecto a AUTOSERVICIO.")
+        
+    return "AUTOSERVICIO"
+
+
+def is_physical_hardware_request(user_message: str, user_role: str = "general") -> bool:
+    """
+    Determina si la solicitud del usuario es de soporte físico/hardware usando el clasificador semántico.
+    """
+    return classify_request_intent(user_message, user_role) == "SOPORTE_FISICO"
+
 
 RESOLVED_INTENTS = [
     "resolved", "si", "sí", "si me sirvio", "sí me sirvió", "si me funciono", 

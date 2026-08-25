@@ -4,6 +4,7 @@ Ciclo de Reintentos en Diagnóstico, Bienvenida Limpia de Rol y Eliminación de 
 """
 
 import sys
+import json
 import asyncio
 from pathlib import Path
 
@@ -205,6 +206,139 @@ async def test_placeholder_sanitization_in_rag_service():
         assert "GLPI" not in resp_text
         assert "Mesa de Ayuda TI" in resp_text
         assert "[Link]" not in resp_text
+
+
+# -----------------------------------------------------------------------------
+# PRUEBAS: ENRUTAMIENTO SEMÁNTICO CON LLM (AUTOSERVICIO VS. SOPORTE FÍSICO)
+# -----------------------------------------------------------------------------
+
+def test_classify_request_intent_unit():
+    """Verifica que classify_request_intent procese el JSON de Ollama correctamente."""
+    from app.services.router_service import classify_request_intent
+
+    with patch("httpx.post") as mock_post:
+        # Caso 1: Retorna AUTOSERVICIO
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"response": json.dumps({"categoria": "AUTOSERVICIO"})}
+        mock_post.return_value = mock_resp
+
+        res = classify_request_intent("¿Cómo reporto las fallas a clase y subo notas?", "docente")
+        assert res == "AUTOSERVICIO"
+
+        # Caso 2: Retorna SOPORTE_FISICO
+        mock_resp.json.return_value = {"response": json.dumps({"categoria": "SOPORTE_FISICO"})}
+        res2 = classify_request_intent("El cable de red está roto y el computador no prende", "funcionario")
+        assert res2 == "SOPORTE_FISICO"
+
+        # Caso 3: Error de red -> Fallback seguro a AUTOSERVICIO
+        mock_post.side_effect = Exception("Ollama connection error")
+        res3 = classify_request_intent("consulta cualquiera", "estudiante")
+        assert res3 == "AUTOSERVICIO"
+
+
+@pytest.mark.asyncio
+async def test_academic_fallas_a_clase_stays_in_autoservicio_and_diagnostico():
+    """
+    Verifica que consultas académicas con la palabra 'fallas' (ej: fallas a clase, inasistencias, notas)
+    NO salten a radicación de hardware, sino que continúen al RAG (AUTOSERVICIO / DIAGNOSTICO).
+    """
+    sess_id = "sess_academic_fallas"
+    router_logic.reset_session(sess_id)
+    session = router_logic.get_session(sess_id)
+    session.user_role = "docente"
+
+    msg = "¿Cómo y hasta cuándo puedo subir las notas de mis estudiantes y reportar las fallas a clase?"
+
+    fake_rag_resp = {
+        "response": "Para subir notas y reportar inasistencias (fallas a clase), ingresa al sistema SIAAF en el módulo docente...",
+        "sources": ["manual_siaaf.pdf"],
+        "has_context": True,
+        "quick_replies": []
+    }
+
+    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="AUTOSERVICIO")), \
+         patch.object(rag_service, "answer_query", new=AsyncMock(return_value=fake_rag_resp)) as mock_rag:
+
+        res = await router_logic.procesar_mensaje(msg, session_id=sess_id)
+
+        assert res["tipo"] == "DIAGNOSTICO"
+        assert res["state"] == "DIAGNOSTICO"
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.DIAGNOSTICO
+        assert "Nombre Completo" not in res["mensaje"]
+        assert "SIAAF" in res["mensaje"]
+        mock_rag.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_physical_hardware_direct_routing_from_idle():
+    """Verifica que consultas de SOPORTE_FISICO salten DIRECTAMENTE a RADICANDO_TICKET pidiendo Nombre."""
+    sess_id = "sess_hw_idle"
+    router_logic.reset_session(sess_id)
+    session = router_logic.get_session(sess_id)
+    session.user_role = "funcionario"
+
+    msg = "Solicito la revisión y reparación de la conexión a internet por cable del equipo de escritorio de mi oficina"
+
+    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="SOPORTE_FISICO")), \
+         patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
+
+        res = await router_logic.procesar_mensaje(msg, session_id=sess_id)
+
+        assert res["tipo"] == "RADICANDO_TICKET"
+        assert res["state"] == "RADICANDO_TICKET"
+        assert res["source"] == "UniMon_SemanticRouter_Hardware"
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.PIDIENDO_NOMBRE
+        assert "revisión técnica o falla física" in res["mensaje"]
+        assert "Nombre Completo" in res["mensaje"]
+        assert res.get("quick_replies") == []
+        mock_rag.assert_not_called()  # RAG NO debe ser llamado para soporte físico directo
+
+
+@pytest.mark.asyncio
+async def test_physical_hardware_no_enciende_direct_routing():
+    """Verifica que 'mi computador no enciende' clasificado como SOPORTE_FISICO salte directo a captura de Nombre."""
+    sess_id = "sess_hw_no_prende"
+    router_logic.reset_session(sess_id)
+    session = router_logic.get_session(sess_id)
+    session.user_role = "docente"
+
+    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="SOPORTE_FISICO")), \
+         patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
+
+        res = await router_logic.procesar_mensaje("mi computador no enciende", session_id=sess_id)
+
+        assert res["tipo"] == "RADICANDO_TICKET"
+        assert res["source"] == "UniMon_SemanticRouter_Hardware"
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.PIDIENDO_NOMBRE
+        assert "Nombre Completo" in res["mensaje"]
+        assert res.get("quick_replies") == []
+        mock_rag.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_physical_hardware_routing_after_role_qualification():
+    """Verifica el flujo: Falla física sin rol previo -> Califica rol -> Salto semántico directo a RADICANDO_TICKET."""
+    sess_id = "sess_hw_role_flow"
+    router_logic.reset_session(sess_id)
+
+    # 1. Consulta inicial de hardware sin rol
+    r1 = await router_logic.procesar_mensaje("El cable de red del computador de mi oficina está roto", session_id=sess_id)
+    assert r1["tipo"] == "PIDIENDO_ROL"
+
+    # 2. Usuario indica rol -> Debe clasificar semánticamente y saltar a RADICANDO_TICKET sin pasar por RAG
+    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="SOPORTE_FISICO")), \
+         patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
+
+        r2 = await router_logic.procesar_mensaje("Soy docente", session_id=sess_id)
+
+        assert r2["tipo"] == "RADICANDO_TICKET"
+        assert r2["source"] == "UniMon_SemanticRouter_Hardware"
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.PIDIENDO_NOMBRE
+        assert "revisión técnica o falla física" in r2["mensaje"]
+        assert "Nombre Completo" in r2["mensaje"]
+        assert r2.get("quick_replies") == []
+        mock_rag.assert_not_called()
 
 
 if __name__ == "__main__":
