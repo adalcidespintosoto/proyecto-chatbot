@@ -23,7 +23,7 @@ from app.services.rag_service import (
 )
 from app.services.glpi_service import glpi_client, is_valid_email
 
-from app.services.router_service import handle_feedback_transition, RESOLVED_INTENTS, TICKET_INTENTS
+from app.services.router_service import handle_feedback_transition, RESOLVED_INTENTS, RETRY_INTENTS, TICKET_EXPLICIT_INTENTS, TICKET_INTENTS
 
 logger = logging.getLogger("unimon.router_logic")
 
@@ -59,7 +59,8 @@ class TicketSession(BaseModel):
     session_id: str
     estado: EstadoTicket = EstadoTicket.IDLE
     categoria: CategoriaSolicitud = CategoriaSolicitud.HARDWARE
-    intentos_diagnostico: int = 0
+    intentos_diagnostico: int = 1
+    diagnosis_attempts: int = 1        # Contador de intentos de diagnóstico
     max_intentos_diagnostico: int = 3  # Diagnóstico multi-turno (2 a 3 intentos)
     user_role: Optional[str] = None    # Rol del usuario: 'estudiante', 'funcionario', 'docente', etc.
     pending_query: Optional[str] = None # Pregunta retenida antes de calificar su perfil
@@ -670,6 +671,7 @@ class RouterLogic:
         # DETECCIÓN DE ROL DEL USUARIO
         # Si el usuario menciona su rol, guardarlo en la sesión
         # -------------------------------------------------------------
+        prev_user_role = session.user_role
         detected_role = cls.detect_user_role(texto)
         if detected_role:
             session.user_role = detected_role
@@ -816,8 +818,16 @@ class RouterLogic:
             session.user_role = detected
             logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
 
-            # Si el usuario formuló una pregunta antes de calificar su rol:
-            if session.pending_query:
+            # Verificar si existía una pregunta técnica previa válida retenida
+            has_valid_query = bool(
+                session.pending_query 
+                and not cls.is_greeting(session.pending_query)
+                and len(session.pending_query.strip()) > 3
+                and not cls.detect_user_role(session.pending_query)
+            )
+
+            # Si el usuario formuló una pregunta técnica real antes de calificar su rol:
+            if has_valid_query:
                 query_to_run = session.pending_query
                 session.pending_query = None
 
@@ -837,10 +847,14 @@ class RouterLogic:
                     cls.add_history(session_id, "assistant", resp_text)
                     return {
                         "tipo": "FUERA_DE_DOMINIO",
+                        "state": "FUERA_DE_DOMINIO",
                         "mensaje": resp_text,
+                        "response": resp_text,
+                        "reply": resp_text,
                         "ticket_id": None,
                         "sources": rag_res.get("sources"),
-                        "source": rag_res.get("source", "ollama_rag")
+                        "source": rag_res.get("source", "ollama_rag"),
+                        "quick_replies": []
                     }
 
                 # Cero Alucinaciones / Sin Documentación
@@ -858,10 +872,16 @@ class RouterLogic:
                     cls.add_history(session_id, "assistant", resp_text)
                     return {
                         "tipo": "OFRECIENDO_RADICACION",
+                        "state": "OFRECIENDO_RADICACION",
                         "mensaje": resp_text,
+                        "response": resp_text,
+                        "reply": resp_text,
                         "ticket_id": None,
                         "sources": rag_res.get("sources", []),
-                        "source": "UniMon_SinDocumentacion"
+                        "source": "UniMon_SinDocumentacion",
+                        "quick_replies": [
+                            {"label": "🎫 Generar reporte", "payload": "CREATE_TICKET"}
+                        ]
                     }
 
                 # Respuesta técnica documentada -> DIAGNOSTICO
@@ -871,6 +891,7 @@ class RouterLogic:
                 session.category_name = cat_name
                 session.urgency, session.impact = cls.calculate_urgency_and_impact(query_to_run)
                 session.intentos_diagnostico = 1
+                session.diagnosis_attempts = 1
                 session.estado = EstadoTicket.DIAGNOSTICO
 
                 cls.add_history(session_id, "user", texto)
@@ -886,12 +907,16 @@ class RouterLogic:
                     "source": rag_res.get("source", "ollama_rag"),
                     "quick_replies": rag_res.get("quick_replies", [
                         {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
-                        {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
+                        {"label": "🔄 No me funcionó", "payload": "RETRY_DIAGNOSIS"},
+                        {"label": "🎫 Generar reporte", "payload": "CREATE_TICKET"}
                     ])
                 }
             else:
-                # No había pregunta previa (saludo inicial o calificación limpia)
+                # No había pregunta previa (saludo inicial o calificación limpia de rol)
+                session.pending_query = None
                 session.estado = EstadoTicket.DIAGNOSTICO
+                session.diagnosis_attempts = 1
+                session.intentos_diagnostico = 1
                 ready_msg = "¡Entendido! ¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?"
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", ready_msg)
@@ -1058,6 +1083,22 @@ class RouterLogic:
                         "ticket_id": None,
                         "source": feedback_res.get("source", "UniMon_Feedback_Success"),
                         "quick_replies": []
+                    }
+                elif feedback_res.get("state") == "DIAGNOSTICO" or feedback_res.get("tipo") == "DIAGNOSTICO":
+                    session.estado = EstadoTicket.DIAGNOSTICO
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", feedback_res["response"])
+                    return {
+                        "tipo": "DIAGNOSTICO",
+                        "state": "DIAGNOSTICO",
+                        "mensaje": feedback_res["response"],
+                        "response": feedback_res["response"],
+                        "reply": feedback_res["response"],
+                        "ticket_id": None,
+                        "source": feedback_res.get("source", "UniMon_Diagnostico_Retry"),
+                        "quick_replies": feedback_res.get("quick_replies", [
+                            {"label": "🎫 Generar reporte a soporte", "payload": "CREATE_TICKET"}
+                        ])
                     }
                 elif feedback_res.get("state") == "RADICANDO_TICKET" or feedback_res.get("tipo") == "RADICANDO_TICKET":
                     session.nombre = None
@@ -1241,15 +1282,18 @@ class RouterLogic:
                     "source": "UniMon_Guardrail"
                 }
 
-            # 2. Si el usuario NO tiene rol asignado en la sesión:
-            if not session.user_role:
-                detected_role = cls.detect_user_role(texto)
+            # 2. Si el usuario NO tenía rol asignado O el mensaje actual es únicamente declarar el rol:
+            is_just_role_declaration = bool(detected_role and (cls.is_greeting(texto) or len(texto.split()) <= 4))
+            
+            if not prev_user_role or is_just_role_declaration:
                 if detected_role:
                     session.user_role = detected_role
                     logger.info(f"[Session: {session_id}] Rol identificado en primer mensaje: '{session.user_role}'")
-                    # Si el mensaje era solo declarar el rol o saludo con rol (ej: "soy estudiante", "hola soy profesor")
-                    if cls.is_greeting(texto) or len(texto.split()) <= 4:
+                    # Si el mensaje era solo declarar el rol o saludo con rol (ej: "soy estudiante", "funcionario", "hola soy profesor")
+                    if is_just_role_declaration:
                         session.estado = EstadoTicket.DIAGNOSTICO
+                        session.diagnosis_attempts = 1
+                        session.intentos_diagnostico = 1
                         greeting_reply = (
                             "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar. "
                             "¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?"
@@ -1257,24 +1301,34 @@ class RouterLogic:
                         cls.add_history(session_id, "user", texto)
                         cls.add_history(session_id, "assistant", greeting_reply)
                         return {
-                            "tipo": "SALUDO",
+                            "tipo": "DIAGNOSTICO",
+                            "state": "DIAGNOSTICO",
                             "mensaje": greeting_reply,
+                            "response": greeting_reply,
+                            "reply": greeting_reply,
                             "ticket_id": None,
-                            "source": "UniMon_Assistant"
+                            "source": "UniMon_Assistant",
+                            "quick_replies": []
                         }
                     # Si vino con pregunta (ej: "soy estudiante y no puedo entrar al portal"), continuará hacia el RAG abajo
                 else:
                     # El usuario no especificó su rol -> Calificación de rol obligatoria
-                    if not cls.is_greeting(texto):
+                    if not cls.is_greeting(texto) and len(texto.split()) > 2 and not cls.is_cancellation(texto):
                         session.pending_query = texto
+                    else:
+                        session.pending_query = None
                     session.estado = EstadoTicket.PIDIENDO_ROL
                     cls.add_history(session_id, "user", texto)
                     cls.add_history(session_id, "assistant", MENSAJE_PIDIENDO_ROL)
                     return {
                         "tipo": "PIDIENDO_ROL",
+                        "state": "PIDIENDO_ROL",
                         "mensaje": MENSAJE_PIDIENDO_ROL,
+                        "response": MENSAJE_PIDIENDO_ROL,
+                        "reply": MENSAJE_PIDIENDO_ROL,
                         "ticket_id": None,
-                        "source": "UniMon_Assistant"
+                        "source": "UniMon_Assistant",
+                        "quick_replies": []
                     }
 
             # Si ya tiene rol en la sesión:
