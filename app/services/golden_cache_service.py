@@ -3,9 +3,11 @@ Servicio de Semantic Golden Cache para UniMon.
 Gestiona la colección `golden_resolved_qa` en ChromaDB, almacenando pares
 pregunta/respuesta validados por usuarios con feedback positivo ('✅ Sí, me funcionó')
 y reutilizándolos como Few-Shot dinámico cuando la similitud coseno >= 0.90.
+Aplica validación estricta de calidad y grounding para evitar envenenamiento de caché.
 """
 
 import logging
+import re
 from typing import Optional, Tuple
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -19,6 +21,18 @@ EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-base"
 
 _embedding_model = None
 _golden_collection = None
+
+# Patrones de respuestas no aptas para almacenar en Golden Cache (fallbacks, rechazos o alucinaciones)
+INVALID_RESPONSE_PATTERNS = [
+    r"no dispongo de un instructivo",
+    r"no dispongo de un procedimiento",
+    r"fuera de (mi|nuestro) dominio",
+    r"exclusivamente en soporte",
+    r"ocurri[oó] un inconveniente",
+    r"no se pudo conectar",
+    r"kactus\.unisimon\.edu\.co",
+    r"\[(?:url|link|enlace)\]",
+]
 
 
 def get_embedding_model() -> SentenceTransformer:
@@ -43,9 +57,53 @@ def get_golden_collection():
     return _golden_collection
 
 
+def clear_golden_cache() -> bool:
+    """
+    Elimina todos los registros de la colección golden_resolved_qa para limpiar casos viciados.
+    
+    Returns:
+        True si se purgó exitosamente, False en caso de error.
+    """
+    global _golden_collection
+    try:
+        client = chromadb.PersistentClient(path=CHROMA_PATH)
+        try:
+            client.delete_collection(COLLECTION_NAME)
+        except Exception:
+            pass
+        _golden_collection = None
+        logger.info("[GoldenCache] Colección golden_resolved_qa purgada exitosamente.")
+        return True
+    except Exception as e:
+        logger.warning(f"[GoldenCache] Error al purgar colección: {e}")
+        return False
+
+
+def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
+    """
+    Valida la calidad y confiabilidad de la interacción antes de almacenarla en Golden Cache.
+    Evita envenenamiento de caché con alucinaciones o respuestas de fallback.
+    """
+    if not user_query or len(user_query.strip()) < 5:
+        logger.debug("[GoldenCache] Descartado: consulta vacía o demasiado corta.")
+        return False
+
+    if not bot_response or len(bot_response.strip()) < 20:
+        logger.debug("[GoldenCache] Descartado: respuesta vacía o demasiado corta.")
+        return False
+
+    resp_lower = bot_response.lower()
+    for pat in INVALID_RESPONSE_PATTERNS:
+        if re.search(pat, resp_lower):
+            logger.info(f"[GoldenCache] Descartado por patrón de baja confianza/fallback: '{pat}'")
+            return False
+
+    return True
+
+
 def save_golden_case(session_id: str, user_query: str, bot_response: str, role: str = "general") -> bool:
     """
-    Guarda una interacción validada con feedback positivo en la colección golden.
+    Guarda una interacción validada con feedback positivo en la colección golden tras pasar control de calidad.
     
     Args:
         session_id: Identificador de la sesión del usuario.
@@ -57,8 +115,7 @@ def save_golden_case(session_id: str, user_query: str, bot_response: str, role: 
         True si se guardó exitosamente, False en caso contrario.
     """
     try:
-        if not user_query or len(user_query.strip()) < 5 or not bot_response:
-            logger.debug("[GoldenCache] Descartado: consulta o respuesta vacía/muy corta.")
+        if not is_valid_for_golden_cache(user_query, bot_response):
             return False
 
         collection = get_golden_collection()
