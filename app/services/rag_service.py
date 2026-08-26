@@ -16,7 +16,7 @@ from langchain_chroma import Chroma
 from sentence_transformers import CrossEncoder
 
 from app.config import get_settings
-from app.services.normalizer_service import normalize_and_expand_query
+from app.services.normalizer_service import normalize_and_expand_query, strip_query_header_noise
 
 logger = logging.getLogger("unimon.rag_service")
 
@@ -59,9 +59,9 @@ def get_reranker() -> Optional[CrossEncoder]:
 def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
     """
     Reordena los fragmentos recuperados mediante Cross-Encoder para máxima precisión semántica.
-    Aplica una bonificación procedimental a fragmentos que contienen instructivos paso a paso
-    ('## 3. Procedimiento', 'Paso 1', 'Paso 2') cuando la consulta es una solicitud procedimental
-    ('cómo', 'como', 'pasos', 'votar', 'radicar', 'ingresar', 'activar', 'descargar').
+    - Bonifica fragmentos de activación y recuperación de contraseña en consultas de credenciales/claves.
+    - Penaliza severamente fragmentos de uso de Teams en consultas de recuperación de contraseñas.
+    - Aplica bonificación procedimental a instructivos paso a paso en consultas operativas.
     
     Args:
         query: La consulta del usuario (expandida o normalizada).
@@ -79,10 +79,19 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         return retrieved_docs[:top_k]
 
     try:
-        pairs = [[query, doc.page_content.strip()] for doc, _ in retrieved_docs]
+        clean_q = strip_query_header_noise(query)
+        pairs = [[clean_q, doc.page_content.strip()] for doc, _ in retrieved_docs]
         scores = reranker.predict(pairs)
 
-        q_lower = query.lower()
+        q_lower = clean_q.lower()
+        is_password_recovery_query = any(w in q_lower for w in [
+            "restablecer", "recuperar", "olvidé", "olvide", "desbloquear", "cambiar clave",
+            "cambiar contraseña", "olvido", "restablecimiento", "recuperación", "clave"
+        ])
+        is_hardware_dotation_query = any(w in q_lower for w in [
+            "portatil", "portátil", "laptop", "computador", "pc", "equipo de computo",
+            "dotacion", "dotación", "solicitar un portatil", "solicitar un computador", "pedir computador"
+        ])
         is_procedural_query = any(w in q_lower for w in [
             "cómo", "como", "pasos", "votar", "radicar", "ingresar", "activar", "descargar", 
             "hago para", "solicitar", "consultar", "inscribir"
@@ -94,6 +103,22 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
             doc, original_score = retrieved_docs[i]
             final_score = float(rerank_score)
             content_lower = doc.page_content.lower()
+
+            # Enrutamiento estricto de recuperación de contraseñas
+            if is_password_recovery_query:
+                # Penalizar fuertemente guías de Teams para evitar mezclas
+                if any(t in content_lower for t in ["acceso a microsoft teams", "microsoft teams para estudiantes", "barra de aplicaciones y hacer clic sobre el ícono de teams"]):
+                    final_score -= 5.0
+                # Bonificar guías de activación de usuario y cambio/recuperación de contraseña
+                if any(p in content_lower for p in ["activación de usuario", "contraseña", "portal estudiantes", "cambio de contraseña", "passwordreset"]):
+                    final_score += 3.0
+
+            # Desambiguación entre dotación de hardware (P-GT-01) y proyectos de software/Jira (P-GT-13)
+            if is_hardware_dotation_query and not any(k in q_lower for k in ["software", "desarrollo", "jira", "proyecto", "solución tecnológica"]):
+                if any(m in content_lower for m in ["mantenimiento preventivo y correctivo de equipos de cómputo", "p-gt-01", "equipo de cómputo"]):
+                    final_score += 2.5
+                if any(j in content_lower for j in ["gestión de requerimientos de recursos y soluciones tecnológicas", "p-gt-13"]):
+                    final_score -= 3.0
 
             # Bonificación procedimental: priorizar fragmentos con pasos e instructivos directos
             if is_procedural_query:
@@ -124,7 +149,7 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
 def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -> str:
     """
     Traduce jerga informal estudiantil a términos técnicos institucionales mediante Ollama.
-    Complementa la expansión léxica estática del normalizer_service.
+    Depura previamente ruido de remitentes y encabezados.
     
     Args:
         raw_query: Consulta original del usuario (puede contener jerga, modismos, etc.).
@@ -133,11 +158,13 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
     Returns:
         Consulta normalizada a terminología institucional formal, o la original si falla.
     """
+    cleaned_query = strip_query_header_noise(raw_query)
+
     system_prompt = (
         "Eres un asistente que normaliza consultas universitarias para búsqueda documental en base de conocimientos de TI.\n"
         "Convierte la consulta del usuario en 1 frase formal con palabras clave institucionales precisas "
-        "(SIAAF, Kactus, Teams, Portal Estudiantes, Elecciones Institucionales, Órganos Colegiados, etc.).\n"
-        "Mantén nombres de trámites oficiales (elecciones, votación órganos colegiados, prematrícula, inasistencias, notas, certificados, cambio de contraseña).\n"
+        "(SIAAF, Kactus, Teams, Portal Estudiantes, Elecciones Institucionales, Órganos Colegiados, Requerimientos Tecnológicos, Dotación de PC, Exámenes Supletorios, Cursos Intersemestrales, Activación de Usuario y Contraseña, etc.).\n"
+        "Mantén nombres de trámites oficiales (solicitud de computador/PC, dotación tecnológica P-GT-13, elecciones, votación órganos colegiados, exámenes supletorios, restablecimiento de contraseña y correo, activación de usuario, notas, certificados).\n"
         "Responde ÚNICAMENTE la frase normalizada, sin explicaciones ni saludos."
     )
 
@@ -150,7 +177,7 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
             json={
                 "model": settings.llm_model,
                 "system": system_prompt,
-                "prompt": f"Rol: {user_role}\nConsulta informal: {raw_query}\nConsulta técnica formal:",
+                "prompt": f"Rol: {user_role}\nConsulta informal: {cleaned_query}\nConsulta técnica formal:",
                 "stream": False,
                 "options": {"temperature": 0.0, "num_predict": 30}
             },
@@ -164,7 +191,8 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
     except Exception as e:
         logger.warning(f"[QueryExpansion] Error en expansión LLM ({e}), usando consulta original.")
 
-    return raw_query
+    return cleaned_query
+
 
 # Mensaje oficial estándar cuando no existe procedimiento documentado en ChromaDB
 MENSAJE_NO_DOCUMENTADO = (
@@ -176,39 +204,41 @@ MENSAJE_NO_DOCUMENTADO = (
     "¿O prefieres que radique un caso de soporte técnico por ti ahora mismo?"
 )
 
-# Prompt del sistema institucional para soporte técnico N1 directo
-STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar.
+# Prompt del sistema institucional para soporte técnico N1 adaptativo
+STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia).
 
-DIRECTIVAS ESTRICTAS DE FIDELIDAD PROCEDIMENTAL:
-1. PROHIBIDO VOLVER A SALUDAR O PRESENTARTE: NUNCA escribas "¡Hola!", "Soy UniMon", ni frases de bienvenida o presentación al inicio de tus respuestas. El usuario ya se encuentra en conversación activa. Empieza directamente con el Paso 1 o la explicación concreta.
-2. EXTRACCIÓN DIRECTA DEL PASO A PASO: Si el contexto contiene una sección de 'Procedimiento Paso a Paso' o instructivo numerado, extrae y reproduce EXACTAMENTE esas acciones (botones, clics, menús, confirmaciones). NO conviertas los requisitos previos o condiciones preliminares en los primeros pasos de la respuesta.
-3. URLs EXACTAS DEL SISTEMA: Usa ÚNICAMENTE la URL o enlace especificado en el fragmento para esa plataforma específica (por ejemplo, si indica elecciones.unisimon.edu.co, usa [Elecciones Institucionales](https://elecciones.unisimon.edu.co/), NUNCA uses portal.unisimon.edu.co a menos que el procedimiento sea del Portal). Formatea en Markdown limpio: [Nombre Plataforma](URL).
-4. PROHIBICIÓN TOTAL DE META-LENGUAJE: Tienes ESTRICTAMENTE PROHIBIDO decir "según el documento proporcionado", "en el PDF adjunto", "de acuerdo al texto", "en el documento de Votación", o "como indica la guía". Responde con autoridad directa como el sistema oficial.
-5. ESTRUCTURA CONCISA: Presenta los pasos en orden cronológico con nombres exactos de botones en negrita (ej: botón **VOTAR**, botón **INICIAR SESIÓN**, botón **OK**).
-6. GROUNDING ESTRICTO Y PROHIBICIÓN DE INVENTAR PLATAFORMAS O ENLACES:
-   - NUNCA inventes plataformas, URLs, módulos o rutas. NO asumas ni digas que un trámite se hace en Kactus, SIAAF, Teams o portales externos si el contexto no lo dice expresamente para esa solicitud en específico.
-   - NUNCA inventes placeholders como "[URL del GLPI]", "[Enlace]", "[Link]", "[URL]", "[Insertar URL]". Solo usa URLs completas si aparecen textualmente en el contexto provisto (ej: https://unisimon.edu.co).
-7. GUÍA ACCIONABLE PASO A PASO: Si el procedimiento es de autoservicio digital documentado (portales, claves, teams, office, carnet, siaaf, kactus, seven, elecciones), explica con claridad qué debe hacer el usuario usando pasos numerados (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
-8. PRÉSTAMO DE EQUIPOS O TRÁMITES NO DIGITALIZADOS EN PORTALES:
-   - Si la consulta es sobre solicitud o préstamo de equipos de cómputo, recursos físicos (micrófonos, tablets, portátiles, videobeams) y el contexto no describe un módulo web, indica que el requerimiento se tramita directamente con la Dirección de TI a través de los canales oficiales:
-     • Sede Barranquilla: solicitudcomputo@unisimon.edu.co | Tel: (605) 3444333 Ext. 8003/8004 | WhatsApp: 3172683922
-     • Sede Cúcuta: helpdesk@unisimon.edu.co | Tel: (607) 5827070 Ext. 129
-9. SOPORTE DE HARDWARE, REDES FÍSICAS O DAÑOS DE EQUIPOS: Si la consulta es una falla física (pantalla rota o sin video, cable dañado, puerto dañado, pc no enciende o red cableada) que requiere atención presencial de TI:
-   - Proporciona únicamente 1 o 2 descartes básicos (verificar cables conectados y encendido).
-   - Informa los canales oficiales de soporte (solicitudcomputo@unisimon.edu.co en Barranquilla / helpdesk@unisimon.edu.co en Cúcuta).
-   - Pregunta si desea que se radique el reporte de soporte técnico.
-10. Finaliza siempre preguntando:
+DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
+
+1. CLASIFICACIÓN Y TONO SEGÚN EL TIPO DE PREGUNTA:
+   - A. CONSULTAS DIRECTAS (Contactos, correos, teléfonos, sedes, horarios, definiciones, directorio):
+     * Responde de forma DIRECTA, BREVE y CONCISA.
+     * Lista los datos de contacto organizados por sede (Barranquilla y Cúcuta) usando viñetas limpias.
+     * NUNCA inventes requisitos previos, restricciones ni pasos de navegación web si el usuario solo pidió números o datos informativos.
+   
+   - B. TRÁMITES Y PROCEDIMIENTOS (Cómo votar, cómo pedir dotación/PC, cómo registrar notas, exámenes supletorios, restablecer claves):
+     * Si el trámite tiene restricciones normativas o aprobaciones de jefatura explícitas en el contexto, inclúyelas al inicio bajo: **⚠️ Requisitos y Restricciones Previas:**
+     * REGLA DE NO-PARADOJA: Para recuperación de contraseñas/correo, NUNCA exijas tener la contraseña activa ni la sesión iniciada. Los requisitos son documento de identidad y acceso al correo personal o celular registrado.
+     * Luego detalla el procedimiento cronológico (**Paso 1**, **Paso 2**, etc.) con botones y enlaces en negrita.
+     * Si en el contexto NO hay requisitos especiales, ve directamente al paso a paso sin inventar nada.
+
+2. PROHIBICIÓN ABSOLUTA DE META-LENGUAJE Y FUGAS DE PROMPT:
+   - JAMÁS escribas títulos de directivas internas como "Prohibición de Omitir Información", "Canales Complejos y Datos Requeridos" o "Según el PDF".
+   - PROHIBIDO VOLVER A SALUDAR O PRESENTARTE ("¡Hola!", "Soy UniMon"). Empieza directamente con la información solicitada.
+
+3. FIDELIDAD AL CONTEXTO Y GROUNDING:
+   - Limítate estrictamente a los hechos extraídos del contexto provisto.
+   - Usa ÚNICAMENTE las URLs especificadas en el contexto formateadas como [Nombre](URL). NUNCA inventes placeholders.
+
+4. FINALIZA SIEMPRE PREGUNTANDO:
    "¿Pudiste resolver tu problema con estos pasos?
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
-11. Si el contexto NO contiene los pasos de solución ni aplica a los casos anteriores, responde únicamente:
-   "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un caso de soporte técnico por ti."
 
-Contexto institucional provisto:
+[CONTEXTO INSTITUCIONAL DOCUMENTADO]:
 {context}
 
 Pregunta del usuario: {query}
-Respuesta directa de soporte:"""
+Respuesta adaptativa directa de soporte:"""
 
 
 OUT_OF_DOMAIN_QUERY_PATTERNS = [
@@ -274,6 +304,7 @@ def clean_llm_response(text: str) -> str:
     2. Sanitiza menciones a GLPI y placeholders falsos.
     3. Corrige enlaces Markdown redundantes donde el texto visible y la URL son idénticos: [http...](http...) -> http...
     4. Elimina frases de fuga y meta-lenguaje ("según el documento proporcionado...").
+    5. Elimina fugas de directivas internas del prompt.
     """
     if not text:
         return ""
@@ -319,6 +350,20 @@ def clean_llm_response(text: str) -> str:
         text,
         flags=re.IGNORECASE
     )
+
+    # 5. Remover fugas de directivas internas del prompt
+    text = re.sub(
+        r"(?im)^#{1,4}\s*(?:Prohibici[oó]n|Reglas?|Directivas?|Canales Complejos|Revisi[oó]n Obligatoria|Fidelidad|Grounding)[^\n]*\n*",
+        "",
+        text
+    )
+    text = re.sub(
+        r"(?im)^\s*\*\*(?:Prohibici[oó]n|Reglas?|Directivas?|Canales Complejos|Revisi[oó]n Obligatoria|Fidelidad|Grounding)[^\n]*\*\*\s*\n*",
+        "",
+        text
+    )
+    text = re.sub(r"(?i)\b(?:prohibici[oó]n de omitir[^\n]*)\b", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
 
@@ -488,10 +533,55 @@ class RAGService:
             except Exception as exc:
                 logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
 
-        # 4. Cross-Encoder Reranker: reordenar y seleccionar Top-3
+        # 4. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
         if valid_docs_with_scores:
             reranked = rerank_chunks(expanded_query, valid_docs_with_scores, top_k=3)
-            for doc, score in reranked:
+
+            # Identificar el documento principal con mayor relevancia semántica
+            primary_doc, _ = reranked[0]
+            primary_source = primary_doc.metadata.get("source")
+
+            # Recolectar fragmentos del documento principal disponibles
+            primary_chunks = []
+            for doc, _ in valid_docs_with_scores:
+                if doc.metadata.get("source") == primary_source:
+                    if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                        primary_chunks.append(doc)
+
+            # Si solo hay 1 fragmento del documento principal y ChromaDB está activo,
+            # recuperar proactivamente fragmentos complementarios (requisitos/pasos) del mismo archivo
+            if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
+                try:
+                    extra_docs = self.vector_store.similarity_search(
+                        expanded_query,
+                        k=4,
+                        filter={"source": primary_source}
+                    )
+                    for edoc in extra_docs:
+                        if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                            primary_chunks.append(edoc)
+                except Exception as exc:
+                    logger.debug(f"No se pudieron cargar fragmentos complementarios para {primary_source}: {exc}")
+
+            # Ordenar fragmentos del documento principal en orden lógico estructural
+            def chunk_logical_rank(chunk_doc):
+                c_lower = chunk_doc.page_content.lower()
+                if any(k in c_lower for k in ["1. generalidades", "1. objetivo", "1. alcance"]):
+                    return 1
+                if any(k in c_lower for k in ["2. requisitos", "requisitos previos", "restricciones", "roles autorizados"]):
+                    return 2
+                if any(k in c_lower for k in ["3. procedimiento", "procedimiento paso a paso", "paso 1"]):
+                    return 3
+                if any(k in c_lower for k in ["4. reglas", "4. políticas", "4. politicas"]):
+                    return 4
+                if any(k in c_lower for k in ["5. canales", "canales de escalado", "canales de soporte"]):
+                    return 5
+                return 6
+
+            primary_chunks_sorted = sorted(primary_chunks, key=chunk_logical_rank)
+
+            # Inyectar fragmentos del documento principal primero
+            for doc in primary_chunks_sorted:
                 retrieved_docs.append(doc)
                 source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                 source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
@@ -500,6 +590,22 @@ class RAGService:
                 if source_filename not in sources:
                     sources.append(source_filename)
                 context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
+
+            # Agregar fragmentos secundarios más relevantes de otros documentos (hasta un máximo de 4 fragmentos)
+            for doc, _ in reranked[1:]:
+                if len(context_parts) >= 4:
+                    break
+                if doc.metadata.get("source") != primary_source:
+                    if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                        retrieved_docs.append(doc)
+                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                        page_num = doc.metadata.get("page", None)
+                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                        if source_filename not in sources:
+                            sources.append(source_filename)
+                        context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
+
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
         if not context_parts:
