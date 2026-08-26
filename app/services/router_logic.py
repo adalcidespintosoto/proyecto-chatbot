@@ -36,6 +36,7 @@ from app.services.router_service import (
     ROLE_SYNONYMS,
     normalize_role
 )
+from app.services.golden_cache_service import search_golden_case, save_golden_case
 
 logger = logging.getLogger("unimon.router_logic")
 
@@ -100,6 +101,7 @@ class TicketSession(BaseModel):
     user_role: Optional[str] = None
     pending_query: Optional[str] = None
     last_user_query: Optional[str] = None
+    last_bot_response: Optional[str] = None
     ubicacion: Optional[str] = None
     activo: Optional[str] = None
 
@@ -250,7 +252,7 @@ AFFIRMATIVE_PATTERNS = [
 
 # Patrones de solicitud de reporte y radicación directa
 REPORT_PATTERNS = [
-    r"\b(vamos a reportar|reportar|reportalo|reportarlo|radicar|radica|radicarlo|radicarla|crear ticket|crea ticket|crea el ticket|abrir caso|abre un caso|ayudame a reportar|ay[uú]dame a reportar|haz el reporte|si|sí|por favor|porfa|por fa|dale|de una|ayúdame|ayudame|solicito soporte)\b"
+    r"\b(vamos a reportar|reportar|reportalo|reportarlo|radicar|radica|radicarlo|radicarla|crear ticket|crea ticket|crea el ticket|abrir caso|abre un caso|ayudame a reportar|ay[uú]dame a reportar|haz el reporte|solicito soporte)\b"
 ]
 
 # Palabras de control/afirmación que NUNCA deben aceptarse como partes de un nombre
@@ -747,8 +749,20 @@ class RouterLogic:
         # -------------------------------------------------------------
         # REGLA GLOBAL 2: Detección de Cierre / Solucionado en IDLE/DIAGNOSTICO
         # Responder de inmediato con despedida institucional y NUNCA activar radicación.
+        # Golden Cache: guardar el caso resuelto para reutilización futura.
         # -------------------------------------------------------------
         if cls.is_solved_confirmation(texto):
+            # Guardar en Golden Cache si hay consulta y respuesta previas
+            if session.last_user_query and session.last_bot_response:
+                try:
+                    save_golden_case(
+                        session_id=session_id,
+                        user_query=session.last_user_query,
+                        bot_response=session.last_bot_response,
+                        role=session.user_role or "general"
+                    )
+                except Exception as e:
+                    logger.warning(f"[GoldenCache] Error al guardar caso en cierre global: {e}")
             cls.reset_session(session_id)
             cls.add_history(session_id, "user", texto)
             cls.add_history(session_id, "assistant", DESPEDIDA_INSTITUCIONAL)
@@ -901,11 +915,24 @@ class RouterLogic:
                     }
 
                 # Consultar RAG con el rol confirmado y filtrar chunks
+                # Golden Cache: buscar coincidencia previa
+                golden_context = ""
+                golden_hit = search_golden_case(query_to_run)
+                if golden_hit:
+                    prev_q, prev_ans, sim = golden_hit
+                    golden_context = (
+                        f"\n\n[CASO PREVIO VALIDADO (similitud={sim:.2f})]: "
+                        f"Pregunta previa: '{prev_q}' -> Respuesta validada: '{prev_ans}'. "
+                        f"Úsalo como referencia directa para responder al usuario."
+                    )
+                    logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en PIDIENDO_ROL.")
+
                 history = cls.get_history(session_id)
                 rag_res = await rag_service.answer_query(
                     query=query_to_run,
                     user_role=session.user_role,
-                    chat_history=history
+                    chat_history=history,
+                    golden_context=golden_context
                 )
                 resp_text = rag_res.get("response", "")
 
@@ -962,6 +989,8 @@ class RouterLogic:
                 session.intentos_diagnostico = 1
                 session.diagnosis_attempts = 1
                 session.estado = EstadoTicket.DIAGNOSTICO
+                session.last_user_query = query_to_run
+                session.last_bot_response = resp_text
 
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", resp_text)
@@ -1142,6 +1171,17 @@ class RouterLogic:
             feedback_res = handle_feedback_transition(texto, "DIAGNOSTICO", session)
             if feedback_res:
                 if feedback_res.get("state") == "FINALIZADO" or feedback_res.get("tipo") == "FINALIZADO":
+                    # Golden Cache: guardar caso resuelto con feedback positivo
+                    if session.last_user_query and session.last_bot_response:
+                        try:
+                            save_golden_case(
+                                session_id=session_id,
+                                user_query=session.last_user_query,
+                                bot_response=session.last_bot_response,
+                                role=session.user_role or "general"
+                            )
+                        except Exception as e:
+                            logger.warning(f"[GoldenCache] Error al guardar caso resuelto: {e}")
                     cls.reset_session(session_id)
                     cls.add_history(session_id, "user", texto)
                     cls.add_history(session_id, "assistant", feedback_res["response"])
@@ -1299,10 +1339,23 @@ class RouterLogic:
             else:
                 query_ctx = texto
 
+            # Golden Cache: buscar coincidencia previa antes del RAG completo
+            golden_context = ""
+            golden_hit = search_golden_case(query_ctx)
+            if golden_hit:
+                prev_q, prev_ans, sim = golden_hit
+                golden_context = (
+                    f"\n\n[CASO PREVIO VALIDADO (similitud={sim:.2f})]: "
+                    f"Pregunta previa: '{prev_q}' -> Respuesta validada: '{prev_ans}'. "
+                    f"Úsalo como referencia directa para responder al usuario."
+                )
+                logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en diagnóstico.")
+
             rag_res = await rag_service.answer_query(
                 query=query_ctx,
                 user_role=session.user_role,
-                chat_history=history
+                chat_history=history,
+                golden_context=golden_context
             )
             resp_text = rag_res.get("response", "")
 
@@ -1342,6 +1395,10 @@ class RouterLogic:
                     "source": rag_res.get("source", "ollama_rag"),
                     "quick_replies": []
                 }
+
+            # Rastrear consulta y respuesta para Golden Cache
+            session.last_user_query = query_ctx
+            session.last_bot_response = resp_text
 
             cls.add_history(session_id, "user", texto)
             cls.add_history(session_id, "assistant", resp_text)
@@ -1509,11 +1566,24 @@ class RouterLogic:
                 }
 
             # 7. Consultar RAG con historial conversacional y rol de usuario
+            # Golden Cache: buscar coincidencia previa
+            golden_context = ""
+            golden_hit = search_golden_case(texto)
+            if golden_hit:
+                prev_q, prev_ans, sim = golden_hit
+                golden_context = (
+                    f"\n\n[CASO PREVIO VALIDADO (similitud={sim:.2f})]: "
+                    f"Pregunta previa: '{prev_q}' -> Respuesta validada: '{prev_ans}'. "
+                    f"Úsalo como referencia directa para responder al usuario."
+                )
+                logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en IDLE.")
+
             history = cls.get_history(session_id)
             rag_res = await rag_service.answer_query(
                 query=texto,
                 user_role=session.user_role,
-                chat_history=history
+                chat_history=history,
+                golden_context=golden_context
             )
             resp_text = rag_res.get("response", "")
 
@@ -1559,6 +1629,8 @@ class RouterLogic:
             session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
             session.intentos_diagnostico = 1
             session.estado = EstadoTicket.DIAGNOSTICO
+            session.last_user_query = texto
+            session.last_bot_response = resp_text
 
             cls.add_history(session_id, "user", texto)
             cls.add_history(session_id, "assistant", resp_text)
