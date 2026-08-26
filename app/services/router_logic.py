@@ -22,7 +22,6 @@ from app.services.rag_service import (
     MENSAJE_FUERA_DE_DOMINIO
 )
 from app.services.glpi_service import glpi_client, is_valid_email
-
 from app.services.router_service import (
     handle_feedback_transition, 
     RESOLVED_INTENTS, 
@@ -32,7 +31,10 @@ from app.services.router_service import (
     PROMPT_HARDWARE_DIRECT,
     classify_request_intent,
     classify_request_intent_async,
-    is_physical_hardware_request
+    is_physical_hardware_request,
+    ROLE_QUICK_REPLIES,
+    ROLE_SYNONYMS,
+    normalize_role
 )
 
 logger = logging.getLogger("unimon.router_logic")
@@ -48,44 +50,58 @@ class EstadoTicket(str, Enum):
     PIDIENDO_DESCRIPCION = "PIDIENDO_DESCRIPCION"
     SOLUCIONADO = "SOLUCIONADO"
     CANCELADO = "CANCELADO"
+    TICKET_CREADO = "TICKET_CREADO"
+    ERROR = "ERROR"
     FINALIZADO = "FINALIZADO"
-    RADICANDO_TICKET = "RADICANDO_TICKET"
     # Campos de compatibilidad hacia atrás
     PIDIENDO_UBICACION = "PIDIENDO_UBICACION"
     PIDIENDO_ACTIVO = "PIDIENDO_ACTIVO"
 
 
-# Alias para compatibilidad hacia atrás
-IntentType = EstadoTicket
+class IntentType(str, Enum):
+    SALUDO = "SALUDO"
+    DIAGNOSTICO = "DIAGNOSTICO"
+    PIDIENDO_ROL = "PIDIENDO_ROL"
+    OFRECIENDO_RADICACION = "OFRECIENDO_RADICACION"
+    RADICANDO_TICKET = "RADICANDO_TICKET"
+    SOLUCIONADO = "SOLUCIONADO"
+    CANCELADO = "CANCELADO"
+    TICKET_CREADO = "TICKET_CREADO"
+    ERROR = "ERROR"
+    FUERA_DE_DOMINIO = "FUERA_DE_DOMINIO"
+    FINALIZADO = "FINALIZADO"
 
 
 class CategoriaSolicitud(str, Enum):
-    SOFTWARE = "SOFTWARE"
-    HARDWARE = "HARDWARE"
+    SOFTWARE = "Software"
+    HARDWARE = "Hardware"
+    REDES = "Redes"
+    OTRO = "Otro"
 
 
 class TicketSession(BaseModel):
-    """Estructura de la sesión conversacional de soporte y tickets."""
     session_id: str
     estado: EstadoTicket = EstadoTicket.IDLE
-    categoria: CategoriaSolicitud = CategoriaSolicitud.HARDWARE
-    intentos_diagnostico: int = 1
-    diagnosis_attempts: int = 1        # Contador de intentos de diagnóstico
-    max_intentos_diagnostico: int = 3  # Diagnóstico multi-turno (2 a 3 intentos)
-    user_role: Optional[str] = None    # Rol del usuario: 'estudiante', 'funcionario', 'docente', etc.
-    pending_query: Optional[str] = None # Pregunta retenida antes de calificar su perfil
-    last_user_query: Optional[str] = None # Última consulta técnica o requerimiento del usuario
-    intentos_fallidos: int = 0
-    last_interaction: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     falla: Optional[str] = None
     descripcion: Optional[str] = None
     nombre: Optional[str] = None
     correo: Optional[str] = None
-    ubicacion: Optional[str] = None
-    activo: Optional[str] = None
+    categoria: CategoriaSolicitud = CategoriaSolicitud.SOFTWARE
+    category_name: Optional[str] = "Soporte Técnico y Gestión de TI Unisimon"
     urgency: int = 3
     impact: int = 3
-    category_name: Optional[str] = "Soporte Técnico y Gestión de TI Unisimon"
+    intentos_diagnostico: int = 0
+    diagnosis_attempts: int = 1
+    max_intentos_diagnostico: int = 3
+    intentos_fallback: int = 0
+    intentos_fallidos: int = 0
+    ticket_id: Optional[int] = None
+    last_interaction: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    user_role: Optional[str] = None
+    pending_query: Optional[str] = None
+    last_user_query: Optional[str] = None
+    ubicacion: Optional[str] = None
+    activo: Optional[str] = None
 
 
 # Almacén de sesiones en memoria indexado por session_id
@@ -97,8 +113,8 @@ session_history: Dict[str, List[Dict[str, str]]] = {}
 # Mensaje de Calificación de Rol Obligatoria
 MENSAJE_PIDIENDO_ROL = (
     "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar.\n\n"
-    "Para brindarte la información exacta y los instructivos correctos correspondientes a tu perfil:\n"
-    "¿Eres **Estudiante** o **Funcionario / Docente**?"
+    "Para brindarte la información exacta y los instructivos correctos correspondientes a tu perfil, "
+    "por favor selecciona tu rol institucional:"
 )
 
 # Saludos simples y cortesía
@@ -347,14 +363,13 @@ class RouterLogic:
     @classmethod
     def detect_user_role(cls, text: str) -> Optional[str]:
         """
-        Detecta si el usuario menciona su rol en la comunidad universitaria.
-        Retorna 'estudiante' o 'funcionario'.
+        Detecta si el usuario menciona o selecciona su rol en la comunidad universitaria.
+        Retorna 'estudiante', 'profesor', 'administrativo' u 'otros'.
         """
-        msg_lower = text.lower()
-        if re.search(r"\b(soy|como|es para un|es para una)?\s*(estudiante|estudiantes|alumno|alumna|alumnos|alumnas|pregrado|posgrado|aspirante|aspirantes)\b", msg_lower):
-            return "estudiante"
-        elif re.search(r"\b(soy|como|es para un|es para una)?\s*(profesor|profesora|profesores|profesoras|docente|docentes|funcionario|funcionaria|funcionarios|funcionarias|administrativo|administrativos|administrativa|administrativas|colaborador|colaboradora|colaboradores|trabajador|trabajadora|trabajadores|empleado|empleada|empleados)\b", msg_lower):
-            return "funcionario"
+        msg_lower = text.lower().strip()
+        for key, role_val in ROLE_SYNONYMS.items():
+            if re.search(rf"\b{key}\b", msg_lower):
+                return role_val
         return None
 
     @classmethod
@@ -829,20 +844,20 @@ class RouterLogic:
         elif estado_actual == EstadoTicket.PIDIENDO_ROL:
             detected = cls.detect_user_role(texto)
             if not detected:
-                t_lower = texto.lower().strip()
-                if re.search(r"\b(estudiante|estudiantes|alumno|alumna|alumnos|alumnas|pregrado|posgrado|aspirante|aspirantes|1|uno)\b", t_lower):
-                    detected = "estudiante"
-                elif re.search(r"\b(funcionario|funcionaria|funcionarios|funcionarias|docente|docentes|profesor|profesora|profesores|profesoras|administrativo|administrativos|administrativa|administrativas|colaborador|colaboradora|colaboradores|trabajador|trabajadora|trabajadores|empleado|empleada|empleados|2|dos)\b", t_lower):
-                    detected = "funcionario"
+                detected = normalize_role(texto)
 
             if not detected:
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", MENSAJE_PIDIENDO_ROL)
                 return {
                     "tipo": "PIDIENDO_ROL",
+                    "state": "PIDIENDO_ROL",
                     "mensaje": MENSAJE_PIDIENDO_ROL,
+                    "response": MENSAJE_PIDIENDO_ROL,
+                    "reply": MENSAJE_PIDIENDO_ROL,
                     "ticket_id": None,
-                    "source": "UniMon_PidiendoRol"
+                    "source": "UniMon_PidiendoRol",
+                    "quick_replies": ROLE_QUICK_REPLIES
                 }
 
             session.user_role = detected
@@ -1410,7 +1425,7 @@ class RouterLogic:
                         "reply": MENSAJE_PIDIENDO_ROL,
                         "ticket_id": None,
                         "source": "UniMon_Assistant",
-                        "quick_replies": []
+                        "quick_replies": ROLE_QUICK_REPLIES
                     }
 
             # Si ya tiene rol en la sesión:

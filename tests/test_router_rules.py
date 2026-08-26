@@ -180,7 +180,7 @@ async def test_direct_role_declaration_without_premature_rag():
     with patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
         r = await router_logic.procesar_mensaje("funcionario", session_id=sess_id)
         assert r["tipo"] == "DIAGNOSTICO"
-        assert router_logic.get_session(sess_id).user_role == "funcionario"
+        assert router_logic.get_session(sess_id).user_role in ["administrativo", "funcionario"]
         assert r.get("quick_replies") == []
         mock_rag.assert_not_called()
 

@@ -41,6 +41,74 @@ PROMPT_HARDWARE_DIRECT = (
     "Por favor, indícame tu **Nombre Completo**:"
 )
 
+# =============================================================================
+# DEFINICIÓN DE ROLES INSTITUCIONALES Y BOTONES INTERACTIVOS (QUICK REPLIES)
+# =============================================================================
+
+ROLE_QUICK_REPLIES = [
+    {"label": "🎓 Estudiante", "payload": "estudiante"},
+    {"label": "👨‍🏫 Profesor", "payload": "profesor"},
+    {"label": "💼 Administrativo", "payload": "administrativo"},
+    {"label": "🌐 Otros / Visitante", "payload": "otros"}
+]
+
+ROLE_SYNONYMS = {
+    "estudiante": "estudiante",
+    "alumno": "estudiante",
+    "alumna": "estudiante",
+    "alumnos": "estudiante",
+    "alumnas": "estudiante",
+    "pregrado": "estudiante",
+    "posgrado": "estudiante",
+    "profesor": "profesor",
+    "profesora": "profesor",
+    "profesores": "profesor",
+    "profesoras": "profesor",
+    "docente": "profesor",
+    "docentes": "profesor",
+    "catedratico": "profesor",
+    "catedrático": "profesor",
+    "catedraticos": "profesor",
+    "catedráticos": "profesor",
+    "administrativo": "administrativo",
+    "administrativa": "administrativo",
+    "administrativos": "administrativo",
+    "administrativas": "administrativo",
+    "funcionario": "administrativo",
+    "funcionaria": "administrativo",
+    "funcionarios": "administrativo",
+    "funcionarias": "administrativo",
+    "colaborador": "administrativo",
+    "colaboradora": "administrativo",
+    "colaboradores": "administrativo",
+    "empleado": "administrativo",
+    "empleada": "administrativo",
+    "empleados": "administrativo",
+    "trabajador": "administrativo",
+    "trabajadora": "administrativo",
+    "otros": "otros",
+    "otro": "otros",
+    "visitante": "otros",
+    "visitantes": "otros",
+    "aspirante": "otros",
+    "aspirantes": "otros",
+    "egresado": "otros",
+    "egresada": "otros",
+    "egresados": "otros",
+    "externo": "otros",
+    "externa": "otros",
+    "externos": "otros"
+}
+
+
+def normalize_role(user_input: str) -> str:
+    """Normaliza el rol ingresado por el usuario usando ROLE_SYNONYMS."""
+    msg = user_input.lower().strip()
+    for key, role_val in ROLE_SYNONYMS.items():
+        if re.search(rf"\b{key}\b", msg):
+            return role_val
+    return "otros"
+
 
 async def classify_request_intent_async(user_message: str, user_role: str = "general") -> str:
     """
