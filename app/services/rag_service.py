@@ -2,7 +2,7 @@
 Servicio RAG Local con ChromaDB, Embeddings Multilingües, Normalizador Léxico y Ollama (Llama 3.1:8B).
 Provee respuestas estrictas de soporte técnico y gestión de TI para la Universidad Simón Bolívar
 (Sedes Barranquilla y Cúcuta, Colombia) basadas en documentos y procedimientos institucionales indexados.
-Aplica normalización léxica y expansión de sinónimos para asertividad >= 90% y corte calibrado a 0.48.
+Aplica normalización léxica, expansión LLM de consultas, Cross-Encoder Reranker y corte calibrado a 0.48.
 """
 
 import logging
@@ -13,6 +13,7 @@ import httpx
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from sentence_transformers import CrossEncoder
 
 from app.config import get_settings
 from app.services.normalizer_service import normalize_and_expand_query
@@ -34,6 +35,117 @@ QUICK_REPLIES_DIAGNOSTICO = [
     {"label": "🔄 No me funcionó", "payload": "RETRY_DIAGNOSIS"},
     {"label": "🎫 Generar reporte", "payload": "CREATE_TICKET"}
 ]
+
+# =============================================================================
+# CROSS-ENCODER RERANKER (Módulo 3: Reordenamiento semántico de alta precisión)
+# =============================================================================
+RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+_reranker = None
+
+
+def get_reranker() -> Optional[CrossEncoder]:
+    """Inicialización diferida (singleton) del Cross-Encoder Reranker."""
+    global _reranker
+    if _reranker is None:
+        try:
+            logger.info(f"Cargando Cross-Encoder Reranker '{RERANKER_MODEL_NAME}'...")
+            _reranker = CrossEncoder(RERANKER_MODEL_NAME)
+            logger.info("Cross-Encoder Reranker cargado exitosamente.")
+        except Exception as e:
+            logger.warning(f"No se pudo cargar CrossEncoder ({e}). Se usará ranking nativo de ChromaDB.")
+    return _reranker
+
+
+def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
+    """
+    Reordena los fragmentos recuperados mediante Cross-Encoder para máxima precisión semántica.
+    
+    Args:
+        query: La consulta del usuario (expandida o normalizada).
+        retrieved_docs: Lista de tuplas (doc, score) provenientes de ChromaDB.
+        top_k: Número máximo de fragmentos a retornar tras el reranking.
+    
+    Returns:
+        Lista de tuplas (doc, score) reordenadas por relevancia semántica real.
+    """
+    if not retrieved_docs or len(retrieved_docs) <= top_k:
+        return retrieved_docs
+
+    reranker = get_reranker()
+    if not reranker:
+        return retrieved_docs[:top_k]
+
+    try:
+        pairs = [[query, doc.page_content.strip()] for doc, _ in retrieved_docs]
+        scores = reranker.predict(pairs)
+
+        # Asignar scores del cross-encoder y ordenar
+        scored_docs = []
+        for i, rerank_score in enumerate(scores):
+            doc, original_score = retrieved_docs[i]
+            scored_docs.append((doc, original_score, float(rerank_score)))
+
+        ranked = sorted(scored_docs, key=lambda x: x[2], reverse=True)
+        result = [(doc, orig_score) for doc, orig_score, _ in ranked[:top_k]]
+
+        logger.info(
+            f"[Reranker] Reordenados {len(retrieved_docs)} fragmentos -> Top-{top_k}. "
+            f"Mejor score reranker: {ranked[0][2]:.4f}"
+        )
+        return result
+    except Exception as e:
+        logger.warning(f"[Reranker] Error reordenando fragmentos: {e}")
+        return retrieved_docs[:top_k]
+
+
+# =============================================================================
+# QUERY EXPANSION LLM (Módulo 2: Traducción de jerga a terminología institucional)
+# =============================================================================
+
+def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -> str:
+    """
+    Traduce jerga informal estudiantil a términos técnicos institucionales mediante Ollama.
+    Complementa la expansión léxica estática del normalizer_service.
+    
+    Args:
+        raw_query: Consulta original del usuario (puede contener jerga, modismos, etc.).
+        user_role: Rol del usuario para contextualización (estudiante, profesor, etc.).
+    
+    Returns:
+        Consulta normalizada a terminología institucional formal, o la original si falla.
+    """
+    system_prompt = (
+        "Eres un asistente que normaliza consultas universitarias para búsqueda documental.\n"
+        "Convierte la consulta del usuario en 1 frase formal con palabras clave institucionales "
+        "(SIAAF, Kactus, Teams, Portal Estudiantes, etc.).\n"
+        "Mantén nombres de trámites oficiales (prematrícula, inasistencias, notas, certificados).\n"
+        "Responde ÚNICAMENTE la frase normalizada, sin explicaciones ni saludos."
+    )
+
+    try:
+        settings = get_settings()
+        ollama_url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
+
+        response = httpx.post(
+            ollama_url,
+            json={
+                "model": settings.llm_model,
+                "system": system_prompt,
+                "prompt": f"Rol: {user_role}\nConsulta informal: {raw_query}\nConsulta técnica formal:",
+                "stream": False,
+                "options": {"temperature": 0.0, "num_predict": 30}
+            },
+            timeout=3.0
+        )
+        if response.status_code == 200:
+            expanded = response.json().get("response", "").strip()
+            if expanded and len(expanded) > 4:
+                logger.info(f"[QueryExpansion] '{raw_query[:40]}...' -> '{expanded[:60]}...'")
+                return expanded
+    except Exception as e:
+        logger.warning(f"[QueryExpansion] Error en expansión LLM ({e}), usando consulta original.")
+
+    return raw_query
 
 # Mensaje oficial estándar cuando no existe procedimiento documentado en ChromaDB
 MENSAJE_NO_DOCUMENTADO = (
@@ -222,15 +334,18 @@ class RAGService:
         question: str,
         user_name: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
-        user_role: Optional[str] = None
+        user_role: Optional[str] = None,
+        golden_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Ejecuta el pipeline RAG completo:
-        1. Normalización y expansión léxica de la consulta.
-        2. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=4, umbral >= 0.48) y filtro por rol.
-        3. Corte estricto / Fallback temático: Si ningún fragmento supera el umbral, evalúa fallback temático o mensaje oficial.
-        4. Ensamblaje del System Prompt institucional e historial conversacional con fragmentos recuperados.
-        5. Invocación asíncrona a Ollama (llama3.1:8b).
+        1. Expansión LLM de consulta (jerga -> terminología institucional).
+        2. Normalización léxica estática (complementaria).
+        3. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=8, umbral >= 0.48) y filtro por rol.
+        4. Cross-Encoder Reranker: reordena Top-8 -> Top-3.
+        5. Corte estricto / Fallback temático: Si ningún fragmento supera el umbral, evalúa fallback.
+        6. Ensamblaje del System Prompt institucional + Golden Cache context + historial.
+        7. Invocación asíncrona a Ollama (unimon:8b).
         """
         retrieved_docs = []
         sources: List[str] = []
@@ -238,27 +353,39 @@ class RAGService:
 
         filter_condition = self._build_role_filter(user_role)
 
-        # 1. Normalización y Expansión Léxica (Synonym Expander)
-        expanded_query = normalize_and_expand_query(question)
-        if expanded_query != question.lower().strip():
-            logger.info(f"Query expandido léxicamente: '{expanded_query[:80]}...'")
+        # 1. Expansión LLM de consulta (traduce jerga a términos institucionales)
+        llm_expanded = expand_and_normalize_query_llm(question, user_role or "general")
 
-        # 2. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=6)
+        # 2. Normalización léxica estática (complementaria)
+        lexical_expanded = normalize_and_expand_query(question)
+
+        # Usar la expansión LLM si difiere del original; si no, usar la léxica
+        if llm_expanded != question:
+            expanded_query = llm_expanded
+            logger.info(f"Query expandido por LLM: '{expanded_query[:80]}...'")
+        elif lexical_expanded != question.lower().strip():
+            expanded_query = lexical_expanded
+            logger.info(f"Query expandido léxicamente: '{expanded_query[:80]}...'")
+        else:
+            expanded_query = question
+
+        # 3. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=8 para reranking)
+        valid_docs_with_scores = []
         if self.vector_store is not None:
             try:
                 filter_desc = f" con filtro {filter_condition}" if filter_condition else " sin filtro"
-                logger.info(f"Buscando fragmentos en ChromaDB (k=6, umbral >= {self.min_relevance_score}{filter_desc}) para: '{expanded_query[:60]}...'")
+                logger.info(f"Buscando fragmentos en ChromaDB (k=8, umbral >= {self.min_relevance_score}{filter_desc}) para: '{expanded_query[:60]}...'")
                 
                 if filter_condition:
                     docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
                         expanded_query,
-                        k=6,
+                        k=8,
                         filter=filter_condition
                     )
                 else:
                     docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
                         expanded_query,
-                        k=6
+                        k=8
                     )
                 
                 for idx, (doc, score) in enumerate(docs_with_scores, 1):
@@ -269,15 +396,25 @@ class RAGService:
                     page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
 
                     if score is not None and score >= self.min_relevance_score:
-                        retrieved_docs.append(doc)
-                        if source_filename not in sources:
-                            sources.append(source_filename)
-                        context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
+                        valid_docs_with_scores.append((doc, score))
                         logger.info(f"  [Chunk #{idx} VÁLIDO] Score: {score_val} | Fuente: {source_filename}{page_info} | Texto: '{doc.page_content.strip()[:100]}...'")
                     else:
                         logger.info(f"  [Chunk #{idx} DESCARTADO] Score: {score_val} < {self.min_relevance_score} | Fuente: {source_filename}{page_info}")
             except Exception as exc:
                 logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
+
+        # 4. Cross-Encoder Reranker: reordenar y seleccionar Top-3
+        if valid_docs_with_scores:
+            reranked = rerank_chunks(expanded_query, valid_docs_with_scores, top_k=3)
+            for doc, score in reranked:
+                retrieved_docs.append(doc)
+                source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                page_num = doc.metadata.get("page", None)
+                page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                if source_filename not in sources:
+                    sources.append(source_filename)
+                context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
         if not context_parts:
@@ -302,8 +439,10 @@ class RAGService:
 
         context_text = "\n\n---\n\n".join(context_parts)
 
-        # 4. Ensamblar System Prompt estricto, historial y User Prompt
+        # 5. Ensamblar System Prompt estricto + Golden Cache few-shot + historial y User Prompt
         system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=context_text, query=question)
+        if golden_context:
+            system_prompt += golden_context
         user_greeting = f"El usuario se llama {user_name}. " if user_name else ""
         role_ctx = f"[Rol del usuario: {user_role}] " if user_role else ""
         user_prompt = f"{user_greeting}{role_ctx}Consulta del usuario: {question}"
@@ -466,16 +605,19 @@ class RAGService:
         query: str,
         user_role: Optional[str] = None,
         user_name: Optional[str] = None,
-        chat_history: Optional[List[Dict[str, str]]] = None
+        chat_history: Optional[List[Dict[str, str]]] = None,
+        golden_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Punto de entrada principal para responder consultas con normalización léxica y filtrado de metadatos por rol.
+        Punto de entrada principal para responder consultas con normalización léxica,
+        expansión LLM, reranking y filtrado de metadatos por rol.
         """
         return await self.query_rag(
             question=query,
             user_name=user_name,
             chat_history=chat_history,
-            user_role=user_role
+            user_role=user_role,
+            golden_context=golden_context
         )
 
     async def consultar(
