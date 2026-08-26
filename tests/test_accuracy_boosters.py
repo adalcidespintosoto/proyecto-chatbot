@@ -82,6 +82,49 @@ class TestGoldenCache:
             )
             assert saved is False
 
+    def test_golden_cache_rejects_hallucinated_and_fallback_responses(self, tmp_path):
+        """Valida que no se almacenen respuestas de fallback o con URLs alucinadas en la caché."""
+        with patch("app.services.golden_cache_service.CHROMA_PATH", str(tmp_path)):
+            import app.services.golden_cache_service as gc
+            gc._golden_collection = None
+
+            # Fallback institucional estándar no debe guardarse
+            saved_fallback = gc.save_golden_case(
+                session_id="test_fallback",
+                user_query="quien puede solicitar prestamos de equipos",
+                bot_response="No dispongo de un instructivo institucional documentado para este caso específico.",
+                role="administrativo"
+            )
+            assert saved_fallback is False
+
+            # Alucinación con dominio falso de kactus no debe guardarse
+            saved_hallucination = gc.save_golden_case(
+                session_id="test_hallucination",
+                user_query="quien puede solicitar prestamos de equipos",
+                bot_response="Debes ingresar al portal de Kactus en https://kactus.unisimon.edu.co para solicitar el equipo.",
+                role="administrativo"
+            )
+            assert saved_hallucination is False
+
+    def test_clear_golden_cache_purges_collection(self, tmp_path):
+        """Valida que clear_golden_cache elimine los casos almacenados."""
+        with patch("app.services.golden_cache_service.CHROMA_PATH", str(tmp_path)):
+            import app.services.golden_cache_service as gc
+            gc._golden_collection = None
+
+            # Guardar caso
+            gc.save_golden_case(
+                session_id="test_purge",
+                user_query="¿Cómo ingreso al correo institucional?",
+                bot_response="Para ingresar a tu correo institucional, visita https://outlook.office.com con tus credenciales Unisimon.",
+                role="estudiante"
+            )
+            assert gc.search_golden_case("¿Cómo ingreso al correo institucional?") is not None
+
+            # Purgar
+            assert gc.clear_golden_cache() is True
+            assert gc.search_golden_case("¿Cómo ingreso al correo institucional?") is None
+
 
 # =============================================================================
 # Test 2: Query Expansion LLM
@@ -255,7 +298,7 @@ class TestFeedbackGoldenIntegration:
             del ticket_sessions[session_id]
 
     def test_conditional_si_in_query_does_not_trigger_ticket_escalation(self):
-        """Valida que consultas con la conjunción condicional 'si' no se interpreten erróneamente como radicación."""
+        """Valida que consultas con palabras sueltas o condicionales no se interpreten como radicación."""
         from app.services.router_logic import RouterLogic
 
         query_with_si = "¿Cómo hago para saber cuál es mi usuario y activar mi correo si soy nuevo en la universidad?"
@@ -264,8 +307,112 @@ class TestFeedbackGoldenIntegration:
         query_with_si_2 = "¿Qué debo hacer si se me bloqueó la cuenta de teams?"
         assert RouterLogic.is_report_request(query_with_si_2) is False
 
-        # Confirmar que solicitudes reales de ticket sí activan is_report_request
-        assert RouterLogic.is_report_request("vamos a reportar") is True
+        # Palabras sueltas NO deben activar radicación de ticket
+        for loose_word in ["falla", "reportar", "daño", "soporte", "ayuda", "problema", "ticket"]:
+            assert RouterLogic.is_report_request(loose_word) is False, f"'{loose_word}' no debería activar radicación"
+
+        # Confirmar que frases compuestas e inequívocas de ticket sí activan is_report_request
         assert RouterLogic.is_report_request("radicar el caso") is True
         assert RouterLogic.is_report_request("crear ticket") is True
+        assert RouterLogic.is_report_request("generar un reporte") is True
+        assert RouterLogic.is_report_request("solicito soporte presencial") is True
+        assert RouterLogic.is_report_request("necesito técnico en sitio") is True
+
+
+    @pytest.mark.asyncio
+    async def test_equipment_request_delivers_rag_response_in_diagnostico_state(self):
+        """Valida que solicitudes de préstamo de equipos fluyan por el pipeline RAG y permanezcan en DIAGNOSTICO."""
+        from app.services.router_logic import RouterLogic, ticket_sessions, TicketSession, EstadoTicket
+
+        session_id = "test_equipment_query_001"
+        session = TicketSession(
+            session_id=session_id,
+            estado=EstadoTicket.DIAGNOSTICO,
+            user_role="administrativo"
+        )
+        ticket_sessions[session_id] = session
+
+        result = await RouterLogic.procesar_mensaje(
+            "donde me comunico para solicitar un equipo de computo",
+            session_id=session_id
+        )
+
+        assert result["tipo"] == "DIAGNOSTICO"
+        assert result["source"] != "UniMon_SolicitudEquipos"
+        # Debe mantenerse en DIAGNOSTICO
+        assert session.estado == EstadoTicket.DIAGNOSTICO
+        # Debe incluir quick replies de feedback interactivo
+        assert len(result.get("quick_replies", [])) > 0
+
+        # Cleanup
+        if session_id in ticket_sessions:
+            del ticket_sessions[session_id]
+
+
+# =============================================================================
+# Test 5: Post-Procesamiento y Sanitización de Respuestas (Anti-Saludos y URLs)
+# =============================================================================
+class TestResponsePostProcessing:
+    """Tests para clean_llm_response en rag_service."""
+
+    def test_clean_llm_response_removes_repetitive_greetings(self):
+        """Valida que se eliminen saludos redundantes al inicio de la respuesta."""
+        from app.services.rag_service import clean_llm_response
+
+        text_with_greeting = (
+            "¡Hola! 👋 Soy UniMon, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar.\n\n"
+            "Paso 1: Ingresa al [Portal Estudiantes](https://portal.unisimon.edu.co).\n"
+            "Paso 2: Selecciona la opción 'Certificados en Línea'."
+        )
+        cleaned = clean_llm_response(text_with_greeting)
+
+        assert not cleaned.startswith("¡Hola!")
+        assert not cleaned.startswith("Soy UniMon")
+        assert cleaned.startswith("Paso 1: Ingresa al")
+
+    def test_clean_llm_response_fixes_redundant_urls(self):
+        """Valida que [https://url](https://url) se convierta en https://url."""
+        from app.services.rag_service import clean_llm_response
+
+        text_with_raw_urls = (
+            "Paso 1: Accede a [https://portal.unisimon.edu.co](https://portal.unisimon.edu.co) e inicia sesión.\n"
+            "Paso 2: Para Teams ingresa a [Microsoft Teams](https://teams.microsoft.com)."
+        )
+        cleaned = clean_llm_response(text_with_raw_urls)
+
+        # Enlace crudo duplicado debe quedar limpio
+        assert "[https://portal.unisimon.edu.co](https://portal.unisimon.edu.co)" not in cleaned
+        assert "https://portal.unisimon.edu.co" in cleaned
+        # Enlace descriptivo debe preservarse
+        assert "[Microsoft Teams](https://teams.microsoft.com)" in cleaned
+
+    def test_clean_llm_response_cleans_glpi_placeholders(self):
+        """Valida que placeholders de GLPI sean convertidos a la Mesa de Ayuda TI."""
+        from app.services.rag_service import clean_llm_response
+
+        text_with_glpi = "Puedes consultar el estado en [URL del GLPI] o comunicarte con GLPI."
+        cleaned = clean_llm_response(text_with_glpi)
+
+        assert "[URL del GLPI]" not in cleaned
+        assert "GLPI" not in cleaned
+        assert "la Mesa de Ayuda TI" in cleaned
+
+    def test_clean_llm_response_removes_meta_language_leaks(self):
+        """Valida que frases de meta-lenguaje y referencias a documentos externos sean eliminadas."""
+        from app.services.rag_service import clean_llm_response
+
+        text_with_metalang = (
+            "Paso 3: Verifica que la elección esté activa en [Elecciones Institucionales](https://elecciones.unisimon.edu.co/) "
+            "o en el documento proporcionado sobre Votación Electrónica para Órganos Colegiados.\n"
+            "Según el documento proporcionado, haz clic en el botón VOTAR."
+        )
+        cleaned = clean_llm_response(text_with_metalang)
+
+        assert "documento proporcionado" not in cleaned
+        assert "Según el documento" not in cleaned
+        assert "Elecciones Institucionales" in cleaned
+
+
+
+
 

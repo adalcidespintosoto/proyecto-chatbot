@@ -163,12 +163,12 @@ FAILURE_AND_SUPPORT_TERMS = [
 
 # Verbos y raíces de solicitud o reserva de préstamo físico
 LOAN_REQUEST_VERBS = [
-    r"\b(prest\w+|pr[eé]st\w+|solicit\w+|asign\w+|apart\w+|reserv\w+|alquil\w+|pedir|pido|necesito\s+que\s+me\s+den|requiero\s+que\s+me\s+presten|como\s+hago\s+para\s+tener|quiero\s+solicitar)\b"
+    r"\b(prest\w+|pr[eé]st\w+|solicit\w+|asign\w+|apart\w+|reserv\w+|alquil\w+|pedir|pido|necesito\s+que\s+me\s+den|requiero\s+que\s+me\s+presten|como\s+hago\s+para\s+tener|quiero\s+solicitar|donde\s+me\s+comunico\s+para|d[oó]nde\s+me\s+comunico\s+para|a\s+donde\s+escribo\s+para|a\s+d[oó]nde\s+escribo\s+para)\b"
 ]
 
 # Nombres de recursos y equipos físicos institucionales
 EQUIPMENT_NOUNS = [
-    r"\b(pc|pcs|compu|computador|computadores|computadora|computadoras|port[aá]til|port[aá]tiles|laptop|laptops|ordenador|torre|pantalla|pantallas|monitor|monitores|display|micr[oó]fono|micr[oó]fonos|diadema|diademas|aud[ií]fonos|auriculares|parlante|parlantes|altavoz|altavoces|tablet|tablets|tableta|tabletas|ipad|ipads|video\s*beam|videobeam|proyector|proyectores|beamer|canon|cañ[oó]n|sala|sala\s+de\s+c[oó]mputo|auditorio|laboratorio|cargador|fuente|cable\s+de\s+poder)\b"
+    r"\b(equipo[s]?(\s+de\s+c[oó]mputo)?|recurso[s]?\s+f[ií]sico[s]?|pc|pcs|compu|computador|computadores|computadora|computadoras|port[aá]til|port[aá]tiles|laptop|laptops|ordenador|torre|pantalla|pantallas|monitor|monitores|display|micr[oó]fono|micr[oó]fonos|diadema|diademas|aud[ií]fonos|auriculares|parlante|parlantes|altavoz|altavoces|tablet|tablets|tableta|tabletas|ipad|ipads|video\s*beam|videobeam|proyector|proyectores|beamer|canon|cañ[oó]n|sala|sala\s+de\s+c[oó]mputo|auditorio|laboratorio|cargador|fuente|cable\s+de\s+poder)\b"
 ]
 
 # Mensaje estructurado directo para solicitudes de préstamo / asignación de equipos
@@ -235,9 +235,11 @@ EXPLICIT_FAIL_PATTERNS = [
     r"^(no|nada|tampoco|sigue ca[ií]do)$"
 ]
 
-# Solicitud directa y explícita de técnico / radicación humana / soporte oficial
-DIRECT_TECH_PATTERNS = [
-    r"\b(crear(\s+un)?\s+ticket|abrir(\s+un)?\s+ticket|generar(\s+un)?\s+ticket|solicitar(\s+un)?\s+ticket|radicar(\s+un)?\s+ticket|radicar(\s+el)?(\s+caso)?|radicarlo|radicarla|necesito(\s+un|\s+a\s+un|\s+a\s+alguien|\s+ayuda|\s+soporte)?\s+(t[eé]cnico|presencial|soporte)|que\s+(lo|la|los|las|el\s+equipo|la\s+\w+|el\s+\w+|un\s+\w+)?\s*revisen|que\s+revisen|que\s+venga\s+un\s+t[eé]cnico|manda(r)?\s+un\s+t[eé]cnico|visita\s+t[eé]cnica|soporte\s+presencial|revisi[oó]n\s+t[eé]cnica|escalar(\s+el)?(\s+caso)?|atenci[oó]n\s+humana)\b"
+# Intenciones explícitas e inequívocas de creación de caso / ticket o solicitud presencial
+EXPLICIT_TICKET_INTENTS = [
+    r"^(crear|abrir|generar|radicar|vamos\s+a\s+radicar|solicito\s+radicar)\s+(un\s+|el\s+)?(ticket|caso|reporte|incidente)$",
+    r"^(solicito|necesito)\s+(un\s+)?(soporte\s+presencial|t[eé]cnico\s+en\s+sitio)$",
+    r"^create_ticket$"
 ]
 
 # Trámites administrativos, cambios de permisos o compras (sin diagnóstico simulado)
@@ -245,18 +247,9 @@ ADMIN_PERMISSIONS_PATTERNS = [
     r"\b(cambio\s+de\s+permisos|autorizar\s+permisos|asignar\s+permisos|compra\s+de|adquisici[oó]n|inventario|revisi[oó]n\s+f[ií]sica|dar\s+de\s+baja|mantenimiento\s+preventivo\s+f[ií]sico)\b"
 ]
 
-# Expresiones afirmativas y de confirmación de radicación / aceptación
-AFFIRMATIVE_PATTERNS = [
-    r"^(s[ií]|si por favor|s[ií] por favor|por favor|porfa|por fa|dale|claro|de una|ay[uú]dame|ayudame|rad[ií]calo|radicar|hazlo|haz el reporte|crear ticket|crea el ticket|solicito soporte|que si ayudame|que si ay[uú]dame|ayudame con el reporte|ay[uú]dame con el reporte|radica el caso|radica el ticket|bueno|ok|s[ií] claro|s[ií] dale|s[ií] ay[uú]dame|adelante|de acuerdo|procede)$"
-]
-
-# Patrones de solicitud de reporte y radicación directa
-REPORT_PATTERNS = [
-    r"\b(vamos a reportar|reportar|reportalo|reportarlo|radicar|radica|radicarlo|radicarla|crear ticket|crea ticket|crea el ticket|abrir caso|abre un caso|ayudame a reportar|ay[uú]dame a reportar|haz el reporte|solicito soporte)\b"
-]
-
 # Palabras de control/afirmación que NUNCA deben aceptarse como partes de un nombre
 NON_NAME_WORDS = {
+
     "si", "sí", "claro", "ok", "ayudame", "ayúdame", "dale", "bueno", "por", "favor",
     "porfa", "procede", "radica", "radicar", "radícalo", "radícala", "radicarlo", "radicarla",
     "ticket", "tickets", "caso", "casos", "hola", "buenas", "buenos", "dias", "días",
@@ -466,43 +459,42 @@ class RouterLogic:
         return any(re.search(pat, msg_clean) for pat in SOLVED_PATTERNS)
 
     @classmethod
-    def is_direct_tech_request(cls, text: str) -> bool:
-        """Detecta si el usuario pide explícitamente un técnico, visita o radicación directa."""
+    def is_explicit_ticket_request(cls, text: str) -> bool:
+        """
+        Detecta si el usuario formula una frase compuesta e inequívoca de solicitud de ticket o técnico en sitio.
+        No coincide con palabras sueltas como 'falla', 'problema', 'daño', 'ayuda' o 'soporte'.
+        """
         msg_clean = text.strip().lower()
-        return any(re.search(pat, msg_clean) for pat in DIRECT_TECH_PATTERNS)
+        msg_clean = re.sub(r"[^\w\s]", " ", msg_clean)
+        msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
+        return any(re.match(pat, msg_clean) for pat in EXPLICIT_TICKET_INTENTS)
+
+    @classmethod
+    def is_direct_tech_request(cls, text: str) -> bool:
+        """Detecta si el usuario formula una frase inequívoca de solicitud de técnico o radicación directa."""
+        return cls.is_explicit_ticket_request(text)
+
+    @classmethod
+    def is_report_request(cls, text: str) -> bool:
+        """Alias para compatibilidad: evalúa intención explícita de ticket."""
+        return cls.is_explicit_ticket_request(text)
 
     @classmethod
     def is_persisting_or_ticket_request(cls, text: str) -> bool:
-        """Detecta si el usuario indica que la falla continúa tras el diagnóstico o pide técnico/ticket."""
+        """Detecta si el usuario indica que la falla continúa tras el diagnóstico."""
         if cls.is_solved_confirmation(text) or cls.is_cancellation(text):
             return False
         msg_clean = re.sub(r"[^\w\s]", " ", text.strip().lower())
         msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
-        return any(re.search(pat, msg_clean) for pat in EXPLICIT_FAIL_PATTERNS) or cls.is_direct_tech_request(text)
+        return any(re.search(pat, msg_clean) for pat in EXPLICIT_FAIL_PATTERNS) or cls.is_explicit_ticket_request(text)
 
     @classmethod
     def is_affirmative(cls, text: str) -> bool:
-        """Detecta si el usuario envía una afirmación ('sí', 'por favor', 'ayúdame', 'radícalo', etc.)."""
+        """Detecta si el usuario confirma expresamente la acción ofrecida."""
         msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ]", " ", text.strip().lower())
         msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
-        words = msg_clean.split()
-        if len(words) <= 7:
-            for pat in AFFIRMATIVE_PATTERNS:
-                if re.search(pat, msg_clean):
-                    return True
-        return False
+        return msg_clean in ["si", "sí", "claro", "por favor", "de acuerdo", "procede", "adelante", "dale"]
 
-    @classmethod
-    def is_report_request(cls, text: str) -> bool:
-        """
-        Detecta si el usuario solicita explícitamente reportar, escalar o radicar el caso,
-        o responde afirmativamente para iniciar la radicación.
-        """
-        msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ]", " ", text.strip().lower())
-        msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
-        if cls.is_affirmative(msg_clean) or cls.is_direct_tech_request(msg_clean):
-            return True
-        return any(re.search(pat, msg_clean) for pat in REPORT_PATTERNS)
 
     @classmethod
     def detect_category(cls, text: str) -> Tuple[CategoriaSolicitud, str]:
@@ -1250,25 +1242,8 @@ class RouterLogic:
                     "quick_replies": []
                 }
 
-            # Caso B: Solicitud de préstamo de equipos en medio de diagnóstico -> Mensaje directo estructurado
-            if cls.is_equipment_request(texto):
-                session.falla = texto
-                session.estado = EstadoTicket.OFRECIENDO_RADICACION
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", MENSAJE_SOLICITUD_EQUIPOS)
-                return {
-                    "tipo": "OFRECIENDO_RADICACION",
-                    "state": "OFRECIENDO_RADICACION",
-                    "mensaje": MENSAJE_SOLICITUD_EQUIPOS,
-                    "response": MENSAJE_SOLICITUD_EQUIPOS,
-                    "reply": MENSAJE_SOLICITUD_EQUIPOS,
-                    "ticket_id": None,
-                    "source": "UniMon_SolicitudEquipos",
-                    "quick_replies": []
-                }
-
-            # Caso C: Solicitud explícita de radicación, reporte o afirmación en diagnóstico -> Iniciar Slot-Filling de inmediato
-            if cls.is_report_request(texto):
+            # Caso B: Solicitud explícita e inequívoca de radicación de ticket ("crear ticket", "radicar caso")
+            if cls.is_explicit_ticket_request(texto):
                 session.nombre = None
                 session.correo = None
                 session.descripcion = None
@@ -1287,57 +1262,10 @@ class RouterLogic:
                     "quick_replies": []
                 }
 
-            # Caso D: Solicitud de trámite administrativo presencial durante diagnóstico
-            if cls.is_physical_or_admin_request(texto):
-                session.estado = EstadoTicket.OFRECIENDO_RADICACION
-                support_msg = cls.build_support_channel_message(session.falla or texto)
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", support_msg)
-                return {
-                    "tipo": "OFRECIENDO_RADICACION",
-                    "state": "OFRECIENDO_RADICACION",
-                    "mensaje": support_msg,
-                    "response": support_msg,
-                    "reply": support_msg,
-                    "ticket_id": None,
-                    "source": "UniMon_CanalSoporte",
-                    "quick_replies": []
-                }
-
-            # Caso D.1: Fallas físicas / Hardware / Solicitud de técnico en sitio
-            intent_cat = await cls.classify_intent(texto, session.user_role or "general")
-            if intent_cat == "SOPORTE_FISICO":
-                session.falla = texto
-                session.descripcion = texto
-                session.categoria = CategoriaSolicitud.HARDWARE
-                session.category_name = "Mantenimiento Preventivo y Correctivo de Equipos y Redes"
-                session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
-                session.estado = EstadoTicket.PIDIENDO_NOMBRE
-                session.nombre = None
-                session.correo = None
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
-                return {
-                    "tipo": "RADICANDO_TICKET",
-                    "state": "RADICANDO_TICKET",
-                    "mensaje": PROMPT_HARDWARE_DIRECT,
-                    "response": PROMPT_HARDWARE_DIRECT,
-                    "reply": PROMPT_HARDWARE_DIRECT,
-                    "ticket_id": None,
-                    "source": "UniMon_SemanticRouter_Hardware",
-                    "quick_replies": []
-                }
-
-            # Caso E: Diagnóstico continuo e ilimitado (sin límite de turnos)
+            # Caso C: Diagnóstico continuo e ilimitado mediante RAG contextual
             session.intentos_diagnostico += 1
             history = cls.get_history(session_id)
-
-            # Contextualizar la consulta con la falla si es reporte de persistencia
-            falla_ctx = session.falla or "soporte técnico institucional"
-            if cls.is_persisting_or_ticket_request(texto):
-                query_ctx = f"El usuario indica sobre la falla '{falla_ctx}': '{texto}'. Proporciona el siguiente paso de diagnóstico o alternativa de solución técnica institucional."
-            else:
-                query_ctx = texto
+            query_ctx = texto
 
             # Golden Cache: buscar coincidencia previa antes del RAG completo
             golden_context = ""
@@ -1350,6 +1278,7 @@ class RouterLogic:
                     f"Úsalo como referencia directa para responder al usuario."
                 )
                 logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en diagnóstico.")
+
 
             rag_res = await rag_service.answer_query(
                 query=query_ctx,
@@ -1502,24 +1431,7 @@ class RouterLogic:
                     "source": "UniMon_Assistant"
                 }
 
-            # 4. Solicitud Directa de Préstamos / Asignación de Equipos (Sin consulta al RAG ni al LLM)
-            if cls.is_equipment_request(texto):
-                session.falla = texto
-                session.categoria = CategoriaSolicitud.HARDWARE
-                session.category_name = "Mantenimiento y Fallas de Cómputo (P-GT-01)"
-                session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
-                session.estado = EstadoTicket.OFRECIENDO_RADICACION
-
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", MENSAJE_SOLICITUD_EQUIPOS)
-                return {
-                    "tipo": "OFRECIENDO_RADICACION",
-                    "mensaje": MENSAJE_SOLICITUD_EQUIPOS,
-                    "ticket_id": None,
-                    "source": "UniMon_SolicitudEquipos"
-                }
-
-            # 5. ENRUTAMIENTO SEMÁNTICO: Fallas físicas / Hardware / Soporte en sitio
+            # 4. ENRUTAMIENTO SEMÁNTICO: Fallas físicas / Hardware / Soporte en sitio
             intent_cat = await cls.classify_intent(texto, session.user_role or "general")
             if intent_cat == "SOPORTE_FISICO":
                 session.falla = texto

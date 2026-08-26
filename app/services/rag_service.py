@@ -59,6 +59,9 @@ def get_reranker() -> Optional[CrossEncoder]:
 def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
     """
     Reordena los fragmentos recuperados mediante Cross-Encoder para máxima precisión semántica.
+    Aplica una bonificación procedimental a fragmentos que contienen instructivos paso a paso
+    ('## 3. Procedimiento', 'Paso 1', 'Paso 2') cuando la consulta es una solicitud procedimental
+    ('cómo', 'como', 'pasos', 'votar', 'radicar', 'ingresar', 'activar', 'descargar').
     
     Args:
         query: La consulta del usuario (expandida o normalizada).
@@ -79,11 +82,27 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         pairs = [[query, doc.page_content.strip()] for doc, _ in retrieved_docs]
         scores = reranker.predict(pairs)
 
+        q_lower = query.lower()
+        is_procedural_query = any(w in q_lower for w in [
+            "cómo", "como", "pasos", "votar", "radicar", "ingresar", "activar", "descargar", 
+            "hago para", "solicitar", "consultar", "inscribir"
+        ])
+
         # Asignar scores del cross-encoder y ordenar
         scored_docs = []
         for i, rerank_score in enumerate(scores):
             doc, original_score = retrieved_docs[i]
-            scored_docs.append((doc, original_score, float(rerank_score)))
+            final_score = float(rerank_score)
+            content_lower = doc.page_content.lower()
+
+            # Bonificación procedimental: priorizar fragmentos con pasos e instructivos directos
+            if is_procedural_query:
+                if any(m in content_lower for m in ["procedimiento paso a paso", "## 3.", "paso 1", "paso 2", "paso 3"]):
+                    final_score += 2.0
+                if "requisitos previos" in content_lower and "procedimiento paso a paso" not in content_lower:
+                    final_score -= 1.0
+
+            scored_docs.append((doc, original_score, final_score))
 
         ranked = sorted(scored_docs, key=lambda x: x[2], reverse=True)
         result = [(doc, orig_score) for doc, orig_score, _ in ranked[:top_k]]
@@ -115,10 +134,10 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
         Consulta normalizada a terminología institucional formal, o la original si falla.
     """
     system_prompt = (
-        "Eres un asistente que normaliza consultas universitarias para búsqueda documental.\n"
-        "Convierte la consulta del usuario en 1 frase formal con palabras clave institucionales "
-        "(SIAAF, Kactus, Teams, Portal Estudiantes, etc.).\n"
-        "Mantén nombres de trámites oficiales (prematrícula, inasistencias, notas, certificados).\n"
+        "Eres un asistente que normaliza consultas universitarias para búsqueda documental en base de conocimientos de TI.\n"
+        "Convierte la consulta del usuario en 1 frase formal con palabras clave institucionales precisas "
+        "(SIAAF, Kactus, Teams, Portal Estudiantes, Elecciones Institucionales, Órganos Colegiados, etc.).\n"
+        "Mantén nombres de trámites oficiales (elecciones, votación órganos colegiados, prematrícula, inasistencias, notas, certificados, cambio de contraseña).\n"
         "Responde ÚNICAMENTE la frase normalizada, sin explicaciones ni saludos."
     )
 
@@ -158,21 +177,31 @@ MENSAJE_NO_DOCUMENTADO = (
 )
 
 # Prompt del sistema institucional para soporte técnico N1 directo
-STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Agente Oficial de Soporte Técnico N1 de la Universidad Simón Bolívar.
+STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar.
 
-REGLAS DE ORO OBLIGATORIAS:
-1. PROHIBICIÓN TOTAL DE REFERENCIAR MANUALES AL USUARIO: NUNCA le digas al usuario "revisa el instructivo", "consulta el PDF", "dirígete a la presentación" o "sigue los pasos del documento X". Tú eres el soporte: extrae los pasos del contexto y redacta la solución directa en tu mensaje.
-2. PROHIBICIÓN TOTAL DE PLACEHOLDERS Y ENLACES FALSOS: NUNCA inventes placeholders como "[URL del GLPI]", "[Enlace]", "[Link]", "[URL]", "[Insertar URL]". NUNCA le digas al usuario que ingrese a GLPI ni que se asigne tickets manualmente. Solo usa URLs completas si aparecen textualmente en el contexto provisto (ej: https://unisimon.edu.co).
-3. GUÍA ACCIONABLE PASO A PASO: Si el procedimiento es de autoservicio digital (portales, claves, teams, office, carnet, siaaf, kactus, seven), explica con claridad qué debe hacer el usuario (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
-4. SOPORTE DE HARDWARE, REDES FÍSICAS O DAÑOS DE EQUIPOS: Si la consulta es una falla física (pantalla rota o sin video, cable dañado, puerto dañado, pc no enciende o red cableada) que requiere atención presencial de TI:
+DIRECTIVAS ESTRICTAS DE FIDELIDAD PROCEDIMENTAL:
+1. PROHIBIDO VOLVER A SALUDAR O PRESENTARTE: NUNCA escribas "¡Hola!", "Soy UniMon", ni frases de bienvenida o presentación al inicio de tus respuestas. El usuario ya se encuentra en conversación activa. Empieza directamente con el Paso 1 o la explicación concreta.
+2. EXTRACCIÓN DIRECTA DEL PASO A PASO: Si el contexto contiene una sección de 'Procedimiento Paso a Paso' o instructivo numerado, extrae y reproduce EXACTAMENTE esas acciones (botones, clics, menús, confirmaciones). NO conviertas los requisitos previos o condiciones preliminares en los primeros pasos de la respuesta.
+3. URLs EXACTAS DEL SISTEMA: Usa ÚNICAMENTE la URL o enlace especificado en el fragmento para esa plataforma específica (por ejemplo, si indica elecciones.unisimon.edu.co, usa [Elecciones Institucionales](https://elecciones.unisimon.edu.co/), NUNCA uses portal.unisimon.edu.co a menos que el procedimiento sea del Portal). Formatea en Markdown limpio: [Nombre Plataforma](URL).
+4. PROHIBICIÓN TOTAL DE META-LENGUAJE: Tienes ESTRICTAMENTE PROHIBIDO decir "según el documento proporcionado", "en el PDF adjunto", "de acuerdo al texto", "en el documento de Votación", o "como indica la guía". Responde con autoridad directa como el sistema oficial.
+5. ESTRUCTURA CONCISA: Presenta los pasos en orden cronológico con nombres exactos de botones en negrita (ej: botón **VOTAR**, botón **INICIAR SESIÓN**, botón **OK**).
+6. GROUNDING ESTRICTO Y PROHIBICIÓN DE INVENTAR PLATAFORMAS O ENLACES:
+   - NUNCA inventes plataformas, URLs, módulos o rutas. NO asumas ni digas que un trámite se hace en Kactus, SIAAF, Teams o portales externos si el contexto no lo dice expresamente para esa solicitud en específico.
+   - NUNCA inventes placeholders como "[URL del GLPI]", "[Enlace]", "[Link]", "[URL]", "[Insertar URL]". Solo usa URLs completas si aparecen textualmente en el contexto provisto (ej: https://unisimon.edu.co).
+7. GUÍA ACCIONABLE PASO A PASO: Si el procedimiento es de autoservicio digital documentado (portales, claves, teams, office, carnet, siaaf, kactus, seven, elecciones), explica con claridad qué debe hacer el usuario usando pasos numerados (Paso 1: Entra a [URL/Opción], Paso 2: Haz clic en [Botón/Menú], Paso 3: Diligencia [Campo]).
+8. PRÉSTAMO DE EQUIPOS O TRÁMITES NO DIGITALIZADOS EN PORTALES:
+   - Si la consulta es sobre solicitud o préstamo de equipos de cómputo, recursos físicos (micrófonos, tablets, portátiles, videobeams) y el contexto no describe un módulo web, indica que el requerimiento se tramita directamente con la Dirección de TI a través de los canales oficiales:
+     • Sede Barranquilla: solicitudcomputo@unisimon.edu.co | Tel: (605) 3444333 Ext. 8003/8004 | WhatsApp: 3172683922
+     • Sede Cúcuta: helpdesk@unisimon.edu.co | Tel: (607) 5827070 Ext. 129
+9. SOPORTE DE HARDWARE, REDES FÍSICAS O DAÑOS DE EQUIPOS: Si la consulta es una falla física (pantalla rota o sin video, cable dañado, puerto dañado, pc no enciende o red cableada) que requiere atención presencial de TI:
    - Proporciona únicamente 1 o 2 descartes básicos (verificar cables conectados y encendido).
    - Informa los canales oficiales de soporte (solicitudcomputo@unisimon.edu.co en Barranquilla / helpdesk@unisimon.edu.co en Cúcuta).
    - Pregunta si desea que se radique el reporte de soporte técnico.
-5. Finaliza siempre preguntando:
+10. Finaliza siempre preguntando:
    "¿Pudiste resolver tu problema con estos pasos?
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
-6. Si el contexto NO contiene los pasos de solución, responde únicamente:
+11. Si el contexto NO contiene los pasos de solución ni aplica a los casos anteriores, responde únicamente:
    "No dispongo de un instructivo institucional documentado para este caso específico. Puedes reportarlo a solicitudcomputo@unisimon.edu.co (Barranquilla) / helpdesk@unisimon.edu.co (Cúcuta) o indicarme si deseas que radique un caso de soporte técnico por ti."
 
 Contexto institucional provisto:
@@ -236,6 +265,62 @@ def is_out_of_domain_response(response_text: str) -> bool:
         "asistente enfocado exclusivamente"
     ]
     return any(marker in text_lower for marker in guardrail_markers)
+
+
+def clean_llm_response(text: str) -> str:
+    """
+    Sanitiza y normaliza la respuesta del LLM:
+    1. Elimina saludos y presentaciones repetitivas al inicio del mensaje.
+    2. Sanitiza menciones a GLPI y placeholders falsos.
+    3. Corrige enlaces Markdown redundantes donde el texto visible y la URL son idénticos: [http...](http...) -> http...
+    4. Elimina frases de fuga y meta-lenguaje ("según el documento proporcionado...").
+    """
+    if not text:
+        return ""
+
+    # 1. Eliminar saludos repetitivos y presentaciones al inicio del mensaje
+    text = re.sub(
+        r"^(?:¡?hola!?(?:\s+[a-záéíóúñ]+)?[,!.]*(?:\s*👋)?(?:\s+soy\s+unimon[^\n]*)?\n+)",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+    text = re.sub(
+        r"^(?:¡?hola!?[^\n]*(?:unimon|asistente|virtual)[^\n]*\n+)",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+    text = re.sub(
+        r"^(?:soy\s+unimon[^\n]*\n+)",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # 2. Sanitizar menciones a GLPI y placeholders
+    text = re.sub(r"\[(?:URL|Link|Enlace)?\s*(?:del?|al?)?\s*GLPI\]", "la Mesa de Ayuda TI", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bGLPI\b", "Mesa de Ayuda TI", text)
+    text = re.sub(r"\[(?:URL|Enlace|Link|Insertar URL)\]", "", text, flags=re.IGNORECASE)
+
+    # 3. Corregir enlaces Markdown redundantes: [http...](http...) -> http...
+    text = re.sub(r'\[(https?://[^\s\]]+)\]\(\1/?\)', r'\1', text)
+
+    # 4. Eliminar meta-lenguaje residual ("según el documento...", "en el documento proporcionado...", etc.)
+    text = re.sub(
+        r"(?:\s*o\s+)?(?:en\s+el|según\s+el|de\s+acuerdo\s+al?|conforme\s+al?)\s+documento\s+(?:proporcionado|adjunto|oficial)?(?:\s+sobre\s+[^\n.,;]+)?",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+    text = re.sub(
+        r"(?:según|de acuerdo a|conforme a)\s+(?:el\s+)?(?:documento|pdf|instructivo|guía|manual)\s*(?:adjunto|proporcionado|oficial)?[,:.]?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    return text.strip()
 
 
 class RAGService:
@@ -476,11 +561,8 @@ class RAGService:
                     eval_tokens = data.get("eval_count", 0) or 0
                     logger.info("Respuesta generada exitosamente por Ollama (tokens: %s prompt, %s eval).", prompt_tokens, eval_tokens)
 
-                    # Sanitizar placeholders y menciones a GLPI
-                    clean_msg = re.sub(r"\[(?:URL|Link|Enlace)?\s*(?:del?|al?)?\s*GLPI\]", "la Mesa de Ayuda TI", bot_message, flags=re.IGNORECASE)
-                    clean_msg = re.sub(r"\bGLPI\b", "Mesa de Ayuda TI", clean_msg)
-                    clean_msg = re.sub(r"\[(?:URL|Enlace|Link|Insertar URL)\]", "", clean_msg, flags=re.IGNORECASE)
-                    bot_message = clean_msg.strip()
+                    # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
+                    bot_message = clean_llm_response(bot_message)
                     
                     if "¿pudiste resolver tu problema con estos pasos?" not in bot_message.lower() and "¿te sirvieron estos pasos" not in bot_message.lower():
                         bot_message = bot_message.rstrip() + CLOSING_FEEDBACK_QUESTION

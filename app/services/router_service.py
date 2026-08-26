@@ -27,10 +27,12 @@ except Exception:
 SYSTEM_ROUTER_PROMPT = """Eres el clasificador de intenciones de soporte de TI de la Universidad Simón Bolívar.
 Tu labor es clasificar el mensaje del usuario en UNA de dos categorías:
 
-1. AUTOSERVICIO: Trámites en plataformas web, SIAAF, Teams, Portal Estudiantes, Kactus, Seven, subida de notas, registro de inasistencias ("fallas a clase"), consulta de calificaciones, restablecimiento de contraseñas, certificados o directrices institucionales.
-2. SOPORTE_FISICO: Averías de hardware, periféricos rotos (mouse, teclado, monitor), cables de red dañados, puntos de red sin servicio, computadores que no prenden/sin video, impresoras atascadas o solicitudes de revisión técnica presencial en oficina/laboratorio.
+1. AUTOSERVICIO: Trámites en plataformas web, SIAAF, Teams, Portal Estudiantes, Kactus, Seven, subida de notas, registro de inasistencias ("fallas a clase"), consulta de calificaciones, restablecimiento de contraseñas, certificados, solicitudes de préstamos/asignación de equipos de cómputo o preguntas sobre canales de atención/contacto.
+2. SOPORTE_FISICO: Averías de hardware, periféricos rotos (mouse, teclado, monitor), cables de red dañados, puntos de red sin servicio, computadores que no prenden/sin video, impresoras atascadas o solicitudes explícitas de revisión técnica presencial por daño físico en oficina/laboratorio.
 
-REGLA CLAVE: "Fallas a clase", "reportar fallas", "subir notas" o "calificaciones" son SIEMPRE de tipo AUTOSERVICIO.
+REGLAS CLAVE:
+- "Fallas a clase", "reportar fallas", "subir notas" o "calificaciones" son SIEMPRE de tipo AUTOSERVICIO.
+- Preguntas sobre canales de atención, contactos, o cómo solicitar/prestar equipos de cómputo son SIEMPRE de tipo AUTOSERVICIO.
 
 Responde ÚNICAMENTE un objeto JSON válido con la clave 'categoria':
 {"categoria": "AUTOSERVICIO"} o {"categoria": "SOPORTE_FISICO"}"""
@@ -188,22 +190,9 @@ def is_physical_hardware_request(user_message: str, user_role: str = "general") 
     return classify_request_intent(user_message, user_role) == "SOPORTE_FISICO"
 
 
-RESOLVED_INTENTS = [
-    "resolved", "si", "sí", "si me sirvio", "sí me sirvió", "si me funciono", 
-    "sí me funcionó", "gracias", "muchas gracias", "listo", "ya quedo", "ya quedó",
-    "ya pude", "solucionado", "todo claro", "excelente"
-]
-
-RETRY_INTENTS = [
-    "retry_diagnosis", "no me funciono", "no me funcionó", "no me sirvio", "no me sirvió", 
-    "no funciono", "no funcionó", "no sirvio", "no sirvió", "no pude", 
-    "sigue saliendo error", "tengo otro error", "no me sale", "no aparece", "sigue igual"
-]
-
-TICKET_EXPLICIT_INTENTS = [
-    "create_ticket", "generar reporte", "crear reporte", "soporte", 
-    "asesor", "radicar", "ticket", "abrir ticket", "crear ticket"
-]
+RESOLVED_INTENTS = ["RESOLVED", "resolved"]
+RETRY_INTENTS = ["RETRY_DIAGNOSIS", "retry_diagnosis", "RETRY", "retry"]
+TICKET_EXPLICIT_INTENTS = ["CREATE_TICKET", "create_ticket", "TICKET", "ticket"]
 
 # Alias de compatibilidad hacia atrás
 TICKET_INTENTS = TICKET_EXPLICIT_INTENTS + RETRY_INTENTS
@@ -215,23 +204,18 @@ def handle_feedback_transition(
     session: Optional[Union[dict, Any]] = None
 ) -> Optional[Dict[str, Any]]:
     """
-    Evalúa la respuesta del usuario tras recibir un instructivo/diagnóstico con ciclo de reintento.
+    Evalúa la retroalimentación del usuario de forma EXCLUSIVA a través de los payloads exactos de los botones:
+    - 'RESOLVED': Éxito -> FINALIZADO
+    - 'RETRY_DIAGNOSIS': Reintento -> DIAGNOSTICO (pregunta por error/paso)
+    - 'CREATE_TICKET': Radicación -> RADICANDO_TICKET (solicita Nombre Completo)
     
-    1. Si el usuario confirma que la solución funcionó ("sí", "gracias", "RESOLVED"),
-       transiciona al estado FINALIZADO con un mensaje cordial de cierre.
-    2. Si solicita explícitamente generar reporte o asesor ("CREATE_TICKET", "generar reporte", "soporte"),
-       transiciona a RADICANDO_TICKET solicitando Nombre Completo.
-    3. Si indica que no funcionó ("no", "no me funcionó", "RETRY_DIAGNOSIS"):
-       - Intento 1: se mantiene en DIAGNOSTICO preguntando por el mensaje de error o paso donde se detuvo.
-       - Intento 2+: transiciona a RADICANDO_TICKET para generar el reporte de soporte técnico sin demoras.
-    4. Si es una nueva consulta o pregunta técnica de seguimiento, retorna None para continuar el flujo RAG.
+    Cualquier otro texto libre de lenguaje natural retorna None para continuar fluidamente en el pipeline RAG.
     """
     if session is None:
         session = {}
 
-    msg = user_message.lower().strip()
-    msg_clean = re.sub(r"[^\w\s\?¿áéíóúÁÉÍÓÚñÑ_]", " ", msg).strip()
-    msg_clean = re.sub(r"\s+", " ", msg_clean)
+    msg_raw = (user_message or "").strip()
+    msg_upper = msg_raw.upper()
 
     # Obtener contador de intentos
     if isinstance(session, dict):
@@ -265,13 +249,8 @@ def handle_feedback_transition(
             elif new_state == "DIAGNOSTICO":
                 session.estado = EstadoTicket.DIAGNOSTICO
 
-    # 1. Caso resuelto satisfactoriamente
-    is_resolved = any(
-        msg == intent or msg.startswith(intent + " ") or msg.startswith(intent + ".") or msg.startswith(intent + "!") or
-        msg_clean == intent or msg_clean.startswith(intent + " ")
-        for intent in RESOLVED_INTENTS
-    )
-    if is_resolved:
+    # 1. Caso resuelto satisfactoriamente (exclusivo por payload)
+    if msg_upper in ["RESOLVED"]:
         _update_session_state("FINALIZADO")
         _set_attempts(0)
         return {
@@ -283,34 +262,20 @@ def handle_feedback_transition(
             "quick_replies": []
         }
 
-    # 2. Solicitud directa de reporte
-    is_explicit_ticket = any(
-        msg == intent or msg.startswith(intent + " ") or msg.startswith(intent + ".") or msg.startswith(intent + "!") or
-        msg_clean == intent or msg_clean.startswith(intent + " ")
-        for intent in TICKET_EXPLICIT_INTENTS
-    )
-    if is_explicit_ticket:
+    # 2. Solicitud directa de reporte (exclusivo por payload)
+    if msg_upper in ["CREATE_TICKET", "TICKET"]:
         _update_session_state("RADICANDO_TICKET")
         return {
-            "response": "Entendido. Vamos a generar un reporte para el equipo de soporte técnico. Por favor, indícame tu **Nombre Completo**:",
-            "mensaje": "Entendido. Vamos a generar un reporte para el equipo de soporte técnico. Por favor, indícame tu **Nombre Completo**:",
+            "response": "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:",
+            "mensaje": "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:",
             "state": "RADICANDO_TICKET",
             "tipo": "RADICANDO_TICKET",
-            "source": "UniMon_SlotFilling",
+            "source": "UniMon_Escalacion_Ticket",
             "quick_replies": []
         }
 
-    # 3. No funcionó (Reintento conversacional o escalado según intentos)
-    is_retry = (
-        any(
-            msg == intent or msg.startswith(intent + " ") or msg.startswith(intent + ".") or msg.startswith(intent + "!") or
-            msg_clean == intent or msg_clean.startswith(intent + " ")
-            for intent in RETRY_INTENTS
-        )
-        or msg in ["no", "nop", "noup"]
-        or msg_clean in ["no", "nop", "noup"]
-    )
-    if is_retry:
+    # 3. No funcionó / Reintento (exclusivo por payload)
+    if msg_upper in ["RETRY_DIAGNOSIS", "RETRY"]:
         if attempts < 2:
             _set_attempts(attempts + 1)
             _update_session_state("DIAGNOSTICO")
@@ -328,13 +293,13 @@ def handle_feedback_transition(
             # Si ya intentó 2 veces, ofrecer directamente la toma de datos
             _update_session_state("RADICANDO_TICKET")
             return {
-                "response": "Entendido, no te preocupes. Para no hacerte esperar más, voy a generar un reporte para que un asesor de soporte técnico revise tu caso. Por favor, indícame tu **Nombre Completo**:",
-                "mensaje": "Entendido, no te preocupes. Para no hacerte esperar más, voy a generar un reporte para que un asesor de soporte técnico revise tu caso. Por favor, indícame tu **Nombre Completo**:",
+                "response": "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:",
+                "mensaje": "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:",
                 "state": "RADICANDO_TICKET",
                 "tipo": "RADICANDO_TICKET",
-                "source": "UniMon_SlotFilling",
+                "source": "UniMon_Escalacion_Ticket",
                 "quick_replies": []
             }
 
-    # 4. Si el usuario realiza una nueva consulta o pregunta de seguimiento
+    # 4. Cualquier otro mensaje de texto no es feedback por payload -> Flujo libre RAG
     return None

@@ -25,8 +25,8 @@ if sys.platform == "win32":
 
 
 def test_handle_feedback_transition_resolved_direct():
-    """Verifica que las intenciones de éxito transicionen directamente a FINALIZADO."""
-    for intent in ["resolved", "RESOLVED", "si", "sí", "si me sirvio", "sí me sirvió", "gracias", "muchas gracias", "listo", "ya quedo"]:
+    """Verifica que el payload exacto RESOLVED transicione directamente a FINALIZADO."""
+    for intent in ["resolved", "RESOLVED"]:
         session = {"state": "DIAGNOSTICO", "diagnosis_attempts": 1}
         res = handle_feedback_transition(intent, "DIAGNOSTICO", session)
         assert res is not None, f"Fallo al reconocer '{intent}' como resuelto"
@@ -39,8 +39,8 @@ def test_handle_feedback_transition_resolved_direct():
 
 
 def test_handle_feedback_transition_explicit_ticket_direct():
-    """Verifica que solicitudes explícitas de reporte o asesor transicionen inmediatamente a RADICANDO_TICKET."""
-    for intent in ["create_ticket", "CREATE_TICKET", "generar reporte", "crear reporte", "soporte", "asesor", "radicar", "ticket"]:
+    """Verifica que el payload CREATE_TICKET transicione inmediatamente a RADICANDO_TICKET."""
+    for intent in ["create_ticket", "CREATE_TICKET", "TICKET"]:
         session = {"state": "DIAGNOSTICO", "diagnosis_attempts": 1}
         res = handle_feedback_transition(intent, "DIAGNOSTICO", session)
         assert res is not None, f"Fallo al reconocer '{intent}' como reporte explícito"
@@ -52,8 +52,8 @@ def test_handle_feedback_transition_explicit_ticket_direct():
 
 
 def test_handle_feedback_transition_retry_first_attempt():
-    """Verifica que en el intento 1 ('no', 'no me funcionó', 'RETRY_DIAGNOSIS') se mantenga en DIAGNOSTICO y pida detalles del error."""
-    for intent in ["retry_diagnosis", "RETRY_DIAGNOSIS", "no", "no me funciono", "no me sirvió", "no pude", "sigue saliendo error"]:
+    """Verifica que el payload RETRY_DIAGNOSIS en intento 1 se mantenga en DIAGNOSTICO y pida detalles del error."""
+    for intent in ["retry_diagnosis", "RETRY_DIAGNOSIS", "RETRY"]:
         session = {"state": "DIAGNOSTICO", "diagnosis_attempts": 1}
         res = handle_feedback_transition(intent, "DIAGNOSTICO", session)
         assert res is not None, f"Fallo al procesar reintento para '{intent}'"
@@ -67,8 +67,8 @@ def test_handle_feedback_transition_retry_first_attempt():
 
 
 def test_handle_feedback_transition_retry_second_attempt_escalates():
-    """Verifica que si ya se reintentó (diagnosis_attempts >= 2) y el usuario dice 'no', escale a RADICANDO_TICKET."""
-    for intent in ["no", "no me funciono", "RETRY_DIAGNOSIS", "no pude"]:
+    """Verifica que si ya se reintentó (diagnosis_attempts >= 2) y se pulsa RETRY_DIAGNOSIS, escale a RADICANDO_TICKET."""
+    for intent in ["RETRY_DIAGNOSIS", "retry_diagnosis", "RETRY"]:
         session = {"state": "DIAGNOSTICO", "diagnosis_attempts": 2}
         res = handle_feedback_transition(intent, "DIAGNOSTICO", session)
         assert res is not None, f"Fallo al escalar en intento 2 para '{intent}'"
@@ -78,17 +78,25 @@ def test_handle_feedback_transition_retry_second_attempt_escalates():
         assert "glpi" not in res["response"].lower()
 
 
-def test_handle_feedback_transition_followup_question():
-    """Verifica que una pregunta de seguimiento no sea interceptada como feedback y retorne None."""
+def test_handle_feedback_transition_natural_text_returns_none_for_rag():
+    """Verifica que textos en lenguaje natural ('si', 'no', preguntas) no sean interceptados como feedback y retornen None."""
     session = {"state": "DIAGNOSTICO", "diagnosis_attempts": 1}
-    res = handle_feedback_transition("¿Cómo descargo el certificado de notas?", "DIAGNOSTICO", session)
-    assert res is None
+    for natural_text in [
+        "¿Cómo descargo el certificado de notas?",
+        "si soy nuevo en la universidad qué hago",
+        "no puedo entrar al portal",
+        "si",
+        "no",
+        "dale gracias"
+    ]:
+        res = handle_feedback_transition(natural_text, "DIAGNOSTICO", session)
+        assert res is None, f"El texto '{natural_text}' fue erróneamente interceptado como feedback"
 
 
 @pytest.mark.asyncio
 async def test_resolved_feedback_after_diagnostico():
-    """Verifica que feedback positivo tras DIAGNOSTICO retorne FINALIZADO sin pedir nombre."""
-    test_cases = ["si me sirvio", "sí", "gracias", "RESOLVED", "si me funcionó", "muchas gracias"]
+    """Verifica que el payload RESOLVED tras DIAGNOSTICO retorne FINALIZADO sin pedir nombre."""
+    test_cases = ["RESOLVED", "resolved"]
     
     for user_input in test_cases:
         sess_id = f"sess_resolved_{user_input.replace(' ', '_')}"
@@ -107,7 +115,7 @@ async def test_resolved_feedback_after_diagnostico():
 
 @pytest.mark.asyncio
 async def test_retry_cycle_and_escalation_flow():
-    """Verifica el ciclo completo: Diagnóstico -> No (Pide Error) -> No (Escala a Ticket con Nombre)."""
+    """Verifica el ciclo completo: Diagnóstico -> RETRY_DIAGNOSIS (Pide Error) -> RETRY_DIAGNOSIS (Escala a Ticket)."""
     sess_id = "sess_retry_cycle_test"
     router_logic.reset_session(sess_id)
     session = router_logic.get_session(sess_id)
@@ -116,8 +124,8 @@ async def test_retry_cycle_and_escalation_flow():
     session.falla = "falla en portal docente"
     session.diagnosis_attempts = 1
 
-    # Turno 1 de feedback: Primer "no" -> Debe pedir aclaración del error y mantenerse en DIAGNOSTICO
-    r1 = await router_logic.procesar_mensaje("no me funciono", session_id=sess_id)
+    # Turno 1 de feedback: Primer RETRY_DIAGNOSIS -> Debe pedir aclaración del error y mantenerse en DIAGNOSTICO
+    r1 = await router_logic.procesar_mensaje("RETRY_DIAGNOSIS", session_id=sess_id)
     assert r1["tipo"] == "DIAGNOSTICO"
     assert session.estado == EstadoTicket.DIAGNOSTICO
     assert session.diagnosis_attempts == 2
@@ -125,8 +133,8 @@ async def test_retry_cycle_and_escalation_flow():
     assert "glpi" not in r1["mensaje"].lower()
     assert len(r1.get("quick_replies", [])) == 1
 
-    # Turno 2 de feedback: Segundo "no" -> Debe escalar a RADICANDO_TICKET pidiendo Nombre Completo
-    r2 = await router_logic.procesar_mensaje("sigue saliendo error", session_id=sess_id)
+    # Turno 2 de feedback: Segundo RETRY_DIAGNOSIS -> Debe escalar a RADICANDO_TICKET pidiendo Nombre Completo
+    r2 = await router_logic.procesar_mensaje("RETRY_DIAGNOSIS", session_id=sess_id)
     assert r2["tipo"] == "RADICANDO_TICKET"
     assert session.estado == EstadoTicket.PIDIENDO_NOMBRE
     assert "nombre completo" in r2["mensaje"].lower()
@@ -135,7 +143,7 @@ async def test_retry_cycle_and_escalation_flow():
 
 @pytest.mark.asyncio
 async def test_explicit_ticket_escalation():
-    """Verifica que pulsar 'CREATE_TICKET' o escribir 'generar reporte' pase directo a RADICANDO_TICKET."""
+    """Verifica que pulsar 'CREATE_TICKET' pase directo a RADICANDO_TICKET."""
     sess_id = "sess_direct_ticket"
     router_logic.reset_session(sess_id)
     session = router_logic.get_session(sess_id)
@@ -148,6 +156,7 @@ async def test_explicit_ticket_escalation():
     assert session.estado == EstadoTicket.PIDIENDO_NOMBRE
     assert "nombre completo" in res["mensaje"].lower()
     assert "glpi" not in res["mensaje"].lower()
+
 
 
 @pytest.mark.asyncio
