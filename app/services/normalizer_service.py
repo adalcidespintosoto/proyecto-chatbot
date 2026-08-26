@@ -1,15 +1,27 @@
 """
-Servicio de Normalización Léxica y Expansor de Sinónimos para UniMon (Universidad Simón Bolívar).
-Normaliza jerga estudiantil, variantes fonéticas, modismos regionales y siglas informales
-a la terminología técnica e institucional oficial de los manuales y procedimientos (P-GT, Moodle, Seven, Kactus).
+Servicio de Normalización Léxica, Depuración de Ruido y Expansor de Sinónimos para UniMon (Universidad Simón Bolívar).
+Normaliza jerga estudiantil, elimina encabezados/ruido de remitente (ej: 'EXALUMNO CARLOS ARDILA:')
+y traduce términos coloquiales a la terminología técnica e institucional oficial.
 """
 
 import re
 
+# Patrones de encabezados con nombres propios o remitentes para eliminación de ruido
+HEADER_NOISE_PATTERNS = [
+    r"^(?:exalumno|egresad[oa]|estudiante|alumno|docente|profesor[a]?|administrativ[oa]|funcionario|usuario|remitente|de|para|nombre|consulta|solicitud|requerimiento)\s+[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+:\s*",
+    r"^(?:de|para|att|asunto):\s*",
+    r"^(?:informaci[oó]n\s+(?:para|sobre|de)|consulta\s+(?:para|sobre|de)|solicitud\s+(?:para|sobre|de))\s+"
+]
+
 SYNONYM_MAP = {
-    # Hardware y Dispositivos
-    r"\b(pc|pcs|compu|computadora|ordenador|maquina|máquina|torre|laptop)\b": "computador equipo de cómputo",
-    r"\b(portatil|portátil|portatiles|portátiles)\b": "computador portátil",
+    # Recuperación de Credenciales, Contraseñas y Desbloqueo de Cuentas
+    r"\b(restablecer\s+correo|recuperar\s+correo|desbloquear\s+correo|restablecer\s+contrase[ñn]a|recuperar\s+contrase[ñn]a|recuperar\s+clave|restablecer\s+clave|cambiar\s+clave|cambiar\s+contrase[ñn]a|olvid[eé]\s+mi\s+contrase[ñn]a|olvid[eé]\s+la\s+clave|olvido\s+contrase[ñn]a|desbloqueo\s+de\s+cuenta|olvido\s+su\s+contraseña)\b": "activación de usuario contraseña y correo institucional autogestión de contraseñas portal estudiantes passwordreset microsoftonline",
+
+    # Hardware y Dispositivos / Dotación de Cómputo
+    r"\b(portatil|portátil|portatiles|portátiles|laptop|laptops)\b": "dotacion equipo de computo portatil mantenimiento computadores",
+    r"\b(computador de mesa|pc de escritorio)\b": "dotacion equipo de computo pc mantenimiento",
+    r"\b(pedir computador|solicitar pc|solicitar portatil|solicitar portátil|solicitar equipo|pedir pc|pedir portatil|pedir portátil|asignar computador|dotaci[oó]n|solicitar computador|asignar portatil|asignar portátil)\b": "dotacion renovacion equipos de computo jefe dependencia mantenimiento preventivo y correctivo de equipos de computo p-gt-01",
+    r"\b(pc|pcs|compu|computadora|ordenador|maquina|máquina|torre)\b": "computador equipo de cómputo",
     r"\b(tablet|tableta|tabletas|ipad)\b": "tableta digital",
     r"\b(videobeam|video beam|beamer|canon|cañon|cañón)\b": "videobeam proyector institucional",
     r"\b(microfono|micrófono|micrófonos|diadema|audifonos|audífonos|auriculares|parlante|altavoz)\b": "micrófono equipo de audio",
@@ -25,6 +37,9 @@ SYNONYM_MAP = {
     r"\b(kactus|caktus|kaktu)\b": "sistema kactus gestión de talento humano y nómina",
     r"\b(pac)\b": "diligenciamiento de pac profesores plan de actividad académica",
     r"\b(carnet|carné|carnet digital|app unisim[oó]n|app)\b": "carnetización app unisimon carnet estudiante",
+    r"\b(supletorio|supletorios|examen supletorio|ex[aá]menes supletorios)\b": "gestión y autorización de exámenes supletorios en siaaf",
+    r"\b(intersemestral|intersemestrales|cursos de [eé]nfasis)\b": "autorización de inscripción para cursos intersemestrales en siaaf",
+    r"\b(votaci[oó]n|[oó]rganos colegiados|votar|elecciones)\b": "votación electrónica aplicativo institucional elecciones órganos colegiados",
     
     # Errores, Accesos y Fallas Comunes
     r"\b(datos incorrectos|clave incorrecta|no me deja entrar|no entra|clave invalida|datos invalidos|no me coge la clave)\b": "problemas de acceso restablecimiento de contraseña credenciales incorrectas",
@@ -35,19 +50,31 @@ SYNONYM_MAP = {
 }
 
 
+def strip_query_header_noise(query: str) -> str:
+    """
+    Elimina prefijos de remitente, encabezados tipo correo o nombres propios
+    (ej: 'EXALUMNO CARLOS ARDILA: INFORMACION PARA RESTABLECER CORREO' -> 'RESTABLECER CORREO').
+    """
+    clean_text = query.strip()
+    for pat in HEADER_NOISE_PATTERNS:
+        clean_text = re.sub(pat, "", clean_text, flags=re.IGNORECASE).strip()
+    return clean_text if clean_text else query.strip()
+
+
 def normalize_and_expand_query(query: str) -> str:
     """
-    Limpia el texto, expande siglas y traduce términos coloquiales/jerga estudiantil
+    Limpia el texto, depura ruido de encabezados, expande siglas y traduce términos coloquiales/jerga estudiantil
     a términos técnicos institucionales para una recuperación semántica de alta precisión (>= 90%).
     """
-    text = query.lower().strip()
+    stripped_text = strip_query_header_noise(query)
+    text_lower = stripped_text.lower().strip()
     expanded_terms = []
     
     for pattern, replacement in SYNONYM_MAP.items():
-        if re.search(pattern, text):
+        if re.search(pattern, text_lower):
             expanded_terms.append(replacement)
             
     if expanded_terms:
-        # Retorna el query original enriquecido con los términos técnicos oficiales
-        return f"{text} {' '.join(expanded_terms)}"
-    return text
+        # Retorna el query limpio enriquecido con los términos técnicos oficiales
+        return f"{text_lower} {' '.join(expanded_terms)}"
+    return text_lower

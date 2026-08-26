@@ -413,6 +413,138 @@ class TestResponsePostProcessing:
         assert "Elecciones Institucionales" in cleaned
 
 
+# =============================================================================
+# Test 6: Arquitectura de Respuesta Integral: Requisitos, Restricciones y Contexto
+# =============================================================================
+class TestIntegralRestrictionsAndPrerequisites:
+    """Valida la inclusión obligatoria de restricciones y prerrequisitos en múltiples escenarios."""
+
+    def test_system_prompt_contains_mandatory_two_layer_structure_directives(self):
+        """Valida que el prompt del sistema contenga las directivas de adaptación de respuesta."""
+        from app.services.rag_service import STRICT_SYSTEM_PROMPT_TEMPLATE
+
+        assert "DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "CONSULTAS DIRECTAS" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "TRÁMITES Y PROCEDIMIENTOS" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "**⚠️ Requisitos y Restricciones Previas:**" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "PROHIBICIÓN ABSOLUTA DE META-LENGUAJE" in STRICT_SYSTEM_PROMPT_TEMPLATE
+
+    def test_clean_llm_response_removes_internal_prompt_leaks(self):
+        """Valida que clean_llm_response elimine transcripciones de directivas internas del prompt."""
+        from app.services.rag_service import clean_llm_response
+
+        text_with_leaks = (
+            "## Prohibición de Omitir Información\n"
+            "Los canales oficiales de TI son:\n"
+            "• Barranquilla: solicitudcomputo@unisimon.edu.co\n"
+            "**Canales Complejos y Datos Requeridos**\n"
+            "• Cúcuta: helpdesk@unisimon.edu.co\n"
+        )
+        cleaned = clean_llm_response(text_with_leaks)
+
+        assert "Prohibición de Omitir" not in cleaned
+        assert "Canales Complejos" not in cleaned
+        assert "solicitudcomputo@unisimon.edu.co" in cleaned
+        assert "helpdesk@unisimon.edu.co" in cleaned
+
+    @pytest.mark.asyncio
+    async def test_direct_directory_query_adaptive_routing(self):
+        """Valida que consultas directas de contacto respondan con canales sin inventar requisitos ni pasos falsos."""
+        from app.services.rag_service import rag_service
+
+        query = "numeros de contactos y correos de soporte tecnico"
+        result = await rag_service.query_rag(query, user_role="general")
+
+        response_text = result.get("response", "")
+        # Debe contener los canales de Barranquilla y Cúcuta
+        assert "solicitudcomputo@unisimon.edu.co" in response_text or "Barranquilla" in response_text
+        assert "helpdesk@unisimon.edu.co" in response_text or "Cúcuta" in response_text
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_context_assembly_for_voting_procedure(self):
+        """Valida que para votaciones se recuperen tanto los requisitos (censo) como el procedimiento paso a paso."""
+        from app.services.rag_service import rag_service
+
+        if rag_service.vector_store is not None:
+            # Buscar fragmentos de votación
+            docs = rag_service.vector_store.similarity_search("como votar representantes estudiantes", k=6)
+            combined_content = " ".join([d.page_content.lower() for d in docs])
+            
+            # Debe contener elementos de requisitos (censo, credenciales) y del procedimiento (votar)
+            assert any(w in combined_content for w in ["censo", "requisito", "activo", "credenciales"])
+            assert any(w in combined_content for w in ["votar", "procedimiento", "paso"])
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_context_assembly_for_equipment_request(self):
+        """Valida que para solicitudes de PC/dotación tecnológica se recuperen requisitos de jefatura/dotación."""
+        from app.services.rag_service import rag_service
+
+        if rag_service.vector_store is not None:
+            docs = rag_service.vector_store.similarity_search("como solicito un pc dotacion de computadores", k=6)
+            combined_content = " ".join([d.page_content.lower() for d in docs])
+            
+            # Debe contener referencias a equipos/mantenimiento/dotación o canales de TI
+            assert any(w in combined_content for w in ["jefe", "dependencia", "solicitudcomputo", "mantenimiento", "requerimiento", "p-gt"])
+
+    @pytest.mark.asyncio
+    async def test_hierarchical_context_assembly_for_siaaf_supletorios(self):
+        """Valida que para exámenes supletorios en SIAAF se recuperen requisitos de fechas/autorización y pasos."""
+        from app.services.rag_service import rag_service
+
+        if rag_service.vector_store is not None:
+            docs = rag_service.vector_store.similarity_search("autorizacion examenes supletorios siaaf", k=6)
+            combined_content = " ".join([d.page_content.lower() for d in docs])
+            
+            assert any(w in combined_content for w in ["siaaf", "supletorio", "examen", "programa", "buscar"])
+
+    def test_strip_query_header_noise(self):
+        """Valida que se eliminen prefijos de remitente y ruido de encabezados."""
+        from app.services.normalizer_service import strip_query_header_noise
+
+        q1 = "EXALUMNO CARLOS ARDILA: INFORMACION PARA RESTABLECER CORREO"
+        assert strip_query_header_noise(q1).upper() == "RESTABLECER CORREO"
+
+        q2 = "ESTUDIANTE JUAN PEREZ: como descargo mis notas"
+        assert strip_query_header_noise(q2) == "como descargo mis notas"
+
+        q3 = "DOCENTE MARIA: consulta sobre teams"
+        assert strip_query_header_noise(q3) == "teams"
+
+    @pytest.mark.asyncio
+    async def test_password_reset_query_with_header_noise(self):
+        """Valida que consultas con ruido de encabezado recuperen el procedimiento de clave y NO el de Teams."""
+        from app.services.rag_service import rag_service
+
+        query = "EXALUMNO CARLOS ARDILA: INFORMACION PARA RESTABLECER CORREO"
+        result = await rag_service.query_rag(query, user_role="general")
+
+        response_text = result.get("response", "")
+        # Debe contener elementos de restablecimiento/contraseña/portal
+        assert any(k in response_text.lower() for k in ["contraseña", "clave", "correo", "portal", "microsoft", "recuperación", "restablecer"])
+        # NO debe confundir con Microsoft Teams ni pedir abrir el ícono de Teams
+        assert "ícono de teams" not in response_text.lower()
+        assert "barra de aplicaciones y hacer clic sobre el ícono de teams" not in response_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_hardware_dotation_disambiguation_from_software_projects(self):
+        """Valida que 'quiero solicitar un portatil' se asocie con dotación/soporte de cómputo y no con proyectos Jira."""
+        from app.services.rag_service import rag_service
+
+        query = "quiero solicitar un portatil"
+        result = await rag_service.query_rag(query, user_role="general")
+
+        response_text = result.get("response", "")
+        # Debe orientar a dotación/mantenimiento de equipos de cómputo o canales TI
+        assert any(k in response_text.lower() for k in ["portátil", "portatil", "equipo", "cómputo", "computo", "solicitudcomputo", "dependencia", "ti"])
+        # No debe referirse a proyectos de software ni desarrollo en Jira
+        assert "desarrollo de software" not in response_text.lower()
+        assert "tablero de jira" not in response_text.lower()
+
+
+
+
+
+
 
 
 
