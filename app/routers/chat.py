@@ -211,20 +211,20 @@ async def upload_document(
             detail=f"No se pudo guardar el archivo: {str(exc)}"
         )
 
-    # Reindexar automáticamente con pipeline multimodal
-    success = ingest_multimodal()
+    # Indexar únicamente el nuevo archivo con pipeline multimodal incremental
+    success = ingest_multimodal(file_path=str(target_path))
     if success:
         rag_service.reload_vector_store()
         return {
             "status": "success",
-            "message": f"Documento '{file.filename}' subido e indexado exitosamente en ChromaDB (pipeline multimodal).",
+            "message": f"Documento '{file.filename}' subido e indexado exitosamente en ChromaDB (pipeline incremental multimodal).",
             "filename": file.filename,
             "size_kb": round(len(content) / 1024, 2)
         }
     else:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="El archivo se guardó, pero ocurrió un error durante la reindexación vectorial."
+            detail="El archivo se guardó, pero ocurrió un error durante la indexación vectorial."
         )
 
 
@@ -236,9 +236,9 @@ async def upload_document(
 )
 async def trigger_reindex():
     """
-    Dispara manualmente el pipeline de ingesta multimodal y actualiza la base vectorial activa.
+    Dispara manualmente el pipeline de ingesta multimodal completa y actualiza la base vectorial activa.
     """
-    success = ingest_multimodal()
+    success = ingest_multimodal(wipe_db=True)
     if success:
         rag_service.reload_vector_store()
         return {

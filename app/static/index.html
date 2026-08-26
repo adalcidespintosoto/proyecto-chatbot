@@ -1135,9 +1135,11 @@
             rolesContainer.innerHTML = '<li class="kpi-list-item" style="color:var(--text-muted)">Sin sesiones registradas aún</li>';
           } else {
             roleKeys.forEach(role => {
-              const li = document.createElement('li');
-              li.className = 'kpi-list-item';
-              const roleName = role === 'docente' ? '👨‍🏫 Docente / Profesor' : role === 'estudiante' ? '🎓 Estudiante' : role === 'funcionario' ? '🏢 Funcionario / Admin' : '👤 ' + role;
+              const roleName = (role === 'profesor' || role === 'docente') ? '👨‍🏫 Profesor' 
+                             : role === 'estudiante' ? '🎓 Estudiante' 
+                             : (role === 'administrativo' || role === 'funcionario') ? '💼 Administrativo' 
+                             : (role === 'otros' || role === 'otro') ? '🌐 Otros / Visitante' 
+                             : '👤 ' + role;
               li.innerHTML = `<span>${roleName}</span> <span class="kpi-badge">${roles[role]} ses.</span>`;
               rolesContainer.appendChild(li);
             });

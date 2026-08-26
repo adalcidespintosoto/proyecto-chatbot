@@ -190,30 +190,32 @@ class RAGService:
     def _build_role_filter(self, user_role: Optional[str]) -> Optional[Dict[str, Any]]:
         """
         Construye la condición de filtrado en ChromaDB según el rol del usuario:
-        - Funcionarios / Profesores / Docentes: Acceden a documentos de audiencia general, funcionario, profesor y admin_ti.
-        - Estudiantes / Otros: Acceden exclusivamente a guías de autoservicio y normativa para estudiantes y generales.
+        - Otros / Visitante / Sin Rol: Acceso irrestricto a toda la base documental (sin filtro de audiencia, retorna None).
+        - Administrativo / Funcionario / Admin TI: Accede a documentos de general, administrativo, funcionario, profesor y admin_ti.
+        - Profesor / Docente: Accede a documentos de general, profesor, docente y estudiante.
+        - Estudiante: Accede a documentos y guías para estudiantes y general.
         """
         if not user_role:
-            return {
-                "$and": [
-                    {"doc_type": {"$in": ["autoservicio", "normativa"]}},
-                    {"audience": {"$in": ["general", "estudiante"]}}
-                ]
-            }
+            return None
 
         role_lower = user_role.strip().lower()
 
-        if role_lower in ["funcionario", "docente", "profesor", "administrativo", "admin_ti"]:
+        if role_lower in ["otros", "otro", "visitante", "visitantes", "aspirante", "aspirantes", "egresado", "egresada", "externo", "externa", "general"]:
+            # Acceso total irrestricto sin filtros
+            return None
+        elif role_lower in ["administrativo", "administrativa", "funcionario", "funcionaria", "admin_ti"]:
             return {
-                "audience": {"$in": ["general", "funcionario", "profesor", "admin_ti"]}
+                "audience": {"$in": ["general", "administrativo", "funcionario", "profesor", "admin_ti"]}
             }
-        else:
+        elif role_lower in ["profesor", "profesora", "docente"]:
             return {
-                "$and": [
-                    {"doc_type": {"$in": ["autoservicio", "normativa"]}},
-                    {"audience": {"$in": ["general", "estudiante"]}}
-                ]
+                "audience": {"$in": ["general", "profesor", "docente", "estudiante"]}
             }
+        elif role_lower in ["estudiante", "alumno", "alumna"]:
+            return {
+                "audience": {"$in": ["general", "estudiante"]}
+            }
+        return None
 
     async def query_rag(
         self,
