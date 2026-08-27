@@ -36,6 +36,7 @@ def init_telemetry_db():
                     session_id TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     user_query TEXT,
+                    bot_response TEXT,
                     intent_category TEXT,
                     source_used TEXT,
                     referenced_docs TEXT,
@@ -46,6 +47,11 @@ def init_telemetry_db():
                     FOREIGN KEY (session_id) REFERENCES telemetry_sessions(session_id)
                 )
             """)
+            # Migración: asegurar existencia de bot_response si la tabla fue creada previamente
+            cursor.execute("PRAGMA table_info(telemetry_interactions);")
+            cols = [c[1] for c in cursor.fetchall()]
+            if "bot_response" not in cols:
+                cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN bot_response TEXT;")
             conn.commit()
             logger.info("Base de datos de telemetría inicializada en: %s", DB_PATH)
     except Exception as e:
@@ -56,6 +62,7 @@ def log_interaction(
     session_id: str,
     role: Optional[str] = "general",
     query: str = "",
+    bot_response: str = "",
     intent: str = "GENERAL",
     source: str = "UniMon",
     docs: Optional[List[str]] = None,
@@ -81,12 +88,13 @@ def log_interaction(
             docs_str = ", ".join(docs) if docs else "None"
             cursor.execute("""
                 INSERT INTO telemetry_interactions (
-                    session_id, user_query, intent_category, source_used,
+                    session_id, user_query, bot_response, intent_category, source_used,
                     referenced_docs, latency_ms, prompt_tokens, eval_tokens, feedback
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session_id, 
                 query, 
+                bot_response,
                 intent, 
                 source or "UniMon", 
                 docs_str, 

@@ -111,3 +111,34 @@ def test_api_analytics_clusters_endpoint(temp_analytics_db):
         assert data["status"] == "success"
         assert "clusters" in data
         assert len(data["clusters"]) == 2
+
+
+def test_export_dpo_dataset(temp_analytics_db):
+    """Valida la exportación de pares DPO (prompt, chosen, rejected) desde SQLite."""
+    from app.services.clustering_service import export_dpo_dataset, export_dpo_dataset_jsonl
+
+    with patch("app.services.clustering_service.DB_PATH", temp_analytics_db):
+        dataset = export_dpo_dataset(temp_analytics_db)
+        assert isinstance(dataset, list)
+        
+        jsonl = export_dpo_dataset_jsonl(temp_analytics_db)
+        assert isinstance(jsonl, str)
+
+
+def test_api_export_dpo_endpoint(temp_analytics_db):
+    """Valida el endpoint HTTP GET /api/analytics/export-dpo-dataset."""
+    with patch("app.services.clustering_service.DB_PATH", temp_analytics_db):
+        client = TestClient(app)
+        
+        # Test formato JSONL por defecto
+        res_jsonl = client.get("/api/analytics/export-dpo-dataset")
+        assert res_jsonl.status_code == 200
+        assert res_jsonl.headers.get("content-type", "").startswith("application/x-ndjson")
+
+        # Test formato JSON estructurado
+        res_json = client.get("/api/analytics/export-dpo-dataset?format=json")
+        assert res_json.status_code == 200
+        data = res_json.json()
+        assert data["status"] == "success"
+        assert "dataset" in data
+

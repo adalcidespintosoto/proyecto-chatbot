@@ -17,6 +17,12 @@ SYNONYM_MAP = {
     # Recuperación de Credenciales, Contraseñas y Desbloqueo de Cuentas
     r"\b(restablecer\s+correo|recuperar\s+correo|desbloquear\s+correo|restablecer\s+contrase[ñn]a|recuperar\s+contrase[ñn]a|recuperar\s+clave|restablecer\s+clave|cambiar\s+clave|cambiar\s+contrase[ñn]a|olvid[eé]\s+mi\s+contrase[ñn]a|olvid[eé]\s+la\s+clave|olvido\s+contrase[ñn]a|desbloqueo\s+de\s+cuenta|olvido\s+su\s+contraseña)\b": "activación de usuario contraseña y correo institucional autogestión de contraseñas portal estudiantes passwordreset microsoftonline",
 
+    # Desambiguación de Estudiante Antiguo / Semestres Superiores
+    r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|segundo\s+semestre|tercer\s+semestre|cuarto\s+semestre|quinto\s+semestre|sexto\s+semestre|s[eé]ptimo\s+semestre|septimo\s+semestre|octavo\s+semestre|noveno\s+semestre|d[eé]cimo\s+semestre|decimo\s+semestre|semestres\s+superiores)\b": "recuperacion contraseña portal estudiante restablecer clave microsoft passwordreset autogestion",
+
+    # Canales de Atención, Contacto y Soporte TI
+    r"\b(canales\s+de\s+atenci[oó]n|canales\s+de\s+atencion|canales\s+de\s+soporte|canales|lineas\s+de\s+atencion|líneas\s+de\s+atención|contacto\s+ti|contacto\s+soporte|wasap|whatsapp|numero\s+de\s+whatsapp|número\s+de\s+whatsapp|cual\s+es\s+el\s+wasap|cuál\s+es\s+el\s+wasap|cual\s+es\s+el\s+whatsapp|cuál\s+es\s+el\s+whatsapp|correo\s+soporte|correo\s+de\s+soporte|telefono\s+soporte|teléfono\s+soporte|directorio\s+ti|escribir\s+a\s+los\s+canales)\b": "directorio canales soporte tecnico whatsapp telefono correo barranquilla cucuta atencion usuarios pbx",
+
     # Hardware y Dispositivos / Dotación de Cómputo
     r"\b(portatil|portátil|portatiles|portátiles|laptop|laptops)\b": "dotacion equipo de computo portatil mantenimiento computadores",
     r"\b(computador de mesa|pc de escritorio)\b": "dotacion equipo de computo pc mantenimiento",

@@ -16,6 +16,8 @@ from app.config import get_settings
 from app.routers import chat, analytics
 from app.services.router_logic import RouterLogic
 from app.services.telemetry_service import init_telemetry_db
+from app.services.rag_service import rag_service, get_embedding_model, get_reranker_model
+from app.services.golden_cache_service import init_golden_cache
 
 # Configuración básica de logging estructurado
 logging.basicConfig(
@@ -41,6 +43,17 @@ async def lifespan(app: FastAPI):
 
     # Inicializar Base de Datos de Telemetría
     init_telemetry_db()
+
+    # Pre-calentamiento (Warmup) de modelos de embeddings, reranker y golden cache para respuesta inmediata (<2s)
+    try:
+        logger.info("Pre-cargando modelos RAG y Golden Cache en RAM (Warmup)...")
+        get_embedding_model()
+        _ = rag_service.vector_store
+        get_reranker_model()
+        init_golden_cache()
+        logger.info("Modelos RAG y Golden Cache listos en memoria (Modo 100% offline).")
+    except Exception as e:
+        logger.warning(f"Aviso durante el pre-calentamiento de modelos: {e}")
 
     # Tarea en segundo plano para limpieza periódica de sesiones inactivas (TTL)
     async def cleanup_loop():

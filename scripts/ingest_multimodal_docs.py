@@ -565,7 +565,7 @@ def ingest_multimodal(
 
     embeddings = HuggingFaceEmbeddings(
         model_name=embedding_model_name,
-        model_kwargs={"device": device},
+        model_kwargs={"device": device, "local_files_only": True},
         encode_kwargs={"normalize_embeddings": True}
     )
 
