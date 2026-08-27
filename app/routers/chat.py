@@ -122,6 +122,7 @@ async def process_chat(request: ChatRequest) -> ChatResponse:
             session_id=session_id,
             role=user_role,
             query=texto,
+            bot_response=mensaje_resp,
             intent=tipo,
             source=source,
             docs=sources,

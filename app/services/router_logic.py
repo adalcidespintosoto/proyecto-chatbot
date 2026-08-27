@@ -36,7 +36,7 @@ from app.services.router_service import (
     ROLE_SYNONYMS,
     normalize_role
 )
-from app.services.golden_cache_service import search_golden_case, save_golden_case
+from app.services.golden_cache_service import search_golden_case, save_golden_case, invalidate_golden_cache_entry
 
 logger = logging.getLogger("unimon.router_logic")
 
@@ -766,6 +766,47 @@ class RouterLogic:
             }
 
         # -------------------------------------------------------------
+        # REGLA GLOBAL 3: Respuesta Determinista Instantánea para Directorio y Canales de Atención TI
+        # -------------------------------------------------------------
+        if estado_actual in [EstadoTicket.IDLE, EstadoTicket.DIAGNOSTICO]:
+            texto_lower = texto.lower().strip()
+            is_direct_contact_query = bool(re.search(
+                r"\b(canales\s+de\s+atenci[oó]n|canales\s+de\s+atencion|canales\s+de\s+soporte|canales|cual\s+es\s+el\s+wasap|cuál\s+es\s+el\s+wasap|cual\s+es\s+el\s+whatsapp|cuál\s+es\s+el\s+whatsapp|wasap\s+soporte|whatsapp\s+soporte|directorio\s+ti|tel[eé]fonos?\s+soporte|correo\s+soporte|escribir\s+a\s+los\s+canales)\b",
+                texto_lower
+            )) and not any(w in texto_lower for w in ["no me sirve", "no funciona", "error", "falla", "dañado", "ticket", "radicar"])
+            
+            if is_direct_contact_query:
+                msg_directorio = (
+                    "Los canales oficiales de atención y soporte técnico TI de la **Universidad Simón Bolívar (Colombia)** son:\n\n"
+                    "• **Sede Barranquilla:**\n"
+                    "  - Correo: `solicitudcomputo@unisimon.edu.co`\n"
+                    "  - WhatsApp: `3172683922`\n"
+                    "  - Teléfono: `(605) 3444333` Ext. `8003` y `8004`\n\n"
+                    "• **Sede Cúcuta:**\n"
+                    "  - Correo: `helpdesk@unisimon.edu.co`\n"
+                    "  - Teléfono: `(607) 5827070` Ext. `129`\n\n"
+                    "¿Pudiste resolver tu problema con estos pasos?\n"
+                    "- Selecciona o escribe **Sí** si te funcionó.\n"
+                    "- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
+                )
+                session.estado = EstadoTicket.DIAGNOSTICO
+                session.last_user_query = texto
+                session.last_bot_response = msg_directorio
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", msg_directorio)
+                return {
+                    "tipo": "DIAGNOSTICO",
+                    "mensaje": msg_directorio,
+                    "response": msg_directorio,
+                    "sources": ["Directorio_Institucional_TI"],
+                    "source": "UniMon_Directorio_Direct",
+                    "quick_replies": [
+                        {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
+                        {"label": "🎫 Generar reporte", "payload": "CREATE_TICKET"}
+                    ]
+                }
+
+        # -------------------------------------------------------------
         # ESTADO: PIDIENDO_DESCRIPCION (Paso 3 de Slot-Filling)
         # Recibe la descripción detallada del requerimiento o problema y guarda el texto exacto
         # -------------------------------------------------------------
@@ -1188,6 +1229,12 @@ class RouterLogic:
                         "quick_replies": []
                     }
                 elif feedback_res.get("state") == "DIAGNOSTICO" or feedback_res.get("tipo") == "DIAGNOSTICO":
+                    # Invalidar caso previo en Golden Cache si el usuario reporta que no le funcionó (RETRY_DIAGNOSIS)
+                    if session.last_user_query:
+                        try:
+                            invalidate_golden_cache_entry(session.last_user_query, session.user_role or "general")
+                        except Exception as e:
+                            logger.warning(f"[GoldenCache] Error al auto-invalidar entrada en retry: {e}")
                     session.estado = EstadoTicket.DIAGNOSTICO
                     cls.add_history(session_id, "user", texto)
                     cls.add_history(session_id, "assistant", feedback_res["response"])
@@ -1204,6 +1251,12 @@ class RouterLogic:
                         ])
                     }
                 elif feedback_res.get("state") == "RADICANDO_TICKET" or feedback_res.get("tipo") == "RADICANDO_TICKET":
+                    # Invalidar caso previo en Golden Cache si el usuario decide escalar a ticket por falla
+                    if session.last_user_query:
+                        try:
+                            invalidate_golden_cache_entry(session.last_user_query, session.user_role or "general")
+                        except Exception as e:
+                            logger.warning(f"[GoldenCache] Error al auto-invalidar entrada en escalación a ticket: {e}")
                     session.nombre = None
                     session.correo = None
                     session.descripcion = None

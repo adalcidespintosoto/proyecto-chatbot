@@ -6,11 +6,18 @@ y reutilizándolos como Few-Shot dinámico cuando la similitud coseno >= 0.90.
 Aplica validación estricta de calidad y grounding para evitar envenenamiento de caché.
 """
 
+import os
 import logging
 import re
+import hashlib
 from typing import Optional, Tuple
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+
+# Forzar modo offline estricto para evitar peticiones a Hugging Face Hub
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger("unimon.golden_cache")
@@ -35,12 +42,19 @@ INVALID_RESPONSE_PATTERNS = [
 ]
 
 
+def normalize_text(text: str) -> str:
+    """Normaliza texto para hashing y búsqueda determinista."""
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", text.strip().lower())
+
+
 def get_embedding_model() -> SentenceTransformer:
-    """Inicialización diferida (singleton) del modelo de embeddings para el Golden Cache."""
+    """Inicialización diferida (singleton) del modelo de embeddings para el Golden Cache en modo offline."""
     global _embedding_model
     if _embedding_model is None:
-        logger.info(f"[GoldenCache] Cargando modelo de embeddings '{EMBEDDING_MODEL_NAME}'...")
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        logger.info(f"[GoldenCache] Cargando modelo de embeddings '{EMBEDDING_MODEL_NAME}' en modo offline...")
+        _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME, local_files_only=True)
     return _embedding_model
 
 
@@ -55,6 +69,12 @@ def get_golden_collection():
         )
         logger.info(f"[GoldenCache] Colección '{COLLECTION_NAME}' inicializada ({_golden_collection.count()} casos).")
     return _golden_collection
+
+
+def init_golden_cache():
+    """Pre-carga el modelo de embeddings y la colección de Golden Cache en memoria (Warmup)."""
+    get_embedding_model()
+    get_golden_collection()
 
 
 def clear_golden_cache() -> bool:
@@ -103,7 +123,8 @@ def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
 
 def save_golden_case(session_id: str, user_query: str, bot_response: str, role: str = "general") -> bool:
     """
-    Guarda una interacción validada con feedback positivo en la colección golden tras pasar control de calidad.
+    Guarda o actualiza una interacción validada con feedback positivo en la colección golden tras pasar control de calidad.
+    Utiliza un hash determinista basado en el rol y consulta para evitar duplicidad (Upsert idempotente).
     
     Args:
         session_id: Identificador de la sesión del usuario.
@@ -121,9 +142,12 @@ def save_golden_case(session_id: str, user_query: str, bot_response: str, role: 
         collection = get_golden_collection()
         model = get_embedding_model()
 
+        clean_query = normalize_text(user_query)
+        role_clean = (role or "general").strip().lower()
+        doc_id = hashlib.sha256(f"{role_clean}:{clean_query}".encode("utf-8")).hexdigest()
+
         # Usar prefijo "query: " para consistencia con el modelo E5
         embedding = model.encode([f"query: {user_query}"])[0].tolist()
-        doc_id = f"golden_{session_id}_{hash(user_query) % 1000000}"
 
         collection.upsert(
             ids=[doc_id],
@@ -131,14 +155,41 @@ def save_golden_case(session_id: str, user_query: str, bot_response: str, role: 
             documents=[bot_response],
             metadatas=[{
                 "user_query": user_query,
-                "role": role or "general",
+                "role": role_clean,
+                "session_id": session_id,
                 "source": "user_feedback_positive"
             }]
         )
-        logger.info(f"[GoldenCache] Caso guardado exitosamente: '{user_query[:50]}...'")
+        logger.info(f"[GoldenCache] Caso guardado/actualizado exitosamente (ID: {doc_id[:8]}...): '{user_query[:50]}...'")
         return True
     except Exception as e:
         logger.warning(f"[GoldenCache] Error guardando caso: {e}")
+        return False
+
+
+def invalidate_golden_cache_entry(query: str, role: str = "general") -> bool:
+    """
+    Elimina una entrada específica del Golden Cache ante feedback negativo o reintento fallido.
+    
+    Args:
+        query: Consulta del usuario a invalidar.
+        role: Rol institucional del usuario.
+        
+    Returns:
+        True si se eliminó exitosamente, False ante error.
+    """
+    try:
+        if not query:
+            return False
+        clean_query = normalize_text(query)
+        role_clean = (role or "general").strip().lower()
+        doc_id = hashlib.sha256(f"{role_clean}:{clean_query}".encode("utf-8")).hexdigest()
+        collection = get_golden_collection()
+        collection.delete(ids=[doc_id])
+        logger.info(f"[GoldenCache] Entrada invalidada/eliminada por feedback negativo (ID: {doc_id[:8]}...): '{query[:50]}...'")
+        return True
+    except Exception as e:
+        logger.warning(f"[GoldenCache] Error al invalidar entrada: {e}")
         return False
 
 

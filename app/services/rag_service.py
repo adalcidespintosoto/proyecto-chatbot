@@ -5,11 +5,16 @@ Provee respuestas estrictas de soporte técnico y gestión de TI para la Univers
 Aplica normalización léxica, expansión LLM de consultas, Cross-Encoder Reranker y corte calibrado a 0.48.
 """
 
+import os
 import logging
 import re
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import httpx
+
+# Forzar modo offline estricto para evitar peticiones a Hugging Face Hub en runtime
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
@@ -44,16 +49,20 @@ _reranker = None
 
 
 def get_reranker() -> Optional[CrossEncoder]:
-    """Inicialización diferida (singleton) del Cross-Encoder Reranker."""
+    """Inicialización diferida (singleton) del Cross-Encoder Reranker en modo offline."""
     global _reranker
     if _reranker is None:
         try:
-            logger.info(f"Cargando Cross-Encoder Reranker '{RERANKER_MODEL_NAME}'...")
-            _reranker = CrossEncoder(RERANKER_MODEL_NAME)
+            logger.info(f"Cargando Cross-Encoder Reranker '{RERANKER_MODEL_NAME}' en modo offline...")
+            _reranker = CrossEncoder(RERANKER_MODEL_NAME, model_kwargs={"local_files_only": True})
             logger.info("Cross-Encoder Reranker cargado exitosamente.")
         except Exception as e:
             logger.warning(f"No se pudo cargar CrossEncoder ({e}). Se usará ranking nativo de ChromaDB.")
     return _reranker
+
+
+# Alias para compatibilidad
+get_reranker_model = get_reranker
 
 
 def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
@@ -86,7 +95,14 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         q_lower = clean_q.lower()
         is_password_recovery_query = any(w in q_lower for w in [
             "restablecer", "recuperar", "olvidé", "olvide", "desbloquear", "cambiar clave",
-            "cambiar contraseña", "olvido", "restablecimiento", "recuperación", "clave"
+            "cambiar contraseña", "olvido", "restablecimiento", "recuperación", "clave", "contraseña", "contrasena"
+        ])
+        is_upper_semester_or_regular = any(w in q_lower for w in [
+            "estudiante antiguo", "estudiante viejo", "estudiante regular", "segundo semestre",
+            "tercer semestre", "cuarto semestre", "quinto semestre", "sexto semestre",
+            "séptimo semestre", "septimo semestre", "octavo semestre", "noveno semestre",
+            "décimo semestre", "decimo semestre", "semestres superiores", "semestre superior",
+            "ya tengo cuenta", "ya tengo correo", "no soy nuevo", "no soy de primer semestre"
         ])
         is_hardware_dotation_query = any(w in q_lower for w in [
             "portatil", "portátil", "laptop", "computador", "pc", "equipo de computo",
@@ -104,14 +120,20 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
             final_score = float(rerank_score)
             content_lower = doc.page_content.lower()
 
-            # Enrutamiento estricto de recuperación de contraseñas
+            # Enrutamiento estricto de recuperación de contraseñas y desambiguación de estudiante antiguo vs primer semestre
             if is_password_recovery_query:
                 # Penalizar fuertemente guías de Teams para evitar mezclas
                 if any(t in content_lower for t in ["acceso a microsoft teams", "microsoft teams para estudiantes", "barra de aplicaciones y hacer clic sobre el ícono de teams"]):
                     final_score -= 5.0
-                # Bonificar guías de activación de usuario y cambio/recuperación de contraseña
-                if any(p in content_lower for p in ["activación de usuario", "contraseña", "portal estudiantes", "cambio de contraseña", "passwordreset"]):
-                    final_score += 3.0
+                
+                # Desambiguación: Si es estudiante antiguo/regular o consulta general de olvido/restablecimiento, penalizar fuertemente guía de Primer Semestre (-6.0)
+                if is_upper_semester_or_regular or any(w in q_lower for w in ["olvidé", "olvide", "olvido", "restablecer", "recuperar", "cambiar clave", "cambiar contraseña", "error de contraseña", "clave incorrecta"]):
+                    if any(ps in content_lower for ps in ["primer semestre", "estudiantes de primer semestre", "primer ingreso", "activación de usuario para estudiantes de primer semestre"]):
+                        final_score -= 6.0
+
+                # Bonificar guías de recuperación de contraseña de Microsoft / Portal Estudiantes / autogestión
+                if any(p in content_lower for p in ["portal estudiantes", "cambio de contraseña", "passwordreset", "passwordreset.microsoftonline.com", "autogestión de contraseñas", "restablecimiento"]):
+                    final_score += 4.0
 
             # Desambiguación entre dotación de hardware (P-GT-01) y proyectos de software/Jira (P-GT-13)
             if is_hardware_dotation_query and not any(k in q_lower for k in ["software", "desarrollo", "jira", "proyecto", "solución tecnológica"]):
@@ -179,9 +201,9 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
                 "system": system_prompt,
                 "prompt": f"Rol: {user_role}\nConsulta informal: {cleaned_query}\nConsulta técnica formal:",
                 "stream": False,
-                "options": {"temperature": 0.0, "num_predict": 30}
+                "options": {"temperature": 0.0, "num_predict": 20}
             },
-            timeout=3.0
+            timeout=5.0
         )
         if response.status_code == 200:
             expanded = response.json().get("response", "").strip()
@@ -215,11 +237,40 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
      * Lista los datos de contacto organizados por sede (Barranquilla y Cúcuta) usando viñetas limpias.
      * NUNCA inventes requisitos previos, restricciones ni pasos de navegación web si el usuario solo pidió números o datos informativos.
    
-   - B. TRÁMITES Y PROCEDIMIENTOS (Cómo votar, cómo pedir dotación/PC, cómo registrar notas, exámenes supletorios, restablecer claves):
+   - B. TRÁMITES Y PROCEDIMIENTOS (Cómo votar, cómo registrar notas, exámenes supletorios, restablecer claves):
      * Si el trámite tiene restricciones normativas o aprobaciones de jefatura explícitas en el contexto, inclúyelas al inicio bajo: **⚠️ Requisitos y Restricciones Previas:**
      * REGLA DE NO-PARADOJA: Para recuperación de contraseñas/correo, NUNCA exijas tener la contraseña activa ni la sesión iniciada. Los requisitos son documento de identidad y acceso al correo personal o celular registrado.
      * Luego detalla el procedimiento cronológico (**Paso 1**, **Paso 2**, etc.) con botones y enlaces en negrita.
      * Si en el contexto NO hay requisitos especiales, ve directamente al paso a paso sin inventar nada.
+
+   - C. DOTACIÓN Y RENOVACIÓN DE PUESTO DE TRABAJO (PC, Portátil de oficina, Cambio o asignación de equipo):
+     * Aplica a: Profesores y Administrativos.
+     * **⚠️ Requisitos y Restricciones Previas:**
+       - Toda solicitud o renovación de equipos de cómputo para puesto de trabajo DEBE ser radicada o contar con el visto bueno/aval del Jefe de Dependencia o Jefatura inmediata.
+       - Estar justificada por necesidades del cargo o por obsolescencia/falla técnica del equipo actual.
+     * **Datos obligatorios a incluir en la solicitud formal a TI:**
+       - Nombre completo y documento de identidad del colaborador.
+       - Cargo y Dependencia/Programa.
+       - Tipo de equipo requerido (PC de escritorio o portátil).
+       - Placa de inventario del equipo actual (en caso de renovación o cambio).
+       - Justificación del requerimiento y aval de la Jefatura.
+     * **Canales oficiales de radicación:**
+       - Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | WhatsApp: 3172683922 | Tel: (605) 3444333 Ext. 8003/8004
+       - Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: (607) 5827070 Ext. 129
+
+   - D. PRÉSTAMO TEMPORAL DE RECURSOS AUDIOVISUALES (Cámaras, Video Beam, Micrófonos, Tablets para clases/eventos):
+     * Si el usuario solicita un préstamo temporal o reserva de equipos para clases o eventos:
+       1. Aclara que la coordinación se realiza directamente con Soporte Técnico TI. NUNCA apruebes el préstamo ni inventes rutas en plataformas web.
+       2. Proporciona los canales oficiales de ambas sedes:
+          - Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | WhatsApp: 3172683922 | Tel: (605) 3444333 Ext. 8003/8004
+          - Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: (607) 5827070 Ext. 129
+       3. Entrega OBLIGATORIAMENTE la plantilla de solicitud con los campos:
+          - Nombre completo y Documento.
+          - Rol y Dependencia/Programa.
+          - Equipo requerido.
+          - Motivo / Evento o clase.
+          - Fecha y Horario.
+          - Ubicación / Salón.
 
 2. PROHIBICIÓN ABSOLUTA DE META-LENGUAJE Y FUGAS DE PROMPT:
    - JAMÁS escribas títulos de directivas internas como "Prohibición de Omitir Información", "Canales Complejos y Datos Requeridos" o "Según el PDF".
@@ -233,6 +284,63 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
    "¿Pudiste resolver tu problema con estos pasos?
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
+
+5. EJEMPLOS CANÓNICOS DE FORMATO Y ESTRUCTURA:
+
+[EJEMPLO 1: Consulta Directa de Canales / Directorio]
+Pregunta: ¿Cuáles son los números de soporte técnico y el WhatsApp?
+Respuesta:
+Los canales oficiales de atención de Soporte Técnico TI de la Universidad Simón Bolívar son:
+• **Sede Barranquilla:**
+  - Correo: `solicitudcomputo@unisimon.edu.co`
+  - WhatsApp: `3172683922`
+  - Teléfono: `(605) 3444333` Ext. `8003` / `8004`
+• **Sede Cúcuta:**
+  - Correo: `helpdesk@unisimon.edu.co`
+  - Teléfono: `(607) 5827070` Ext. `129`
+
+¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
+
+[EJEMPLO 2: Trámite con Requisitos Previos (Dotación/PC)]
+Pregunta: Soy administrativo y necesito solicitar un portátil de oficina.
+Respuesta:
+**⚠️ Requisitos y Restricciones Previas:**
+- Toda solicitud o renovación de equipos de cómputo debe contar con el visto bueno del Jefe de Dependencia y estar justificada por necesidades del cargo.
+
+**Procedimiento de Solicitud:**
+1. Envía la solicitud formal desde tu correo institucional a `solicitudcomputo@unisimon.edu.co` (Barranquilla) o `helpdesk@unisimon.edu.co` (Cúcuta) con copia a tu jefatura.
+2. Incluye los siguientes datos:
+   - Nombre completo y documento de identidad.
+   - Cargo y Dependencia.
+   - Tipo de equipo requerido (PC de escritorio o portátil).
+   - Placa de inventario del equipo actual (si es cambio o renovación).
+   - Justificación del requerimiento y aval de la Jefatura.
+
+¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
+
+[EJEMPLO 3: Préstamo Audiovisual Temporal]
+Pregunta: Necesito un proyector y micrófono para una conferencia mañana.
+Respuesta:
+La solicitud de préstamo temporal de recursos audiovisuales se coordina directamente con Soporte Técnico TI:
+• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333 Ext. 8003/8004`
+• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
+
+Por favor diligencia y envía la siguiente plantilla a los canales de soporte:
+- **Nombre Completo:**
+- **Documento de Identidad:**
+- **Rol y Dependencia/Programa:**
+- **Equipo Requerido:**
+- **Motivo / Evento o Clase:**
+- **Fecha y Horario:**
+- **Ubicación / Salón:**
+
+¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
 
 [CONTEXTO INSTITUCIONAL DOCUMENTADO]:
 {context}
@@ -363,9 +471,42 @@ def clean_llm_response(text: str) -> str:
         text
     )
     text = re.sub(r"(?i)\b(?:prohibici[oó]n de omitir[^\n]*)\b", "", text)
+
+    # 6. Remover variantes intermedias o duplicadas del pie de confirmación para reubicarlo estrictamente al final
+    text = re.sub(
+        r"(?i)\n*¿(?:pudiste resolver tu problema|te sirvieron estos pasos)[^\n]*(?:\n\s*-[^\n]*)*\??",
+        "",
+        text
+    )
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
+
+
+def strip_chunk_boilerplate(content: str) -> str:
+    """
+    Elimina encabezados repetitivos de calidad, códigos de formato y metadatos
+    de paginación de los fragmentos recuperados para reducir consumo de tokens y enfocar el LLM.
+    """
+    if not content:
+        return ""
+    cleaned = re.sub(
+        r"(?im)^.*(?:universidad\s+sim[oó]n\s+bol[ií]var|sistema\s+de\s+gesti[oó]n\s+de\s+la\s+calidad).*$",
+        "",
+        content
+    )
+    cleaned = re.sub(
+        r"(?im)^\s*(?:c[oó]digo|versi[oó]n|procedimiento|instructivo|p[aá]gina)\s*:\s*[A-Z0-9.\-/\s]+$",
+        "",
+        cleaned
+    )
+    cleaned = re.sub(
+        r"(?i)\bp[aá]gina\s+\d+\s+de\s+\d+\b",
+        "",
+        cleaned
+    )
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 
 class RAGService:
@@ -396,11 +537,12 @@ class RAGService:
 
     @property
     def embeddings(self) -> HuggingFaceEmbeddings:
-        """Inicialización diferida (lazy-load) del modelo de embeddings."""
+        """Inicialización diferida (lazy-load) del modelo de embeddings en modo offline."""
         if self._embeddings is None:
-            logger.info(f"Cargando modelo de embeddings '{self.embedding_model_name}'...")
+            logger.info(f"Cargando modelo de embeddings '{self.embedding_model_name}' en modo offline...")
             self._embeddings = HuggingFaceEmbeddings(
                 model_name=self.embedding_model_name,
+                model_kwargs={"local_files_only": True},
                 encode_kwargs={"normalize_embeddings": True}
             )
         return self._embeddings
@@ -589,7 +731,8 @@ class RAGService:
                 page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
                 if source_filename not in sources:
                     sources.append(source_filename)
-                context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
+                cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
 
             # Agregar fragmentos secundarios más relevantes de otros documentos (hasta un máximo de 4 fragmentos)
             for doc, _ in reranked[1:]:
@@ -604,7 +747,8 @@ class RAGService:
                         page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
                         if source_filename not in sources:
                             sources.append(source_filename)
-                        context_parts.append(f"[{source_filename}{page_info}]\n{doc.page_content.strip()}")
+                        cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                        context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
 
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
@@ -649,7 +793,7 @@ class RAGService:
             "messages": messages,
             "stream": False,
             "options": {
-                "temperature": 0.1
+                "temperature": 0.0
             }
         }
 
@@ -670,8 +814,8 @@ class RAGService:
                     # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
                     bot_message = clean_llm_response(bot_message)
                     
-                    if "¿pudiste resolver tu problema con estos pasos?" not in bot_message.lower() and "¿te sirvieron estos pasos" not in bot_message.lower():
-                        bot_message = bot_message.rstrip() + CLOSING_FEEDBACK_QUESTION
+                    # Ubicar el pie de confirmación estrictamente al final del mensaje
+                    bot_message = bot_message.rstrip() + CLOSING_FEEDBACK_QUESTION
 
                     return {
                         "response": bot_message,
@@ -705,9 +849,9 @@ class RAGService:
         saludo = f"¡Hola {user_name}!" if user_name else "¡Hola!"
         msg_lower = user_message.lower()
 
-        if any(w in msg_lower for w in ["contacto", "canal", "canales", "telefono", "teléfono", "correo", "atención", "atencion"]):
+        if any(w in msg_lower for w in ["contacto", "canal", "canales", "telefono", "teléfono", "correo", "atención", "atencion", "wasap", "whatsapp", "directorio"]):
             contenido = (
-                f"{saludo} Los canales oficiales de atención y soporte TI de la **Universidad Simón Bolívar (Colombia)** son:\n\n"
+                f"{saludo} Los canales oficiales de atención y soporte técnico TI de la **Universidad Simón Bolívar (Colombia)** son:\n\n"
                 "• **Sede Barranquilla:**\n"
                 "  - Correo: `solicitudcomputo@unisimon.edu.co`\n"
                 "  - WhatsApp: `3172683922`\n"
@@ -715,7 +859,7 @@ class RAGService:
                 "• **Sede Cúcuta:**\n"
                 "  - Correo: `helpdesk@unisimon.edu.co`\n"
                 "  - Teléfono: `(607) 5827070` Ext. `129`\n\n"
-                "También puedes radicar un caso directamente en esta plataforma describiendo la falla."
+                "También puedes radicar un caso directamente con nuestro equipo describiendo tu solicitud."
             )
         elif any(w in msg_lower for w in ["portal", "portal web", "pagina", "notas", "matricula", "matrícula"]):
             contenido = (
@@ -829,3 +973,8 @@ class RAGService:
 
 # Instancia por defecto para importaciones limpias
 rag_service = RAGService()
+
+
+def get_embedding_model() -> HuggingFaceEmbeddings:
+    """Retorna la instancia del modelo de embeddings de RAG (singleton)."""
+    return rag_service.embeddings

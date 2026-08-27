@@ -125,6 +125,47 @@ class TestGoldenCache:
             assert gc.clear_golden_cache() is True
             assert gc.search_golden_case("¿Cómo ingreso al correo institucional?") is None
 
+    def test_golden_cache_deterministic_upsert_no_duplicates(self, tmp_path):
+        """Valida que múltiples guardados de la misma consulta actualicen el registro sin crear duplicados."""
+        with patch("app.services.golden_cache_service.CHROMA_PATH", str(tmp_path)):
+            import app.services.golden_cache_service as gc
+            gc._golden_collection = None
+
+            query = "¿Cómo solicitar un computador de escritorio?"
+            resp1 = "Debes radicar la solicitud con visto bueno de tu jefatura inmediata a través de solicitudcomputo@unisimon.edu.co."
+            resp2 = "Actualizado: Radica con visto bueno de jefatura a solicitudcomputo@unisimon.edu.co incluyendo placa de inventario."
+
+            # Guardar desde sesión 1
+            gc.save_golden_case("sess_001", query, resp1, role="administrativo")
+            col = gc.get_golden_collection()
+            assert col.count() == 1
+
+            # Guardar misma consulta desde sesión 2
+            gc.save_golden_case("sess_002", query, resp2, role="administrativo")
+            assert col.count() == 1
+
+            # La respuesta retornada debe ser la actualizada
+            match = gc.search_golden_case(query)
+            assert match is not None
+            assert match[1] == resp2
+
+    def test_golden_cache_invalidation_on_negative_feedback(self, tmp_path):
+        """Valida que invalidate_golden_cache_entry elimine la entrada específica ante feedback negativo."""
+        with patch("app.services.golden_cache_service.CHROMA_PATH", str(tmp_path)):
+            import app.services.golden_cache_service as gc
+            gc._golden_collection = None
+
+            query = "el video beam no esta dando video"
+            resp = "Verifica la conexión del cable HDMI y enciende el selector de entrada."
+
+            # Guardar
+            gc.save_golden_case("sess_beam", query, resp, role="profesor")
+            assert gc.search_golden_case(query) is not None
+
+            # Invalidar por feedback negativo
+            assert gc.invalidate_golden_cache_entry(query, role="profesor") is True
+            assert gc.search_golden_case(query) is None
+
 
 # =============================================================================
 # Test 2: Query Expansion LLM
@@ -539,6 +580,30 @@ class TestIntegralRestrictionsAndPrerequisites:
         # No debe referirse a proyectos de software ni desarrollo en Jira
         assert "desarrollo de software" not in response_text.lower()
         assert "tablero de jira" not in response_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_upper_semester_password_disambiguation(self):
+        """Valida que estudiantes antiguos o de semestres superiores reciban recuperación Microsoft y no guía de primer semestre."""
+        from app.services.rag_service import rag_service
+
+        query = "Soy estudiante de tercer semestre y se me olvidó la clave del portal"
+        result = await rag_service.query_rag(query, user_role="estudiante")
+
+        response_text = result.get("response", "")
+        # Debe incluir flujo de recuperación o portal
+        assert any(w in response_text.lower() for w in ["portal", "contraseña", "clave", "microsoft", "recuperar", "restablecer", "olvidó"])
+        # Debe contener la pregunta de cierre estrictamente al final
+        assert response_text.rstrip().endswith("¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.")
+
+    def test_contact_channels_synonym_mapping(self):
+        """Valida que consultas de canales de atención y WhatsApp expandan a términos oficiales."""
+        from app.services.normalizer_service import normalize_and_expand_query
+
+        res_canales = normalize_and_expand_query("canales de atencion")
+        assert "directorio canales soporte tecnico" in res_canales
+
+        res_wasap = normalize_and_expand_query("cual es el wasap")
+        assert "whatsapp" in res_wasap and "soporte" in res_wasap
 
 
 
