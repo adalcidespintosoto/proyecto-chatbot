@@ -605,6 +605,121 @@ class TestIntegralRestrictionsAndPrerequisites:
         res_wasap = normalize_and_expand_query("cual es el wasap")
         assert "whatsapp" in res_wasap and "soporte" in res_wasap
 
+    def test_extract_email_with_special_and_latin_characters(self):
+        """Valida que correos con 'ñ' o caracteres latinos no se trunquen."""
+        from app.services.router_logic import RouterLogic, extract_email_address
+
+        email1 = "dañoasa@unisimon.edu.co"
+        assert RouterLogic.extract_email(f"mi correo es {email1}") == email1
+        assert extract_email_address(f"  {email1}  ") == email1
+
+        email2 = "maría.pérez@unisimon.edu.co"
+        assert RouterLogic.extract_email(f"contacto: {email2}") == email2
+
+    @pytest.mark.asyncio
+    async def test_ordinal_semester_disambiguation_penalizes_primer_semestre(self):
+        """Valida que '4to semestre' o 'quinto semestre' penalice el documento de primer ingreso."""
+        from app.services.rag_service import rag_service
+
+        query = "soy de 4to semestre y no puedo ingresar al portal"
+        result = await rag_service.query_rag(query, user_role="estudiante")
+
+        response_text = result.get("response", "")
+        assert any(w in response_text.lower() for w in ["portal", "contraseña", "clave", "microsoft", "recuperar", "restablecer"])
+        # No debe dar la inducción de primer semestre
+        assert "bienvenido a tu primer semestre" not in response_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_role_selection_after_out_of_domain_purges_context(self):
+        """Valida que seleccionar rol tras una pregunta fuera de dominio no contamine la sesión con la pregunta anterior."""
+        from app.services.router_logic import RouterLogic
+
+        sess_id = "role_purge_sess_1"
+        # 1. Enviar pregunta fuera de dominio (código general)
+        res1 = await RouterLogic.procesar_mensaje("puedes hacer codigo", session_id=sess_id)
+        assert res1.get("tipo") == "FUERA_DE_DOMINIO"
+
+        # 2. Enviar declaración de rol
+        res2 = await RouterLogic.procesar_mensaje("estudiante", session_id=sess_id)
+        assert res2.get("tipo") == "DIAGNOSTICO"
+        # No debe intentar buscar "código estudiantil" ni ejecutar RAG sobre el código anterior
+        assert "código estudiantil" not in res2.get("mensaje", "").lower()
+        assert "en qué" in res2.get("mensaje", "").lower() or "te puedo colaborar" in res2.get("mensaje", "").lower()
+
+    @pytest.mark.asyncio
+    async def test_procedural_response_structural_hierarchy(self):
+        """Valida que en una consulta procedimental el paso a paso preceda a los canales de soporte."""
+        from app.services.rag_service import rag_service
+
+        query = "Cómo restauro una copia de seguridad o backup"
+        res = await rag_service.query_rag(query, user_role="funcionario")
+        text = res.get("response", "")
+
+        # Si incluye canales y pasos, verificar que el procedimiento o pasos estén antes de los canales
+        if "solicitudcomputo" in text.lower() and "paso" in text.lower():
+            idx_paso = text.lower().find("paso")
+            idx_canal = text.lower().find("solicitudcomputo")
+            assert idx_paso < idx_canal, "El paso a paso debe preceder a los canales de soporte"
+
+    @pytest.mark.asyncio
+    async def test_out_of_domain_guardrail_strict(self):
+        """Valida que programación general, ensayos, tareas y cultura general sean interceptados por el guardrail."""
+        from app.services.router_logic import RouterLogic
+
+        ood_queries = [
+            "puedes hacer codigo",
+            "investigacion de garcia marques",
+            "hola mundo en python",
+            "hazme un ensayo sobre la revolucion francesa",
+            "receta de arroz con pollo",
+            "cuentame un chiste"
+        ]
+
+        for q in ood_queries:
+            res = await RouterLogic.procesar_mensaje(q, session_id=f"ood_{hash(q)}")
+            assert res.get("tipo") == "FUERA_DE_DOMINIO", f"Falló para query: {q}"
+            assert res.get("quick_replies") == []
+            assert "No estoy facultado" in res.get("mensaje", "") or "exclusivamente" in res.get("mensaje", "")
+
+    def test_sanitize_markdown_links_allowed_and_hallucinated_urls(self):
+        """Valida que URLs alucinadas se conviertan a texto plano y URLs permitidas se conserven."""
+        from app.services.rag_service import sanitize_markdown_links, clean_llm_response
+
+        # 1. URL alucinada inventada por el LLM -> debe quedar solo el texto plano
+        fake_text = "Ingresa en [Activación de Cuenta](https://unisimon.edu.co/activacion-de-cuenta) para continuar."
+        sanitized_fake = sanitize_markdown_links(fake_text)
+        assert sanitized_fake == "Ingresa en Activación de Cuenta para continuar."
+
+        # 2. URL permitida oficial -> debe conservarse el enlace Markdown
+        valid_text = "Ingresa a [Portal Estudiantes](https://portal.unisimon.edu.co) y selecciona la opción."
+        sanitized_valid = sanitize_markdown_links(valid_text)
+        assert "[Portal Estudiantes](https://portal.unisimon.edu.co)" in sanitized_valid
+
+        # 3. URL de Microsoft Password Reset permitida -> debe conservarse
+        ms_text = "Restablece tu clave en [Microsoft Password Reset](https://passwordreset.microsoftonline.com)."
+        sanitized_ms = clean_llm_response(ms_text)
+        assert "[Microsoft Password Reset](https://passwordreset.microsoftonline.com)" in sanitized_ms
+
+    @pytest.mark.asyncio
+    async def test_self_service_password_reset_priority_over_support_email(self):
+        """Valida que consultas de olvido de contraseña prioricen el autoservicio del portal con pasos detallados."""
+        from app.services.rag_service import rag_service
+
+        query = "olvidé mi contraseña del portal estudiantil cómo la recupero"
+        res = await rag_service.query_rag(query, user_role="estudiante")
+        text = res.get("response", "")
+
+        # Debe incluir los pasos de autoservicio
+        assert any(w in text.lower() for w in ["portal", "portales", "olvidé", "olvide", "usuario", "contraseña", "clave"])
+        # No debe limitarse a pedir un correo de soporte como única respuesta
+        assert "paso" in text.lower() or "1." in text or "ingresar" in text.lower()
+
+
+
+
+
+
+
 
 
 

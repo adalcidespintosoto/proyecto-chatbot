@@ -273,8 +273,18 @@ SOFTWARE_KEYWORDS = [
     r"\brestableser\b", r"\bolvid[eé]\b", r"\blogin\b", r"\bsesi[oó]n\b", r"\bceci[oó]n\b"
 ]
 
-# Regex estándar para extracción y validación de correo
-EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+# Regex estándar para extracción y validación de correo con soporte para caracteres latinos y Unicode
+EMAIL_REGEX = re.compile(r"[\w\.\+-]+@[\w\.-]+\.\w+", re.UNICODE)
+
+
+def extract_email_address(text: str) -> str:
+    """Soporte para normalización de caracteres latinos antes de validar estructura de correo."""
+    clean_text = text.strip()
+    match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', clean_text, re.UNICODE)
+    if match:
+        return match.group(0).lower()
+    return clean_text.lower()
+
 
 # Disparadores de urgencia crítica
 CRITICAL_TRIGGERS = [
@@ -509,8 +519,9 @@ class RouterLogic:
 
     @classmethod
     def extract_email(cls, text: str) -> Optional[str]:
-        """Extrae el primer correo válido del texto."""
-        match = EMAIL_REGEX.search(text)
+        """Extrae el primer correo válido del texto soportando caracteres especiales y latinos."""
+        clean_text = text.strip()
+        match = EMAIL_REGEX.search(clean_text)
         if match:
             return match.group(0).strip().lower()
         return None
@@ -807,6 +818,26 @@ class RouterLogic:
                 }
 
         # -------------------------------------------------------------
+        # REGLA GLOBAL 4: Guardrail Estricto Fuera de Dominio (Out-of-Domain)
+        # Intercepta antes de cualquier llamada a RAG temas no institucionales
+        # (programación general, investigaciones, ensayos, cultura general, recetas, etc.)
+        # -------------------------------------------------------------
+        if estado_actual in [EstadoTicket.IDLE, EstadoTicket.DIAGNOSTICO, EstadoTicket.PIDIENDO_ROL]:
+            if is_out_of_domain_query(texto):
+                cls.reset_session(session_id)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", MENSAJE_FUERA_DE_DOMINIO)
+                return {
+                    "tipo": "FUERA_DE_DOMINIO",
+                    "state": "FUERA_DE_DOMINIO",
+                    "mensaje": MENSAJE_FUERA_DE_DOMINIO,
+                    "response": MENSAJE_FUERA_DE_DOMINIO,
+                    "ticket_id": None,
+                    "source": "UniMon_Guardrail",
+                    "quick_replies": []
+                }
+
+        # -------------------------------------------------------------
         # ESTADO: PIDIENDO_DESCRIPCION (Paso 3 de Slot-Filling)
         # Recibe la descripción detallada del requerimiento o problema y guarda el texto exacto
         # -------------------------------------------------------------
@@ -910,12 +941,17 @@ class RouterLogic:
             session.user_role = detected
             logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
 
+            # Si la consulta previa retenida era fuera de dominio, purgarla inmediatamente para evitar contaminación
+            if session.pending_query and is_out_of_domain_query(session.pending_query):
+                session.pending_query = None
+
             # Verificar si existía una pregunta técnica previa válida retenida
             has_valid_query = bool(
                 session.pending_query 
                 and not cls.is_greeting(session.pending_query)
                 and len(session.pending_query.strip()) > 3
                 and not cls.detect_user_role(session.pending_query)
+                and not is_out_of_domain_query(session.pending_query)
             )
 
             # Si el usuario formuló una pregunta técnica real antes de calificar su rol:
@@ -1449,7 +1485,7 @@ class RouterLogic:
                     # Si vino con pregunta (ej: "soy estudiante y no puedo entrar al portal"), continuará hacia el RAG abajo
                 else:
                     # El usuario no especificó su rol -> Calificación de rol obligatoria
-                    if not cls.is_greeting(texto) and len(texto.split()) > 2 and not cls.is_cancellation(texto):
+                    if not cls.is_greeting(texto) and len(texto.split()) > 2 and not cls.is_cancellation(texto) and not is_out_of_domain_query(texto):
                         session.pending_query = texto
                     else:
                         session.pending_query = None
