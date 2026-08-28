@@ -5,7 +5,10 @@ Gestiona el almacenamiento SQLite local en data/analytics.db y el cálculo de KP
 
 import sqlite3
 import time
+import json
+import re
 import logging
+from collections import Counter
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -129,7 +132,8 @@ def update_session_status(session_id: str, status: str, escalated: bool = False)
 
 def get_kpis_summary() -> Dict[str, Any]:
     """
-    Calcula y retorna las métricas consolidadas de KPIs de UniMon.
+    Calcula y retorna las métricas consolidadas de KPIs y observabilidad de UniMon
+    directamente desde la base de datos SQLite (data/analytics.db).
     """
     if not DB_PATH.exists():
         init_telemetry_db()
@@ -137,76 +141,164 @@ def get_kpis_summary() -> Dict[str, Any]:
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        # 1. Totales y Tasas
-        total_sessions_row = cursor.execute("SELECT COUNT(*) FROM telemetry_sessions").fetchone()
-        raw_total_sessions = total_sessions_row[0] if total_sessions_row else 0
-        total_sessions = raw_total_sessions if raw_total_sessions > 0 else 1
-        
-        resolved_row = cursor.execute(
-            "SELECT COUNT(*) FROM telemetry_sessions WHERE final_status IN ('FINALIZADO', 'SOLUCIONADO')"
-        ).fetchone()
-        resolved_sessions = resolved_row[0] if resolved_row else 0
 
-        escalated_row = cursor.execute(
-            "SELECT COUNT(*) FROM telemetry_sessions WHERE escalated_ticket = 1 OR final_status IN ('RADICANDO_TICKET', 'TICKET_CREADO')"
-        ).fetchone()
-        escalated_sessions = escalated_row[0] if escalated_row else 0
-        
-        # 2. Recursos y Rendimiento
-        perf = cursor.execute("""
-            SELECT 
-                AVG(latency_ms) as avg_latency,
-                SUM(prompt_tokens) as total_prompt_tokens,
-                SUM(eval_tokens) as total_eval_tokens,
-                COUNT(*) as total_queries
-            FROM telemetry_interactions
-        """).fetchone()
-        
-        avg_lat = perf["avg_latency"] if perf and perf["avg_latency"] is not None else 0.0
-        tot_prompt = perf["total_prompt_tokens"] if perf and perf["total_prompt_tokens"] is not None else 0
-        tot_eval = perf["total_eval_tokens"] if perf and perf["total_eval_tokens"] is not None else 0
-        tot_queries = perf["total_queries"] if perf and perf["total_queries"] is not None else 0
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [t[0] for t in cursor.fetchall()]
 
-        # 3. Distribución por Rol
-        roles_rows = cursor.execute(
-            "SELECT COALESCE(role, 'general') as user_role, COUNT(*) as count FROM telemetry_sessions GROUP BY role"
-        ).fetchall()
-        roles_dist = {r["user_role"]: r["count"] for r in roles_rows} if roles_rows else {}
-        
-        # 4. Top 5 Documentos Más Consultados
-        top_docs = cursor.execute("""
-            SELECT referenced_docs, COUNT(*) as count 
-            FROM telemetry_interactions 
-            WHERE referenced_docs IS NOT NULL AND referenced_docs != 'None' AND referenced_docs != ''
-            GROUP BY referenced_docs 
-            ORDER BY count DESC LIMIT 5
-        """).fetchall()
-        
-        # 5. Top 5 Preguntas Más Frecuentes
-        top_queries = cursor.execute("""
-            SELECT user_query, COUNT(*) as count 
-            FROM telemetry_interactions 
-            WHERE user_query IS NOT NULL AND user_query != ''
-            GROUP BY LOWER(TRIM(user_query)) 
-            ORDER BY count DESC LIMIT 5
-        """).fetchall()
+        # Soporte para esquema unificado 'interactions'
+        if "interactions" in tables and "telemetry_sessions" not in tables:
+            total_queries = cursor.execute("SELECT COUNT(*) FROM interactions").fetchone()[0] or 0
+            total_sessions = cursor.execute("SELECT COUNT(DISTINCT session_id) FROM interactions").fetchone()[0] or 0
 
-        tasa_res = round((resolved_sessions / total_sessions) * 100, 1) if raw_total_sessions > 0 else 0.0
-        tasa_esc = round((escalated_sessions / total_sessions) * 100, 1) if raw_total_sessions > 0 else 0.0
+            resolved = cursor.execute("SELECT COUNT(*) FROM interactions WHERE resolved = 1").fetchone()[0] or 0
+            escalated = cursor.execute("SELECT COUNT(*) FROM interactions WHERE escalated = 1").fetchone()[0] or 0
+
+            rate_resolved = round((resolved / total_sessions * 100), 1) if total_sessions > 0 else 0.0
+            rate_escalated = round((escalated / total_sessions * 100), 1) if total_sessions > 0 else 0.0
+
+            avg_latency = cursor.execute("SELECT AVG(latency_ms) FROM interactions WHERE latency_ms > 0").fetchone()[0] or 0.0
+            tokens_in = cursor.execute("SELECT SUM(prompt_tokens) FROM interactions").fetchone()[0] or 0
+            tokens_out = cursor.execute("SELECT SUM(eval_tokens) FROM interactions").fetchone()[0] or 0
+
+            roles_data = cursor.execute("""
+                SELECT COALESCE(user_role, role, 'No especificado') as role, COUNT(*) as count 
+                FROM interactions 
+                GROUP BY 1 
+                ORDER BY count DESC
+            """).fetchall()
+            role_distribution = {row["role"]: row["count"] for row in roles_data}
+
+            top_docs_data = cursor.execute("""
+                SELECT docs_used, COUNT(*) as count 
+                FROM interactions 
+                WHERE docs_used IS NOT NULL AND docs_used NOT IN ('', 'None', '[]', 'null')
+                GROUP BY docs_used 
+                ORDER BY count DESC 
+                LIMIT 5
+            """).fetchall()
+            top_documents = [
+                {
+                    "name": row["docs_used"].replace('["', '').replace('"]', '').replace('"', ''),
+                    "referenced_docs": row["docs_used"].replace('["', '').replace('"]', '').replace('"', ''),
+                    "count": row["count"]
+                }
+                for row in top_docs_data
+            ]
+
+            top_queries_data = cursor.execute("""
+                SELECT user_query, COUNT(*) as count 
+                FROM interactions 
+                WHERE length(TRIM(user_query)) > 5 
+                  AND LOWER(TRIM(user_query)) NOT IN ('hola', 'estudiante', 'profesor', 'docente', 'administrativo', 'funcionario', 'otros', 'otro', 'resolved', 'retry_diagnosis')
+                GROUP BY LOWER(TRIM(user_query)) 
+                ORDER BY count DESC 
+                LIMIT 5
+            """).fetchall()
+            top_queries = [
+                {
+                    "query": row["user_query"],
+                    "user_query": row["user_query"],
+                    "count": row["count"]
+                }
+                for row in top_queries_data
+            ]
+
+        else:
+            # Esquema estándar con 'telemetry_sessions' y 'telemetry_interactions'
+            total_sessions = cursor.execute("SELECT COUNT(*) FROM telemetry_sessions").fetchone()[0] or 0
+            total_queries = cursor.execute("SELECT COUNT(*) FROM telemetry_interactions").fetchone()[0] or 0
+
+            resolved = cursor.execute(
+                "SELECT COUNT(*) FROM telemetry_sessions WHERE final_status IN ('FINALIZADO', 'SOLUCIONADO', 'RESOLVED')"
+            ).fetchone()[0] or 0
+
+            escalated = cursor.execute(
+                "SELECT COUNT(*) FROM telemetry_sessions WHERE escalated_ticket = 1 OR final_status IN ('RADICANDO_TICKET', 'TICKET_CREADO', 'ESCALADO')"
+            ).fetchone()[0] or 0
+
+            rate_resolved = round((resolved / total_sessions * 100), 1) if total_sessions > 0 else 0.0
+            rate_escalated = round((escalated / total_sessions * 100), 1) if total_sessions > 0 else 0.0
+
+            avg_lat_row = cursor.execute("SELECT AVG(latency_ms) FROM telemetry_interactions WHERE latency_ms > 0").fetchone()[0]
+            avg_latency = avg_lat_row or 0.0
+            tokens_in = cursor.execute("SELECT SUM(prompt_tokens) FROM telemetry_interactions").fetchone()[0] or 0
+            tokens_out = cursor.execute("SELECT SUM(eval_tokens) FROM telemetry_interactions").fetchone()[0] or 0
+
+            roles_data = cursor.execute("""
+                SELECT COALESCE(role, 'No especificado') as role, COUNT(*) as count 
+                FROM telemetry_sessions 
+                GROUP BY role 
+                ORDER BY count DESC
+            """).fetchall()
+            role_distribution = {row["role"]: row["count"] for row in roles_data}
+
+            # Top 5 Documentos / Procedimientos Consultados
+            top_docs_data = cursor.execute("""
+                SELECT referenced_docs, COUNT(*) as count 
+                FROM telemetry_interactions 
+                WHERE referenced_docs IS NOT NULL AND referenced_docs NOT IN ('', 'None', '[]', 'null')
+                GROUP BY referenced_docs 
+                ORDER BY count DESC 
+                LIMIT 5
+            """).fetchall()
+            top_documents = [
+                {
+                    "name": str(row["referenced_docs"]).replace('["', '').replace('"]', '').replace('"', ''),
+                    "referenced_docs": str(row["referenced_docs"]).replace('["', '').replace('"]', '').replace('"', ''),
+                    "count": row["count"]
+                }
+                for row in top_docs_data
+            ]
+
+            # Top 5 Preguntas Más Frecuentes
+            top_queries_data = cursor.execute("""
+                SELECT user_query, COUNT(*) as count 
+                FROM telemetry_interactions 
+                WHERE user_query IS NOT NULL 
+                  AND length(TRIM(user_query)) > 5 
+                  AND LOWER(TRIM(user_query)) NOT IN ('hola', 'estudiante', 'profesor', 'docente', 'administrativo', 'funcionario', 'otros', 'otro', 'resolved', 'retry_diagnosis')
+                GROUP BY LOWER(TRIM(user_query)) 
+                ORDER BY count DESC 
+                LIMIT 5
+            """).fetchall()
+            top_queries = [
+                {
+                    "query": row["user_query"],
+                    "user_query": row["user_query"],
+                    "count": row["count"]
+                }
+                for row in top_queries_data
+            ]
+
+        total_tokens_val = (tokens_in or 0) + (tokens_out or 0)
 
         return {
-            "total_sesiones": raw_total_sessions,
-            "sesiones_resueltas": resolved_sessions,
-            "sesiones_escaladas": escalated_sessions,
-            "tasa_resolucion_n1_pct": tasa_res,
-            "tasa_escalado_tickets_pct": tasa_esc,
-            "latencia_promedio_ms": round(avg_lat, 1),
-            "total_tokens_gastados": tot_prompt + tot_eval,
-            "total_prompt_tokens": tot_prompt,
-            "total_eval_tokens": tot_eval,
-            "total_consultas": tot_queries,
-            "distribucion_roles": roles_dist,
-            "top_documentos_referenciados": [dict(r) for r in top_docs],
-            "top_preguntas_frecuentes": [dict(q) for q in top_queries]
+            # Claves estándar solicitadas
+            "resolution_rate": rate_resolved,
+            "escalation_rate": rate_escalated,
+            "resolved_count": resolved,
+            "escalated_count": escalated,
+            "avg_latency_ms": round(avg_latency, 1),
+            "tokens_in": tokens_in or 0,
+            "tokens_out": tokens_out or 0,
+            "total_tokens": total_tokens_val,
+            "total_sessions": total_sessions,
+            "total_queries": total_queries,
+            "role_distribution": role_distribution,
+            "top_documents": top_documents,
+            "top_queries": top_queries,
+            # Alias heredados en español para retrocompatibilidad total
+            "tasa_resolucion_n1_pct": rate_resolved,
+            "tasa_escalado_tickets_pct": rate_escalated,
+            "sesiones_resueltas": resolved,
+            "sesiones_escaladas": escalated,
+            "latencia_promedio_ms": round(avg_latency, 1),
+            "total_prompt_tokens": tokens_in or 0,
+            "total_eval_tokens": tokens_out or 0,
+            "total_tokens_gastados": total_tokens_val,
+            "total_sesiones": total_sessions,
+            "total_consultas": total_queries,
+            "distribucion_roles": role_distribution,
+            "top_documentos_referenciados": top_documents,
+            "top_preguntas_frecuentes": top_queries
         }
