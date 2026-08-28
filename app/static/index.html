@@ -15,6 +15,7 @@
       --accent-glow: #00a3ff;
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
+      --text-content: #e2e8f0;
       --user-bubble: #1d4ed8;
       --bot-bubble: rgba(30, 41, 59, 0.85);
       --ticket-bg: rgba(16, 185, 129, 0.12);
@@ -98,102 +99,127 @@
     .action-btn {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--card-border);
-      color: #cbd5e1;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.76rem;
-      font-family: inherit;
+      color: var(--text-main);
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 500;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
-      text-decoration: none;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
+      font-family: inherit;
     }
 
     .action-btn:hover {
-      background: rgba(0, 163, 255, 0.15);
-      border-color: rgba(0, 163, 255, 0.4);
-      color: #ffffff;
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
     }
 
+    /* Badge En Línea con acceso administrativo secreto */
     .badge-online {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 0.75rem;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
       color: #34d399;
-      padding: 4px 10px;
-      background: rgba(16, 185, 129, 0.08);
+      padding: 6px 12px;
       border-radius: 20px;
-      border: 1px solid rgba(16, 185, 129, 0.2);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.25s ease;
     }
 
-    .badge-online .dot {
+    .badge-online:hover {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.5);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .dot {
       width: 7px;
       height: 7px;
+      background-color: #34d399;
       border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 8px #10b981;
+      box-shadow: 0 0 8px #34d399;
+      animation: pulse 2s infinite;
     }
 
-    /* Main Container Centrado */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Container */
     .app-container {
       flex: 1;
-      max-width: 900px;
+      max-width: 1000px;
       width: 100%;
       margin: 0 auto;
       padding: 1.25rem 1rem;
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 70px);
     }
 
-    /* Chat Card */
     .chat-card {
-      flex: 1;
       background: var(--card-bg);
+      backdrop-filter: blur(20px);
       border: 1px solid var(--card-border);
       border-radius: var(--radius-lg);
+      flex: 1;
       display: flex;
       flex-direction: column;
-      backdrop-filter: blur(16px);
       overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 163, 255, 0.05);
+      position: relative;
     }
 
-    /* Quick suggestions bar */
+    /* Quick Action Suggestions */
     .quick-bar {
-      padding: 8px 16px;
-      background: rgba(15, 23, 42, 0.6);
+      padding: 0.75rem 1.25rem;
+      background: rgba(15, 23, 42, 0.4);
       border-bottom: 1px solid var(--card-border);
       display: flex;
       gap: 8px;
       overflow-x: auto;
       white-space: nowrap;
+      scrollbar-width: none;
+    }
+
+    .quick-bar::-webkit-scrollbar {
+      display: none;
     }
 
     .quick-chip {
       background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 5px 12px;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 20px;
       font-size: 0.78rem;
-      color: #cbd5e1;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
+      font-family: inherit;
     }
 
     .quick-chip:hover {
-      background: rgba(0, 163, 255, 0.15);
-      border-color: rgba(0, 163, 255, 0.4);
+      background: rgba(0, 163, 255, 0.12);
+      border-color: rgba(0, 163, 255, 0.35);
       color: #ffffff;
       transform: translateY(-1px);
     }
 
+    /* Messages Area */
     .chat-messages {
       flex: 1;
       padding: 1.5rem;
@@ -201,13 +227,12 @@
       display: flex;
       flex-direction: column;
       gap: 1.25rem;
-      scroll-behavior: smooth;
     }
 
     .message {
       display: flex;
       gap: 12px;
-      max-width: 82%;
+      max-width: 85%;
       animation: fadeIn 0.3s ease-out;
     }
 
@@ -226,8 +251,8 @@
     }
 
     .avatar {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 10px;
       display: flex;
       align-items: center;
@@ -236,78 +261,111 @@
       flex-shrink: 0;
     }
 
-    .message.user .avatar {
-      background: #2563eb;
+    .message.bot .avatar {
+      background: linear-gradient(135deg, #0052cc, #00a3ff);
+      box-shadow: 0 0 10px rgba(0, 163, 255, 0.3);
     }
 
-    .message.bot .avatar {
-      background: linear-gradient(135deg, #0284c7, #00d2ff);
-      box-shadow: 0 0 12px rgba(0, 210, 255, 0.35);
+    .message.user .avatar {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      box-shadow: 0 0 10px rgba(124, 58, 237, 0.3);
     }
 
     .bubble {
-      padding: 12px 16px;
-      border-radius: var(--radius-lg);
+      padding: 1rem 1.25rem;
+      border-radius: 18px;
       font-size: 0.92rem;
-      line-height: 1.55;
+      line-height: 1.6;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .message.user .bubble {
       background: var(--user-bubble);
       color: #ffffff;
       border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 15px rgba(29, 78, 216, 0.3);
     }
 
     .message.bot .bubble {
       background: var(--bot-bubble);
       border: 1px solid var(--card-border);
-      color: #e2e8f0;
       border-bottom-left-radius: 4px;
+      color: var(--text-main);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
 
-    .bubble p {
-      margin-bottom: 8px;
+    /* Contenedor de Texto Principal Legible */
+    .msg-text {
+      color: var(--text-content);
+      line-height: 1.65;
+      font-size: 0.92rem;
     }
-    .bubble p:last-child {
+
+    .msg-text p {
+      margin-bottom: 0.6rem;
+    }
+
+    .msg-text p:last-child {
       margin-bottom: 0;
     }
 
-    .bubble ul {
-      margin-left: 18px;
-      margin-bottom: 8px;
+    .msg-text strong {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .msg-text ol, .msg-text ul {
+      margin-left: 1.25rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .msg-text li {
+      margin-bottom: 0.35rem;
+    }
+
+    .msg-text code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #93c5fd;
     }
 
     .meta-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
+      margin-top: 6px;
       font-size: 0.72rem;
-      padding: 3px 8px;
-      border-radius: 4px;
-      margin-top: 8px;
-      background: rgba(255, 255, 255, 0.06);
       color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    /* Ticket Notification Card */
+    /* Ticket Card */
     .ticket-badge {
-      margin-top: 10px;
-      padding: 14px;
+      margin-top: 8px;
       background: var(--ticket-bg);
       border: 1px solid var(--ticket-border);
-      border-radius: var(--radius-sm);
+      border-radius: 12px;
+      padding: 12px;
+      color: var(--ticket-color);
+      font-size: 0.85rem;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      font-size: 0.86rem;
     }
 
     .ticket-header {
+      font-weight: 700;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-weight: 600;
-      color: var(--ticket-color);
+      border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+      padding-bottom: 6px;
     }
 
     .ticket-id {
@@ -315,12 +373,13 @@
       padding: 2px 8px;
       border-radius: 6px;
       font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
     }
 
-    /* Chat Input Area */
+    /* Input Area */
     .chat-input-area {
       padding: 1rem 1.25rem;
-      background: rgba(9, 13, 22, 0.9);
+      background: rgba(9, 13, 22, 0.7);
       border-top: 1px solid var(--card-border);
       display: flex;
       gap: 10px;
@@ -334,42 +393,46 @@
 
     .chat-input {
       width: 100%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 24px;
-      padding: 12px 20px;
-      color: var(--text-main);
-      font-family: inherit;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 12px 18px;
+      color: #ffffff;
       font-size: 0.92rem;
+      font-family: inherit;
       outline: none;
-      transition: all 0.2s;
+      transition: all 0.25s ease;
     }
 
     .chat-input:focus {
       border-color: var(--accent-glow);
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 0 12px rgba(0, 163, 255, 0.2);
+      box-shadow: 0 0 15px rgba(0, 163, 255, 0.25);
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    .chat-input::placeholder {
+      color: var(--text-muted);
     }
 
     .send-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
       background: linear-gradient(135deg, #0066cc, #00a3ff);
-      color: white;
       border: none;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
+      color: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
       flex-shrink: 0;
-      box-shadow: 0 0 14px rgba(0, 163, 255, 0.35);
+      box-shadow: 0 4px 12px rgba(0, 163, 255, 0.3);
     }
 
-    .send-btn:hover {
+    .send-btn:hover:not(:disabled) {
       transform: scale(1.05);
-      box-shadow: 0 0 18px rgba(0, 163, 255, 0.5);
+      box-shadow: 0 6px 18px rgba(0, 163, 255, 0.45);
     }
 
     .send-btn:disabled {
@@ -378,17 +441,18 @@
       transform: none;
     }
 
-    /* Typing indicator */
+    /* Typing Indicator */
     .typing-indicator {
-      display: inline-flex;
+      display: flex;
+      align-items: center;
       gap: 4px;
-      padding: 8px 12px;
+      padding: 4px 8px;
     }
 
     .typing-dot {
       width: 6px;
       height: 6px;
-      background: var(--text-muted);
+      background-color: var(--text-muted);
       border-radius: 50%;
       animation: typing 1.4s infinite ease-in-out;
     }
@@ -407,7 +471,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin-top: 10px;
+      margin-top: 8px;
       animation: fadeIn 0.3s ease-out;
     }
 
@@ -442,238 +506,26 @@
       border-color: rgba(255, 255, 255, 0.1);
       color: var(--text-muted);
     }
-
-    /* Modal de Analítica y KPIs */
-    .modal-backdrop {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(4, 7, 13, 0.8);
-      backdrop-filter: blur(10px);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .modal-backdrop.active {
-      display: flex;
-      animation: modalFadeIn 0.25s ease-out;
-    }
-
-    @keyframes modalFadeIn {
-      from { opacity: 0; transform: scale(0.96); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .modal-card {
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
-      width: 100%;
-      max-width: 900px;
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 163, 255, 0.15);
-      overflow: hidden;
-    }
-
-    .modal-header {
-      padding: 1.2rem 1.5rem;
-      border-bottom: 1px solid var(--card-border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(15, 23, 42, 0.95);
-    }
-
-    .modal-header h2 {
-      font-size: 1.15rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: #ffffff;
-    }
-
-    .modal-header-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .modal-close-btn {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .modal-close-btn:hover {
-      background: rgba(239, 68, 68, 0.2);
-      border-color: rgba(239, 68, 68, 0.4);
-      color: #ffffff;
-    }
-
-    .modal-body {
-      padding: 1.5rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 12px;
-    }
-
-    .kpi-card {
-      background: rgba(30, 41, 59, 0.45);
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 1rem 1.2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .kpi-card::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 4px;
-      height: 100%;
-      background: var(--accent-glow);
-    }
-
-    .kpi-card.success::before { background: #10b981; }
-    .kpi-card.warning::before { background: #f59e0b; }
-    .kpi-card.purple::before { background: #8b5cf6; }
-
-    .kpi-title {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .kpi-value {
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: #ffffff;
-      font-family: 'Outfit', sans-serif;
-    }
-
-    .kpi-subtext {
-      font-size: 0.74rem;
-      color: #94a3b8;
-    }
-
-    .kpi-details-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-
-    @media (max-width: 768px) {
-      .kpi-details-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .kpi-panel {
-      background: rgba(30, 41, 59, 0.35);
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .kpi-panel h3 {
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: #cbd5e1;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .kpi-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .kpi-list-item {
-      font-size: 0.8rem;
-      padding: 8px 12px;
-      background: rgba(15, 23, 42, 0.6);
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .kpi-badge {
-      background: rgba(0, 163, 255, 0.15);
-      color: #93c5fd;
-      border: 1px solid rgba(0, 163, 255, 0.3);
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      white-space: nowrap;
-    }
   </style>
 </head>
 <body>
 
+  <!-- Header Limpio de Usuario -->
   <header>
     <div class="brand">
       <div class="brand-logo">⚡</div>
       <div class="brand-text">
-        <h1>UniMon • Asistente Virtual TI Unisimon</h1>
-        <p>Soporte Técnico & Procedimientos Institucionales (Barranquilla y Cúcuta)</p>
+        <h1>UniMon • Soporte TI</h1>
+        <p>Universidad Simón Bolívar · Asistente Virtual Oficial</p>
       </div>
     </div>
     <div class="header-actions">
-      <button class="action-btn" onclick="openAnalyticsModal()" title="Ver Dashboard de Métricas y KPIs de UniMon">
-        📊 Métricas & KPIs
+      <button class="action-btn" onclick="resetChat()" title="Iniciar una nueva consulta">
+        🔄 Nueva consulta
       </button>
-      <input type="file" id="pdfUploadInput" accept=".pdf" style="display:none;" onchange="handleFileUpload(event)">
-      <button class="action-btn" onclick="document.getElementById('pdfUploadInput').click()" title="Subir nuevo PDF de procedimiento">
-        📤 Subir PDF
-      </button>
-      <button class="action-btn" onclick="handleManualReindex()" title="Reindexar base vectorial">
-        🔄 Reindexar
-      </button>
-      <a href="/docs" target="_blank" class="action-btn" style="text-decoration:none;">
-        📚 Docs
-      </a>
-      <div class="badge-online"><span class="dot"></span> Online</div>
+      <div class="badge-online" onclick="openAdminSecret()" title="🟢 Sistema en línea • Clic para Administrar (Ctrl+Alt+A)" tabindex="0" role="button">
+        <span class="dot"></span> En Línea
+      </div>
     </div>
   </header>
 
@@ -701,8 +553,10 @@
         <div class="message bot">
           <div class="avatar">⚡</div>
           <div class="bubble">
-            <p><strong>¡Hola! Soy UniMon</strong>, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la <strong>Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta)</strong>.</p>
-            <p>Puedo ayudarte a resolver dudas sobre los <strong>procedimientos institucionales de TI</strong> (mantenimiento, backups, antimalware, Seven/Kactus) o <strong>radicar directamente una solicitud de soporte técnico</strong>.</p>
+            <div class="msg-text">
+              <p><strong>¡Hola! Soy UniMon</strong>, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la <strong>Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta)</strong>.</p>
+              <p>Puedo ayudarte a resolver dudas sobre los <strong>procedimientos institucionales de TI</strong> (mantenimiento, backups, antimalware, Seven/Kactus) o <strong>radicar directamente una solicitud de soporte técnico</strong>.</p>
+            </div>
             <div class="meta-tag">🤖 UniMon Unisimon • Soporte Conversacional Directo</div>
           </div>
         </div>
@@ -730,89 +584,6 @@
     </main>
   </div>
 
-  <!-- Modal de Analítica y KPIs de UniMon -->
-  <div class="modal-backdrop" id="analyticsModal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2>📊 Observabilidad & KPIs • UniMon</h2>
-        <div class="modal-header-actions">
-          <button class="action-btn" id="kpiRefreshBtn" onclick="fetchKPIs()" title="Recargar métricas">
-            🔄 Actualizar
-          </button>
-          <button class="modal-close-btn" onclick="closeAnalyticsModal()" title="Cerrar ventana">
-            ✕
-          </button>
-        </div>
-      </div>
-      <div class="modal-body">
-        
-        <!-- Grid de Tarjetas KPI -->
-        <div class="kpi-grid">
-          <div class="kpi-card success">
-            <div class="kpi-title">🎯 Tasa Resolución Nivel 1</div>
-            <div class="kpi-value" id="kpiTasaResolucion">0%</div>
-            <div class="kpi-subtext" id="kpiResolucionSubtext">0 sesiones resueltas</div>
-          </div>
-
-          <div class="kpi-card warning">
-            <div class="kpi-title">🎫 Tasa Escalado a Soporte</div>
-            <div class="kpi-value" id="kpiTasaEscalado">0%</div>
-            <div class="kpi-subtext" id="kpiEscaladoSubtext">0 transferidas a soporte</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-title">⚡ Latencia Promedio</div>
-            <div class="kpi-value" id="kpiLatencia">0 ms</div>
-            <div class="kpi-subtext">Tiempo de respuesta global</div>
-          </div>
-
-          <div class="kpi-card purple">
-            <div class="kpi-title">🧠 Tokens Consumidos</div>
-            <div class="kpi-value" id="kpiTokens">0</div>
-            <div class="kpi-subtext" id="kpiTokensSubtext">Prompt / Generación</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-title">👥 Sesiones Totales</div>
-            <div class="kpi-value" id="kpiTotalSesiones">0</div>
-            <div class="kpi-subtext">Histórico de conversaciones</div>
-          </div>
-
-          <div class="kpi-card">
-            <div class="kpi-title">💬 Consultas Procesadas</div>
-            <div class="kpi-value" id="kpiTotalConsultas">0</div>
-            <div class="kpi-subtext">Mensajes analizados</div>
-          </div>
-        </div>
-
-        <!-- Paneles de Detalle -->
-        <div class="kpi-details-grid">
-          <div class="kpi-panel">
-            <h3>🎓 Distribución de Consultas por Rol</h3>
-            <ul class="kpi-list" id="kpiRolesContainer">
-              <li class="kpi-list-item" style="color:var(--text-muted)">Cargando roles...</li>
-            </ul>
-          </div>
-
-          <div class="kpi-panel">
-            <h3>📄 Top 5 Procedimientos / Docs Consultados</h3>
-            <ul class="kpi-list" id="kpiTopDocs">
-              <li class="kpi-list-item" style="color:var(--text-muted)">Cargando documentos...</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="kpi-panel">
-          <h3>❓ Top 5 Preguntas Más Frecuentes</h3>
-          <ul class="kpi-list" id="kpiTopQueries">
-            <li class="kpi-list-item" style="color:var(--text-muted)">Cargando preguntas frecuentes...</li>
-          </ul>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
   <script>
     const chatMessages = document.getElementById('chatMessages');
     const messageInput = document.getElementById('messageInput');
@@ -829,11 +600,14 @@
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    function formatText(text) {
+    function formatMarkdown(text) {
       if (!text) return "";
-      let formatted = text
+      let formatted = String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;font-family:monospace;">$1</code>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>');
       return `<p>${formatted}</p>`;
@@ -844,7 +618,45 @@
       handleChatSubmit();
     }
 
-    function addMessage(sender, htmlContent, meta = null, ticketDetails = null, quickReplies = null) {
+    function resetChat() {
+      sessionId = 'sess_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+      sessionStorage.setItem('unimon_session_id', sessionId);
+
+      chatMessages.innerHTML = `
+        <div class="message bot">
+          <div class="avatar">⚡</div>
+          <div class="bubble">
+            <div class="msg-text">
+              <p><strong>¡Hola! Soy UniMon</strong>, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la <strong>Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta)</strong>.</p>
+              <p>Puedo ayudarte a resolver dudas sobre los <strong>procedimientos institucionales de TI</strong> (mantenimiento, backups, antimalware, Seven/Kactus) o <strong>radicar directamente una solicitud de soporte técnico</strong>.</p>
+            </div>
+            <div class="meta-tag">🤖 UniMon Unisimon • Soporte Conversacional Directo</div>
+          </div>
+        </div>
+      `;
+      messageInput.value = '';
+      messageInput.focus();
+    }
+
+    function openAdminSecret() {
+      window.open('/admin', '_blank');
+    }
+
+    // Atajo de teclado discreto: Ctrl + Alt + A
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        openAdminSecret();
+      }
+    });
+
+    /**
+     * Renderizado estructurado de burbujas en 3 partes sin sobreescritura destructiva:
+     * 1) Texto Principal (.msg-text)
+     * 2) Acciones / Quick Replies / Ticket (.quick-replies-container / .ticket-badge)
+     * 3) Footer / Metadata (.meta-tag)
+     */
+    function addMessage(sender, rawText, meta = null, ticketDetails = null, quickReplies = null) {
       const messageDiv = document.createElement('div');
       messageDiv.className = `message ${sender}`;
 
@@ -854,8 +666,18 @@
 
       const bubble = document.createElement('div');
       bubble.className = 'bubble';
-      bubble.innerHTML = htmlContent;
 
+      // 1. Contenedor de Texto Principal (SIEMPRE PRIMERO)
+      const textContainer = document.createElement('div');
+      textContainer.className = 'msg-text';
+      if (sender === 'user') {
+        textContainer.innerHTML = `<p>${String(rawText || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
+      } else {
+        textContainer.innerHTML = formatMarkdown(rawText);
+      }
+      bubble.appendChild(textContainer);
+
+      // 2. Contenedor de Detalles de Ticket (si aplica)
       if (ticketDetails) {
         const ticketCard = document.createElement('div');
         ticketCard.className = 'ticket-badge';
@@ -871,7 +693,7 @@
         bubble.appendChild(ticketCard);
       }
 
-      // Renderizar botones de respuesta rápida debajo del mensaje del bot
+      // 3. Contenedor de Respuestas Rápidas / Quick Replies
       if (quickReplies && quickReplies.length > 0) {
         const quickRepliesContainer = document.createElement('div');
         quickRepliesContainer.className = 'quick-replies-container';
@@ -881,9 +703,7 @@
           button.className = 'quick-reply-btn';
           button.innerText = btn.label;
           button.onclick = () => {
-            // Deshabilitar botones tras hacer clic
             quickRepliesContainer.querySelectorAll('button').forEach(b => b.disabled = true);
-            // Enviar el payload como mensaje
             sendMessage(btn.payload);
           };
           quickRepliesContainer.appendChild(button);
@@ -891,6 +711,7 @@
         bubble.appendChild(quickRepliesContainer);
       }
 
+      // 4. Contenedor Footer / Metadata Tag
       if (meta) {
         const metaTag = document.createElement('div');
         metaTag.className = 'meta-tag';
@@ -935,20 +756,19 @@
       if (!text) return;
 
       // 1. Mostrar mensaje del usuario
-      addMessage('user', `<p>${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`);
+      addMessage('user', text);
       messageInput.value = '';
       sendBtn.disabled = true;
 
       // 2. Mostrar indicador de escritura
       showTypingIndicator();
 
-      // 3. Payload conversacional de Nivel 1
+      // 3. Payload conversacional
       const payload = {
         session_id: sessionId,
         mensaje: text,
         message: text
       };
-
 
       try {
         const response = await fetch('/api/chat', {
@@ -963,234 +783,44 @@
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          const errMsg = errData.detail || `Error en el servidor (${response.status})`;
-          addMessage('bot', `<p style="color:var(--danger)">⚠️ <strong>Error:</strong> ${errMsg}</p>`);
-          return;
+          throw new Error(errData.detail || `HTTP Error ${response.status}`);
         }
 
         const data = await response.json();
         
-        const tipoResp = data.tipo || data.intent || "INFO";
-        let metaInfo = `🤖 Estado/Tipo: ${tipoResp}`;
-        if (data.source) {
-          metaInfo += ` • Fuente: ${data.source}`;
-        }
+        // Extracción robusta del texto de respuesta
+        const botText = data.mensaje || data.response || data.bot_response || data.message || data.answer || data.reply || data.respuesta || "";
+
+        let metaInfo = `🤖 UniMon Nivel 1 • ${data.source || 'Directo'}`;
         if (data.sources && data.sources.length > 0) {
-          metaInfo += ` • Refs: ${data.sources.join(', ')}`;
+          metaInfo += ` • Ref: ${data.sources.join(', ')}`;
         }
 
-        const textoBot = data.mensaje || data.reply || "";
-        const detallesTicket = data.ticket_details || (data.ticket_id ? { ticket_id: data.ticket_id, category: "Soporte Técnico TI", urgency: 3, impact: 3 } : null);
+        let ticketObj = null;
+        if (data.ticket_id) {
+          ticketObj = {
+            ticket_id: data.ticket_id,
+            category: data.categoria || data.category || "Incidente TI",
+            urgency: data.urgencia || data.urgency || 3,
+            impact: data.impacto || data.impact || 3
+          };
+        }
 
-        addMessage(
-          'bot', 
-          formatText(textoBot), 
-          metaInfo, 
-          detallesTicket,
-          data.quick_replies
-        );
+        addMessage('bot', botText, metaInfo, ticketObj, data.quick_replies);
 
       } catch (err) {
         removeTypingIndicator();
-        addMessage('bot', `<p style="color:var(--danger)">⚠️ <strong>Error de conexión:</strong> No se pudo comunicar con el servidor backend (${err.message}).</p>`);
+        addMessage('bot', `⚠️ **Lo siento, ocurrió un error temporal de conexión:** ${err.message}. Por favor intenta de nuevo.`);
       } finally {
         sendBtn.disabled = false;
         messageInput.focus();
       }
-
     }
 
     function sendQuickMessage(text) {
       messageInput.value = text;
       handleChatSubmit();
     }
-
-    async function handleFileUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      addMessage('bot', `<p>⏳ Subiendo e indexando <code>${file.name}</code> en ChromaDB...</p>`, `🤖 Ingestión RAG`);
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      try {
-        const res = await fetch('/api/admin/upload', {
-          method: 'POST',
-          body: formData
-        });
-
-        const data = await res.json();
-        if (res.ok) {
-          addMessage('bot', `<p>📄 <strong>Nuevo documento indexado:</strong> Se ha integrado exitosamente <code>${data.filename}</code> a la base de conocimiento.</p>`, `🤖 Ingestión RAG Completada`);
-        } else {
-          addMessage('bot', `<p style="color:var(--danger)">❌ <strong>Error al subir:</strong> ${data.detail || 'Fallo de procesamiento'}</p>`);
-        }
-      } catch (err) {
-        addMessage('bot', `<p style="color:var(--danger)">❌ <strong>Error de red:</strong> ${err.message}</p>`);
-      } finally {
-        event.target.value = '';
-      }
-    }
-
-    async function handleManualReindex() {
-      addMessage('bot', `<p>⏳ Reindexando todos los procedimientos de <code>./data/docs/</code>...</p>`, `🤖 Sincronización RAG`);
-
-      try {
-        const res = await fetch('/api/admin/reindex', {
-          method: 'POST'
-        });
-        const data = await res.json();
-        if (res.ok) {
-          addMessage('bot', `<p>🔄 <strong>Reindexación completada:</strong> La base vectorial ChromaDB ha sido sincronizada y actualizada en memoria.</p>`, `🤖 Sincronización RAG`);
-        } else {
-          addMessage('bot', `<p style="color:var(--danger)">❌ <strong>Error:</strong> ${data.detail}</p>`);
-        }
-      } catch (err) {
-        addMessage('bot', `<p style="color:var(--danger)">❌ <strong>Error de red:</strong> ${err.message}</p>`);
-      }
-    }
-
-    // ==========================================
-    // Módulo de Analítica y KPIs de UniMon
-    // ==========================================
-    function openAnalyticsModal() {
-      const modal = document.getElementById('analyticsModal');
-      if (modal) {
-        modal.classList.add('active');
-        fetchKPIs();
-      }
-    }
-
-    function closeAnalyticsModal() {
-      const modal = document.getElementById('analyticsModal');
-      if (modal) {
-        modal.classList.remove('active');
-      }
-    }
-
-    // Cerrar modal al hacer clic en el backdrop o presionar Escape
-    window.addEventListener('click', (e) => {
-      const modal = document.getElementById('analyticsModal');
-      if (modal && e.target === modal) {
-        closeAnalyticsModal();
-      }
-    });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeAnalyticsModal();
-      }
-    });
-
-    async function fetchKPIs() {
-      const refreshBtn = document.getElementById('kpiRefreshBtn');
-      if (refreshBtn) {
-        refreshBtn.disabled = true;
-        refreshBtn.innerText = "⏳ Cargando...";
-      }
-
-      try {
-        const res = await fetch('/api/analytics/kpis');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const kpis = json.data || {};
-
-        // 1. Métricas Principales
-        const elTotalSes = document.getElementById('kpiTotalSesiones');
-        if (elTotalSes) elTotalSes.innerText = kpis.total_sesiones ?? 0;
-
-        const elTasaRes = document.getElementById('kpiTasaResolucion');
-        if (elTasaRes) elTasaRes.innerText = `${kpis.tasa_resolucion_n1_pct ?? 0}%`;
-
-        const elTasaEsc = document.getElementById('kpiTasaEscalado');
-        if (elTasaEsc) elTasaEsc.innerText = `${kpis.tasa_escalado_tickets_pct ?? 0}%`;
-
-        const elLat = document.getElementById('kpiLatencia');
-        if (elLat) elLat.innerText = `${kpis.latencia_promedio_ms ?? 0} ms`;
-
-        const elTok = document.getElementById('kpiTokens');
-        if (elTok) elTok.innerText = (kpis.total_tokens_gastados ?? 0).toLocaleString();
-
-        const elTotCon = document.getElementById('kpiTotalConsultas');
-        if (elTotCon) elTotCon.innerText = kpis.total_consultas ?? 0;
-
-        // Subtextos
-        const elResSub = document.getElementById('kpiResolucionSubtext');
-        if (elResSub) elResSub.innerText = `${kpis.sesiones_resueltas ?? 0} sesiones resueltas en Nivel 1`;
-
-        const elEscSub = document.getElementById('kpiEscaladoSubtext');
-        if (elEscSub) elEscSub.innerText = `${kpis.sesiones_escaladas ?? 0} transferidas a soporte`;
-
-        const elTokSub = document.getElementById('kpiTokensSubtext');
-        if (elTokSub) elTokSub.innerText = `${(kpis.total_prompt_tokens ?? 0).toLocaleString()} in / ${(kpis.total_eval_tokens ?? 0).toLocaleString()} out`;
-
-        // 2. Roles
-        const rolesContainer = document.getElementById('kpiRolesContainer');
-        if (rolesContainer) {
-          rolesContainer.innerHTML = '';
-          const roles = kpis.distribucion_roles || {};
-          const roleKeys = Object.keys(roles);
-          if (roleKeys.length === 0) {
-            rolesContainer.innerHTML = '<li class="kpi-list-item" style="color:var(--text-muted)">Sin sesiones registradas aún</li>';
-          } else {
-            roleKeys.forEach(role => {
-              const roleName = (role === 'profesor' || role === 'docente') ? '👨‍🏫 Profesor' 
-                             : role === 'estudiante' ? '🎓 Estudiante' 
-                             : (role === 'administrativo' || role === 'funcionario') ? '💼 Administrativo' 
-                             : (role === 'otros' || role === 'otro') ? '🌐 Otros / Visitante' 
-                             : '👤 ' + role;
-              li.innerHTML = `<span>${roleName}</span> <span class="kpi-badge">${roles[role]} ses.</span>`;
-              rolesContainer.appendChild(li);
-            });
-          }
-        }
-
-        // 3. Top Documentos
-        const docsContainer = document.getElementById('kpiTopDocs');
-        if (docsContainer) {
-          docsContainer.innerHTML = '';
-          const docs = kpis.top_documentos_referenciados || [];
-          if (docs.length === 0) {
-            docsContainer.innerHTML = '<li class="kpi-list-item" style="color:var(--text-muted)">No hay consultas con documentos aún</li>';
-          } else {
-            docs.forEach(d => {
-              const li = document.createElement('li');
-              li.className = 'kpi-list-item';
-              li.innerHTML = `<span>📄 <code>${d.referenced_docs}</code></span> <span class="kpi-badge">${d.count} veces</span>`;
-              docsContainer.appendChild(li);
-            });
-          }
-        }
-
-        // 4. Top Preguntas
-        const queriesContainer = document.getElementById('kpiTopQueries');
-        if (queriesContainer) {
-          queriesContainer.innerHTML = '';
-          const queries = kpis.top_preguntas_frecuentes || [];
-          if (queries.length === 0) {
-            queriesContainer.innerHTML = '<li class="kpi-list-item" style="color:var(--text-muted)">No hay consultas registradas aún</li>';
-          } else {
-            queries.forEach(q => {
-              const li = document.createElement('li');
-              li.className = 'kpi-list-item';
-              li.innerHTML = `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:80%;" title="${q.user_query}">💬 "${q.user_query}"</span> <span class="kpi-badge">${q.count}</span>`;
-              queriesContainer.appendChild(li);
-            });
-          }
-        }
-
-      } catch (err) {
-        console.error("Error al cargar KPIs:", err);
-      } finally {
-        if (refreshBtn) {
-          refreshBtn.disabled = false;
-          refreshBtn.innerText = "🔄 Actualizar";
-        }
-      }
-    }
   </script>
 </body>
 </html>
-
-

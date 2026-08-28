@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UniMon Admin — Panel de Control y Observabilidad USB</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --usb-blue: #003865;
+      --usb-blue-dark: #002244;
+      --usb-blue-light: #0A58CA;
+      --usb-red: #B91C1C;
+      --usb-red-hover: #991B1B;
+      --bg-dark: #070D18;
+      --bg-card: #0F1A2E;
+      --bg-card-hover: #16243F;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(10, 88, 202, 0.5);
+      --text-primary: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --accent-success: #10B981;
+      --accent-warning: #F59E0B;
+      --accent-info: #0284C7;
+      --accent-purple: #8B5CF6;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 56, 101, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* Navbar / Header */
+    header.admin-header {
+      background: linear-gradient(135deg, var(--usb-blue-dark) 0%, #081326 100%);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--usb-blue) 0%, var(--usb-red) 100%);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.3rem;
+      color: white;
+      box-shadow: 0 0 15px rgba(185, 28, 28, 0.4);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34D399;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #34D399;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #34D399;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--usb-blue-light) 0%, var(--usb-blue) 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(10, 88, 202, 0.3);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #1D4ED8 0%, #003865 100%);
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, var(--usb-red) 0%, #991B1B 100%);
+      color: white;
+    }
+    .btn-danger:hover {
+      background: #7F1D1D;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Container & Layout */
+    .admin-container {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem;
+      flex: 1;
+    }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 2rem;
+      padding-bottom: 0.5rem;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      color: white;
+      background: var(--usb-blue);
+      box-shadow: 0 4px 12px rgba(0, 56, 101, 0.4);
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Grid Layouts */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--usb-blue-light);
+    }
+    .kpi-card.success::before { background: var(--accent-success); }
+    .kpi-card.warning::before { background: var(--accent-warning); }
+    .kpi-card.danger::before { background: var(--usb-red); }
+    .kpi-card.purple::before { background: var(--accent-purple); }
+
+    .kpi-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kpi-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: white;
+      line-height: 1.1;
+      margin-bottom: 0.25rem;
+    }
+
+    .kpi-subtext {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Section Panels */
+    .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .item-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background 0.2s;
+    }
+
+    .item-row:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .item-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 75%;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      background: rgba(10, 88, 202, 0.2);
+      color: #60A5FA;
+      border: 1px solid rgba(10, 88, 202, 0.3);
+    }
+
+    /* Upload & Document Management */
+    .upload-box {
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 1.5rem;
+    }
+
+    .upload-box:hover, .upload-box.dragover {
+      border-color: var(--usb-blue-light);
+      background: rgba(10, 88, 202, 0.06);
+    }
+
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      color: var(--usb-blue-light);
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+    }
+
+    .form-select, .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: white;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-select:focus, .form-input:focus {
+      border-color: var(--usb-blue-light);
+    }
+
+    /* Table Styles */
+    .table-container {
+      overflow-x: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    table.data-table th {
+      background: rgba(0, 0, 0, 0.25);
+      padding: 12px 16px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+    }
+
+    table.data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-primary);
+    }
+
+    table.data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Progress & Status Log */
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 1rem 0;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--usb-blue-light), var(--accent-success));
+      transition: width 0.3s ease;
+    }
+
+    .log-terminal {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.8rem;
+      color: #A7F3D0;
+      max-height: 180px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    /* Toast Notifications */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border-left: 4px solid var(--usb-blue-light);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      color: white;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .toast.success { border-color: var(--accent-success); }
+    .toast.error { border-color: var(--usb-red); }
+
+    /* Footer */
+    footer.admin-footer {
+      border-top: 1px solid var(--border-color);
+      padding: 1.5rem 2rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      background: var(--bg-dark);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="brand-section">
+      <div class="brand-logo">U</div>
+      <div>
+        <div class="brand-title">UniMon Admin Console</div>
+        <div class="brand-subtitle">Universidad Simón Bolívar · Mesa de Ayuda TI</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="badge-status" id="systemStatusBadge">
+        <span class="status-dot"></span>
+        <span id="systemStatusText">Sistema Operativo</span>
+      </div>
+      <a href="/docs" target="_blank" class="btn btn-secondary" title="Abrir Documentación Swagger / OpenAPI">
+        📚 API Docs
+      </a>
+      <a href="/" class="btn btn-secondary" title="Abrir interfaz pública de Chat">
+        💬 Ir al Chat
+      </a>
+      <button class="btn btn-primary" onclick="loadAllData()" id="refreshBtn">
+        🔄 Actualizar
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="admin-container">
+
+    <!-- Tab Navigation -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('tab-telemetry')">
+        📊 Métricas & Observabilidad
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-documents')">
+        📚 Base de Conocimiento RAG
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-system')">
+        ⚡ Diagnóstico de Servidor
+      </button>
+    </nav>
+
+    <!-- ================================================================= -->
+    <!-- TAB 1: DASHBOARD DE OBSERVABILIDAD & KPIS -->
+    <!-- ================================================================= -->
+    <section id="tab-telemetry" class="tab-content active">
+
+      <!-- KPI Summary Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-title">💬 Consultas Totales</div>
+          <div class="kpi-value" id="kpiTotalConsultas">0</div>
+          <div class="kpi-subtext" id="kpiTotalSesionesSubtext">0 sesiones auditadas</div>
+        </div>
+
+        <div class="kpi-card success">
+          <div class="kpi-title">🎯 Resolución Nivel 1</div>
+          <div class="kpi-value" id="kpiTasaResolucion">0%</div>
+          <div class="kpi-subtext" id="kpiResolucionSubtext">Autoservicio RAG resuelto</div>
+        </div>
+
+        <div class="kpi-card warning">
+          <div class="kpi-title">🎫 Escalado a GLPI</div>
+          <div class="kpi-value" id="kpiTasaEscalado">0%</div>
+          <div class="kpi-subtext" id="kpiEscaladoSubtext">Tickets radicados en Mesa TI</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">⚡ Latencia Media GPU</div>
+          <div class="kpi-value" id="kpiLatencia">0 ms</div>
+          <div class="kpi-subtext">Inferencia Ollama + Reranker</div>
+        </div>
+
+        <div class="kpi-card purple">
+          <div class="kpi-title">🧠 Tokens Consumidos</div>
+          <div class="kpi-value" id="kpiTokens">0</div>
+          <div class="kpi-subtext" id="kpiTokensSubtext">0 in / 0 out</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-title">👥 Sesiones Activas</div>
+          <div class="kpi-value" id="kpiTotalSesiones">0</div>
+          <div class="kpi-subtext">Histórico total en SQLite</div>
+        </div>
+      </div>
+
+      <!-- Breakdown Panels -->
+      <div class="panel-grid">
+        <!-- Distribución por Rol -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">🎓 Distribución de Consultas por Rol</h3>
+            <span class="badge" id="totalRolesBadge">0 perfiles</span>
+          </div>
+          <ul class="item-list" id="rolesList">
+            <li class="item-row"><span class="item-label">Cargando distribución...</span></li>
+          </ul>
+        </div>
+
+        <!-- Top 5 Documentos -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">📄 Top 5 Documentos / Procedimientos</h3>
+            <span class="badge">RAG Referenciado</span>
+          </div>
+          <ul class="item-list" id="topDocsList">
+            <li class="item-row"><span class="item-label">Cargando documentos...</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Top 5 Preguntas y Exportadores -->
+      <div class="panel-card" style="margin-bottom: 2rem;">
+        <div class="panel-header">
+          <h3 class="panel-title">❓ Top 5 Preguntas Más Frecuentes de Usuarios</h3>
+          <div style="display: flex; gap: 8px;">
+            <a href="/api/analytics/export-dpo-dataset?format=jsonl" class="btn btn-secondary" download>
+              📥 Exportar DPO Dataset
+            </a>
+            <a href="/api/analytics/clusters" class="btn btn-secondary" target="_blank">
+              🔍 Ver Clusters Semánticos
+            </a>
+          </div>
+        </div>
+        <ul class="item-list" id="topQueriesList">
+          <li class="item-row"><span class="item-label">Cargando preguntas frecuentes...</span></li>
+        </ul>
+      </div>
+
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 2: GESTIÓN Y CARGA DE DOCUMENTOS RAG -->
+    <!-- ================================================================= -->
+    <section id="tab-documents" class="tab-content">
+      
+      <div class="panel-grid">
+        
+        <!-- Formulario de Subida -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">📤 Cargar Nuevo Documento</h3>
+            <span class="badge">PDF / DOCX / PPTX</span>
+          </div>
+
+          <form id="uploadDocForm" onsubmit="handleDocUpload(event)">
+            <div class="upload-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
+              <div class="upload-icon">📁</div>
+              <div style="font-weight: 700; margin-bottom: 4px;">Arrastra un archivo aquí o haz clic para examinar</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Soporta guías, manuales y reglamentos (.pdf, .docx, .pptx, .txt)</div>
+              <div id="selectedFileName" style="margin-top: 10px; font-weight: 600; color: #60A5FA;"></div>
+              <input type="file" id="fileInput" style="display: none;" accept=".pdf,.docx,.pptx,.txt" onchange="updateSelectedFile(this)">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="audienceSelect">Audiencia Objetivo / Rol Documental</label>
+              <select id="audienceSelect" class="form-select">
+                <option value="estudiante">🎓 Estudiantes (1_estudiantes)</option>
+                <option value="profesor">👨‍🏫 Profesores y Docentes (2_profesores)</option>
+                <option value="administrativo">💼 Administrativos y Funcionarios (3_funcionarios_gestion)</option>
+                <option value="general" selected>🌐 General / Normativa Institucional (4_general_normativa)</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="autoIndexCheck" style="cursor: pointer;">
+              <label for="autoIndexCheck" style="font-size: 0.85rem; cursor: pointer; color: var(--text-secondary);">
+                Indexar inmediatamente en ChromaDB tras guardar
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;" id="uploadSubmitBtn">
+              ⬆️ Guardar en Base de Conocimiento
+            </button>
+          </form>
+
+          <div class="progress-bar-container" id="uploadProgressContainer">
+            <div class="progress-bar" id="uploadProgressBar"></div>
+          </div>
+        </div>
+
+        <!-- Acciones de Indexación -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">⚡ Re-indexación Vectorial</h3>
+            <span class="badge" id="chromaStatusBadge">ChromaDB</span>
+          </div>
+
+          <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+            Ejecuta el pipeline multimodal para extraer texto, tabular capturas con Vision-LLM y calcular embeddings con <code>BAAI/bge-m3</code>.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <button class="btn btn-primary" onclick="triggerReindex(true, false)" id="reindexIncBtn">
+              ⚡ Re-indexar Incrementales (Solo Nuevos / Modificados)
+            </button>
+
+            <button class="btn btn-danger" onclick="confirmWipeAndReindex()" id="reindexFullBtn">
+              ⚠️ Reconstruir Base Completa (Wipe & Re-index)
+            </button>
+          </div>
+
+          <div class="log-terminal" id="indexingTerminalLog"></div>
+        </div>
+
+      </div>
+
+      <!-- Tabla de Documentos en el Repositorio -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <h3 class="panel-title">📁 Documentos Indexados en <code>data/docs/</code></h3>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="docSearchInput" class="form-input" placeholder="Buscar documento..." style="width: 220px; padding: 6px 10px;" oninput="filterDocTable()">
+            <span class="badge" id="docsCountBadge">0 archivos</span>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="docsTable">
+            <thead>
+              <tr>
+                <th>Archivo</th>
+                <th>Audiencia / Carpeta</th>
+                <th>Tamaño</th>
+                <th>Última Modificación</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="docsTableBody">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                  Cargando inventario documental...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 3: DIAGNÓSTICO DE SERVIDOR -->
+    <!-- ================================================================= -->
+    <section id="tab-system" class="tab-content">
+      <div class="panel-grid">
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">🖥️ Infraestructura y Modelos</h3>
+          </div>
+          <div id="systemDiagnosticsInfo" style="font-size: 0.9rem; line-height: 1.8;">
+            Cargando estado del sistema...
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">🎫 Mesa de Ayuda GLPI</h3>
+          </div>
+          <div id="glpiDiagnosticsInfo" style="font-size: 0.9rem; line-height: 1.8;">
+            Verificando configuración de GLPI API...
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <span id="toastIcon">ℹ️</span>
+    <span id="toastMsg">Mensaje de notificación</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="admin-footer">
+    UniMon Admin Platform v1.0 · Universidad Simón Bolívar (Barranquilla & Cúcuta) · Modo Seguro Offline
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    let allDocuments = [];
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      const target = document.getElementById(tabId);
+      if (target) target.classList.add('active');
+
+      if (tabId === 'tab-telemetry') loadKPIs();
+      if (tabId === 'tab-documents') loadDocuments();
+      if (tabId === 'tab-system') loadSystemStatus();
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const msg = document.getElementById('toastMsg');
+      const icon = document.getElementById('toastIcon');
+
+      msg.innerText = message;
+      toast.className = `toast show ${type}`;
+      icon.innerText = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 4000);
+    }
+
+    // ==========================================
+    // 1. CARGA DE KPIS Y OBSERVABILIDAD
+    // ==========================================
+    async function loadKPIs() {
+      try {
+        const res = await fetch('/api/analytics/kpis');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const kpis = json.data || json || {};
+
+        // Métricas
+        document.getElementById('kpiTotalConsultas').innerText = (kpis.total_queries ?? 0).toLocaleString();
+        document.getElementById('kpiTotalSesiones').innerText = (kpis.total_sessions ?? 0).toLocaleString();
+        document.getElementById('kpiTotalSesionesSubtext').innerText = `${kpis.total_sessions ?? 0} conversaciones registradas`;
+
+        document.getElementById('kpiTasaResolucion').innerText = `${kpis.resolution_rate ?? 0}%`;
+        document.getElementById('kpiResolucionSubtext').innerText = `${kpis.resolved_count ?? 0} resueltas en Nivel 1`;
+
+        document.getElementById('kpiTasaEscalado').innerText = `${kpis.escalation_rate ?? 0}%`;
+        document.getElementById('kpiEscaladoSubtext').innerText = `${kpis.escalated_count ?? 0} radicadas en GLPI`;
+
+        document.getElementById('kpiLatencia').innerText = `${kpis.avg_latency_ms ?? 0} ms`;
+
+        const tokIn = kpis.tokens_in ?? 0;
+        const tokOut = kpis.tokens_out ?? 0;
+        document.getElementById('kpiTokens').innerText = (kpis.total_tokens ?? 0).toLocaleString();
+        document.getElementById('kpiTokensSubtext').innerText = `${tokIn.toLocaleString()} in / ${tokOut.toLocaleString()} out`;
+
+        // Roles
+        const rolesContainer = document.getElementById('rolesList');
+        const roles = kpis.role_distribution || {};
+        const roleKeys = Object.keys(roles);
+        rolesContainer.innerHTML = '';
+        document.getElementById('totalRolesBadge').innerText = `${roleKeys.length} perfiles`;
+
+        if (roleKeys.length === 0) {
+          rolesContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">Sin sesiones registradas aún</li>';
+        } else {
+          roleKeys.forEach(r => {
+            const li = document.createElement('li');
+            li.className = 'item-row';
+            const rLower = String(r).toLowerCase();
+            const icon = rLower.includes('prof') || rLower.includes('doc') ? '👨‍🏫' : rLower.includes('est') ? '🎓' : rLower.includes('admin') || rLower.includes('func') ? '💼' : '👤';
+            li.innerHTML = `<span class="item-label">${icon} ${r}</span> <span class="badge">${roles[r]} sesiones</span>`;
+            rolesContainer.appendChild(li);
+          });
+        }
+
+        // Top Documentos
+        const docsContainer = document.getElementById('topDocsList');
+        const docs = kpis.top_documents || [];
+        docsContainer.innerHTML = '';
+        if (docs.length === 0) {
+          docsContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">No hay referencias documentales aún</li>';
+        } else {
+          docs.forEach(d => {
+            const li = document.createElement('li');
+            li.className = 'item-row';
+            const docName = d.name || d.referenced_docs || 'Documento';
+            li.innerHTML = `<span class="item-label">📄 <code>${docName}</code></span> <span class="badge">${d.count} consultas</span>`;
+            docsContainer.appendChild(li);
+          });
+        }
+
+        // Top Preguntas
+        const queriesContainer = document.getElementById('topQueriesList');
+        const queries = kpis.top_queries || [];
+        queriesContainer.innerHTML = '';
+        if (queries.length === 0) {
+          queriesContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">No hay consultas suficientes aún</li>';
+        } else {
+          queries.forEach(q => {
+            const li = document.createElement('li');
+            li.className = 'item-row';
+            const text = q.query || q.user_query || '';
+            li.innerHTML = `<span class="item-label" title="${text}">💬 "${text}"</span> <span class="badge">${q.count} veces</span>`;
+            queriesContainer.appendChild(li);
+          });
+        }
+
+      } catch (err) {
+        console.error('Error cargando KPIs:', err);
+        showToast('Error al conectar con el servidor de telemetría', 'error');
+      }
+    }
+
+    // ==========================================
+    // 2. INVENTARIO DE DOCUMENTOS
+    // ==========================================
+    async function loadDocuments() {
+      try {
+        const res = await fetch('/api/admin/docs');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        allDocuments = data.documents || [];
+        renderDocTable(allDocuments);
+      } catch (err) {
+        console.error('Error cargando documentos:', err);
+        showToast('Error al cargar la lista de documentos', 'error');
+      }
+    }
+
+    function renderDocTable(docs) {
+      const tbody = document.getElementById('docsTableBody');
+      const badge = document.getElementById('docsCountBadge');
+      badge.innerText = `${docs.length} archivos`;
+      tbody.innerHTML = '';
+
+      if (docs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:2rem;">No se encontraron documentos en data/docs/</td></tr>';
+        return;
+      }
+
+      docs.forEach(doc => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>📄 ${doc.filename}</strong></td>
+          <td><span class="badge">${doc.audience}</span> <span style="font-size:0.75rem; color:var(--text-muted)">(${doc.folder})</span></td>
+          <td>${doc.size_formatted}</td>
+          <td>${doc.modified_at}</td>
+          <td>
+            <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="deleteDocument('${doc.filename}')">
+              🗑️ Eliminar
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterDocTable() {
+      const q = document.getElementById('docSearchInput').value.toLowerCase().trim();
+      if (!q) {
+        renderDocTable(allDocuments);
+        return;
+      }
+      const filtered = allDocuments.filter(d => 
+        d.filename.toLowerCase().includes(q) || 
+        d.audience.toLowerCase().includes(q) || 
+        d.folder.toLowerCase().includes(q)
+      );
+      renderDocTable(filtered);
+    }
+
+    // ==========================================
+    // 3. SUBIDA DE ARCHIVOS
+    // ==========================================
+    function updateSelectedFile(input) {
+      const display = document.getElementById('selectedFileName');
+      if (input.files && input.files[0]) {
+        display.innerText = `Archivo seleccionado: ${input.files[0].name} (${(input.files[0].size/1024).toFixed(1)} KB)`;
+      } else {
+        display.innerText = '';
+      }
+    }
+
+    // Drag and Drop
+    const dropZone = document.getElementById('dropZone');
+    ['dragenter', 'dragover'].forEach(name => {
+      dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+    });
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        document.getElementById('fileInput').files = files;
+        updateSelectedFile(document.getElementById('fileInput'));
+      }
+    });
+
+    async function handleDocUpload(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files || !fileInput.files[0]) {
+        showToast('Por favor selecciona un archivo PDF o documento', 'error');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const audience = document.getElementById('audienceSelect').value;
+      const autoIndex = document.getElementById('autoIndexCheck').checked;
+      const submitBtn = document.getElementById('uploadSubmitBtn');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('audience', audience);
+      formData.append('auto_index', autoIndex);
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = '⏳ Subiendo y guardando...';
+
+      try {
+        const res = await fetch('/api/admin/upload-doc', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || `Error HTTP ${res.status}`);
+
+        showToast(`Documento '${file.name}' guardado exitosamente`, 'success');
+        fileInput.value = '';
+        document.getElementById('selectedFileName').innerText = '';
+        loadDocuments();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = '⬆️ Guardar en Base de Conocimiento';
+      }
+    }
+
+    async function deleteDocument(filename) {
+      if (!confirm(`¿Estás seguro de eliminar '${filename}' y purgar sus vectores en ChromaDB?`)) return;
+      try {
+        const res = await fetch(`/api/admin/docs/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || 'Error al eliminar');
+        showToast(result.message, 'success');
+        loadDocuments();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ==========================================
+    // 4. RE-INDEXACIÓN DE CHROMADB
+    // ==========================================
+    async function triggerReindex(incremental = true, wipeDb = false) {
+      const terminal = document.getElementById('indexingTerminalLog');
+      const incBtn = document.getElementById('reindexIncBtn');
+      const fullBtn = document.getElementById('reindexFullBtn');
+
+      terminal.style.display = 'block';
+      terminal.innerText = `[${new Date().toLocaleTimeString()}] Iniciando indexación (incremental=${incremental}, wipe=${wipeDb})...\nProcesando documentos y extrayendo texto...\n`;
+      
+      incBtn.disabled = true;
+      fullBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/admin/reindex?incremental=${incremental}&wipe_db=${wipeDb}`, {
+          method: 'POST'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Fallo durante la re-indexación');
+
+        terminal.innerText += `[${new Date().toLocaleTimeString()}] ✅ ${data.message}\nDuración: ${data.duration_seconds}s | Fragmentos clasificados: ${data.taxonomy_chunks_classified}\n`;
+        showToast('Base vectorial ChromaDB actualizada exitosamente', 'success');
+        loadKPIs();
+      } catch (err) {
+        terminal.innerText += `[${new Date().toLocaleTimeString()}] ❌ Error: ${err.message}\n`;
+        showToast(`Error al reindexar: ${err.message}`, 'error');
+      } finally {
+        incBtn.disabled = false;
+        fullBtn.disabled = false;
+      }
+    }
+
+    function confirmWipeAndReindex() {
+      if (confirm('ADVERTENCIA: Esto borrará todos los vectores en ChromaDB y reconstruirá la base desde cero. ¿Deseas continuar?')) {
+        triggerReindex(false, true);
+      }
+    }
+
+    // ==========================================
+    // 5. ESTADO DEL SISTEMA
+    // ==========================================
+    async function loadSystemStatus() {
+      const diag = document.getElementById('systemDiagnosticsInfo');
+      const glpiDiag = document.getElementById('glpiDiagnosticsInfo');
+
+      try {
+        const res = await fetch('/api/admin/system-status');
+        const data = await res.json();
+
+        diag.innerHTML = `
+          <div><strong>Aplicación:</strong> ${data.app_name} (v${data.app_version})</div>
+          <div><strong>Aceleración Hardware:</strong> ⚡ ${data.gpu_active}</div>
+          <div><strong>Ollama Endpoint:</strong> <code>${data.ollama.endpoint}</code> (${data.ollama.active ? '🟢 En línea' : '🔴 Desconectado'})</div>
+          <div><strong>Modelo LLM Configurado:</strong> <code>${data.ollama.model_configured}</code></div>
+          <div><strong>Archivos Fuente en Disco:</strong> ${data.knowledge_base.total_source_files} documentos</div>
+        `;
+
+        glpiDiag.innerHTML = `
+          <div><strong>GLPI REST Endpoint:</strong> <code>${data.glpi.endpoint}</code></div>
+          <div><strong>Estado de Tokens:</strong> ${data.glpi.configured ? '🟢 Configurados (App & User Token OK)' : '🟡 Incompletos en .env'}</div>
+          <div style="margin-top:10px;"><a href="${data.glpi.endpoint}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem;">Abrir GLPI Network Cloud</a></div>
+        `;
+      } catch (err) {
+        diag.innerText = 'No se pudo consultar el estado del servidor.';
+      }
+    }
+
+    // Carga inicial
+    function loadAllData() {
+      const btn = document.getElementById('refreshBtn');
+      if (btn) btn.innerText = '⏳ Cargando...';
+      Promise.all([loadKPIs(), loadDocuments(), loadSystemStatus()]).finally(() => {
+        if (btn) btn.innerText = '🔄 Actualizar';
+      });
+    }
+
+    window.onload = loadAllData;
+  </script>
+</body>
+</html>
