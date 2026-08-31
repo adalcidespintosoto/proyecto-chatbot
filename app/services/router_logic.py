@@ -21,7 +21,13 @@ from app.services.rag_service import (
     MENSAJE_NO_DOCUMENTADO,
     MENSAJE_FUERA_DE_DOMINIO
 )
-from app.services.glpi_service import glpi_client, is_valid_email
+from app.services.glpi_service import (
+    glpi_client, 
+    is_valid_email, 
+    get_ticket_summary_and_timeline,
+    is_active_glpi_status,
+    GLPI_STATUS_NAMES
+)
 from app.services.router_service import (
     handle_feedback_transition, 
     RESOLVED_INTENTS, 
@@ -52,6 +58,7 @@ class EstadoTicket(str, Enum):
     PIDIENDO_CORREO = "PIDIENDO_CORREO"
     PIDIENDO_DESCRIPCION = "PIDIENDO_DESCRIPCION"
     CONFIRMANDO_SEGUIMIENTO = "CONFIRMANDO_SEGUIMIENTO"
+    ESCRIBIENDO_SEGUIMIENTO = "ESCRIBIENDO_SEGUIMIENTO"
     SOLUCIONADO = "SOLUCIONADO"
     CANCELADO = "CANCELADO"
     TICKET_CREADO = "TICKET_CREADO"
@@ -101,6 +108,8 @@ class TicketSession(BaseModel):
     intentos_fallidos: int = 0
     ticket_id: Optional[int] = None
     existing_ticket_id_today: Optional[int] = None
+    target_ticket_id_followup: Optional[int] = None
+    tickets_today_list: List[int] = Field(default_factory=list)
     decision_mismo_o_nuevo: bool = False
     last_interaction: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     user_role: Optional[str] = None
@@ -661,44 +670,105 @@ class RouterLogic:
         # -------------------------------------------------------------
         tickets_today = await glpi_client.get_tickets_today_for_email(correo_sol)
 
-        # REGLA A: Si ya tiene >= 2 tickets radicados hoy -> Bloquear creación
+        # REGLA A: Si ya tiene >= 2 tickets radicados hoy -> Notificar límite con canales directos y ofrecer opción de seguimiento a cualquiera de los dos
         if len(tickets_today) >= 2 and not session.decision_mismo_o_nuevo:
-            cls.reset_session(session_id)
+            t1_id = tickets_today[0]["ticket_id"]
+            t2_id = tickets_today[1]["ticket_id"]
+            session.tickets_today_list = [t1_id, t2_id]
+            session.existing_ticket_id_today = t1_id
+            session.estado = EstadoTicket.CONFIRMANDO_SEGUIMIENTO
+
+            # Consultar resúmenes de ambos tickets para dar contexto enriquecido
+            summary1 = await glpi_client.get_ticket_summary_and_timeline(t1_id)
+            summary2 = await glpi_client.get_ticket_summary_and_timeline(t2_id)
+
+            t1_title = summary1.get("title") or f"Ticket #{t1_id}"
+            t1_date = summary1.get("date") or "Hoy"
+            t1_status = summary1.get("status_name") or "En curso"
+
+            t2_title = summary2.get("title") or f"Ticket #{t2_id}"
+            t2_date = summary2.get("date") or "Hoy"
+            t2_status = summary2.get("status_name") or "En curso"
+
             block_msg = (
-                f"Has alcanzado el límite máximo de 2 solicitudes radicadas por día en GLPI para el correo **{correo_sol}**. "
-                f"Para casos urgentes adicionales, comunícate directamente con la Mesa de Ayuda (Barranquilla: Ext. 8003/8004 | Cúcuta: Ext. 129)."
+                f"Has alcanzado el límite máximo de 2 solicitudes radicadas por día para el correo **{correo_sol}**.\n\n"
+                f"📞 **Canales Directos de Mesa de Ayuda TI:**\n"
+                f"• **Sede Barranquilla:** solicitudcomputo@unisimon.edu.co | WhatsApp: 3172683922 | PBX: (605) 3444333 Ext. 8003 / 8004\n"
+                f"• **Sede Cúcuta:** helpdesk@unisimon.edu.co | PBX: (607) 5827070 Ext. 129\n\n"
+                f"📋 **Tus solicitudes activas de hoy:**\n"
+                f"1️⃣ **Ticket #{t1_id}:** {t1_title} [Estado: {t1_status}] (Apertura: {t1_date})\n"
+                f"2️⃣ **Ticket #{t2_id}:** {t2_title} [Estado: {t2_status}] (Apertura: {t2_date})\n\n"
+                f"Si necesitas agregar información o actualizar alguno de tus casos activos, por favor selecciona el ticket correspondiente:"
             )
+
+            quick_replies = [
+                {"label": f"💬 Agregar a Ticket #{t1_id}", "payload": f"FOLLOWUP_TICKET_{t1_id}"},
+                {"label": f"💬 Agregar a Ticket #{t2_id}", "payload": f"FOLLOWUP_TICKET_{t2_id}"},
+                {"label": "❌ Cancelar", "payload": "CANCELAR"}
+            ]
+
+            cls.add_history(session_id, "assistant", block_msg)
             return {
                 "tipo": "ERROR",
-                "state": "FINALIZADO",
+                "state": "CONFIRMANDO_SEGUIMIENTO",
                 "mensaje": block_msg,
                 "response": block_msg,
+                "reply": block_msg,
                 "ticket_id": None,
                 "source": "GLPI_Limit_Exceeded",
-                "quick_replies": []
+                "quick_replies": quick_replies
             }
 
-        # REGLA B: Si tiene exactamente 1 ticket radicado hoy -> Preguntar si es seguimiento o nuevo reporte
+        # REGLA B: Si tiene exactamente 1 ticket radicado hoy -> Consultar contexto en GLPI y renderizar tarjeta
         if len(tickets_today) == 1 and not session.decision_mismo_o_nuevo:
             existing_id = tickets_today[0]["ticket_id"]
-            session.existing_ticket_id_today = existing_id
-            session.estado = EstadoTicket.CONFIRMANDO_SEGUIMIENTO
-            ask_msg = (
-                f"Detectamos que ya tienes el Ticket **#{existing_id}** abierto hoy en GLPI. "
-                f"¿Deseas agregar esta información como seguimiento a ese mismo caso o necesitas radicar un reporte independiente?"
-            )
-            return {
-                "tipo": "RADICANDO_TICKET",
-                "state": "CONFIRMANDO_SEGUIMIENTO",
-                "mensaje": ask_msg,
-                "response": ask_msg,
-                "ticket_id": None,
-                "source": "GLPI_Followup_Disambiguation",
-                "quick_replies": [
-                    {"label": "📌 Mismo caso (Seguimiento)", "payload": "FOLLOWUP_SAME_TICKET"},
-                    {"label": "🆕 Nuevo reporte", "payload": "CREATE_NEW_TICKET"}
+
+            # 1. Consulta de Contexto en GLPI
+            summary = await glpi_client.get_ticket_summary_and_timeline(existing_id)
+            
+            # Si el ticket ya fue cerrado o resuelto, no se considera activo -> Proceder a crear nuevo ticket
+            if summary.get("is_active") is False or not is_active_glpi_status(summary.get("status")):
+                pass
+            else:
+                session.existing_ticket_id_today = existing_id
+                session.estado = EstadoTicket.CONFIRMANDO_SEGUIMIENTO
+
+                title = summary.get("title") or f"Ticket #{existing_id}"
+                date_opened = summary.get("date") or datetime.now().strftime("%Y-%m-%d %H:%M")
+                initial_content = summary.get("initial_content") or "Solicitud de soporte técnico registrada previamente"
+                last_followup_text = summary.get("last_followup") or "Sin seguimientos previos registrados"
+                status_name = summary.get("status_name") or "En curso"
+
+                # 2. Renderizado de Tarjeta de Resumen en el Chat
+                card_msg = (
+                    f"📋 **Detectamos un caso activo radicado hoy a tu nombre:**\n"
+                    f"• **Ticket:** #{existing_id} - {title}\n"
+                    f"• **Estado actual:** {status_name}\n"
+                    f"• **Fecha de apertura:** {date_opened}\n"
+                    f"• **Descripción inicial:** {initial_content}\n"
+                    f"• **Último seguimiento:** {last_followup_text}\n\n"
+                    f"---\n"
+                    f"¿Deseas agregar esta nueva información como **seguimiento al ticket activo** o se trata de un **asunto completamente nuevo**?"
+                )
+
+                # 3. Botones de Acción (Quick Replies)
+                quick_replies = [
+                    {"label": "💬 Agregar a este ticket", "payload": "FOLLOWUP_SAME_TICKET"},
+                    {"label": "🆕 Crear ticket nuevo (Otro asunto)", "payload": "CREATE_NEW_TICKET"},
+                    {"label": "❌ Cancelar", "payload": "CANCELAR"}
                 ]
-            }
+
+                cls.add_history(session_id, "assistant", card_msg)
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "state": "CONFIRMANDO_SEGUIMIENTO",
+                    "mensaje": card_msg,
+                    "response": card_msg,
+                    "reply": card_msg,
+                    "ticket_id": None,
+                    "source": "GLPI_Followup_Disambiguation",
+                    "quick_replies": quick_replies
+                }
 
         # REGLA C: 0 tickets hoy (o usuario eligió 'Nuevo reporte') -> Crear nuevo ticket
         asunto_ticket = f"[Soporte TI Unisimon] {falla_desc[:50]}"
@@ -725,29 +795,38 @@ class RouterLogic:
 
             # Registrar actividad en SQLite
             from app.services.telemetry_service import log_ticket_activity
-            log_ticket_activity(session_id=session_id, email=correo_sol, ticket_id=ticket_id, action="NUEVO")
+            action_type = "NUEVO_2" if session.decision_mismo_o_nuevo else "NUEVO"
+            log_ticket_activity(session_id=session_id, email=correo_sol, ticket_id=ticket_id, action=action_type)
 
             cls.reset_session(session_id)
 
-            confirmacion_msg = (
-                f"✅ Se ha radicado exitosamente tu solicitud de soporte técnico con el radicado **#{ticket_id}**.\n\n"
-                f"📋 **Resumen del Caso:**\n"
-                f"- **Solicitante:** {nombre_sol}\n"
-                f"- **Correo:** {correo_sol}\n"
-                f"- **Descripción:** {falla_desc}\n\n"
-                f"Un técnico de la Dirección de TI revisará tu caso y se pondrá en contacto a través de tu correo institucional (**{correo_sol}**)."
-            )
+            if session.decision_mismo_o_nuevo:
+                confirmacion_msg = f"✅ Se ha radicado un nuevo reporte independiente con el **Ticket #{ticket_id}**."
+            else:
+                confirmacion_msg = (
+                    f"✅ Se ha radicado exitosamente tu solicitud de soporte técnico con el radicado **#{ticket_id}**.\n\n"
+                    f"📋 **Resumen del Caso:**\n"
+                    f"- **Solicitante:** {nombre_sol}\n"
+                    f"- **Correo:** {correo_sol}\n"
+                    f"- **Descripción:** {falla_desc}\n\n"
+                    f"Un técnico de la Dirección de TI revisará tu caso y se pondrá en contacto a través de tu correo institucional (**{correo_sol}**)."
+                )
 
+            cls.add_history(session_id, "assistant", confirmacion_msg)
             return {
                 "tipo": "TICKET_CREADO",
+                "state": "FINALIZADO",
                 "mensaje": confirmacion_msg,
+                "response": confirmacion_msg,
+                "reply": confirmacion_msg,
                 "ticket_id": ticket_id,
                 "ticket_details": {
                     "ticket_id": ticket_id,
                     "category": category_name,
                     "urgency": session.urgency,
                     "impact": session.impact,
-                    "status": "success"
+                    "status": "success",
+                    "action": action_type
                 },
                 "category": category_name,
                 "source": "GLPI_REST_API"
@@ -933,59 +1012,207 @@ class RouterLogic:
             return await cls._radicar_ticket_en_glpi(session_id, session)
 
         # -------------------------------------------------------------
-        # ESTADO: CONFIRMANDO_SEGUIMIENTO (Desambiguación de Regla B)
+        # ESTADO: CONFIRMANDO_SEGUIMIENTO (Desambiguación de Reglas de Tickets)
         # -------------------------------------------------------------
         elif estado_actual == EstadoTicket.CONFIRMANDO_SEGUIMIENTO:
+            # 1. Cancelación
+            if cls.is_cancellation(texto) or texto.upper() in ["CANCELAR", "CANCEL", "CANCEL_ACTION"]:
+                cls.reset_session(session_id)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", MENSAJE_CANCELACION)
+                return {
+                    "tipo": "CANCELADO",
+                    "state": "FINALIZADO",
+                    "mensaje": MENSAJE_CANCELACION,
+                    "response": MENSAJE_CANCELACION,
+                    "reply": MENSAJE_CANCELACION,
+                    "ticket_id": None,
+                    "source": "UniMon_Cancelacion",
+                    "quick_replies": []
+                }
+
             texto_upper = texto.upper()
+            texto_lower = texto.lower()
+
             is_followup = (
                 "FOLLOWUP" in texto_upper or "MISMO" in texto_upper or "SEGUIMIENTO" in texto_upper or
-                "mismo caso" in texto.lower() or "seguimiento" in texto.lower()
+                "AGREGAR" in texto_upper or "A ESTE TICKET" in texto_upper or
+                "mismo caso" in texto_lower or "seguimiento" in texto_lower or "agregar" in texto_lower or
+                "añadir" in texto_lower or "continuar" in texto_lower or "a este ticket" in texto_lower or
+                "este ticket" in texto_lower or "ticket 1" in texto_lower or "ticket 2" in texto_lower or
+                "primer ticket" in texto_lower or "segundo ticket" in texto_lower
             )
             is_new = (
                 "NEW" in texto_upper or "NUEVO" in texto_upper or "INDEPENDIENTE" in texto_upper or
-                "nuevo reporte" in texto.lower() or "otro ticket" in texto.lower()
+                "OTRO" in texto_upper or "ASUNTO" in texto_upper or
+                "nuevo reporte" in texto_lower or "otro ticket" in texto_lower or "ticket nuevo" in texto_lower or
+                "otro asunto" in texto_lower or "crear ticket nuevo" in texto_lower or "nuevo" in texto_lower
             )
 
             if is_followup:
-                existing_id = session.existing_ticket_id_today or 1000
-                falla_desc = session.descripcion or session.falla or "Seguimiento de usuario"
-                correo_sol = session.correo or "solicitudcomputo@unisimon.edu.co"
-                from app.services.telemetry_service import log_ticket_activity
-                await glpi_client.add_ticket_followup(ticket_id=existing_id, content=falla_desc, email=correo_sol)
-                log_ticket_activity(session_id=session_id, email=correo_sol, ticket_id=existing_id, action="FOLLOWUP")
-                cls.reset_session(session_id)
-                confirm_followup = (
-                    f"✅ Se ha registrado exitosamente el seguimiento en tu Ticket **#{existing_id}** en GLPI.\n\n"
-                    f"El equipo de Mesa de Ayuda TI revisará la nueva información agregada a tu caso."
+                # Determinar cuál ticket se desea actualizar
+                target_id = None
+                m_payload = re.search(r"FOLLOWUP_TICKET_(\d+)", texto_upper)
+                if m_payload:
+                    target_id = int(m_payload.group(1))
+                else:
+                    m_num = re.search(r"#?(\d{3,6})", texto)
+                    if m_num:
+                        target_id = int(m_num.group(1))
+
+                if target_id is None:
+                    if "1" in texto or "primer" in texto_lower:
+                        if session.tickets_today_list:
+                            target_id = session.tickets_today_list[0]
+                    elif "2" in texto or "segund" in texto_lower:
+                        if len(session.tickets_today_list) >= 2:
+                            target_id = session.tickets_today_list[1]
+
+                if target_id is None:
+                    target_id = session.existing_ticket_id_today or (session.tickets_today_list[0] if session.tickets_today_list else 1000)
+
+                session.target_ticket_id_followup = target_id
+                session.estado = EstadoTicket.ESCRIBIENDO_SEGUIMIENTO
+
+                ask_followup_msg = (
+                    f"Por favor escribe a continuación el **mensaje, avance o información adicional** que deseas añadir al **Ticket #{target_id}**:"
                 )
+
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", ask_followup_msg)
                 return {
-                    "tipo": "TICKET_CREADO",
-                    "state": "FINALIZADO",
-                    "mensaje": confirm_followup,
-                    "response": confirm_followup,
-                    "ticket_id": existing_id,
-                    "source": "GLPI_Followup_Success",
-                    "quick_replies": []
+                    "tipo": "RADICANDO_TICKET",
+                    "state": "ESCRIBIENDO_SEGUIMIENTO",
+                    "mensaje": ask_followup_msg,
+                    "response": ask_followup_msg,
+                    "reply": ask_followup_msg,
+                    "ticket_id": target_id,
+                    "source": "UniMon_Followup_Input",
+                    "quick_replies": [
+                        {"label": "❌ Cancelar", "payload": "CANCELAR"}
+                    ]
                 }
             elif is_new:
                 session.decision_mismo_o_nuevo = True
                 return await cls._radicar_ticket_en_glpi(session_id, session)
             else:
-                ask_msg = (
-                    f"Por favor selecciona si deseas agregar esta información como seguimiento al Ticket **#{session.existing_ticket_id_today}** o crear un nuevo reporte:"
-                )
-                return {
-                    "tipo": "RADICANDO_TICKET",
-                    "state": "CONFIRMANDO_SEGUIMIENTO",
-                    "mensaje": ask_msg,
-                    "response": ask_msg,
-                    "ticket_id": None,
-                    "source": "GLPI_Followup_Disambiguation",
-                    "quick_replies": [
-                        {"label": "📌 Mismo caso (Seguimiento)", "payload": "FOLLOWUP_SAME_TICKET"},
-                        {"label": "🆕 Nuevo reporte", "payload": "CREATE_NEW_TICKET"}
+                # Si tiene 2 o más tickets hoy, re-renderizar opciones múltiples
+                if len(session.tickets_today_list) >= 2:
+                    t1_id = session.tickets_today_list[0]
+                    t2_id = session.tickets_today_list[1]
+                    summary1 = await glpi_client.get_ticket_summary_and_timeline(t1_id)
+                    summary2 = await glpi_client.get_ticket_summary_and_timeline(t2_id)
+                    t1_title = summary1.get("title") or f"Ticket #{t1_id}"
+                    t1_date = summary1.get("date") or "Hoy"
+                    t1_status = summary1.get("status_name") or "En curso"
+
+                    t2_title = summary2.get("title") or f"Ticket #{t2_id}"
+                    t2_date = summary2.get("date") or "Hoy"
+                    t2_status = summary2.get("status_name") or "En curso"
+
+                    correo_sol = session.correo or "solicitudcomputo@unisimon.edu.co"
+                    block_msg = (
+                        f"Has alcanzado el límite máximo de 2 solicitudes radicadas por día para el correo **{correo_sol}**.\n\n"
+                        f"📞 **Canales Directos de Mesa de Ayuda TI:**\n"
+                        f"• **Sede Barranquilla:** solicitudcomputo@unisimon.edu.co | WhatsApp: 3172683922 | PBX: (605) 3444333 Ext. 8003 / 8004\n"
+                        f"• **Sede Cúcuta:** helpdesk@unisimon.edu.co | PBX: (607) 5827070 Ext. 129\n\n"
+                        f"📋 **Tus solicitudes activas de hoy:**\n"
+                        f"1️⃣ **Ticket #{t1_id}:** {t1_title} [Estado: {t1_status}] (Apertura: {t1_date})\n"
+                        f"2️⃣ **Ticket #{t2_id}:** {t2_title} [Estado: {t2_status}] (Apertura: {t2_date})\n\n"
+                        f"Si necesitas agregar información o actualizar alguno de tus casos activos, por favor selecciona el ticket correspondiente:"
+                    )
+                    quick_replies = [
+                        {"label": f"💬 Agregar a Ticket #{t1_id}", "payload": f"FOLLOWUP_TICKET_{t1_id}"},
+                        {"label": f"💬 Agregar a Ticket #{t2_id}", "payload": f"FOLLOWUP_TICKET_{t2_id}"},
+                        {"label": "❌ Cancelar", "payload": "CANCELAR"}
                     ]
+                    return {
+                        "tipo": "ERROR",
+                        "state": "CONFIRMANDO_SEGUIMIENTO",
+                        "mensaje": block_msg,
+                        "response": block_msg,
+                        "reply": block_msg,
+                        "ticket_id": None,
+                        "source": "GLPI_Limit_Exceeded",
+                        "quick_replies": quick_replies
+                    }
+                else:
+                    existing_id = session.existing_ticket_id_today or 1000
+                    summary = await glpi_client.get_ticket_summary_and_timeline(existing_id)
+                    title = summary.get("title") or f"Ticket #{existing_id}"
+                    date_opened = summary.get("date") or datetime.now().strftime("%Y-%m-%d %H:%M")
+                    initial_content = summary.get("initial_content") or "Solicitud de soporte técnico registrada previamente"
+                    last_followup_text = summary.get("last_followup") or "Sin seguimientos previos registrados"
+                    status_name = summary.get("status_name") or "En curso"
+
+                    card_msg = (
+                        f"📋 **Detectamos un caso activo radicado hoy a tu nombre:**\n"
+                        f"• **Ticket:** #{existing_id} - {title}\n"
+                        f"• **Estado actual:** {status_name}\n"
+                        f"• **Fecha de apertura:** {date_opened}\n"
+                        f"• **Descripción inicial:** {initial_content}\n"
+                        f"• **Último seguimiento:** {last_followup_text}\n\n"
+                        f"---\n"
+                        f"¿Deseas agregar esta nueva información como **seguimiento al ticket activo** o se trata de un **asunto completamente nuevo**?"
+                    )
+                    quick_replies = [
+                        {"label": "💬 Agregar a este ticket", "payload": "FOLLOWUP_SAME_TICKET"},
+                        {"label": "🆕 Crear ticket nuevo (Otro asunto)", "payload": "CREATE_NEW_TICKET"},
+                        {"label": "❌ Cancelar", "payload": "CANCELAR"}
+                    ]
+                    return {
+                        "tipo": "RADICANDO_TICKET",
+                        "state": "CONFIRMANDO_SEGUIMIENTO",
+                        "mensaje": card_msg,
+                        "response": card_msg,
+                        "reply": card_msg,
+                        "ticket_id": None,
+                        "source": "GLPI_Followup_Disambiguation",
+                        "quick_replies": quick_replies
+                    }
+
+        # -------------------------------------------------------------
+        # ESTADO: ESCRIBIENDO_SEGUIMIENTO (Captura del texto de seguimiento)
+        # -------------------------------------------------------------
+        elif estado_actual == EstadoTicket.ESCRIBIENDO_SEGUIMIENTO:
+            # 1. Cancelación
+            if cls.is_cancellation(texto) or texto.upper() in ["CANCELAR", "CANCEL", "CANCEL_ACTION"]:
+                cls.reset_session(session_id)
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", MENSAJE_CANCELACION)
+                return {
+                    "tipo": "CANCELADO",
+                    "state": "FINALIZADO",
+                    "mensaje": MENSAJE_CANCELACION,
+                    "response": MENSAJE_CANCELACION,
+                    "reply": MENSAJE_CANCELACION,
+                    "ticket_id": None,
+                    "source": "UniMon_Cancelacion",
+                    "quick_replies": []
                 }
+
+            target_id = session.target_ticket_id_followup or session.existing_ticket_id_today or 1000
+            followup_content = texto.strip()
+            correo_sol = session.correo or "solicitudcomputo@unisimon.edu.co"
+            from app.services.telemetry_service import log_ticket_activity
+            await glpi_client.add_ticket_followup(ticket_id=target_id, content=followup_content, email=correo_sol)
+            log_ticket_activity(session_id=session_id, email=correo_sol, ticket_id=target_id, action="FOLLOWUP")
+            cls.reset_session(session_id)
+            confirm_followup = (
+                f"✅ Se ha añadido tu mensaje como seguimiento al **Ticket #{target_id}**. El equipo de TI ya tiene actualizado tu caso."
+            )
+            cls.add_history(session_id, "user", texto)
+            cls.add_history(session_id, "assistant", confirm_followup)
+            return {
+                "tipo": "TICKET_CREADO",
+                "state": "FINALIZADO",
+                "mensaje": confirm_followup,
+                "response": confirm_followup,
+                "reply": confirm_followup,
+                "ticket_id": target_id,
+                "source": "GLPI_Followup_Success",
+                "quick_replies": []
+            }
 
         # -------------------------------------------------------------
         # ESTADO: PIDIENDO_CORREO (Paso 2 de Slot-Filling)
