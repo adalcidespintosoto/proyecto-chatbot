@@ -114,7 +114,8 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         ])
         is_password_recovery_query = any(w in q_lower for w in [
             "restablecer", "recuperar", "olvidé", "olvide", "desbloquear", "cambiar clave",
-            "cambiar contraseña", "olvido", "restablecimiento", "recuperación", "clave", "contraseña", "contrasena"
+            "cambiar contraseña", "olvido", "restablecimiento", "recuperación", "clave", "contraseña", "contrasena",
+            "no puedo ingresar", "no puedo entrar", "no me deja entrar", "no puedo acceder", "no me deja ingresar"
         ])
         is_upper_semester_or_regular = bool(re.search(
             r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|semestres?\s+(?:avanzados?|superiores?)|"
@@ -128,6 +129,13 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         is_hardware_dotation_query = any(w in q_lower for w in [
             "portatil", "portátil", "laptop", "computador", "pc", "equipo de computo",
             "dotacion", "dotación", "solicitar un portatil", "solicitar un computador", "pedir computador"
+        ])
+        is_teacher_grading_query = any(w in q_lower for w in [
+            "subo las notas", "subo notas", "subir notas", "cargar notas", "cargo notas", "calificar",
+            "fallas de mis alumnos", "inasistencias", "reporte de fallas", "reporte de las fallas",
+            "mis alumnos", "mis estudiantes", "ingreso de calificaciones", "planillas de calificaciones",
+            "cerrar el sistema", "cierre de sistema", "subir calificaciones", "cargar calificaciones",
+            "reporte de inasistencias", "inasistencias y consulta de listados", "autoevaluación docente"
         ])
         is_procedural_query = any(w in q_lower for w in [
             "cómo", "como", "pasos", "votar", "radicar", "ingresar", "activar", "descargar", 
@@ -191,6 +199,16 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
                     final_score += 2.5
                 if any(j in content_lower for j in ["gestión de requerimientos de recursos y soluciones tecnológicas", "p-gt-13"]):
                     final_score -= 3.0
+
+            # Desambiguación de Docentes ingresando calificaciones / inasistencias vs Estudiantes consultando
+            if is_teacher_grading_query:
+                if any(doc_name in source_lower for doc_name in [
+                    "ingreso de calificaciones, inasistencias", "calificaciones posgrados", "registro y carga de calificaciones",
+                    "listados académicos y de asistencia", "listados academicos"
+                ]) or "docente" in source_lower or "profesor" in source_lower or "posgrado" in source_lower:
+                    final_score += 5.0
+                if "portal estudiantes" in source_lower or "estudiante" in source_lower or "consulta e impresión de calificaciones" in source_lower:
+                    final_score -= 5.0
 
             # Bonificación procedimental: priorizar fragmentos con pasos e instructivos directos
             if is_procedural_query:
