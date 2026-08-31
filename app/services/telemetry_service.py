@@ -124,7 +124,7 @@ def get_tickets_today_for_email_db(email: str) -> List[Dict[str, Any]]:
             cursor.execute("""
                 SELECT ticket_id, action, created_at
                 FROM telemetry_tickets
-                WHERE LOWER(email) = ? AND action = 'NUEVO'
+                WHERE LOWER(email) = ? AND action IN ('NUEVO', 'NUEVO_2')
                   AND DATE(created_at) = DATE('now')
                 ORDER BY id DESC
             """, (email.strip().lower(),))
