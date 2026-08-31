@@ -372,9 +372,23 @@ class RouterLogic:
     def detect_user_role(cls, text: str) -> Optional[str]:
         """
         Detecta si el usuario menciona o selecciona su rol en la comunidad universitaria.
+        Maneja desambiguación contextual (ej. 'mis alumnos', 'subo notas' -> profesor).
         Retorna 'estudiante', 'profesor', 'administrativo' u 'otros'.
         """
         msg_lower = text.lower().strip()
+
+        # 1. Patrones contextuales prioritarios de profesor / docente
+        if any(re.search(pat, msg_lower) for pat in [
+            r"\bmis\s+(alumnos|alumnas|estudiantes)\b",
+            r"\b(de|a)\s+mis\s+(alumnos|alumnas|estudiantes)\b",
+            r"\b(subir|subo|cargar|cargo|ingresar|ingreso|digitar|digito)\s+(las\s+)?(notas|calificaciones|fallas|inasistencias)\b",
+            r"\b(reportar|reporte\s+de)\s+(fallas|inasistencias)\b",
+            r"\bcalificar\s+(alumnos|estudiantes|grupo|curso|planillas)\b",
+            r"\b(soy|como)\s+(profesor|profesora|docente|catedr[aá]tico|catedr[aá]tica)\b"
+        ]):
+            return "profesor"
+
+        # 2. Búsqueda directa por sinónimos estándar
         for key, role_val in ROLE_SYNONYMS.items():
             if re.search(rf"\b{key}\b", msg_lower):
                 return role_val
@@ -787,13 +801,14 @@ class RouterLogic:
 
         # -------------------------------------------------------------
         # DETECCIÓN DE ROL DEL USUARIO
-        # Si el usuario menciona su rol, guardarlo en la sesión
+        # El rol se asigna únicamente cuando el usuario responde a PIDIENDO_ROL
+        # o cuando en IDLE su mensaje es exclusivamente una declaración de rol.
         # -------------------------------------------------------------
-        prev_user_role = session.user_role
-        detected_role = cls.detect_user_role(texto)
-        if detected_role:
-            session.user_role = detected_role
-            logger.info(f"[Session: {session_id}] Rol detectado y asignado: '{session.user_role}'")
+        if session.user_role is None and estado_actual == EstadoTicket.PIDIENDO_ROL:
+            detected_role = cls.detect_user_role(texto) or normalize_role(texto)
+            if detected_role:
+                session.user_role = detected_role
+                logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
 
         logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Rol: {session.user_role} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje ({len(texto)} chars): '{texto}'")
 
@@ -1073,7 +1088,7 @@ class RouterLogic:
                 session.pending_query 
                 and not cls.is_greeting(session.pending_query)
                 and len(session.pending_query.strip()) > 3
-                and not cls.detect_user_role(session.pending_query)
+                and not (cls.detect_user_role(session.pending_query) and len(session.pending_query.split()) <= 3)
                 and not is_out_of_domain_query(session.pending_query)
             )
 
@@ -1577,38 +1592,44 @@ class RouterLogic:
                     "source": "UniMon_Guardrail"
                 }
 
-            # 2. Si el usuario NO tenía rol asignado O el mensaje actual es únicamente declarar el rol:
-            is_just_role_declaration = bool(detected_role and (cls.is_greeting(texto) or len(texto.split()) <= 4))
-            
-            if not prev_user_role or is_just_role_declaration:
-                if detected_role:
+            # 2. Si el usuario NO tiene rol asignado en la sesión:
+            if not session.user_role:
+                detected_role = cls.detect_user_role(texto) or normalize_role(texto)
+                has_question_keywords = any(w in texto.lower() for w in [
+                    "?", "¿", "dónde", "donde", "cómo", "como", "por qué", "porque", 
+                    "por dónde", "por donde", "subo", "puedo", "quiero", "necesito", 
+                    "ayuda", "autoevaluacion", "autoevaluación", "clave", "contraseña", 
+                    "portal", "fallas", "problema", "error", "calificaciones", "promedio"
+                ])
+                is_just_role_declaration = bool(detected_role and len(texto.split()) <= 4 and not has_question_keywords)
+
+                if is_just_role_declaration:
+                    # El usuario envió únicamente su rol (ej: "estudiante", "profesor", "soy docente", "administrativo")
                     session.user_role = detected_role
                     logger.info(f"[Session: {session_id}] Rol identificado en primer mensaje: '{session.user_role}'")
-                    # Si el mensaje era solo declarar el rol o saludo con rol (ej: "soy estudiante", "funcionario", "hola soy profesor")
-                    if is_just_role_declaration:
-                        session.estado = EstadoTicket.DIAGNOSTICO
-                        session.diagnosis_attempts = 1
-                        session.intentos_diagnostico = 1
-                        greeting_reply = (
-                            "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar. "
-                            "¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?"
-                        )
-                        cls.add_history(session_id, "user", texto)
-                        cls.add_history(session_id, "assistant", greeting_reply)
-                        return {
-                            "tipo": "DIAGNOSTICO",
-                            "state": "DIAGNOSTICO",
-                            "mensaje": greeting_reply,
-                            "response": greeting_reply,
-                            "reply": greeting_reply,
-                            "ticket_id": None,
-                            "source": "UniMon_Assistant",
-                            "quick_replies": []
-                        }
-                    # Si vino con pregunta (ej: "soy estudiante y no puedo entrar al portal"), continuará hacia el RAG abajo
+                    session.estado = EstadoTicket.DIAGNOSTICO
+                    session.diagnosis_attempts = 1
+                    session.intentos_diagnostico = 1
+                    greeting_reply = (
+                        "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar. "
+                        "¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?"
+                    )
+                    cls.add_history(session_id, "user", texto)
+                    cls.add_history(session_id, "assistant", greeting_reply)
+                    return {
+                        "tipo": "DIAGNOSTICO",
+                        "state": "DIAGNOSTICO",
+                        "mensaje": greeting_reply,
+                        "response": greeting_reply,
+                        "reply": greeting_reply,
+                        "ticket_id": None,
+                        "source": "UniMon_Assistant",
+                        "quick_replies": []
+                    }
                 else:
-                    # El usuario no especificó su rol -> Calificación de rol obligatoria
-                    if not cls.is_greeting(texto) and len(texto.split()) > 2 and not cls.is_cancellation(texto) and not is_out_of_domain_query(texto):
+                    # El usuario formuló una pregunta o saludo sin haber seleccionado su rol previamente.
+                    # Retener la consulta y solicitar OBLIGATORIAMENTE la selección de rol.
+                    if not cls.is_greeting(texto) and len(texto.split()) > 1 and not cls.is_cancellation(texto) and not is_out_of_domain_query(texto):
                         session.pending_query = texto
                     else:
                         session.pending_query = None

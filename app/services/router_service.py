@@ -111,13 +111,13 @@ ROLE_SYNONYMS = {
 }
 
 
-def normalize_role(user_input: str) -> str:
+def normalize_role(user_input: str) -> Optional[str]:
     """Normaliza el rol ingresado por el usuario usando ROLE_SYNONYMS."""
     msg = user_input.lower().strip()
     for key, role_val in ROLE_SYNONYMS.items():
         if re.search(rf"\b{key}\b", msg):
             return role_val
-    return "otros"
+    return None
 
 
 async def classify_request_intent_async(user_message: str, user_role: str = "general") -> str:
