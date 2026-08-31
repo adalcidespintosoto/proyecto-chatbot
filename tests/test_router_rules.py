@@ -281,7 +281,7 @@ async def test_academic_fallas_a_clase_stays_in_autoservicio_and_diagnostico():
 
 @pytest.mark.asyncio
 async def test_physical_hardware_direct_routing_from_idle():
-    """Verifica que consultas de SOPORTE_FISICO salten DIRECTAMENTE a RADICANDO_TICKET pidiendo Nombre."""
+    """Verifica que consultas de SOPORTE_FISICO entreguen canales oficiales y ofrezcan quick replies antes de pedir Nombre."""
     sess_id = "sess_hw_idle"
     router_logic.reset_session(sess_id)
     session = router_logic.get_session(sess_id)
@@ -294,19 +294,22 @@ async def test_physical_hardware_direct_routing_from_idle():
 
         res = await router_logic.procesar_mensaje(msg, session_id=sess_id)
 
-        assert res["tipo"] == "RADICANDO_TICKET"
-        assert res["state"] == "RADICANDO_TICKET"
+        assert res["tipo"] == "OFRECIENDO_RADICACION"
+        assert res["state"] == "OFRECIENDO_RADICACION"
         assert res["source"] == "UniMon_SemanticRouter_Hardware"
-        assert router_logic.get_session(sess_id).estado == EstadoTicket.PIDIENDO_NOMBRE
-        assert "revisión técnica o falla física" in res["mensaje"]
-        assert "Nombre Completo" in res["mensaje"]
-        assert res.get("quick_replies") == []
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.OFRECIENDO_RADICACION
+        assert "solicitudcomputo@unisimon.edu.co" in res["mensaje"]
+        assert "helpdesk@unisimon.edu.co" in res["mensaje"]
+        assert "Nombre Completo" not in res["mensaje"]
+        assert len(res.get("quick_replies", [])) == 2
+        assert res["quick_replies"][0]["payload"] == "CREATE_TICKET"
+        assert res["quick_replies"][1]["payload"] == "RESOLVED"
         mock_rag.assert_not_called()  # RAG NO debe ser llamado para soporte físico directo
 
 
 @pytest.mark.asyncio
 async def test_physical_hardware_no_enciende_direct_routing():
-    """Verifica que 'mi computador no enciende' clasificado como SOPORTE_FISICO salte directo a captura de Nombre."""
+    """Verifica que 'mi computador no enciende' clasificado como SOPORTE_FISICO ofrezca canales y botones."""
     sess_id = "sess_hw_no_prende"
     router_logic.reset_session(sess_id)
     session = router_logic.get_session(sess_id)
@@ -317,17 +320,18 @@ async def test_physical_hardware_no_enciende_direct_routing():
 
         res = await router_logic.procesar_mensaje("mi computador no enciende", session_id=sess_id)
 
-        assert res["tipo"] == "RADICANDO_TICKET"
+        assert res["tipo"] == "OFRECIENDO_RADICACION"
         assert res["source"] == "UniMon_SemanticRouter_Hardware"
-        assert router_logic.get_session(sess_id).estado == EstadoTicket.PIDIENDO_NOMBRE
-        assert "Nombre Completo" in res["mensaje"]
-        assert res.get("quick_replies") == []
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.OFRECIENDO_RADICACION
+        assert "solicitudcomputo@unisimon.edu.co" in res["mensaje"]
+        assert "Nombre Completo" not in res["mensaje"]
+        assert len(res.get("quick_replies", [])) == 2
         mock_rag.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_physical_hardware_routing_after_role_qualification():
-    """Verifica el flujo: Falla física sin rol previo -> Califica rol -> Salto semántico directo a RADICANDO_TICKET."""
+    """Verifica el flujo: Falla física sin rol previo -> Califica rol -> Canales oficiales + Quick Replies."""
     sess_id = "sess_hw_role_flow"
     router_logic.reset_session(sess_id)
 
@@ -335,19 +339,81 @@ async def test_physical_hardware_routing_after_role_qualification():
     r1 = await router_logic.procesar_mensaje("El cable de red del computador de mi oficina está roto", session_id=sess_id)
     assert r1["tipo"] == "PIDIENDO_ROL"
 
-    # 2. Usuario indica rol -> Debe clasificar semánticamente y saltar a RADICANDO_TICKET sin pasar por RAG
+    # 2. Usuario indica rol -> Debe clasificar semánticamente y ofrecer radicación con canales oficiales
     with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="SOPORTE_FISICO")), \
          patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
 
         r2 = await router_logic.procesar_mensaje("Soy docente", session_id=sess_id)
 
-        assert r2["tipo"] == "RADICANDO_TICKET"
+        assert r2["tipo"] == "OFRECIENDO_RADICACION"
         assert r2["source"] == "UniMon_SemanticRouter_Hardware"
-        assert router_logic.get_session(sess_id).estado == EstadoTicket.PIDIENDO_NOMBRE
-        assert "revisión técnica o falla física" in r2["mensaje"]
-        assert "Nombre Completo" in r2["mensaje"]
-        assert r2.get("quick_replies") == []
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.OFRECIENDO_RADICACION
+        assert "solicitudcomputo@unisimon.edu.co" in r2["mensaje"]
+        assert "Nombre Completo" not in r2["mensaje"]
+        assert len(r2.get("quick_replies", [])) == 2
         mock_rag.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_role_persistence_across_resolved_and_cancel_and_tickets():
+    """Verifica que el rol del usuario permanezca FIJO durante toda la sesión tras marcar resuelto, cancelar o radicar."""
+    sess_id = "sess_role_persistence_test"
+    router_logic.reset_session(sess_id)
+
+    # Paso 1: Usuario declara que es estudiante
+    r1 = await router_logic.procesar_mensaje("Hola, soy estudiante", session_id=sess_id)
+    assert r1["tipo"] == "DIAGNOSTICO"
+    session = router_logic.get_session(sess_id)
+    assert session.user_role == "estudiante"
+
+    # Paso 2: Usuario realiza consulta que se resuelve positivamente con RESOLVED
+    session.last_user_query = "¿Cómo veo mi horario?"
+    session.last_bot_response = "Ingresa al portal..."
+    session.estado = EstadoTicket.DIAGNOSTICO
+
+    r2 = await router_logic.procesar_mensaje("RESOLVED", session_id=sess_id)
+    assert r2["tipo"] == "FINALIZADO"
+    # El rol DEBE continuar como 'estudiante'
+    assert router_logic.get_session(sess_id).user_role == "estudiante"
+
+    # Paso 3: Nueva consulta del usuario en la misma sesión -> NO debe volver a pedir rol
+    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="AUTOSERVICIO")), \
+         patch.object(rag_service, "answer_query", new=AsyncMock(return_value={"response": "Pasos para notas...", "sources": [], "has_context": True, "quick_replies": []})) as mock_rag:
+
+        r3 = await router_logic.procesar_mensaje("¿Cómo consulto mis calificaciones?", session_id=sess_id)
+        assert r3["tipo"] == "DIAGNOSTICO"
+        assert r3["tipo"] != "PIDIENDO_ROL"
+        assert router_logic.get_session(sess_id).user_role == "estudiante"
+        mock_rag.assert_called_once()
+
+    # Paso 4: Usuario inicia radicación y luego cancela
+    router_logic.get_session(sess_id).estado = EstadoTicket.PIDIENDO_NOMBRE
+    r4 = await router_logic.procesar_mensaje("cancelar", session_id=sess_id)
+    assert r4["tipo"] == "CANCELADO"
+    # El rol DEBE seguir activo tras cancelación
+    assert router_logic.get_session(sess_id).user_role == "estudiante"
+
+
+@pytest.mark.asyncio
+async def test_complex_question_containing_ya_no_does_not_trigger_solved():
+    """Verifica que 'Le di en olvidar contraseña pero el link me llegó a un correo viejo que ya no tengo abierto, ¿dónde actualizo ese correo?' NO sea clasificado como SOLUCIONADO."""
+    sess_id = "sess_complex_q_ya_no"
+    router_logic.reset_session(sess_id)
+    session = router_logic.get_session(sess_id)
+    session.user_role = "estudiante"
+    session.estado = EstadoTicket.DIAGNOSTICO
+
+    msg = "Le di en olvidar contraseña pero el link me llegó a un correo viejo que ya no tengo abierto, ¿dónde actualizo ese correo?"
+    assert not router_logic.is_solved_confirmation(msg)
+
+    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="AUTOSERVICIO")), \
+         patch.object(rag_service, "answer_query", new=AsyncMock(return_value={"response": "Para actualizar tu correo personal...", "sources": ["actualizacion_datos.pdf"], "has_context": True, "quick_replies": []})) as mock_rag:
+
+        res = await router_logic.procesar_mensaje(msg, session_id=sess_id)
+        assert res["tipo"] == "DIAGNOSTICO"
+        assert res["tipo"] != "SOLUCIONADO"
+        assert "actualizar tu correo" in res["mensaje"]
+        mock_rag.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -68,11 +68,53 @@ from app.services.rag_service import rag_service
 
 
 # ==========================================
-# Endpoint Principal: POST /api/chat
+# Rate Limiter & Sanitización
 # ==========================================
 
 import time
+import re
+from fastapi import Request
 from app.services.telemetry_service import log_interaction, update_session_status
+
+RATE_LIMIT_BUCKET: Dict[str, List[float]] = {}
+MAX_REQUESTS_PER_MINUTE = 25
+RATE_LIMIT_WINDOW = 60.0
+
+INJECTION_PATTERNS = [
+    r"(?i)\bignora\s+(tus|las|todas\s+las)?\s*instrucciones\b",
+    r"(?i)\bolvida\s+(tu|el)?\s*sistema\b",
+    r"(?i)\bignore\s+(all\s+)?(previous\s+)?instructions\b",
+    r"(?i)\bignore\s+your\s+system\s+prompt\b",
+    r"(?i)\bact[uú]a\s+como\s+dan\b",
+]
+
+
+def check_rate_limit(key: str):
+    """Verifica si la IP o session_id ha superado el límite de 25 peticiones por minuto."""
+    now = time.time()
+    timestamps = RATE_LIMIT_BUCKET.get(key, [])
+    # Limpiar marcas de tiempo fuera de la ventana de 60s
+    timestamps = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+    if len(timestamps) >= MAX_REQUESTS_PER_MINUTE:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas solicitudes. Por favor espera un momento."
+        )
+    timestamps.append(now)
+    RATE_LIMIT_BUCKET[key] = timestamps
+
+
+def sanitize_input_text(text: str) -> str:
+    """Sanitiza el texto eliminando etiquetas HTML, neutralizando inyecciones de prompt y limitando a 600 caracteres."""
+    # 1. Limitar longitud máxima a 600 caracteres
+    clean = text[:600].strip()
+    # 2. Eliminar etiquetas HTML / script
+    clean = re.sub(r'<[^>]*>', '', clean).strip()
+    # 3. Neutralizar intentos de inyección de prompt
+    for pat in INJECTION_PATTERNS:
+        clean = re.sub(pat, "[consulta filtrada]", clean)
+    return clean.strip()
+
 
 @router.post(
     "/chat",
@@ -81,20 +123,32 @@ from app.services.telemetry_service import log_interaction, update_session_statu
     summary="Procesar mensaje del usuario con Chatbot de Nivel 1 y Router de Intención",
     description="Orquesta el diagnóstico proactivo de Nivel 1 con RAG (Llama 3.1) o la captura conversacional y radicación de tickets en GLPI."
 )
-async def process_chat(request: ChatRequest) -> ChatResponse:
+async def process_chat(request: ChatRequest, raw_request: Request = None) -> ChatResponse:
     """
     Endpoint principal para interacción con el Asistente Virtual UniMon.
-    Conecta directamente con router_logic.procesar_mensaje(mensaje, session_id).
-    Registra métricas y telemetría de rendimiento y resolución en segundo plano.
+    Aplica limitación de tasa (25 req/min), sanitización de entrada y registro de telemetría.
     """
-    texto = request.get_texto()
-    if not texto:
+    raw_texto = request.get_texto()
+    if not raw_texto:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El campo 'mensaje' no puede estar vacío."
         )
 
     session_id = request.session_id or "default_session"
+
+    # Aplicar Rate Limiting por session_id / IP cliente
+    client_ip = raw_request.client.host if raw_request and raw_request.client else session_id
+    rate_key = f"{session_id}_{client_ip}"
+    check_rate_limit(rate_key)
+
+    # Sanitizar y validar longitud del mensaje (máx 600 chars)
+    texto = sanitize_input_text(raw_texto)
+    if not texto:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El mensaje ingresado no contiene texto válido tras la sanitización."
+        )
 
     logger.info(f"Procesando mensaje para session_id '{session_id}' (longitud: {len(texto)} chars): '{texto}'")
 

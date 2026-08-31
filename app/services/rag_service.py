@@ -1,8 +1,8 @@
 """
-Servicio RAG Local con ChromaDB, Embeddings Multilingües, Normalizador Léxico y Ollama (Llama 3.1:8B).
+Servicio RAG Local con ChromaDB, Embeddings Multilingües, Normalizador Léxico, Multi-Query Generator y Ollama (unimon:8b).
 Provee respuestas estrictas de soporte técnico y gestión de TI para la Universidad Simón Bolívar
 (Sedes Barranquilla y Cúcuta, Colombia) basadas en documentos y procedimientos institucionales indexados.
-Aplica normalización léxica, expansión LLM de consultas, Cross-Encoder Reranker y corte calibrado a 0.48.
+Aplica normalización léxica, expansión multi-consulta LLM de consultas, Cross-Encoder Reranker y corte calibrado a 0.38.
 """
 
 import os
@@ -25,8 +25,21 @@ from app.services.normalizer_service import normalize_and_expand_query, strip_qu
 
 logger = logging.getLogger("unimon.rag_service")
 
-# Umbral mínimo de similitud para considerar relevante un fragmento recuperado (calibrado a 0.48)
-MIN_RELEVANCE_SCORE_THRESHOLD = 0.48
+# Umbral mínimo de similitud para considerar relevante un fragmento recuperado (calibrado a 0.38 para tolerancia a jerga/sinónimos)
+MIN_RELEVANCE_SCORE_THRESHOLD = 0.38
+
+
+def format_e5_query(query: str) -> str:
+    """
+    Asegura que toda consulta enviada al modelo de embeddings 'intfloat/multilingual-e5-base'
+    y a ChromaDB incluya el prefijo formal 'query: ' para maximizar compatibilidad y precisión.
+    """
+    if not query:
+        return ""
+    cleaned = query.strip()
+    if not cleaned.lower().startswith("query:"):
+        return f"query: {cleaned}"
+    return cleaned
 
 # Pregunta estandarizada de cierre para diagnósticos y quick replies
 CLOSING_FEEDBACK_QUESTION = (
@@ -93,6 +106,12 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         scores = reranker.predict(pairs)
 
         q_lower = clean_q.lower()
+        is_specific_lab_query = bool(re.search(r"\b(laboratorio\s+de\s+[a-záéíóúñ]+|lab\s+de\s+[a-záéíóúñ]+|laboratorio\s+espec[ií]fico|laboratorio\s+biom[eé]dico|laboratorio\s+mac)\b", q_lower))
+        is_general_campus_query = not is_specific_lab_query and any(w in q_lower for w in [
+            "salon", "salones", "aula", "aulas", "oficina", "oficinas", "sede", "sedes", 
+            "barranquilla", "cucuta", "cúcuta", "mantenimiento", "computador", "equipos", 
+            "soporte", "daño", "falla", "red", "internet", "proceso", "gestion de ti", "gestión de ti"
+        ])
         is_password_recovery_query = any(w in q_lower for w in [
             "restablecer", "recuperar", "olvidé", "olvide", "desbloquear", "cambiar clave",
             "cambiar contraseña", "olvido", "restablecimiento", "recuperación", "clave", "contraseña", "contrasena"
@@ -121,6 +140,35 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
             doc, original_score = retrieved_docs[i]
             final_score = float(rerank_score)
             content_lower = doc.page_content.lower()
+            source_lower = doc.metadata.get("source", "").lower()
+
+            # Penalización a documentos con alcance específico de laboratorios particulares cuando la consulta es general
+            if is_general_campus_query and not is_specific_lab_query:
+                if any(lab in content_lower for lab in [
+                    "laboratorio de simulación", "laboratorio de simulacion", "laboratorios especializados",
+                    "laboratorio de cómputo avanzado", "laboratorio de biomédica", "laboratorio de fisica",
+                    "laboratorio de química", "laboratorio mac"
+                ]) or ("laboratorio" in source_lower and "mantenimiento" not in source_lower):
+                    final_score -= 3.5
+
+            # Priorizar manuales institucionales marco ('Caracterización del Proceso Institucional de Gestión de TI', 'Mantenimiento Preventivo y Correctivo General')
+            is_process_or_maintenance_query = (is_general_campus_query or any(w in q_lower for w in [
+                "proceso", "gestión", "gestion", "caracterización", "caracterizacion", "mantenimiento", 
+                "preventivo", "correctivo", "daño", "dañado", "falla", "equipo", "infraestructura", "ti"
+            ])) and not is_password_recovery_query
+
+            if is_process_or_maintenance_query:
+                if any(marco in content_lower for marco in [
+                    "caracterización del proceso", "caracterizacion del proceso",
+                    "caracterización del proceso institucional de gestión de ti",
+                    "caracterizacion del proceso institucional de gestion de ti",
+                    "mantenimiento preventivo y correctivo general",
+                    "mantenimiento preventivo y correctivo de equipos de cómputo",
+                    "p-gt-01", "c-gt-01"
+                ]) or any(marco_src in source_lower for marco_src in [
+                    "caracterizacion", "caracterización", "mantenimiento_preventivo", "p-gt-01", "c-gt-01"
+                ]):
+                    final_score += 2.5
 
             # Enrutamiento estricto de recuperación de contraseñas y desambiguación de estudiante antiguo vs primer semestre
             if is_password_recovery_query:
@@ -167,12 +215,170 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
 
 
 # =============================================================================
-# QUERY EXPANSION LLM (Módulo 2: Traducción de jerga a terminología institucional)
+# MULTI-QUERY GENERATOR & QUERY EXPANSION (Módulo 2: Tolerancia a jerga estudiantil)
 # =============================================================================
+
+# Diccionario semántico institucional rápido para expansión instantánea de jerga
+SEMANTIC_SYNONYM_DICTIONARY = [
+    {
+        "triggers": ["materia", "materias", "profe", "profes", "profesor", "profesores", "docente", "docentes", "horario", "horarios", "asignatura", "asignaturas", "franja", "franjas", "clase", "clases"],
+        "variants": [
+            "Consulta de horario y asignaturas portal estudiantes SIAAF",
+            "Listado de materias inscritas y docentes asignados",
+            "Ver horario académico sede Barranquilla Cúcuta"
+        ]
+    },
+    {
+        "triggers": ["pago", "pagar", "matricula", "matrícula", "recibo", "volante", "liquidación", "liquidacion", "financiero", "semestre", "valor"],
+        "variants": [
+            "Generación y pago de volante de matrícula portal estudiantes",
+            "Consulta de liquidación matrícula y pagos financieros",
+            "Procedimiento de pago de matrícula académica"
+        ]
+    },
+    {
+        "triggers": ["nota", "notas", "calificacion", "calificaciones", "promedio", "boletin", "boletín", "supletorio", "supletorios", "examen", "examenes", "parcial"],
+        "variants": [
+            "Consulta de notas y calificaciones parciales SIAAF portal estudiantes",
+            "Historial académico y registro de calificaciones",
+            "Autorización y registro de exámenes supletorios en SIAAF"
+        ]
+    },
+    {
+        "triggers": ["clave", "contraseña", "contrasena", "olvide", "olvidé", "bloqueo", "desbloquear", "restablecer", "recuperar", "usuario", "correo", "login", "ingresar", "acceder"],
+        "variants": [
+            "Restablecimiento de contraseña portal estudiantes y correo institucional",
+            "Recuperación de acceso cuenta de usuario portal institucional",
+            "Autogestión de contraseñas estudiantes Microsoft 365"
+        ]
+    },
+    {
+        "triggers": ["computador", "portatil", "portátil", "pc", "laptop", "equipo", "dotacion", "dotación", "cambio de equipo", "solicitar computador", "pedir computador"],
+        "variants": [
+            "Solicitud y asignación de equipo de cómputo y dotación tecnológica",
+            "Mantenimiento preventivo y correctivo de equipos de cómputo P-GT-01",
+            "Requerimientos de recursos tecnológicos funcionarios"
+        ]
+    },
+    {
+        "triggers": ["teams", "reunion", "reuniones", "clases virtuales", "tim", "videollamada"],
+        "variants": [
+            "Acceso a Microsoft Teams para estudiantes",
+            "Inicio de sesión y acceso a clases virtuales Teams",
+            "Credenciales y soporte Microsoft Teams estudiantes"
+        ]
+    },
+    {
+        "triggers": ["carnet", "carné", "app", "aplicacion", "aplicación", "movil", "móvil", "digital"],
+        "variants": [
+            "Consulta y activación de carnet digital App Unisimon",
+            "Descarga y uso de aplicación móvil Unisimon",
+            "Soporte carnet estudiantil digital"
+        ]
+    },
+    {
+        "triggers": ["votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "colegiados", "organos colegiados"],
+        "variants": [
+            "Votación electrónica para elecciones de órganos colegiados",
+            "Acceso al portal de elecciones institucionales",
+            "Procedimiento de votación representantes estudiantiles"
+        ]
+    }
+]
+
+
+def get_dictionary_query_variants(query: str) -> List[str]:
+    """
+    Genera variantes de búsqueda institucional mediante reglas semánticas y sinónimos cotidianos.
+    """
+    q_lower = query.lower()
+    variants = []
+    for entry in SEMANTIC_SYNONYM_DICTIONARY:
+        if any(re.search(r'\b' + re.escape(t) + r'\b', q_lower) for t in entry["triggers"]):
+            for v in entry["variants"]:
+                if v not in variants:
+                    variants.append(v)
+            if len(variants) >= 3:
+                break
+    return variants[:3]
+
+
+async def async_generate_multi_query_variants(
+    raw_query: str,
+    user_role: str = "general",
+    max_variants: int = 3
+) -> List[str]:
+    """
+    Genera 3 variantes de búsqueda formal/institucional a partir de una frase informal/ambigua.
+    Utiliza Ollama ('unimon:8b') de forma asíncrona y rápida, con fallback instantáneo a diccionario semántico.
+    """
+    cleaned_query = strip_query_header_noise(raw_query)
+    variants: List[str] = []
+
+    # 1. Intentar generación asíncrona con unimon:8b
+    system_prompt = (
+        "Eres un generador de consultas de búsqueda documental para la base de conocimientos de TI "
+        "de la Universidad Simón Bolívar (SIAAF, Portal Estudiantes, Teams, Kactus, etc.).\n"
+        "Tu tarea: traducir la consulta informal o ambigua del usuario en exactamente 3 variantes de búsqueda técnica e institucional.\n"
+        "Reglas:\n"
+        "- Responde ÚNICAMENTE 3 líneas numeradas (1, 2, 3).\n"
+        "- Usa terminología formal universitaria (ej. SIAAF, Portal Estudiantes, Horario Académico, Asignaturas, Notas, Matrícula, Microsoft Teams, Restablecimiento de Contraseña).\n"
+        "- Sin explicaciones, saludos ni comentarios."
+    )
+
+    try:
+        settings = get_settings()
+        ollama_url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                ollama_url,
+                json={
+                    "model": settings.llm_model,
+                    "system": system_prompt,
+                    "prompt": f"Rol: {user_role}\nConsulta informal: {cleaned_query}\n3 variantes formales de búsqueda:",
+                    "stream": False,
+                    "options": {"temperature": 0.1, "num_predict": 70}
+                },
+                timeout=4.0
+            )
+            if response.status_code == 200:
+                raw_text = response.json().get("response", "").strip()
+                lines = raw_text.splitlines()
+                for line in lines:
+                    cleaned_line = re.sub(r"^\s*(?:\d+[\.\)]|\-|\*)\s*", "", line).strip()
+                    if cleaned_line and len(cleaned_line) > 5 and cleaned_line not in variants:
+                        variants.append(cleaned_line)
+                    if len(variants) >= max_variants:
+                        break
+    except Exception as exc:
+        logger.debug(f"[MultiQuery] Fallback a diccionario semántico ({exc})")
+
+    # 2. Complementar con diccionario semántico si faltan variantes
+    if len(variants) < max_variants:
+        dict_vars = get_dictionary_query_variants(cleaned_query)
+        for dv in dict_vars:
+            if dv not in variants:
+                variants.append(dv)
+            if len(variants) >= max_variants:
+                break
+
+    # 3. Incorporar expansión léxica tradicional
+    lexical = normalize_and_expand_query(cleaned_query)
+    if lexical and lexical not in variants and lexical != cleaned_query:
+        variants.append(lexical)
+
+    # 4. Asegurar que la consulta base limpia esté presente
+    if cleaned_query and cleaned_query not in variants:
+        variants.append(cleaned_query)
+
+    logger.info(f"[MultiQuery] '{raw_query[:40]}' -> {len(variants)} variantes generadas: {variants}")
+    return variants[:max_variants + 1]
+
 
 def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -> str:
     """
-    Traduce jerga informal estudiantil a términos técnicos institucionales mediante Ollama.
+    Traduce jerga informal estudiantil a términos técnicos institucionales mediante Ollama (síncrono).
     Depura previamente ruido de remitentes y encabezados.
     
     Args:
@@ -230,6 +436,11 @@ MENSAJE_NO_DOCUMENTADO = (
 
 # Prompt del sistema institucional para soporte técnico N1 adaptativo
 STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta, Colombia).
+
+DIRECTRICES DE RESPUESTA:
+1. Interpreta la intención del usuario aunque use lenguaje informal, abreviaturas o sinónimos cotidianos (ej. 'profes', 'materias', 'horarios', 'portal').
+2. Si el contexto menciona el sistema (ej. SIAAF, Teams, Portal Estudiantes), infiere la ruta lógica paso a paso y oriéntalo con seguridad.
+3. Solo en caso de que la consulta sea totalmente ajena a la universidad o no exista ninguna relación en el contexto, remite amablemente a los canales presenciales de TI (Ext. 8003/8004 en Barranquilla o Ext. 129 en Cúcuta).
 
 DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
 
@@ -298,9 +509,11 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
    
    PROHIBICIÓN ESTRICTA: Cuando la respuesta sea un instructivo paso a paso (Paso 1, Paso 2...), NUNCA inicies el mensaje saludando con los números de teléfono o correos de soporte. Los canales oficiales de TI van EXCLUSIVAMENTE en la última sección ('Si el problema persiste o no puedes completar el proceso: ...'). El paso a paso SIEMPRE debe preceder a los canales.
 
-4. PROHIBICIÓN ABSOLUTA DE META-LENGUAJE Y FUGAS DE PROMPT:
+4. PROHIBICIÓN ABSOLUTA DE META-LENGUAJE, AUTO-JUSTIFICACIONES Y FUGAS DE PROMPT:
    - JAMÁS escribas títulos de directivas internas como "Prohibición de Omitir Información", "Canales Complejos y Datos Requeridos" o "Según el PDF".
    - PROHIBIDO VOLVER A SALUDAR O PRESENTARTE ("¡Hola!", "Soy UniMon"). Empieza directamente con la información solicitada.
+   - PROHIBIDO hablar de ti mismo, justificarte o disculparte por fallas o respuestas previas.
+   - PROHIBIDO usar frases como "Lo siento pero no puedo proporcionar información sobre el rol", "Hubo un error en la respuesta anterior", "Como modelo de lenguaje" o similares. Responde de forma directa, ejecutiva y profesional con la información disponible.
 
 5. FIDELIDAD AL CONTEXTO Y GROUNDING:
    - Limítate estrictamente a los hechos extraídos del contexto provisto.
@@ -363,6 +576,25 @@ Por favor diligencia y envía la siguiente plantilla a los canales de soporte:
 - **Motivo / Evento o Clase:**
 - **Fecha y Horario:**
 - **Ubicación / Salón:**
+
+¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
+
+[EJEMPLO 4: Restablecimiento de Contraseña / Acceso Portal]
+Pregunta: Olvidé mi contraseña del portal de estudiantes
+Respuesta:
+Para restablecer tu contraseña del Portal Estudiantes, sigue estos pasos:
+
+1. Ingresa al portal institucional en http://www.unisimon.edu.co/ y haz clic en **Portales**.
+2. Selecciona **Portal Estudiantes** y elige tu sede (Barranquilla o Cúcuta).
+3. Haz clic en la opción **¿Olvidó su contraseña?** o **Restablecer clave**.
+4. Digita tu documento de identidad o código estudiantil y presiona **Enviar**.
+5. Revisa tu correo personal registrado y abre el enlace de restablecimiento para definir tu nueva contraseña.
+
+Si presentas inconvenientes durante el proceso, puedes contactar a Soporte TI:
+• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333 Ext. 8003/8004`
+• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
 
 ¿Pudiste resolver tu problema con estos pasos?
 - Selecciona o escribe **Sí** si te funcionó.
@@ -561,7 +793,7 @@ def clean_llm_response(text: str) -> str:
         flags=re.IGNORECASE
     )
 
-    # 6. Remover fugas de directivas internas del prompt
+    # 6. Remover fugas de directivas internas, encabezados de prompt y casos de referencia
     text = re.sub(
         r"(?im)^#{1,4}\s*(?:Prohibici[oó]n|Reglas?|Directivas?|Canales Complejos|Revisi[oó]n Obligatoria|Fidelidad|Grounding)[^\n]*\n*",
         "",
@@ -573,8 +805,32 @@ def clean_llm_response(text: str) -> str:
         text
     )
     text = re.sub(r"(?i)\b(?:prohibici[oó]n de omitir[^\n]*)\b", "", text)
+    text = re.sub(r"(?im)^\s*\[CONTEXTO\s+INSTITUCIONAL\s+DOCUMENTADO\]:?\s*\n*", "", text)
+    text = re.sub(r"(?im)^\s*\[[A-Za-z0-9_.\- \u00C0-\u017F]+\.pdf(?:\s*\(Pág\.\s*\d+\))?\]\s*\n*", "", text)
+    text = re.sub(r"(?im)^---\s*\n*", "", text)
+    text = re.sub(r"(?im)^\s*Pregunta\s+del\s+usuario:?[^\n]*\n*", "", text)
+    text = re.sub(r"(?im)^\s*Respuesta\s+(?:adaptativa\s+)?directa\s+(?:de\s+soporte)?:?\s*\n*", "", text)
+    text = re.sub(r"(?im)^\s*\[CASO\s+(?:PREVIO\s+VALIDADO|INSTITUCIONAL\s+PREVIO|DE\s+REFERENCIA\s+VALIDADO)[^\n\]]*\]:?(?:\s*Pregunta\s+previa:?[^\n]*->\s*Respuesta\s+validada:?\s*'?|\s*)", "", text)
+    text = re.sub(r"(?im)^\s*Ejemplo\s+institucional\s+de\s+referencia:?\s*\n*(?:-\s*Consulta\s+similar:?[^\n]*\n*)*(?:-\s*Soluci[oó]n\s+validada:?\s*\n*)*", "", text)
 
-    # 7. Remover variantes intermedias o duplicadas del pie de confirmación para reubicarlo estrictamente al final
+    # 7. Eliminar justificaciones, disculpas, coletillas de modelo o meta-lenguaje inicial
+    text = re.sub(
+        r"(?im)^(?:¡?(?:lo siento|disculpa|disculpas)[,!.]*(?:\s*pero)?\s*[^.\n]*(?:no puedo|no tengo|como modelo|asistencia directa)[^.\n]*[.\n]+(?:\s*sin embargo[^.\n]*[.\n]+)?)",
+        "",
+        text
+    )
+    text = re.sub(
+        r"(?i)\b(?:lo siento|disculpa|disculpas)?[^.,\n]*(?:no puedo proporcionar informaci[oó]n sobre el rol|hubo un error en la respuesta anterior|como modelo de lenguaje|no tengo informaci[oó]n sobre mi rol)[^.,\n]*[.,]?",
+        "",
+        text
+    )
+    text = re.sub(
+        r"(?i)\b(?:hubo un error en la respuesta anterior|en la respuesta anterior hubo un error)[^.,\n]*[.,]?",
+        "",
+        text
+    )
+
+    # 8. Remover variantes intermedias o duplicadas del pie de confirmación para reubicarlo estrictamente al final
     text = re.sub(
         r"(?i)\n*¿(?:pudiste resolver tu problema|te sirvieron estos pasos)[^\n]*(?:\n\s*-[^\n]*)*\??",
         "",
@@ -740,59 +996,56 @@ class RAGService:
 
         filter_condition = self._build_role_filter(user_role)
 
-        # 1. Expansión LLM de consulta (traduce jerga a términos institucionales)
-        llm_expanded = expand_and_normalize_query_llm(question, user_role or "general")
+        # 1. Expansión Multi-Consulta asíncrona tolerante a jerga
+        query_variants = await async_generate_multi_query_variants(question, user_role or "general", max_variants=3)
 
-        # 2. Normalización léxica estática (complementaria)
-        lexical_expanded = normalize_and_expand_query(question)
-
-        # Usar la expansión LLM si difiere del original; si no, usar la léxica
-        if llm_expanded != question:
-            expanded_query = llm_expanded
-            logger.info(f"Query expandido por LLM: '{expanded_query[:80]}...'")
-        elif lexical_expanded != question.lower().strip():
-            expanded_query = lexical_expanded
-            logger.info(f"Query expandido léxicamente: '{expanded_query[:80]}...'")
-        else:
-            expanded_query = question
-
-        # 3. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=8 para reranking)
-        valid_docs_with_scores = []
+        # 2. Búsqueda por similitud con puntuación de relevancia en ChromaDB combinando variantes
+        candidate_docs_map: Dict[str, tuple] = {}
         if self.vector_store is not None:
             try:
                 filter_desc = f" con filtro {filter_condition}" if filter_condition else " sin filtro"
-                logger.info(f"Buscando fragmentos en ChromaDB (k=8, umbral >= {self.min_relevance_score}{filter_desc}) para: '{expanded_query[:60]}...'")
-                
-                if filter_condition:
-                    docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
-                        expanded_query,
-                        k=8,
-                        filter=filter_condition
-                    )
-                else:
-                    docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
-                        expanded_query,
-                        k=8
-                    )
-                
-                for idx, (doc, score) in enumerate(docs_with_scores, 1):
+                logger.info(f"Buscando fragmentos en ChromaDB ({len(query_variants)} variantes, umbral >= {self.min_relevance_score}{filter_desc})")
+
+                for q_var in query_variants:
+                    formatted_query = format_e5_query(q_var)
+                    if filter_condition:
+                        docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
+                            formatted_query,
+                            k=6,
+                            filter=filter_condition
+                        )
+                    else:
+                        docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
+                            formatted_query,
+                            k=6
+                        )
+
+                    for doc, score in docs_with_scores:
+                        if score is not None and score >= self.min_relevance_score:
+                            source_path = doc.metadata.get("source", "")
+                            page_num = doc.metadata.get("page", doc.metadata.get("page_number", ""))
+                            # Clave única determinista por fragmento para deduplicación
+                            chunk_key = f"{source_path}_{page_num}_{doc.page_content.strip()[:100]}"
+
+                            if chunk_key not in candidate_docs_map or score > candidate_docs_map[chunk_key][1]:
+                                candidate_docs_map[chunk_key] = (doc, score)
+
+                valid_docs_with_scores = sorted(candidate_docs_map.values(), key=lambda x: x[1], reverse=True)
+                for idx, (doc, score) in enumerate(valid_docs_with_scores[:8], 1):
                     score_val = f"{score:.4f}" if score is not None else "N/A"
                     source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                     source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                    page_num = doc.metadata.get("page", None)
+                    page_num = doc.metadata.get("page", doc.metadata.get("page_number", None))
                     page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                    logger.info(f"  [Chunk #{idx} VÁLIDO] Score: {score_val} | Fuente: {source_filename}{page_info} | Texto: '{doc.page_content.strip()[:90]}...'")
 
-                    if score is not None and score >= self.min_relevance_score:
-                        valid_docs_with_scores.append((doc, score))
-                        logger.info(f"  [Chunk #{idx} VÁLIDO] Score: {score_val} | Fuente: {source_filename}{page_info} | Texto: '{doc.page_content.strip()[:100]}...'")
-                    else:
-                        logger.info(f"  [Chunk #{idx} DESCARTADO] Score: {score_val} < {self.min_relevance_score} | Fuente: {source_filename}{page_info}")
             except Exception as exc:
                 logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
 
-        # 4. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
+        # 3. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
         if valid_docs_with_scores:
-            reranked = rerank_chunks(expanded_query, valid_docs_with_scores, top_k=3)
+            rerank_query = query_variants[0] if query_variants else question
+            reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=3)
 
             # Identificar el documento principal con mayor relevancia semántica
             primary_doc, _ = reranked[0]
@@ -809,8 +1062,9 @@ class RAGService:
             # recuperar proactivamente fragmentos complementarios (requisitos/pasos) del mismo archivo
             if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
                 try:
+                    search_q = format_e5_query(rerank_query)
                     extra_docs = self.vector_store.similarity_search(
-                        expanded_query,
+                        search_q,
                         k=4,
                         filter={"source": primary_source}
                     )
@@ -890,9 +1144,11 @@ class RAGService:
         context_text = "\n\n---\n\n".join(context_parts)
 
         # 5. Ensamblar System Prompt estricto + Golden Cache few-shot + historial y User Prompt
-        system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=context_text, query=question)
+        full_context = context_text
         if golden_context:
-            system_prompt += golden_context
+            full_context = f"{full_context}\n\n---\n[CASO DE REFERENCIA VALIDADO]:\n{golden_context.strip()}"
+
+        system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=full_context, query=question)
         user_greeting = f"El usuario se llama {user_name}. " if user_name else ""
         role_ctx = f"[Rol del usuario: {user_role}] " if user_role else ""
         user_prompt = f"{user_greeting}{role_ctx}Consulta del usuario: {question}"

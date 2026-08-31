@@ -38,10 +38,18 @@ Responde ÚNICAMENTE un objeto JSON válido con la clave 'categoria':
 {"categoria": "AUTOSERVICIO"} o {"categoria": "SOPORTE_FISICO"}"""
 
 PROMPT_HARDWARE_DIRECT = (
-    "Entendido. Al tratarse de una revisión técnica o falla física en tu equipo/red, "
-    "generaré de inmediato una solicitud de soporte para que el equipo de TI atienda tu caso en sitio.\n\n"
-    "Por favor, indícame tu **Nombre Completo**:"
+    "Para fallas físicas, averías de hardware, puntos de red o problemas con torniquetes y equipos de cómputo, "
+    "el personal técnico de la Dirección de TI realiza la revisión y atención presencial en sitio.\n\n"
+    "📞 **Canales Directos de Soporte TI:**\n"
+    "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
+    "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`\n\n"
+    "¿Deseas que radique una solicitud de soporte técnico en GLPI para que un técnico atienda tu caso en sitio?"
 )
+
+HARDWARE_QUICK_REPLIES = [
+    {"label": "🎫 Radicar Ticket en GLPI", "payload": "CREATE_TICKET"},
+    {"label": "✅ Tengo la información", "payload": "RESOLVED"}
+]
 
 # =============================================================================
 # DEFINICIÓN DE ROLES INSTITUCIONALES Y BOTONES INTERACTIVOS (QUICK REPLIES)
@@ -274,7 +282,7 @@ def handle_feedback_transition(
             "quick_replies": []
         }
 
-    # 3. No funcionó / Reintento (exclusivo por payload)
+    # 3. No funcionó / Reintento (exclusivo por payload) - Escala al segundo intento
     if msg_upper in ["RETRY_DIAGNOSIS", "RETRY"]:
         if attempts < 2:
             _set_attempts(attempts + 1)
@@ -290,7 +298,7 @@ def handle_feedback_transition(
                 ]
             }
         else:
-            # Si ya intentó 2 veces, ofrecer directamente la toma de datos
+            # Si ya intentó 4 veces, ofrecer directamente la toma de datos
             _update_session_state("RADICANDO_TICKET")
             return {
                 "response": "Con gusto te ayudo a radicar el caso. Para iniciar, por favor indícame tu **Nombre Completo**:",

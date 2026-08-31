@@ -453,6 +453,27 @@ class TestResponsePostProcessing:
         assert "Según el documento" not in cleaned
         assert "Elecciones Institucionales" in cleaned
 
+    def test_clean_llm_response_removes_prompt_headers_and_golden_case_leaks(self):
+        """Valida que encabezados de prompt como 'Pregunta del usuario:', 'Respuesta adaptativa directa:' y casos validados sean eliminados."""
+        from app.services.rag_service import clean_llm_response
+
+        raw_leak = (
+            "Pregunta del usuario: Dónde me meto para ver las notas de los cortes\n"
+            "Respuesta adaptativa directa de soporte:\n\n"
+            "[CASO PREVIO VALIDADO (similitud=0.92)]: Pregunta previa: 'dónde consultar notas' -> Respuesta validada: 'Paso 1: Ingresar a http://www.unisimon.edu.co/ y hacer clic en Portal Estudiantes.'\n\n"
+            "Paso 1: Ingresar a http://www.unisimon.edu.co/ y hacer clic en Portal Estudiantes.\n"
+            "Paso 2: Digitar credenciales y presionar ACCEDER.\n"
+            "Paso 3: Clic en Calificaciones."
+        )
+        cleaned = clean_llm_response(raw_leak)
+
+        assert "Pregunta del usuario" not in cleaned
+        assert "Respuesta adaptativa directa" not in cleaned
+        assert "CASO PREVIO VALIDADO" not in cleaned
+        assert "Pregunta previa" not in cleaned
+        assert "Respuesta validada" not in cleaned
+        assert cleaned.startswith("Paso 1: Ingresar a")
+
 
 # =============================================================================
 # Test 6: Arquitectura de Respuesta Integral: Requisitos, Restricciones y Contexto
