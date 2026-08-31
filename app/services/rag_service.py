@@ -128,7 +128,8 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         ))
         is_hardware_dotation_query = any(w in q_lower for w in [
             "portatil", "portátil", "laptop", "computador", "pc", "equipo de computo",
-            "dotacion", "dotación", "solicitar un portatil", "solicitar un computador", "pedir computador"
+            "dotacion", "dotación", "solicitar un portatil", "solicitar un computador", "pedir computador",
+            "prestar", "préstamo", "prestamo", "reemplazo", "mientras arreglan", "otro equipo", "asignación de equipo"
         ])
         is_teacher_grading_query = any(w in q_lower for w in [
             "subo las notas", "subo notas", "subir notas", "cargar notas", "cargo notas", "calificar",
@@ -193,10 +194,10 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
                 if any(ps in content_lower for ps in ["primer semestre", "estudiantes de primer semestre", "primer ingreso", "activación de usuario para estudiantes de primer semestre"]):
                     final_score -= 6.0
 
-            # Desambiguación entre dotación de hardware (P-GT-01) y proyectos de software/Jira (P-GT-13)
+            # Desambiguación entre dotación/préstamo de hardware (P-GT-01 / Asignación) y proyectos de software/Jira (P-GT-13)
             if is_hardware_dotation_query and not any(k in q_lower for k in ["software", "desarrollo", "jira", "proyecto", "solución tecnológica"]):
-                if any(m in content_lower for m in ["mantenimiento preventivo y correctivo de equipos de cómputo", "p-gt-01", "equipo de cómputo"]):
-                    final_score += 2.5
+                if any(m in content_lower for m in ["mantenimiento preventivo y correctivo de equipos de cómputo", "solicitud y asignación de equipos de cómputo", "asignación de equipo", "préstamo de equipo", "p-gt-01", "equipo de cómputo"]):
+                    final_score += 3.5
                 if any(j in content_lower for j in ["gestión de requerimientos de recursos y soluciones tecnológicas", "p-gt-13"]):
                     final_score -= 3.0
 
@@ -247,7 +248,7 @@ SEMANTIC_SYNONYM_DICTIONARY = [
         ]
     },
     {
-        "triggers": ["pago", "pagar", "matricula", "matrícula", "recibo", "volante", "liquidación", "liquidacion", "financiero", "semestre", "valor"],
+        "triggers": ["pago", "pagar", "matricula", "matrícula", "recibo", "volante", "liquidación", "liquidacion", "financiero", "pago semestre", "valor matricula", "costo matricula"],
         "variants": [
             "Generación y pago de volante de matrícula portal estudiantes",
             "Consulta de liquidación matrícula y pagos financieros",
@@ -271,11 +272,15 @@ SEMANTIC_SYNONYM_DICTIONARY = [
         ]
     },
     {
-        "triggers": ["computador", "portatil", "portátil", "pc", "laptop", "equipo", "dotacion", "dotación", "cambio de equipo", "solicitar computador", "pedir computador"],
+        "triggers": [
+            "computador", "portatil", "portátil", "pc", "laptop", "equipo", "dotacion", "dotación", 
+            "cambio de equipo", "solicitar computador", "pedir computador", "prestar", "préstamo", 
+            "prestamo", "prestado", "reemplazo", "mientras arreglan", "mientras reparan", "otro equipo"
+        ],
         "variants": [
-            "Solicitud y asignación de equipo de cómputo y dotación tecnológica",
-            "Mantenimiento preventivo y correctivo de equipos de cómputo P-GT-01",
-            "Requerimientos de recursos tecnológicos funcionarios"
+            "Solicitud y asignación de equipo de cómputo y préstamo institucional",
+            "Procedimiento de dotación tecnológica y reemplazo de equipos de cómputo",
+            "Mantenimiento preventivo y correctivo de equipos de cómputo P-GT-01"
         ]
     },
     {

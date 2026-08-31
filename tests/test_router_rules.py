@@ -289,7 +289,7 @@ async def test_physical_hardware_direct_routing_from_idle():
 
     msg = "Solicito la revisión y reparación de la conexión a internet por cable del equipo de escritorio de mi oficina"
 
-    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="SOPORTE_FISICO")), \
+    with patch("app.services.router_logic.classify_request_intent_async", new=AsyncMock(return_value="SOPORTE_FISICO")), \
          patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
 
         res = await router_logic.procesar_mensaje(msg, session_id=sess_id)
@@ -303,6 +303,8 @@ async def test_physical_hardware_direct_routing_from_idle():
         assert "Nombre Completo" not in res["mensaje"]
         assert len(res.get("quick_replies", [])) == 2
         assert res["quick_replies"][0]["payload"] == "CREATE_TICKET"
+        assert res["quick_replies"][0]["label"] == "🎫 Radicar ticket"
+        assert "GLPI" not in res["quick_replies"][0]["label"]
         assert res["quick_replies"][1]["payload"] == "RESOLVED"
         mock_rag.assert_not_called()  # RAG NO debe ser llamado para soporte físico directo
 
@@ -315,7 +317,7 @@ async def test_physical_hardware_no_enciende_direct_routing():
     session = router_logic.get_session(sess_id)
     session.user_role = "docente"
 
-    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="SOPORTE_FISICO")), \
+    with patch("app.services.router_logic.classify_request_intent_async", new=AsyncMock(return_value="SOPORTE_FISICO")), \
          patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
 
         res = await router_logic.procesar_mensaje("mi computador no enciende", session_id=sess_id)
@@ -326,6 +328,8 @@ async def test_physical_hardware_no_enciende_direct_routing():
         assert "solicitudcomputo@unisimon.edu.co" in res["mensaje"]
         assert "Nombre Completo" not in res["mensaje"]
         assert len(res.get("quick_replies", [])) == 2
+        assert "GLPI" not in res["mensaje"]
+        assert "GLPI" not in res["quick_replies"][0]["label"]
         mock_rag.assert_not_called()
 
 
@@ -340,7 +344,7 @@ async def test_physical_hardware_routing_after_role_qualification():
     assert r1["tipo"] == "PIDIENDO_ROL"
 
     # 2. Usuario indica rol -> Debe clasificar semánticamente y ofrecer radicación con canales oficiales
-    with patch.object(router_logic, "classify_intent", new=AsyncMock(return_value="SOPORTE_FISICO")), \
+    with patch("app.services.router_logic.classify_request_intent_async", new=AsyncMock(return_value="SOPORTE_FISICO")), \
          patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
 
         r2 = await router_logic.procesar_mensaje("Soy docente", session_id=sess_id)
@@ -351,7 +355,41 @@ async def test_physical_hardware_routing_after_role_qualification():
         assert "solicitudcomputo@unisimon.edu.co" in r2["mensaje"]
         assert "Nombre Completo" not in r2["mensaje"]
         assert len(r2.get("quick_replies", [])) == 2
+        assert "GLPI" not in r2["mensaje"]
+        assert "GLPI" not in r2["quick_replies"][0]["label"]
         mock_rag.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_informative_loan_query_with_damage_context_stays_in_autoservicio_and_rag():
+    """
+    Verifica que una pregunta informativa sobre préstamo de equipo por daño previo
+    ('Trabajo en nómina y se me dañó el PC, ¿me pueden prestar otro equipo mientras arreglan el mío?')
+    sea clasificada como AUTOSERVICIO y entregue el procedimiento RAG sin saltar a radicación directa ni mencionar GLPI.
+    """
+    sess_id = "sess_loan_informative"
+    router_logic.reset_session(sess_id)
+    session = router_logic.get_session(sess_id)
+    session.user_role = "administrativo"
+
+    msg = "Trabajo en admisiones/nómina y se me dañó el computador, ¿me pueden prestar otro equipo mientras arreglan el mío?"
+
+    fake_rag_resp = {
+        "response": "Para solicitar un equipo de cómputo en préstamo o asignación temporal mientras se realiza el mantenimiento de tu equipo, debes enviar una solicitud a solicitudcomputo@unisimon.edu.co con la autorización de tu jefe inmediato.",
+        "sources": ["Solicitud y Asignación de Equipos de Cómputo.pdf"],
+        "has_context": True,
+        "quick_replies": []
+    }
+
+    with patch.object(rag_service, "answer_query", new=AsyncMock(return_value=fake_rag_resp)) as mock_rag:
+        res = await router_logic.procesar_mensaje(msg, session_id=sess_id)
+
+        assert res["tipo"] == "DIAGNOSTICO"
+        assert res["state"] == "DIAGNOSTICO"
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.DIAGNOSTICO
+        assert "GLPI" not in res["mensaje"]
+        assert "solicitudcomputo@unisimon.edu.co" in res["mensaje"]
+        mock_rag.assert_called_once()
 
 
 @pytest.mark.asyncio

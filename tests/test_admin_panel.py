@@ -88,7 +88,7 @@ async def test_admin_upload_and_delete_doc(tmp_path):
 
 @pytest.mark.asyncio
 async def test_user_index_html_rendering_and_secret_admin_trigger():
-    """Verifica que index.html contenga la estructura de renderizado de texto y el trigger secreto a /admin."""
+    """Verifica que index.html contenga la estructura de renderizado de texto y el trigger secreto a /admin sin exponer botones visibles a usuarios."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         res = await client.get("/")
@@ -96,6 +96,7 @@ async def test_user_index_html_rendering_and_secret_admin_trigger():
         html = res.text
         assert "msg-text" in html
         assert "openAdminSecret" in html
-        assert "badge-online" in html
+        assert "badge-online" not in html  # El botón visible 'En Línea' fue removido de cara al usuario
         assert "data.mensaje" in html or "botText" in html
-        assert "Ctrl+Alt+A" in html or "ctrlKey" in html
+        assert "Ctrl + Alt + A" in html or "ctrlKey" in html
+

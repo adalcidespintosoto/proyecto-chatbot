@@ -33,6 +33,7 @@ from app.services.router_service import (
     classify_request_intent,
     classify_request_intent_async,
     is_physical_hardware_request,
+    is_informative_procedure_query,
     ROLE_QUICK_REPLIES,
     ROLE_SYNONYMS,
     normalize_role
@@ -416,6 +417,8 @@ class RouterLogic:
         Determina semánticamente si el mensaje corresponde a una falla física, daño de hardware,
         cableado, punto de red, revisión en sitio o mantenimiento de equipos.
         """
+        if is_informative_procedure_query(text):
+            return False
         return is_physical_hardware_request(text, role)
 
     @classmethod
