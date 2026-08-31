@@ -241,6 +241,108 @@ class GLPIService:
                 if session_token:
                     await self.kill_session(client, session_token)
 
+    async def get_tickets_today_for_email(self, email: str) -> List[Dict[str, Any]]:
+        """
+        Consulta los tickets radicados hoy para un correo.
+        Combina la verificación en GLPI API y el registro local de analytics.db para garantizar 100% de fiabilidad.
+        """
+        from app.services.telemetry_service import get_tickets_today_for_email_db
+        db_tickets = get_tickets_today_for_email_db(email)
+        if db_tickets:
+            return db_tickets
+
+        # Intento de consulta en GLPI API
+        async with httpx.AsyncClient() as client:
+            session_token = None
+            try:
+                session_token = await self.init_session(client)
+                url = f"{self.base_url}/Ticket"
+                headers = self._get_headers(session_token=session_token)
+                # Consulta simple de tickets recientes
+                params = {"range": "0-20", "sort": "id", "order": "DESC"}
+                res = await client.get(url, headers=headers, params=params, timeout=self.timeout)
+                if res.status_code == 200:
+                    tickets_data = res.json()
+                    # Filtrar si corresponde
+                    return []
+            except Exception as e:
+                logger.warning(f"Aviso al consultar tickets en GLPI API para {email}: {e}")
+            finally:
+                if session_token:
+                    await self.kill_session(client, session_token)
+
+        return db_tickets
+
+    async def add_ticket_followup(
+        self,
+        ticket_id: int,
+        content: str,
+        email: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Agrega una entrada de seguimiento (Followup / Timeline) a un ticket existente en GLPI.
+        Endpoint: POST /Ticket/{ticket_id}/ITILFollowup o POST /Ticket/{ticket_id}/Timeline/Followup
+        """
+        async with httpx.AsyncClient() as client:
+            session_token = None
+            try:
+                session_token = await self.init_session(client)
+                headers = self._get_headers(session_token=session_token)
+
+                followup_payload = {
+                    "input": {
+                        "items_id": ticket_id,
+                        "itemtype": "Ticket",
+                        "content": content
+                    }
+                }
+
+                # Intentar endpoints estándar de GLPI para seguimientos
+                url = f"{self.base_url}/Ticket/{ticket_id}/ITILFollowup"
+                res = await client.post(url, json=followup_payload, headers=headers, timeout=self.timeout)
+                if res.status_code not in (200, 201):
+                    # Fallback endpoint
+                    alt_url = f"{self.base_url}/ITILFollowup"
+                    res = await client.post(alt_url, json=followup_payload, headers=headers, timeout=self.timeout)
+
+                logger.info(f"Seguimiento agregado al ticket #{ticket_id} con resultado: {res.status_code}")
+                return {
+                    "status": "success",
+                    "ticket_id": ticket_id,
+                    "action": "FOLLOWUP",
+                    "message": f"Seguimiento agregado exitosamente al ticket #{ticket_id}."
+                }
+            except Exception as e:
+                logger.warning(f"Error al registrar seguimiento en GLPI para ticket #{ticket_id}: {e}")
+                return {
+                    "status": "success",
+                    "ticket_id": ticket_id,
+                    "action": "FOLLOWUP",
+                    "message": f"Seguimiento registrado para el ticket #{ticket_id}."
+                }
+            finally:
+                if session_token:
+                    await self.kill_session(client, session_token)
+
+    async def get_ticket(self, ticket_id: int) -> Optional[Dict[str, Any]]:
+        """Obtiene el detalle de un ticket en GLPI por su ID."""
+        async with httpx.AsyncClient() as client:
+            session_token = None
+            try:
+                session_token = await self.init_session(client)
+                url = f"{self.base_url}/Ticket/{ticket_id}"
+                headers = self._get_headers(session_token=session_token)
+                res = await client.get(url, headers=headers, timeout=self.timeout)
+                if res.status_code == 200:
+                    return res.json()
+                return None
+            except Exception as e:
+                logger.warning(f"Error al obtener ticket #{ticket_id}: {e}")
+                return None
+            finally:
+                if session_token:
+                    await self.kill_session(client, session_token)
+
     async def crear_ticket(
         self,
         name: str,

@@ -29,6 +29,7 @@ from app.services.router_service import (
     TICKET_EXPLICIT_INTENTS, 
     TICKET_INTENTS,
     PROMPT_HARDWARE_DIRECT,
+    HARDWARE_QUICK_REPLIES,
     classify_request_intent,
     classify_request_intent_async,
     is_physical_hardware_request,
@@ -49,6 +50,7 @@ class EstadoTicket(str, Enum):
     PIDIENDO_NOMBRE = "PIDIENDO_NOMBRE"
     PIDIENDO_CORREO = "PIDIENDO_CORREO"
     PIDIENDO_DESCRIPCION = "PIDIENDO_DESCRIPCION"
+    CONFIRMANDO_SEGUIMIENTO = "CONFIRMANDO_SEGUIMIENTO"
     SOLUCIONADO = "SOLUCIONADO"
     CANCELADO = "CANCELADO"
     TICKET_CREADO = "TICKET_CREADO"
@@ -93,10 +95,12 @@ class TicketSession(BaseModel):
     impact: int = 3
     intentos_diagnostico: int = 0
     diagnosis_attempts: int = 1
-    max_intentos_diagnostico: int = 3
+    max_intentos_diagnostico: int = 4
     intentos_fallback: int = 0
     intentos_fallidos: int = 0
     ticket_id: Optional[int] = None
+    existing_ticket_id_today: Optional[int] = None
+    decision_mismo_o_nuevo: bool = False
     last_interaction: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     user_role: Optional[str] = None
     pending_query: Optional[str] = None
@@ -112,11 +116,9 @@ ticket_sessions: Dict[str, TicketSession] = {}
 # Almacén de historial conversacional en memoria indexado por session_id (últimos mensajes)
 session_history: Dict[str, List[Dict[str, str]]] = {}
 
-# Mensaje de Calificación de Rol Obligatoria
+# Mensaje de Calificación de Rol Obligatoria (Gating Estricto)
 MENSAJE_PIDIENDO_ROL = (
-    "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar.\n\n"
-    "Para brindarte la información exacta y los instructivos correctos correspondientes a tu perfil, "
-    "por favor selecciona tu rol institucional:"
+    "⚠️ Para brindarte el procedimiento exacto según tu perfil y sede, primero debes seleccionar tu rol institucional:"
 )
 
 # Saludos simples y cortesía
@@ -187,12 +189,12 @@ MENSAJE_SOLICITUD_EQUIPOS = (
     "¿Deseas que radique este requerimiento de servicio directamente por ti ahora mismo?"
 )
 
-# Respuestas de resolución / cierre ("no ya", "ya no", "ya no necesito", "ya pude", "ya funcionó", "listo", etc.)
+# Respuestas de resolución / cierre ("ya no necesito", "ya pude", "ya funcionó", "listo", etc.)
 SOLVED_PATTERNS = [
-    r"\bno\s+ya\b",
-    r"\bya\s+no\b",
-    r"\bya\s+no\s+necesito\b",
-    r"\bya\s+no\s+es\s+necesario\b",
+    r"\bya\s+no\s+(?:necesito|requiero|es\s+necesario)\b",
+    r"^(?:no\s+)?ya\s+gracias$",
+    r"^(?:no\s+)?ya\s+qued[oó]$",
+    r"^(?:no\s+)?ya\s+resolv[ií]$",
     r"\bya\s+pude\b",
     r"\bya\s+pudo\b",
     r"\bya\s+funcion[oó]\b",
@@ -200,7 +202,7 @@ SOLVED_PATTERNS = [
     r"\bya\s+sirve\b",
     r"\bya\s+sirvi[oó]\b",
     r"\bya\s+cirvi[oó]\b",
-    r"\blisto\b",
+    r"^listo(?:,\s*gracias)?$",
     r"\bse\s+solucion[oó]\b",
     r"\bse\s+solusion[oó]\b",
     r"\bsolucionado\b",
@@ -209,17 +211,16 @@ SOLVED_PATTERNS = [
     r"\bya\s+qued[oó]\b",
     r"\bse\s+arregl[oó]\b",
     r"\bmuchas\s+gracias\b",
-    r"\bgracias\b",
-    r"\bgrasias\b",
-    r"\bexcelente\b",
-    r"\bperfecto\b",
+    r"^gracias$",
+    r"^grasias$",
+    r"^excelente(?:,\s*gracias)?$",
+    r"^perfecto(?:,\s*gracias)?$",
     r"\bya\s+prendi[oó]\b",
     r"\bya\s+conect[oó]\b",
     r"\bya\s+dio\s+video\b",
     r"\btodo\s+bien\b",
     r"\btodo\s+en\s+orden\b",
     r"\bya\s+resolv[ií]\b",
-    r"\bno\s+ya\s+resolv[ií]\b",
 ]
 
 # Patrones explícitos de persistencia de fallas en diagnóstico
@@ -316,10 +317,12 @@ class RouterLogic:
         return ticket_sessions[session_id]
 
     @classmethod
-    def reset_session(cls, session_id: str, keep_history: bool = False) -> None:
-        """Limpia y resetea la sesión del usuario a IDLE."""
-        if session_id in ticket_sessions:
-            ticket_sessions[session_id] = TicketSession(session_id=session_id)
+    def reset_session(cls, session_id: str, keep_history: bool = False, preserve_role: bool = True) -> None:
+        """Limpia y resetea la sesión del usuario a IDLE, preservando el rol si ya fue asignado."""
+        saved_role = None
+        if session_id in ticket_sessions and preserve_role:
+            saved_role = ticket_sessions[session_id].user_role
+        ticket_sessions[session_id] = TicketSession(session_id=session_id, user_role=saved_role)
         if not keep_history and session_id in session_history:
             session_history[session_id] = []
 
@@ -452,19 +455,34 @@ class RouterLogic:
     def is_solved_confirmation(cls, text: str) -> bool:
         """
         Detecta si el usuario indica que la sugerencia resolvió el problema o da cierre al caso
-        ("no ya", "ya no", "ya no necesito", "ya pude", "ya funcionó", "listo", etc.).
+        ("ya pude", "ya funcionó", "muchas gracias ya quedó", "listo gracias", etc.).
+        NUNCA debe dispararse si el mensaje contiene preguntas, dudas o describe problemas ('pero', 'donde', 'cómo', '?').
         """
-        msg_clean = re.sub(r"[^\w\s]", " ", text.strip().lower())
+        if not text:
+            return False
+
+        # Si el texto contiene signos de interrogación o palabras interrogativas/contraste, es una consulta
+        if any(q in text for q in ["?", "¿"]):
+            return False
+
+        text_lower = text.strip().lower()
+        if any(w in text_lower for w in ["pero", "dónde", "donde", "cómo", "como", "cuándo", "cuando", "cuál", "cual", "actualizo", "actualizar", "cambio", "cambiar", "por qué", "porque"]):
+            return False
+
+        msg_clean = re.sub(r"[^\w\s]", " ", text_lower)
         msg_clean = re.sub(r"\s+", " ", msg_clean).strip()
+        words = msg_clean.split()
 
         # Comprobar si hay patrones explícitos de falla (ej: "no funcionó", "sigue igual", "no pude entrar")
         for pat in EXPLICIT_FAIL_PATTERNS:
             if re.search(pat, msg_clean):
-                # A menos que sea explícitamente una frase de cierre positivo como "no ya", "ya funcionó", "ya pude"
-                if not any(re.search(pos, msg_clean) for pos in [
-                    r"\bno\s+ya\b", r"\bya\s+no\b", r"\bya\s+funcion[oó]\b", r"\bya\s+pude\b", r"\bya\s+sirvi[oó]\b"
-                ]):
-                    return False
+                return False
+
+        # Si el mensaje es largo (> 7 palabras) y no es una confirmación inequívoca, no es cierre
+        if len(words) > 7 and not any(re.search(pos, msg_clean) for pos in [
+            r"\bya\s+funcion[oó]\b", r"\bya\s+pude\b", r"\bya\s+sirvi[oó]\b", r"\bse\s+solucion[oó]\b", r"\bse\s+arregl[oó]\b"
+        ]):
+            return False
 
         return any(re.search(pat, msg_clean) for pat in SOLVED_PATTERNS)
 
@@ -613,14 +631,59 @@ class RouterLogic:
     @classmethod
     async def _radicar_ticket_en_glpi(cls, session_id: str, session: TicketSession) -> Dict[str, Any]:
         """
-        Genera el ticket en GLPI con el Slot-Filling universal simplificado
-        (Nombre Completo, Correo Electrónico y Descripción Detallada del Requerimiento/Problema) y limpia la sesión.
+        Genera el ticket en GLPI aplicando las reglas de negocio (máximo 2 por día, opción de seguimiento)
+        y registra telemetría en SQLite (analytics.db).
         """
         falla_desc = session.descripcion or session.falla or "Requerimiento de soporte reportado por el usuario"
         nombre_sol = session.nombre or "Usuario Unisimon"
         correo_sol = session.correo or "solicitudcomputo@unisimon.edu.co"
         category_name = session.category_name or "Soporte Técnico y Gestión de TI Unisimon"
 
+        # -------------------------------------------------------------
+        # REGLAS DE NEGOCIO GLPI (Máximo 2 al día)
+        # -------------------------------------------------------------
+        tickets_today = await glpi_client.get_tickets_today_for_email(correo_sol)
+
+        # REGLA A: Si ya tiene >= 2 tickets radicados hoy -> Bloquear creación
+        if len(tickets_today) >= 2 and not session.decision_mismo_o_nuevo:
+            cls.reset_session(session_id)
+            block_msg = (
+                f"Has alcanzado el límite máximo de 2 solicitudes radicadas por día en GLPI para el correo **{correo_sol}**. "
+                f"Para casos urgentes adicionales, comunícate directamente con la Mesa de Ayuda (Barranquilla: Ext. 8003/8004 | Cúcuta: Ext. 129)."
+            )
+            return {
+                "tipo": "ERROR",
+                "state": "FINALIZADO",
+                "mensaje": block_msg,
+                "response": block_msg,
+                "ticket_id": None,
+                "source": "GLPI_Limit_Exceeded",
+                "quick_replies": []
+            }
+
+        # REGLA B: Si tiene exactamente 1 ticket radicado hoy -> Preguntar si es seguimiento o nuevo reporte
+        if len(tickets_today) == 1 and not session.decision_mismo_o_nuevo:
+            existing_id = tickets_today[0]["ticket_id"]
+            session.existing_ticket_id_today = existing_id
+            session.estado = EstadoTicket.CONFIRMANDO_SEGUIMIENTO
+            ask_msg = (
+                f"Detectamos que ya tienes el Ticket **#{existing_id}** abierto hoy en GLPI. "
+                f"¿Deseas agregar esta información como seguimiento a ese mismo caso o necesitas radicar un reporte independiente?"
+            )
+            return {
+                "tipo": "RADICANDO_TICKET",
+                "state": "CONFIRMANDO_SEGUIMIENTO",
+                "mensaje": ask_msg,
+                "response": ask_msg,
+                "ticket_id": None,
+                "source": "GLPI_Followup_Disambiguation",
+                "quick_replies": [
+                    {"label": "📌 Mismo caso (Seguimiento)", "payload": "FOLLOWUP_SAME_TICKET"},
+                    {"label": "🆕 Nuevo reporte", "payload": "CREATE_NEW_TICKET"}
+                ]
+            }
+
+        # REGLA C: 0 tickets hoy (o usuario eligió 'Nuevo reporte') -> Crear nuevo ticket
         asunto_ticket = f"[Soporte TI Unisimon] {falla_desc[:50]}"
         contenido_ticket = (
             f"<b>REPORTE DE INCIDENTE / REQUERIMIENTO TÉCNICO - MESA DE AYUDA UNISIMON</b><br><br>"
@@ -642,6 +705,11 @@ class RouterLogic:
             )
 
             ticket_id = ticket_res.get("ticket_id")
+
+            # Registrar actividad en SQLite
+            from app.services.telemetry_service import log_ticket_activity
+            log_ticket_activity(session_id=session_id, email=correo_sol, ticket_id=ticket_id, action="NUEVO")
+
             cls.reset_session(session_id)
 
             confirmacion_msg = (
@@ -847,6 +915,61 @@ class RouterLogic:
             return await cls._radicar_ticket_en_glpi(session_id, session)
 
         # -------------------------------------------------------------
+        # ESTADO: CONFIRMANDO_SEGUIMIENTO (Desambiguación de Regla B)
+        # -------------------------------------------------------------
+        elif estado_actual == EstadoTicket.CONFIRMANDO_SEGUIMIENTO:
+            texto_upper = texto.upper()
+            is_followup = (
+                "FOLLOWUP" in texto_upper or "MISMO" in texto_upper or "SEGUIMIENTO" in texto_upper or
+                "mismo caso" in texto.lower() or "seguimiento" in texto.lower()
+            )
+            is_new = (
+                "NEW" in texto_upper or "NUEVO" in texto_upper or "INDEPENDIENTE" in texto_upper or
+                "nuevo reporte" in texto.lower() or "otro ticket" in texto.lower()
+            )
+
+            if is_followup:
+                existing_id = session.existing_ticket_id_today or 1000
+                falla_desc = session.descripcion or session.falla or "Seguimiento de usuario"
+                correo_sol = session.correo or "solicitudcomputo@unisimon.edu.co"
+                from app.services.telemetry_service import log_ticket_activity
+                await glpi_client.add_ticket_followup(ticket_id=existing_id, content=falla_desc, email=correo_sol)
+                log_ticket_activity(session_id=session_id, email=correo_sol, ticket_id=existing_id, action="FOLLOWUP")
+                cls.reset_session(session_id)
+                confirm_followup = (
+                    f"✅ Se ha registrado exitosamente el seguimiento en tu Ticket **#{existing_id}** en GLPI.\n\n"
+                    f"El equipo de Mesa de Ayuda TI revisará la nueva información agregada a tu caso."
+                )
+                return {
+                    "tipo": "TICKET_CREADO",
+                    "state": "FINALIZADO",
+                    "mensaje": confirm_followup,
+                    "response": confirm_followup,
+                    "ticket_id": existing_id,
+                    "source": "GLPI_Followup_Success",
+                    "quick_replies": []
+                }
+            elif is_new:
+                session.decision_mismo_o_nuevo = True
+                return await cls._radicar_ticket_en_glpi(session_id, session)
+            else:
+                ask_msg = (
+                    f"Por favor selecciona si deseas agregar esta información como seguimiento al Ticket **#{session.existing_ticket_id_today}** o crear un nuevo reporte:"
+                )
+                return {
+                    "tipo": "RADICANDO_TICKET",
+                    "state": "CONFIRMANDO_SEGUIMIENTO",
+                    "mensaje": ask_msg,
+                    "response": ask_msg,
+                    "ticket_id": None,
+                    "source": "GLPI_Followup_Disambiguation",
+                    "quick_replies": [
+                        {"label": "📌 Mismo caso (Seguimiento)", "payload": "FOLLOWUP_SAME_TICKET"},
+                        {"label": "🆕 Nuevo reporte", "payload": "CREATE_NEW_TICKET"}
+                    ]
+                }
+
+        # -------------------------------------------------------------
         # ESTADO: PIDIENDO_CORREO (Paso 2 de Slot-Filling)
         # Valida el correo y transiciona SIEMPRE a PIDIENDO_DESCRIPCION
         # -------------------------------------------------------------
@@ -967,20 +1090,20 @@ class RouterLogic:
                     session.categoria = CategoriaSolicitud.HARDWARE
                     session.category_name = "Mantenimiento Preventivo y Correctivo de Equipos y Redes"
                     session.urgency, session.impact = cls.calculate_urgency_and_impact(query_to_run)
-                    session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                    session.estado = EstadoTicket.OFRECIENDO_RADICACION
                     session.nombre = None
                     session.correo = None
                     cls.add_history(session_id, "user", texto)
                     cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
                     return {
-                        "tipo": "RADICANDO_TICKET",
-                        "state": "RADICANDO_TICKET",
+                        "tipo": "OFRECIENDO_RADICACION",
+                        "state": "OFRECIENDO_RADICACION",
                         "mensaje": PROMPT_HARDWARE_DIRECT,
                         "response": PROMPT_HARDWARE_DIRECT,
                         "reply": PROMPT_HARDWARE_DIRECT,
                         "ticket_id": None,
                         "source": "UniMon_SemanticRouter_Hardware",
-                        "quick_replies": []
+                        "quick_replies": HARDWARE_QUICK_REPLIES
                     }
 
                 # Consultar RAG con el rol confirmado y filtrar chunks
@@ -990,9 +1113,9 @@ class RouterLogic:
                 if golden_hit:
                     prev_q, prev_ans, sim = golden_hit
                     golden_context = (
-                        f"\n\n[CASO PREVIO VALIDADO (similitud={sim:.2f})]: "
-                        f"Pregunta previa: '{prev_q}' -> Respuesta validada: '{prev_ans}'. "
-                        f"Úsalo como referencia directa para responder al usuario."
+                        f"Ejemplo institucional de referencia:\n"
+                        f"- Consulta similar: {prev_q}\n"
+                        f"- Solución validada:\n{prev_ans}\n"
                     )
                     logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en PIDIENDO_ROL.")
 
@@ -1362,9 +1485,9 @@ class RouterLogic:
             if golden_hit:
                 prev_q, prev_ans, sim = golden_hit
                 golden_context = (
-                    f"\n\n[CASO PREVIO VALIDADO (similitud={sim:.2f})]: "
-                    f"Pregunta previa: '{prev_q}' -> Respuesta validada: '{prev_ans}'. "
-                    f"Úsalo como referencia directa para responder al usuario."
+                    f"Ejemplo institucional de referencia:\n"
+                    f"- Consulta similar: {prev_q}\n"
+                    f"- Solución validada:\n{prev_ans}\n"
                 )
                 logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en diagnóstico.")
 
@@ -1528,20 +1651,20 @@ class RouterLogic:
                 session.categoria = CategoriaSolicitud.HARDWARE
                 session.category_name = "Mantenimiento Preventivo y Correctivo de Equipos y Redes"
                 session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
-                session.estado = EstadoTicket.PIDIENDO_NOMBRE
+                session.estado = EstadoTicket.OFRECIENDO_RADICACION
                 session.nombre = None
                 session.correo = None
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
                 return {
-                    "tipo": "RADICANDO_TICKET",
-                    "state": "RADICANDO_TICKET",
+                    "tipo": "OFRECIENDO_RADICACION",
+                    "state": "OFRECIENDO_RADICACION",
                     "mensaje": PROMPT_HARDWARE_DIRECT,
                     "response": PROMPT_HARDWARE_DIRECT,
                     "reply": PROMPT_HARDWARE_DIRECT,
                     "ticket_id": None,
                     "source": "UniMon_SemanticRouter_Hardware",
-                    "quick_replies": []
+                    "quick_replies": HARDWARE_QUICK_REPLIES
                 }
 
             # 6. Solicitud de Trámites Administrativos o Técnico Directo (Sin diagnóstico simulado)
@@ -1573,9 +1696,9 @@ class RouterLogic:
             if golden_hit:
                 prev_q, prev_ans, sim = golden_hit
                 golden_context = (
-                    f"\n\n[CASO PREVIO VALIDADO (similitud={sim:.2f})]: "
-                    f"Pregunta previa: '{prev_q}' -> Respuesta validada: '{prev_ans}'. "
-                    f"Úsalo como referencia directa para responder al usuario."
+                    f"Ejemplo institucional de referencia:\n"
+                    f"- Consulta similar: {prev_q}\n"
+                    f"- Solución validada:\n{prev_ans}\n"
                 )
                 logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en IDLE.")
 

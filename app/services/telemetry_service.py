@@ -50,6 +50,16 @@ def init_telemetry_db():
                     FOREIGN KEY (session_id) REFERENCES telemetry_sessions(session_id)
                 )
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS telemetry_tickets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    email TEXT,
+                    ticket_id INTEGER,
+                    action TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             # Migración: asegurar existencia de bot_response si la tabla fue creada previamente
             cursor.execute("PRAGMA table_info(telemetry_interactions);")
             cols = [c[1] for c in cursor.fetchall()]
@@ -59,6 +69,70 @@ def init_telemetry_db():
             logger.info("Base de datos de telemetría inicializada en: %s", DB_PATH)
     except Exception as e:
         logger.error("Error al inicializar base de datos de telemetría: %s", e)
+
+
+def log_ticket_activity(
+    session_id: str,
+    email: str,
+    ticket_id: int,
+    action: str = "NUEVO"
+):
+    """Registra la creación de un ticket o adición de seguimiento en analytics.db."""
+    try:
+        if not DB_PATH.exists():
+            init_telemetry_db()
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS telemetry_tickets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    email TEXT,
+                    ticket_id INTEGER,
+                    action TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                INSERT INTO telemetry_tickets (session_id, email, ticket_id, action)
+                VALUES (?, ?, ?, ?)
+            """, (session_id, email.strip().lower(), int(ticket_id), action.upper()))
+            conn.commit()
+            logger.info("Actividad de ticket registrada: email=%s, ticket_id=%s, action=%s", email, ticket_id, action)
+    except Exception as e:
+        logger.error("Error al registrar actividad de ticket en telemetría: %s", e)
+
+
+def get_tickets_today_for_email_db(email: str) -> List[Dict[str, Any]]:
+    """Consulta los tickets creados hoy en la base de datos local para un correo dado."""
+    try:
+        if not DB_PATH.exists():
+            init_telemetry_db()
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS telemetry_tickets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    email TEXT,
+                    ticket_id INTEGER,
+                    action TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                SELECT ticket_id, action, created_at
+                FROM telemetry_tickets
+                WHERE LOWER(email) = ? AND action = 'NUEVO'
+                  AND DATE(created_at) = DATE('now')
+                ORDER BY id DESC
+            """, (email.strip().lower(),))
+            rows = cursor.fetchall()
+            return [{"ticket_id": r["ticket_id"], "action": r["action"], "created_at": r["created_at"]} for r in rows]
+    except Exception as e:
+        logger.error("Error al consultar tickets del día para %s: %s", email, e)
+        return []
 
 
 def log_interaction(

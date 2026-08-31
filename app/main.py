@@ -100,6 +100,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    """Agrega cabeceras de seguridad HTTP estándar a todas las respuestas."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    return response
+
 # Inclusión de Routers
 app.include_router(chat.router)
 app.include_router(analytics.router)
