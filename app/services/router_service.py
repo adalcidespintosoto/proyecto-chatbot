@@ -27,12 +27,18 @@ except Exception:
 SYSTEM_ROUTER_PROMPT = """Eres el clasificador de intenciones de soporte de TI de la Universidad Simón Bolívar.
 Tu labor es clasificar el mensaje del usuario en UNA de dos categorías:
 
-1. AUTOSERVICIO: Trámites en plataformas web, SIAAF, Teams, Portal Estudiantes, Kactus, Seven, subida de notas, registro de inasistencias ("fallas a clase"), consulta de calificaciones, restablecimiento de contraseñas, certificados, solicitudes de préstamos/asignación de equipos de cómputo o preguntas sobre canales de atención/contacto.
-2. SOPORTE_FISICO: Averías de hardware, periféricos rotos (mouse, teclado, monitor), cables de red dañados, puntos de red sin servicio, computadores que no prenden/sin video, impresoras atascadas o solicitudes explícitas de revisión técnica presencial por daño físico en oficina/laboratorio.
+1. AUTOSERVICIO:
+- Toda consulta informativa o procedimental sobre trámites, instructivos paso a paso, políticas, requisitos o canales de atención.
+- Solicitudes o preguntas sobre préstamo, asignación temporal o dotación de equipos de cómputo (portátiles, PCs, salas, proyectores, micrófonos), INCLUYENDO si el usuario menciona que su equipo actual falló o se dañó y pregunta si le pueden prestar o asignar otro mientras lo arreglan.
+- Trámites en plataformas web: SIAAF, Teams, Portal Estudiantes/Profesores/Administrativos, Kactus, Seven, subida de notas, reporte de inasistencias ("fallas a clase"), calificaciones, recuperación de contraseñas.
+
+2. SOPORTE_FISICO:
+- Reportes directos y explícitos de averías físicas donde el usuario ÚNICAMENTE informa que un equipo, periférico o cable se dañó/rompió/no prende y requiere revisión técnica presencial en sitio (ej: "mi monitor no prende", "el cable de red se rompió", "el torniquete está trabado"), SIN realizar preguntas informativas sobre procedimientos, trámites o préstamos.
 
 REGLAS CLAVE:
-- "Fallas a clase", "reportar fallas", "subir notas" o "calificaciones" son SIEMPRE de tipo AUTOSERVICIO.
-- Preguntas sobre canales de atención, contactos, o cómo solicitar/prestar equipos de cómputo son SIEMPRE de tipo AUTOSERVICIO.
+- Toda pregunta con interrogativos o verbos de trámite ("¿cómo...?", "¿dónde...?", "¿me pueden prestar...?", "¿cuál es el trámite...?", "¿puedo solicitar...?") es SIEMPRE AUTOSERVICIO.
+- Consultas sobre "fallas a clase", "reportar fallas", "subir notas" o "calificaciones" son SIEMPRE AUTOSERVICIO.
+- Preguntas sobre préstamo de equipos, asignación de portátiles o dotación son SIEMPRE AUTOSERVICIO.
 
 Responde ÚNICAMENTE un objeto JSON válido con la clave 'categoria':
 {"categoria": "AUTOSERVICIO"} o {"categoria": "SOPORTE_FISICO"}"""
@@ -43,11 +49,11 @@ PROMPT_HARDWARE_DIRECT = (
     "📞 **Canales Directos de Soporte TI:**\n"
     "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
     "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`\n\n"
-    "¿Deseas que radique una solicitud de soporte técnico en GLPI para que un técnico atienda tu caso en sitio?"
+    "¿Deseas que radique una solicitud de soporte técnico para que un técnico atienda tu caso en sitio?"
 )
 
 HARDWARE_QUICK_REPLIES = [
-    {"label": "🎫 Radicar Ticket en GLPI", "payload": "CREATE_TICKET"},
+    {"label": "🎫 Radicar ticket", "payload": "CREATE_TICKET"},
     {"label": "✅ Tengo la información", "payload": "RESOLVED"}
 ]
 
@@ -120,10 +126,34 @@ def normalize_role(user_input: str) -> Optional[str]:
     return None
 
 
+INFORMATIVE_PROCEDURAL_PATTERNS = [
+    r"\b(?:c[oó]mo|d[oó]nde|por\s+d[oó]nde|cu[aá]l|qui[eé]n|qu[eé]\s+requisitos|qu[eé]\s+documentos)\b",
+    r"\b(?:me\s+pueden\s+prestar|puedo\s+pedir|se\s+puede\s+prestar|pueden\s+asignar|me\s+prestan)\b",
+    r"\b(?:pr[eé]stamo|prestar|prestamo|solicitar\s+un\s+(?:equipo|computador|port[aá]til|pc|laptop)|pedir\s+(?:equipo|computador|port[aá]til|pc))\b",
+    r"\b(?:reemplazo|dotaci[oó]n|asignaci[oó]n|tr[aá]mite|instructivo|procedimiento|pol[ií]tica|requisitos\s+para)\b",
+    r"\b(?:mientras\s+(?:arreglan|reparan|revisan|componen))\b",
+    r"\b(?:cu[aá]nto\s+demora|tiempo\s+de\s+respuesta|qu[eé]\s+cubre)\b"
+]
+
+
+def is_informative_procedure_query(user_message: str) -> bool:
+    """
+    Detecta si la consulta del usuario es de carácter informativo, procedimental o sobre
+    préstamo/reemplazo/dotación de equipos, garantizando que deba ser atendida por el pipeline RAG
+    explicativo (AUTOSERVICIO) y no derivada a radicación directa.
+    """
+    msg = (user_message or "").lower().strip()
+    return any(re.search(pat, msg) for pat in INFORMATIVE_PROCEDURAL_PATTERNS)
+
+
 async def classify_request_intent_async(user_message: str, user_role: str = "general") -> str:
     """
     Clasificador semántico asíncrono con LLM local para determinar AUTOSERVICIO vs SOPORTE_FISICO.
+    Prioriza consultas informativas y procedimentales para entrega de RAG explicativo.
     """
+    if is_informative_procedure_query(user_message):
+        return "AUTOSERVICIO"
+
     prompt = f"Rol de usuario: {user_role}\nConsulta del usuario: \"{user_message}\"\nClasificación JSON:"
     
     try:
@@ -159,7 +189,11 @@ async def classify_request_intent_async(user_message: str, user_role: str = "gen
 def classify_request_intent(user_message: str, user_role: str = "general") -> str:
     """
     Clasificador semántico síncrono con LLM local para determinar AUTOSERVICIO vs SOPORTE_FISICO.
+    Prioriza consultas informativas y procedimentales para entrega de RAG explicativo.
     """
+    if is_informative_procedure_query(user_message):
+        return "AUTOSERVICIO"
+
     prompt = f"Rol de usuario: {user_role}\nConsulta del usuario: \"{user_message}\"\nClasificación JSON:"
     
     try:
