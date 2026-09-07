@@ -26,6 +26,13 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # Asegurar que el directorio raíz del proyecto esté en el PYTHONPATH
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -62,6 +69,7 @@ stats = {
     "images_described": 0,
     "images_skipped": 0,
     "chunks_generated": 0,
+    "chunks_deduplicated": 0,
     "vision_errors": 0,
 }
 
@@ -506,6 +514,277 @@ def generate_deterministic_chunk_ids(chunks: List[Document]) -> List[str]:
 
 
 # =============================================================================
+# DETECCIÓN DE REDUNDANCIA Y CONTROL DE ADMISIÓN (PRE-FLIGHT CHECK)
+# =============================================================================
+
+def calculate_chunk_redundancy(
+    chunks: List[Document],
+    vector_store: Chroma,
+    embeddings: HuggingFaceEmbeddings,
+    threshold: float = 0.88,
+    exclude_source: Optional[str] = None,
+    batch_size: int = 32
+) -> dict:
+    """
+    Evalúa la redundancia semántica de una lista de fragmentos contra ChromaDB.
+    Usa embeddings normalizados: Similitud Coseno = 1.0 - distancia.
+    """
+    total_chunks = len(chunks)
+    if total_chunks == 0:
+        return {
+            "total_chunks": 0,
+            "redundant_count": 0,
+            "novel_count": 0,
+            "redundancy_ratio": 0.0,
+            "overlapping_sources": {},
+            "redundant_indices": set(),
+            "novel_indices": set(),
+            "chunk_results": []
+        }
+
+    try:
+        col = vector_store._collection
+        col_count = col.count()
+    except Exception:
+        col = None
+        col_count = 0
+
+    if col_count == 0 or col is None:
+        return {
+            "total_chunks": total_chunks,
+            "redundant_count": 0,
+            "novel_count": total_chunks,
+            "redundancy_ratio": 0.0,
+            "overlapping_sources": {},
+            "redundant_indices": set(),
+            "novel_indices": set(range(total_chunks)),
+            "chunk_results": [{"chunk": c, "similarity": 0.0, "matched_source": None, "is_redundant": False} for c in chunks]
+        }
+
+    texts = [c.page_content for c in chunks]
+    chunk_embeddings = embeddings.embed_documents(texts)
+
+    redundant_indices = set()
+    novel_indices = set()
+    overlapping_sources = {}
+    chunk_results = []
+
+    n_results = min(5 if exclude_source else 1, col_count)
+
+    for start_idx in range(0, total_chunks, batch_size):
+        batch_embs = chunk_embeddings[start_idx:start_idx + batch_size]
+        batch_chunks = chunks[start_idx:start_idx + batch_size]
+
+        try:
+            results = col.query(
+                query_embeddings=batch_embs,
+                n_results=n_results,
+                include=["distances", "metadatas"]
+            )
+        except Exception as exc:
+            logger.warning(f"Error consultando ChromaDB para redundancia: {exc}")
+            continue
+
+        for i, chunk in enumerate(batch_chunks):
+            global_idx = start_idx + i
+            distances = results["distances"][i] if i < len(results["distances"]) else []
+            metadatas = results["metadatas"][i] if i < len(results["metadatas"]) else []
+
+            best_dist = 999.0
+            best_meta = {}
+            for dist, meta in zip(distances, metadatas):
+                src = meta.get("source") if meta else ""
+                if exclude_source and src == exclude_source:
+                    continue
+                best_dist = dist
+                best_meta = meta or {}
+                break
+
+            similarity = max(0.0, 1.0 - best_dist) if best_dist < 900.0 else 0.0
+            matched_src = best_meta.get("source", "desconocido") if best_meta else None
+
+            is_redundant = (similarity >= threshold) and (matched_src is not None)
+
+            if is_redundant:
+                redundant_indices.add(global_idx)
+                if matched_src not in overlapping_sources:
+                    overlapping_sources[matched_src] = {
+                        "count": 0,
+                        "max_similarity": 0.0,
+                        "sample_snippet": chunk.page_content[:100].strip()
+                    }
+                overlapping_sources[matched_src]["count"] += 1
+                overlapping_sources[matched_src]["max_similarity"] = max(
+                    overlapping_sources[matched_src]["max_similarity"],
+                    similarity
+                )
+            else:
+                novel_indices.add(global_idx)
+
+            chunk_results.append({
+                "chunk": chunk,
+                "similarity": similarity,
+                "matched_source": matched_src,
+                "is_redundant": is_redundant
+            })
+
+    redundancy_ratio = (len(redundant_indices) / total_chunks) * 100.0 if total_chunks > 0 else 0.0
+
+    return {
+        "total_chunks": total_chunks,
+        "redundant_count": len(redundant_indices),
+        "novel_count": len(novel_indices),
+        "redundancy_ratio": redundancy_ratio,
+        "overlapping_sources": overlapping_sources,
+        "redundant_indices": redundant_indices,
+        "novel_indices": novel_indices,
+        "chunk_results": chunk_results
+    }
+
+
+def print_redundancy_report(
+    target_name: str,
+    report: dict,
+    threshold: float = 0.88
+) -> None:
+    """Imprime en consola un reporte visual con semáforo sobre la redundancia del documento."""
+    total = report["total_chunks"]
+    redundant = report["redundant_count"]
+    novel = report["novel_count"]
+    ratio = report["redundancy_ratio"]
+    overlaps = report["overlapping_sources"]
+
+    sorted_sources = sorted(overlaps.items(), key=lambda x: x[1]["count"], reverse=True)
+
+    print("\n" + "=" * 70)
+    print(" 🔍 AUDITORÍA DE REDUNDANCIA DOCUMENTAL (PRE-INGESTA) - UNIMON")
+    print("=" * 70)
+    print(f" Documento evaluado:     {target_name}")
+    print(f" Fragmentos generados:   {total}")
+    print(f" Umbral de redundancia:  >= {threshold:.0%} de similitud semántica")
+    print("-" * 70)
+    print(" 📊 BALANCE DE CONTENIDO:")
+    print(f"   • Fragmentos Nuevos (Aportan valor):       {novel:>3} ({100.0 - ratio:>5.1f}%)")
+    print(f"   • Fragmentos Redundantes (Ya indexados):   {redundant:>3} ({ratio:>5.1f}%)")
+    print("-" * 70)
+
+    if ratio < 25.0:
+        print(" 🟢 DIAGNÓSTICO: [BAJA REDUNDANCIA / CONOCIMIENTO NUEVO]")
+        print("    El documento contiene principalmente procedimientos o datos no registrados.")
+        print("    💡 Recomendación: Aprobado para indexación normal sin riesgo de saturación.")
+    elif ratio < 70.0:
+        print(" 🟡 DIAGNÓSTICO: [REDUNDANCIA MODERADA / SOLAPAMIENTO PARCIAL]")
+        print("    El documento comparte bases normativas o encabezados con otros existentes,")
+        print("    pero incluye secciones nuevas y específicas.")
+        print("    💡 Recomendación: Utiliza el flag '--deduplicate' para omitir los fragmentos")
+        print("       duplicados y guardar exclusivamente el contenido novedoso.")
+    else:
+        print(" 🔴 DIAGNÓSTICO: [ALTA REDUNDANCIA / DOCUMENTO DUPLICADO O VERSIÓN ANTERIOR]")
+        print("    Más del 70% del documento ya se encuentra cubierto por la base de datos.")
+        print("    💡 Recomendación:")
+        print("       - Si es una versión actualizada (ej. 2024 que reemplaza 2023):")
+        print("         Elimina primero el documento viejo con '--delete-doc <archivo_viejo>'")
+        print("         antes de cargar este.")
+        print("       - Si no es una versión nueva, descarta la indexación para evitar saturación.")
+
+    if sorted_sources:
+        print("\n 📁 Documentos existentes que ya contienen esta información:")
+        for idx, (src_name, info) in enumerate(sorted_sources[:5], 1):
+            pct_overlap = (info["count"] / total) * 100.0 if total > 0 else 0.0
+            print(f"    {idx}. {src_name}")
+            print(f"       Coincidencia: {info['count']} fragmentos ({pct_overlap:.1f}% del documento)")
+            print(f"       Similitud máxima observada: {info['max_similarity'] * 100.0:.1f}%\n")
+
+    print("=" * 70 + "\n")
+
+
+def audit_chroma_database_redundancy(
+    vector_store: Chroma,
+    embeddings: HuggingFaceEmbeddings,
+    threshold: float = 0.88,
+    min_overlap_chunks: int = 2
+) -> None:
+    """
+    Escanea la base de datos ChromaDB completa y detecta pares de documentos existentes
+    que tienen alta redundancia entre sí.
+    """
+    print("\n" + "=" * 70)
+    print(" 📋 AUDITORÍA GLOBAL DE REDUNDANCIA EN CHROMADB - UNISIMON")
+    print("=" * 70)
+
+    try:
+        col = vector_store._collection
+        count = col.count()
+        print(f" Total de fragmentos indexados en la colección: {count}")
+        if count == 0:
+            print(" La base de datos está vacía. No hay fragmentos que auditar.")
+            print("=" * 70 + "\n")
+            return
+
+        all_data = col.get(include=["metadatas", "documents"])
+        metadatas = all_data.get("metadatas", []) or []
+        documents = all_data.get("documents", []) or []
+        ids = all_data.get("ids", []) or []
+
+        docs_by_source = {}
+        for doc_id, meta, text in zip(ids, metadatas, documents):
+            src = meta.get("source", "desconocido") if meta else "desconocido"
+            if src not in docs_by_source:
+                docs_by_source[src] = []
+            docs_by_source[src].append({"id": doc_id, "text": text, "meta": meta})
+
+        total_sources = len(docs_by_source)
+        print(f" Documentos fuente registrados: {total_sources}")
+        print(f" Umbral de solapamiento semántico: >= {threshold:.0%}")
+        print("-" * 70)
+        print(" Analizando solapamiento cruzado entre documentos...")
+
+        overlap_matrix = {}
+
+        for src, chunk_list in tqdm(docs_by_source.items(), desc="Auditoría de Colección", unit="doc"):
+            sample_texts = [c["text"] for c in chunk_list]
+            sample_embeddings = embeddings.embed_documents(sample_texts)
+            res = col.query(
+                query_embeddings=sample_embeddings,
+                n_results=min(5, count),
+                include=["distances", "metadatas"]
+            )
+            for distances, metas in zip(res["distances"], res["metadatas"]):
+                for dist, meta in zip(distances, metas):
+                    other_src = meta.get("source") if meta else None
+                    if not other_src or other_src == src:
+                        continue
+                    sim = 1.0 - dist
+                    if sim >= threshold:
+                        pair = tuple(sorted([src, other_src]))
+                        if pair not in overlap_matrix:
+                            overlap_matrix[pair] = {"count": 0, "max_sim": 0.0}
+                        overlap_matrix[pair]["count"] += 1
+                        overlap_matrix[pair]["max_sim"] = max(overlap_matrix[pair]["max_sim"], sim)
+
+        significant_overlaps = [
+            (pair, data) for pair, data in overlap_matrix.items()
+            if data["count"] >= min_overlap_chunks
+        ]
+        significant_overlaps.sort(key=lambda x: x[1]["count"], reverse=True)
+
+        if not significant_overlaps:
+            print("\n ✅ No se encontraron pares de documentos con redundancia crítica.")
+        else:
+            print(f"\n ⚠️ Se detectaron {len(significant_overlaps)} pares con solapamiento significativo (>= {min_overlap_chunks} chunks):\n")
+            for idx, ((doc_a, doc_b), data) in enumerate(significant_overlaps, 1):
+                len_a = len(docs_by_source.get(doc_a, []))
+                len_b = len(docs_by_source.get(doc_b, []))
+                print(f" {idx:2d}. [{data['max_sim']*100:.1f}% similitud máx | {data['count']} fragmentos solapados]")
+                print(f"     • Doc A ({len_a} chunks): {doc_a}")
+                print(f"     • Doc B ({len_b} chunks): {doc_b}")
+
+        print("\n" + "=" * 70 + "\n")
+    except Exception as exc:
+        logger.error(f"Error durante la auditoría global de ChromaDB: {exc}", exc_info=True)
+
+
+# =============================================================================
 # ORQUESTADOR PRINCIPAL DE INGESTA MULTIMODAL E INCREMENTAL
 # =============================================================================
 
@@ -516,14 +795,20 @@ def ingest_multimodal(
     file_path: Optional[str] = None,
     incremental: bool = False,
     delete_doc: Optional[str] = None,
-    wipe_db: bool = False
+    wipe_db: bool = False,
+    check_redundancy: bool = False,
+    deduplicate: bool = False,
+    similarity_threshold: float = 0.88,
+    audit_db: bool = False
 ) -> bool:
     """
     Pipeline de ingesta multimodal con soporte para:
+    - Auditoría de redundancia (--check-redundancy): evaluación previa segura (dry-run).
+    - Deduplicación activa (--deduplicate): descarta chunks redundantes antes del upsert.
+    - Auditoría global de BD (--audit-db): detecta solapamiento entre documentos cargados.
     - Ingesta incremental (--incremental): procesa solo documentos no indexados.
     - Ingesta de archivo único (--file <ruta>): agrega o actualiza solo ese archivo.
     - Eliminación de documento (--delete-doc <nombre>): borra todos los chunks del archivo.
-    - Actualización con upsert determinista en ChromaDB.
     """
     settings = get_settings()
     docs_dir = Path(docs_path or settings.docs_dir)
@@ -596,6 +881,15 @@ def ingest_multimodal(
         persist_directory=str(chroma_dir),
         embedding_function=embeddings
     )
+
+    # 2.1 CASO: Auditoría global de redundancia en la base de datos existente
+    if audit_db:
+        audit_chroma_database_redundancy(
+            vector_store=vector_store,
+            embeddings=embeddings,
+            threshold=similarity_threshold
+        )
+        return True
 
     # 3. Determinar lista de archivos a procesar
     if file_path:
@@ -704,11 +998,64 @@ def ingest_multimodal(
     stats["chunks_generated"] = len(chunks)
     logger.info(f"Total de fragmentos generados: {stats['chunks_generated']}")
 
-    # 7. Limpiar chunks anteriores de los archivos a procesar para evitar huérfanos
+    # 7. Si se solicitó auditoría previa de redundancia (Dry-Run / Pre-Flight Check)
+    if check_redundancy:
+        logger.info("🔍 Ejecutando auditoría de redundancia previa a la ingesta (Dry-Run)...")
+        for f in all_files:
+            file_chunks = [c for c in chunks if c.metadata.get("source") == f.name]
+            if not file_chunks:
+                continue
+            rep = calculate_chunk_redundancy(
+                chunks=file_chunks,
+                vector_store=vector_store,
+                embeddings=embeddings,
+                threshold=similarity_threshold,
+                exclude_source=f.name
+            )
+            print_redundancy_report(f.name, rep, threshold=similarity_threshold)
+        logger.info("✅ Auditoría de redundancia completada. No se modificó la base de datos ChromaDB.")
+        return True
+
+    # 8. Deduplicación activa durante la ingesta (si se solicitó --deduplicate)
+    if deduplicate:
+        logger.info(f"🛡️ Modo Deduplicación Activa (Umbral >= {similarity_threshold:.0%}): Filtrando fragmentos redundantes...")
+        filtered_chunks = []
+        total_deduped = 0
+        for f in all_files:
+            file_chunks = [c for c in chunks if c.metadata.get("source") == f.name]
+            if not file_chunks:
+                continue
+            rep = calculate_chunk_redundancy(
+                chunks=file_chunks,
+                vector_store=vector_store,
+                embeddings=embeddings,
+                threshold=similarity_threshold,
+                exclude_source=f.name
+            )
+            novel = [c for idx, c in enumerate(file_chunks) if idx not in rep["redundant_indices"]]
+            deduped_count = rep["redundant_count"]
+            total_deduped += deduped_count
+            if deduped_count > 0:
+                logger.info(
+                    f"   • '{f.name}': {len(novel)}/{len(file_chunks)} fragmentos novedosos conservados "
+                    f"({deduped_count} redundantes descartados)."
+                )
+            filtered_chunks.extend(novel)
+
+        stats["chunks_deduplicated"] = total_deduped
+        chunks = filtered_chunks
+        stats["chunks_generated"] = len(chunks)
+
+        if not chunks:
+            logger.warning("⚠️ Todos los fragmentos procesados superaron el umbral de redundancia con documentos ya existentes.")
+            logger.warning("   No se indexó ningún fragmento para evitar saturación de la base vectorial.")
+            return True
+
+    # 9. Limpiar chunks anteriores de los archivos a procesar para evitar huérfanos
     for f in all_files:
         delete_document_chunks(vector_store, f.name)
 
-    # 8. Indexar con upsert determinista en ChromaDB
+    # 10. Indexar con upsert determinista en ChromaDB
     texts = [c.page_content for c in chunks]
     metadatas = [c.metadata for c in chunks]
     ids = generate_deterministic_chunk_ids(chunks)
@@ -724,7 +1071,7 @@ def ingest_multimodal(
 
     elapsed_time = time.time() - start_time
 
-    # 9. Reporte final
+    # 11. Reporte final
     logger.info("=" * 70)
     logger.info(" [ÉXITO] INGESTA COMPLETADA")
     logger.info("=" * 70)
@@ -732,7 +1079,8 @@ def ingest_multimodal(
     logger.info(f" • Páginas PDF extraídas:      {stats['pages_extracted']}")
     logger.info(f" • Diapositivas PPTX extraídas:{stats['slides_extracted']}")
     logger.info(f" • Imágenes interpretadas:     {stats['images_described']} ({stats['images_skipped']} descartadas por tamaño)")
-    logger.info(f" • Fragmentos indexados:        {stats['chunks_generated']}")
+    dedup_info = f" ({stats['chunks_deduplicated']} descartados por redundancia)" if stats.get("chunks_deduplicated", 0) > 0 else ""
+    logger.info(f" • Fragmentos indexados:        {stats['chunks_generated']}{dedup_info}")
     logger.info(f" • Tiempo total:               {elapsed_time:.1f} segundos ({elapsed_time / 60:.1f} min)")
     logger.info(f" • Base vectorial en:          {chroma_dir.resolve()}")
     logger.info(f" • Dispositivo de embeddings:  {device.upper()}")
@@ -774,6 +1122,27 @@ if __name__ == "__main__":
         help="Forzar eliminación completa de la base de datos ChromaDB antes de reindexar"
     )
     parser.add_argument(
+        "--check-redundancy", "-c",
+        action="store_true",
+        help="Auditoría previa (Dry-Run): evalúa la redundancia del/los documento(s) contra ChromaDB sin alterar la base"
+    )
+    parser.add_argument(
+        "--deduplicate",
+        action="store_true",
+        help="Filtrar y descartar fragmentos redundantes durante la ingesta, guardando solo contenido novedoso"
+    )
+    parser.add_argument(
+        "--similarity-threshold", "-t",
+        type=float,
+        default=0.88,
+        help="Umbral de similitud semántica para clasificar un fragmento como redundante (por defecto: 0.88 / 88%%)"
+    )
+    parser.add_argument(
+        "--audit-db",
+        action="store_true",
+        help="Escanear toda la base de datos ChromaDB y reportar pares de documentos existentes con alta redundancia mutua"
+    )
+    parser.add_argument(
         "--docs-dir",
         type=str,
         default=None,
@@ -794,7 +1163,11 @@ if __name__ == "__main__":
         file_path=args.file,
         incremental=args.incremental,
         delete_doc=args.delete_doc,
-        wipe_db=args.wipe
+        wipe_db=args.wipe,
+        check_redundancy=args.check_redundancy,
+        deduplicate=args.deduplicate,
+        similarity_threshold=args.similarity_threshold,
+        audit_db=args.audit_db
     )
     sys.exit(0 if success else 1)
 
