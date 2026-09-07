@@ -102,17 +102,35 @@ def clear_golden_cache() -> bool:
 def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
     """
     Valida la calidad y confiabilidad de la interacción antes de almacenarla en Golden Cache.
-    Evita envenenamiento de caché con alucinaciones o respuestas de fallback.
+    Evita envenenamiento de caché con alucinaciones, respuestas de fallback, footers aislados
+    o disculpas de LLM.
     """
     if not user_query or len(user_query.strip()) < 5:
         logger.debug("[GoldenCache] Descartado: consulta vacía o demasiado corta.")
         return False
 
-    if not bot_response or len(bot_response.strip()) < 20:
-        logger.debug("[GoldenCache] Descartado: respuesta vacía o demasiado corta.")
+    if not bot_response or len(bot_response.strip()) < 60:
+        logger.debug("[GoldenCache] Descartado: respuesta vacía o demasiado corta (< 60 chars).")
         return False
 
-    resp_lower = bot_response.lower()
+    resp_lower = bot_response.strip().lower()
+
+    # Rechazar si la respuesta es solo la pregunta de cierre/feedback (footer aislado)
+    if resp_lower.startswith("¿pudiste resolver") or resp_lower.startswith("**¿pudiste resolver"):
+        logger.info("[GoldenCache] Descartado: respuesta contiene solo el footer de confirmación.")
+        return False
+
+    # Rechazar frases de disculpa o meta-lenguaje del LLM
+    llm_apology_phrases = [
+        "lo siento", "error en la respuesta", "como modelo de lenguaje",
+        "lamento la confusión", "lamento la confusion",
+        "hubo un error", "no puedo continuar con la conversación"
+    ]
+    for phrase in llm_apology_phrases:
+        if phrase in resp_lower:
+            logger.info(f"[GoldenCache] Descartado por frase de disculpa/meta-lenguaje LLM: '{phrase}'")
+            return False
+
     for pat in INVALID_RESPONSE_PATTERNS:
         if re.search(pat, resp_lower):
             logger.info(f"[GoldenCache] Descartado por patrón de baja confianza/fallback: '{pat}'")
@@ -193,13 +211,14 @@ def invalidate_golden_cache_entry(query: str, role: str = "general") -> bool:
         return False
 
 
-def search_golden_case(user_query: str, threshold: float = 0.90) -> Optional[Tuple[str, str, float]]:
+def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[str] = None) -> Optional[Tuple[str, str, float]]:
     """
     Busca si existe una consulta similar previamente resuelta con éxito.
     
     Args:
         user_query: Consulta actual del usuario.
         threshold: Umbral mínimo de similitud coseno (default: 0.90).
+        role: Rol institucional del usuario para filtrar resultados por contexto (opcional).
     
     Returns:
         Tupla (pregunta_previa, respuesta_validada, similitud) si supera el umbral, None si no.
@@ -212,9 +231,15 @@ def search_golden_case(user_query: str, threshold: float = 0.90) -> Optional[Tup
         model = get_embedding_model()
         embedding = model.encode([f"query: {user_query}"])[0].tolist()
 
+        # Filtrar por rol si se especifica uno distinto a "general"
+        where_filter = None
+        if role and role.strip().lower() != "general":
+            where_filter = {"role": {"$in": [role.strip().lower(), "general"]}}
+
         results = collection.query(
             query_embeddings=[embedding],
             n_results=1,
+            where=where_filter,
             include=["documents", "metadatas", "distances"]
         )
 
@@ -238,3 +263,65 @@ def search_golden_case(user_query: str, threshold: float = 0.90) -> Optional[Tup
         logger.warning(f"[GoldenCache] Error consultando cache: {e}")
 
     return None
+
+
+def purge_anomalous_golden_entries() -> int:
+    """
+    Recorre la colección golden_resolved_qa y elimina entradas anómalas:
+    - Respuestas con menos de 60 caracteres (truncadas o vacías).
+    - Respuestas que son solo el footer de confirmación (¿Pudiste resolver...?).
+    - Respuestas con disculpas de LLM o meta-lenguaje prohibido.
+    
+    Returns:
+        Número de entradas eliminadas.
+    """
+    try:
+        collection = get_golden_collection()
+        data = collection.get(include=["documents", "metadatas"])
+
+        if not data or not data["ids"]:
+            logger.info("[GoldenCache] Colección vacía, nada que purgar.")
+            return 0
+
+        ids_to_delete = []
+        llm_apology_phrases = [
+            "lo siento", "error en la respuesta", "como modelo de lenguaje",
+            "lamento la confusión", "lamento la confusion",
+            "hubo un error", "no puedo continuar con la conversación"
+        ]
+
+        for doc_id, doc in zip(data["ids"], data["documents"]):
+            doc_strip = doc.strip()
+            doc_lower = doc_strip.lower()
+
+            # Respuesta demasiado corta
+            if len(doc_strip) < 60:
+                ids_to_delete.append(doc_id)
+                continue
+
+            # Solo footer de confirmación
+            if doc_lower.startswith("¿pudiste resolver") or doc_lower.startswith("**¿pudiste resolver"):
+                ids_to_delete.append(doc_id)
+                continue
+
+            # Disculpas o meta-lenguaje de LLM
+            if any(phrase in doc_lower for phrase in llm_apology_phrases):
+                ids_to_delete.append(doc_id)
+                continue
+
+            # Patrones de fallback registrados
+            for pat in INVALID_RESPONSE_PATTERNS:
+                if re.search(pat, doc_lower):
+                    ids_to_delete.append(doc_id)
+                    break
+
+        if ids_to_delete:
+            collection.delete(ids=ids_to_delete)
+            logger.info(f"[GoldenCache] Purgadas {len(ids_to_delete)} entradas anómalas en saneamiento.")
+        else:
+            logger.info("[GoldenCache] No se encontraron entradas anómalas.")
+
+        return len(ids_to_delete)
+    except Exception as e:
+        logger.warning(f"[GoldenCache] Error durante purga de anomalías: {e}")
+        return 0
