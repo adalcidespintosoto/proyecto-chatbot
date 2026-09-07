@@ -220,11 +220,21 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
 
             scored_docs.append((doc, original_score, final_score))
 
-        ranked = sorted(scored_docs, key=lambda x: x[2], reverse=True)
+        # Descartar fragmentos con score final inferior al umbral de corte (ruido o contradicciones semánticas)
+        MIN_RERANK_SCORE_CUTOFF = -2.0
+        ranked = sorted(
+            [item for item in scored_docs if item[2] >= MIN_RERANK_SCORE_CUTOFF],
+            key=lambda x: x[2], reverse=True
+        )
+
+        if not ranked:
+            logger.info(f"[Reranker] Ningún fragmento superó el umbral de corte ({MIN_RERANK_SCORE_CUTOFF}). Retornando lista vacía.")
+            return []
+
         result = [(doc, orig_score) for doc, orig_score, _ in ranked[:top_k]]
 
         logger.info(
-            f"[Reranker] Reordenados {len(retrieved_docs)} fragmentos -> Top-{top_k}. "
+            f"[Reranker] Reordenados {len(retrieved_docs)} fragmentos -> Top-{top_k} (corte >= {MIN_RERANK_SCORE_CUTOFF}). "
             f"Mejor score reranker: {ranked[0][2]:.4f}"
         )
         return result
@@ -1086,14 +1096,15 @@ class RAGService:
             if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
                 try:
                     search_q = format_e5_query(rerank_query)
-                    extra_docs = self.vector_store.similarity_search(
+                    extra_docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
                         search_q,
                         k=4,
                         filter={"source": primary_source}
                     )
-                    for edoc in extra_docs:
-                        if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                            primary_chunks.append(edoc)
+                    for edoc, escore in extra_docs_with_scores:
+                        if escore is not None and escore >= self.min_relevance_score:
+                            if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                                primary_chunks.append(edoc)
                 except Exception as exc:
                     logger.debug(f"No se pudieron cargar fragmentos complementarios para {primary_source}: {exc}")
 
@@ -1187,7 +1198,10 @@ class RAGService:
             "messages": messages,
             "stream": False,
             "options": {
-                "temperature": 0.0
+                "temperature": 0.0,
+                "repeat_penalty": 1.15,
+                "top_p": 0.9,
+                "num_predict": 768
             }
         }
 

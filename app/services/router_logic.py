@@ -938,7 +938,8 @@ class RouterLogic:
                 "tipo": "SOLUCIONADO",
                 "mensaje": DESPEDIDA_INSTITUCIONAL,
                 "ticket_id": None,
-                "source": "UniMon_Nivel1_Resolved"
+                "source": "UniMon_Nivel1_Resolved",
+                "feedback": "RESOLVED"
             }
 
         # -------------------------------------------------------------
@@ -1352,9 +1353,9 @@ class RouterLogic:
                     }
 
                 # Consultar RAG con el rol confirmado y filtrar chunks
-                # Golden Cache: buscar coincidencia previa
+                # Golden Cache: buscar coincidencia previa (filtrada por rol)
                 golden_context = ""
-                golden_hit = search_golden_case(query_to_run)
+                golden_hit = search_golden_case(query_to_run, role=session.user_role)
                 if golden_hit:
                     prev_q, prev_ans, sim = golden_hit
                     golden_context = (
@@ -1630,7 +1631,8 @@ class RouterLogic:
                         "reply": feedback_res["response"],
                         "ticket_id": None,
                         "source": feedback_res.get("source", "UniMon_Feedback_Success"),
-                        "quick_replies": []
+                        "quick_replies": [],
+                        "feedback": "RESOLVED"
                     }
                 elif feedback_res.get("state") == "DIAGNOSTICO" or feedback_res.get("tipo") == "DIAGNOSTICO":
                     # Invalidar caso previo en Golden Cache si el usuario reporta que no le funcionó (RETRY_DIAGNOSIS)
@@ -1652,7 +1654,8 @@ class RouterLogic:
                         "source": feedback_res.get("source", "UniMon_Diagnostico_Retry"),
                         "quick_replies": feedback_res.get("quick_replies", [
                             {"label": "🎫 Generar reporte a soporte", "payload": "CREATE_TICKET"}
-                        ])
+                        ]),
+                        "feedback": "RETRY"
                     }
                 elif feedback_res.get("state") == "RADICANDO_TICKET" or feedback_res.get("tipo") == "RADICANDO_TICKET":
                     # Invalidar caso previo en Golden Cache si el usuario decide escalar a ticket por falla
@@ -1675,7 +1678,8 @@ class RouterLogic:
                         "reply": feedback_res["response"],
                         "ticket_id": None,
                         "source": feedback_res.get("source", "UniMon_SlotFilling"),
-                        "quick_replies": []
+                        "quick_replies": [],
+                        "feedback": "ESCALATED"
                     }
 
             # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
@@ -1724,9 +1728,9 @@ class RouterLogic:
             history = cls.get_history(session_id)
             query_ctx = texto
 
-            # Golden Cache: buscar coincidencia previa antes del RAG completo
+            # Golden Cache: buscar coincidencia previa antes del RAG completo (filtrada por rol)
             golden_context = ""
-            golden_hit = search_golden_case(query_ctx)
+            golden_hit = search_golden_case(query_ctx, role=session.user_role)
             if golden_hit:
                 prev_q, prev_ans, sim = golden_hit
                 golden_context = (
@@ -1859,10 +1863,9 @@ class RouterLogic:
                 else:
                     # El usuario formuló una pregunta o saludo sin haber seleccionado su rol previamente.
                     # Retener la consulta y solicitar OBLIGATORIAMENTE la selección de rol.
-                    if not cls.is_greeting(texto) and len(texto.split()) > 1 and not cls.is_cancellation(texto) and not is_out_of_domain_query(texto):
-                        session.pending_query = texto
-                    else:
-                        session.pending_query = None
+                    # Permitir retención de consultas técnicas monopalabra (ej: 'Teams', 'SIAAF', 'Contraseña')
+                    is_valid_topic = len(texto.strip()) >= 3 and not cls.is_greeting(texto) and not cls.is_cancellation(texto) and not is_out_of_domain_query(texto)
+                    session.pending_query = texto if is_valid_topic else None
                     session.estado = EstadoTicket.PIDIENDO_ROL
                     cls.add_history(session_id, "user", texto)
                     cls.add_history(session_id, "assistant", MENSAJE_PIDIENDO_ROL)
@@ -1941,9 +1944,9 @@ class RouterLogic:
                 }
 
             # 7. Consultar RAG con historial conversacional y rol de usuario
-            # Golden Cache: buscar coincidencia previa
+            # Golden Cache: buscar coincidencia previa (filtrada por rol)
             golden_context = ""
-            golden_hit = search_golden_case(texto)
+            golden_hit = search_golden_case(texto, role=session.user_role)
             if golden_hit:
                 prev_q, prev_ans, sim = golden_hit
                 golden_context = (

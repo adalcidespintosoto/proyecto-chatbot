@@ -35,9 +35,9 @@ SYNONYM_MAP = {
     r"\b(pantalla|monitor|display)\b": "pantalla monitor de video",
     
     # Plataformas y Sistemas
-    r"\b(aula|campus virtual|moodle|aula virtual)\b": "aula extendida plataforma educativa",
+    r"\b(aula|campus virtual|moodle|aula virtual|como entro al aula)\b": "instructivo portales estudiantes siaaf acceso plataforma institucional aula extendida",
     r"\b(portal|portal de la u|pagina de la u|portal estudiantil|portal estudiantes|portal docentes|sistema de notas)\b": "instructivo portales estudiantes ingreso plataforma notas",
-    r"\b(teams|tim|reuniones virtuales)\b": "microsoft teams reuniones grupos institucionales",
+    r"\b(teams|tim|reuniones virtuales|como entro a teams|como ingreso a team|como voy a teams)\b": "acceso a microsoft teams para estudiantes inicio sesion credenciales institucionales",
     r"\b(correo|mail|email|outlook)\b": "correo institucional office 365",
     r"\b(seven|seben)\b": "sistema seven erp financiero",
     r"\b(kactus|caktus|kaktu)\b": "sistema kactus gestión de talento humano y nómina",
