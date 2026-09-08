@@ -142,6 +142,11 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
             "cómo", "como", "pasos", "votar", "radicar", "ingresar", "activar", "descargar", 
             "hago para", "solicitar", "consultar", "inscribir"
         ])
+        is_network_connectivity_query = any(w in q_lower for w in [
+            "internet", "conexion", "conexión", "conectividad", "wifi", "red", 
+            "sin internet", "sin red", "no hay internet", "se cayó la red", "se cayo el internet",
+            "caida de red", "caída de red", "cable de red"
+        ]) and not any(app in q_lower for app in ["teams", "kactus", "seven", "siaaf", "correo", "moodle", "office", "onedrive"])
 
         # Asignar scores del cross-encoder y ordenar
         scored_docs = []
@@ -217,6 +222,13 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
                     final_score += 2.0
                 if "requisitos previos" in content_lower and "procedimiento paso a paso" not in content_lower:
                     final_score -= 1.0
+
+            # Desambiguación de fallas o reportes de conectividad / red / internet vs manuales de software que solo mencionan internet como prerrequisito
+            if is_network_connectivity_query:
+                if any(app_doc in source_lower or app_doc in content_lower for app_doc in [
+                    "teams", "microsoft teams", "kactus", "seven", "calificaciones", "votación", "votacion", "carnet"
+                ]):
+                    final_score -= 6.0
 
             scored_docs.append((doc, original_score, final_score))
 
@@ -459,9 +471,9 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
 
 # Mensaje oficial estándar cuando no existe procedimiento documentado en ChromaDB
 MENSAJE_NO_DOCUMENTADO = (
-    "No dispongo de un instructivo o procedimiento institucional documentado para responder a tu solicitud, "
-    "o se trata de una labor técnica/física especializada que debe ser atendida directamente por el personal de TI.\n\n"
-    "Puedes comunicarte directamente con los canales oficiales de soporte técnico:\n"
+    "Actualmente no me encuentro en la capacidad de responder a tu solicitud, ya que no dispongo de conocimiento, "
+    "instructivo o procedimiento institucional documentado sobre este tema.\n\n"
+    "Puedes comunicarte directamente con los canales oficiales de soporte técnico TI:\n"
     "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
     "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n"
     "¿O prefieres que radique un caso de soporte técnico por ti ahora mismo?"
@@ -472,8 +484,10 @@ STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de 
 
 DIRECTRICES DE RESPUESTA:
 1. Interpreta la intención del usuario aunque use lenguaje informal, abreviaturas o sinónimos cotidianos (ej. 'profes', 'materias', 'horarios', 'portal').
-2. Si el contexto menciona el sistema (ej. SIAAF, Teams, Portal Estudiantes), infiere la ruta lógica paso a paso y oriéntalo con seguridad.
-3. Solo en caso de que la consulta sea totalmente ajena a la universidad o no exista ninguna relación en el contexto, remite amablemente a los canales presenciales de TI (Ext. 8003/8004 en Barranquilla o Ext. 129 en Cúcuta).
+2. FIDELIDAD INSTITUCIONAL Y COHERENCIA DE ROL:
+   - Utiliza ÚNICAMENTE los procedimientos descritos en el contexto. ESTÁ ESTRICTAMENTE PROHIBIDO inventar botones, opciones de menú, portales o pasos web ficticios.
+   - Si el rol del usuario es 'Administrativo' o 'Profesor', NUNCA lo envíes al 'Portal Estudiantes'. Respeta estrictamente el rol institucional del usuario.
+3. Si la consulta describe una falla técnica de infraestructura (ej. corte de internet, daño físico de cables o equipos) o un caso donde no existe procedimiento de autoservicio en el contexto, explica brevemente los descartes iniciales válidos y orienta directamente a los canales de Soporte TI de la sede sin inventar trámites web.
 
 DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
 
@@ -507,46 +521,35 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
    - D. PRÉSTAMO TEMPORAL DE RECURSOS AUDIOVISUALES (Cámaras, Video Beam, Micrófonos, Tablets para clases/eventos):
      * Si el usuario solicita un préstamo temporal o reserva de equipos para clases o eventos:
        1. Aclara que la coordinación se realiza directamente con Soporte Técnico TI. NUNCA apruebes el préstamo ni inventes rutas en plataformas web.
-       2. Proporciona los canales oficiales de ambas sedes:
-          - Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | WhatsApp: 3172683922 | Tel: (605) 3444333 Ext. 8003/8004
-          - Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: (607) 5827070 Ext. 129
-       3. Entrega OBLIGATORIAMENTE la plantilla de solicitud con los campos:
-          - Nombre completo y Documento.
-          - Rol y Dependencia/Programa.
-          - Equipo requerido.
-          - Motivo / Evento o clase.
-          - Fecha y Horario.
-          - Ubicación / Salón.
+       2. Proporciona los canales oficiales de ambas sedes.
+       3. Entrega OBLIGATORIAMENTE la plantilla de solicitud (Nombre, Documento, Rol, Equipo, Motivo, Fecha/Horario, Salón).
 
-2. PRIORIZACIÓN OBLIGATORIA DE PROCEDIMIENTOS DE AUTOSERVICIO (PORTAL, CONTRASEÑAS, CERTIFICADOS, SIAAF):
-   - Si el contexto contiene un procedimiento de AUTOSERVICIO o pasos web que el usuario puede realizar por su cuenta:
-     1. ES OBLIGATORIO explicar el procedimiento paso a paso (Paso 1, Paso 2, Paso 3...) detallando los clics, botones y menús exactos descritos en el documento.
-     2. ESTÁ ESTRICTAMENTE PROHIBIDO decirle al usuario que envíe un correo o solicitud a soporte como primera opción.
-     3. Los canales de soporte (solicitudcomputo@unisimon.edu.co / WhatsApp 3172683922 / helpdesk@unisimon.edu.co) se indican ÚNICAMENTE al final como alternativa de escalado en caso de fallas o problemas técnicos persistentes.
-   
-   - EJEMPLO ESPECÍFICO (RESTABLECIMIENTO DE CONTRASEÑA ESTUDIANTES):
-     * Si el estudiante olvidó su clave:
-       - Paso 1: Ingresar a [http://www.unisimon.edu.co/](http://www.unisimon.edu.co/) y hacer clic en **Portales**.
-       - Paso 2: Seleccionar **Portal Estudiantes** y elegir sede (Barranquilla o Cúcuta).
-       - Paso 3: Hacer clic en **'Olvidé mi Usuario / Contraseña'**.
-       - Paso 4: Digitar documento de identidad o código y presionar **Enviar**.
-       - Paso 5: Abrir el enlace recibido en su correo personal (remitente `informacion@unisimonbolivar.edu.co`, validez de 24 horas) y definir la nueva clave (8 a 15 caracteres, al menos una mayúscula, una minúscula y un número).
+2. PROCEDIMIENTOS DE AUTOSERVICIO VS. INCIDENCIAS Y FALLAS TÉCNICAS:
+   A. CASOS DE AUTOSERVICIO DOCUMENTADO (El usuario puede resolverlo por su cuenta):
+      - Si la consulta del usuario corresponde a un procedimiento, trámite o configuración documentado en el contexto (ej. restablecimiento de contraseña, ingreso a Teams, consulta de notas, carnet digital, matrícula, aplicativos institucionales):
+        * ES OBLIGATORIO explicar el procedimiento paso a paso (Paso 1, Paso 2, Paso 3...) detallando con exactitud los clics, botones y menús reales descritos en el documento institucional.
+        * ESTÁ ESTRICTAMENTE PROHIBIDO decirle al usuario que envíe un correo o solicitud a soporte como primera opción cuando existe un instructivo que le permite realizarlo por autoservicio.
+        * Los canales de soporte (solicitudcomputo@unisimon.edu.co / WhatsApp 3172683922 / helpdesk@unisimon.edu.co) se indican ÚNICAMENTE al final del mensaje como alternativa de escalado en caso de fallas o problemas técnicos persistentes.
+
+   B. CASOS DE INCIDENCIA TÉCNICA, INFRAESTRUCTURA O FALLA GENERAL (Sin autoservicio posible):
+      - Si la consulta reporta una falla de infraestructura o servicio (ej. corte o caída de internet/wifi, daño físico en cables, periféricos, equipos o servidores caídos) o el contexto NO describe una opción de autoservicio para solucionar la falla:
+        * ESTÁ ESTRICTAMENTE PROHIBIDO inventar pasos o botones en portales (ej. NUNCA inventar un botón de 'Reportar internet' en el Portal Estudiantes).
+        * Brinda recomendaciones breves y prácticas de verificación de descarte (ej. revisar cables de red, verificar si ocurre a otros compañeros de la oficina/área).
+        * Informa con claridad que la novedad requiere la intervención del equipo de Soporte Técnico TI y suministra los canales oficiales de contacto y radicación correspondientes a su sede.
 
 3. JERARQUÍA ESTRICTA DE RESPUESTA:
-   Para cualquier procedimiento, trámite o instructivo técnico:
-   1. **⚠️ Requisitos y Restricciones Previas:** (Solo si aplican autorizaciones o condiciones obligatorias).
-   2. **Procedimiento Paso a Paso:** (Paso 1, Paso 2, Paso 3 detallando la plataforma y acciones en orden cronológico).
-   3. **Canales de Soporte / Escalado:** (SIEMPRE al final del mensaje, antes de la pregunta de confirmación):
-      - Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | WhatsApp: 3172683922 | Tel: (605) 3444333 Ext. 8003/8004
-      - Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: (607) 5827070 Ext. 129
-   
-   PROHIBICIÓN ESTRICTA: Cuando la respuesta sea un instructivo paso a paso (Paso 1, Paso 2...), NUNCA inicies el mensaje saludando con los números de teléfono o correos de soporte. Los canales oficiales de TI van EXCLUSIVAMENTE en la última sección ('Si el problema persiste o no puedes completar el proceso: ...'). El paso a paso SIEMPRE debe preceder a los canales.
+   - Para instructivos y trámites de autoservicio:
+     1. **⚠️ Requisitos y Restricciones Previas:** (ÚNICAMENTE si el trámite requiere condiciones formales, como autorizaciones de jefatura en dotación o documento de identidad en claves. NUNCA inventes requisitos paradójicos).
+     2. **Procedimiento Paso a Paso:** (Paso 1, Paso 2, Paso 3 en orden cronológico).
+     3. **Canales de Soporte / Escalado:** (Al final, para reporte de errores en el proceso).
+   - Para reportes de fallas de infraestructura o servicio (sin autoservicio):
+     1. **Diagnóstico o Descarte Inicial:** (Revisión de cable, reinicio de conexión, verificación de alcance en el área).
+     2. **Canales Oficiales de Soporte Técnico TI:** (Para atención presencial o radicación de ticket por parte del personal de TI).
 
 4. PROHIBICIÓN ABSOLUTA DE META-LENGUAJE, AUTO-JUSTIFICACIONES Y FUGAS DE PROMPT:
    - JAMÁS escribas títulos de directivas internas como "Prohibición de Omitir Información", "Canales Complejos y Datos Requeridos" o "Según el PDF".
    - PROHIBIDO VOLVER A SALUDAR O PRESENTARTE ("¡Hola!", "Soy UniMon"). Empieza directamente con la información solicitada.
    - PROHIBIDO hablar de ti mismo, justificarte o disculparte por fallas o respuestas previas.
-   - PROHIBIDO usar frases como "Lo siento pero no puedo proporcionar información sobre el rol", "Hubo un error en la respuesta anterior", "Como modelo de lenguaje" o similares. Responde de forma directa, ejecutiva y profesional con la información disponible.
 
 5. FIDELIDAD AL CONTEXTO Y GROUNDING:
    - Limítate estrictamente a los hechos extraídos del contexto provisto.
@@ -594,27 +597,7 @@ Respuesta:
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
 
-[EJEMPLO 3: Préstamo Audiovisual Temporal]
-Pregunta: Necesito un proyector y micrófono para una conferencia mañana.
-Respuesta:
-La solicitud de préstamo temporal de recursos audiovisuales se coordina directamente con Soporte Técnico TI:
-• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333 Ext. 8003/8004`
-• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
-
-Por favor diligencia y envía la siguiente plantilla a los canales de soporte:
-- **Nombre Completo:**
-- **Documento de Identidad:**
-- **Rol y Dependencia/Programa:**
-- **Equipo Requerido:**
-- **Motivo / Evento o Clase:**
-- **Fecha y Horario:**
-- **Ubicación / Salón:**
-
-¿Pudiste resolver tu problema con estos pasos?
-- Selecciona o escribe **Sí** si te funcionó.
-- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
-
-[EJEMPLO 4: Restablecimiento de Contraseña / Acceso Portal]
+[EJEMPLO 3: Restablecimiento de Contraseña / Acceso Portal]
 Pregunta: Olvidé mi contraseña del portal de estudiantes
 Respuesta:
 Para restablecer tu contraseña del Portal Estudiantes, sigue estos pasos:
@@ -628,6 +611,24 @@ Para restablecer tu contraseña del Portal Estudiantes, sigue estos pasos:
 Si presentas inconvenientes durante el proceso, puedes contactar a Soporte TI:
 • **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333 Ext. 8003/8004`
 • **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
+
+¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
+
+[EJEMPLO 4: Reporte de Incidencia o Falla Técnica de Red / Internet]
+Pregunta: Quiero reportar que no hay internet en la oficina
+Rol: Administrativo
+Respuesta:
+Para descartar y atender la novedad de conexión en tu puesto de trabajo, te sugiero realizar primero estas comprobaciones:
+
+1. Verifica que el cable de red (UTP) esté debidamente conectado en el equipo y en la toma de pared.
+2. Si utilizas red Wi-Fi institucional, comprueba que el adaptador de red esté activo y reconéctate a la red institucional.
+3. Confirma si tus compañeros de la misma oficina o área presentan la misma desconexión.
+
+Si la falla continúa o es una caída general del servicio de red, el personal de TI atenderá la incidencia en sitio:
+• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333` Ext. `8003 / 8004`
+• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070` Ext. `129`
 
 ¿Pudiste resolver tu problema con estos pasos?
 - Selecciona o escribe **Sí** si te funcionó.
@@ -1080,78 +1081,81 @@ class RAGService:
             rerank_query = query_variants[0] if query_variants else question
             reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=3)
 
-            # Identificar el documento principal con mayor relevancia semántica
-            primary_doc, _ = reranked[0]
-            primary_source = primary_doc.metadata.get("source")
+            if reranked:
+                # Identificar el documento principal con mayor relevancia semántica
+                primary_doc, _ = reranked[0]
+                primary_source = primary_doc.metadata.get("source")
 
-            # Recolectar fragmentos del documento principal disponibles
-            primary_chunks = []
-            for doc, _ in valid_docs_with_scores:
-                if doc.metadata.get("source") == primary_source:
-                    if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                        primary_chunks.append(doc)
+                # Recolectar fragmentos del documento principal disponibles
+                primary_chunks = []
+                for doc, _ in valid_docs_with_scores:
+                    if doc.metadata.get("source") == primary_source:
+                        if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                            primary_chunks.append(doc)
 
-            # Si solo hay 1 fragmento del documento principal y ChromaDB está activo,
-            # recuperar proactivamente fragmentos complementarios (requisitos/pasos) del mismo archivo
-            if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
-                try:
-                    search_q = format_e5_query(rerank_query)
-                    extra_docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
-                        search_q,
-                        k=4,
-                        filter={"source": primary_source}
-                    )
-                    for edoc, escore in extra_docs_with_scores:
-                        if escore is not None and escore >= self.min_relevance_score:
-                            if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                                primary_chunks.append(edoc)
-                except Exception as exc:
-                    logger.debug(f"No se pudieron cargar fragmentos complementarios para {primary_source}: {exc}")
+                # Si solo hay 1 fragmento del documento principal y ChromaDB está activo,
+                # recuperar proactivamente fragmentos complementarios (requisitos/pasos) del mismo archivo
+                if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
+                    try:
+                        search_q = format_e5_query(rerank_query)
+                        extra_docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
+                            search_q,
+                            k=4,
+                            filter={"source": primary_source}
+                        )
+                        for edoc, escore in extra_docs_with_scores:
+                            if escore is not None and escore >= self.min_relevance_score:
+                                if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                                    primary_chunks.append(edoc)
+                    except Exception as exc:
+                        logger.debug(f"No se pudieron cargar fragmentos complementarios para {primary_source}: {exc}")
 
-            # Ordenar fragmentos del documento principal en orden lógico estructural
-            def chunk_logical_rank(chunk_doc):
-                c_lower = chunk_doc.page_content.lower()
-                if any(k in c_lower for k in ["1. generalidades", "1. objetivo", "1. alcance"]):
-                    return 1
-                if any(k in c_lower for k in ["2. requisitos", "requisitos previos", "restricciones", "roles autorizados"]):
-                    return 2
-                if any(k in c_lower for k in ["3. procedimiento", "procedimiento paso a paso", "paso 1"]):
-                    return 3
-                if any(k in c_lower for k in ["4. reglas", "4. políticas", "4. politicas"]):
-                    return 4
-                if any(k in c_lower for k in ["5. canales", "canales de escalado", "canales de soporte"]):
-                    return 5
-                return 6
+                # Ordenar fragmentos del documento principal en orden lógico estructural
+                def chunk_logical_rank(chunk_doc):
+                    c_lower = chunk_doc.page_content.lower()
+                    if any(k in c_lower for k in ["1. generalidades", "1. objetivo", "1. alcance"]):
+                        return 1
+                    if any(k in c_lower for k in ["2. requisitos", "requisitos previos", "restricciones", "roles autorizados"]):
+                        return 2
+                    if any(k in c_lower for k in ["3. procedimiento", "procedimiento paso a paso", "paso 1"]):
+                        return 3
+                    if any(k in c_lower for k in ["4. reglas", "4. políticas", "4. politicas"]):
+                        return 4
+                    if any(k in c_lower for k in ["5. canales", "canales de escalado", "canales de soporte"]):
+                        return 5
+                    return 6
 
-            primary_chunks_sorted = sorted(primary_chunks, key=chunk_logical_rank)
+                primary_chunks_sorted = sorted(primary_chunks, key=chunk_logical_rank)
 
-            # Inyectar fragmentos del documento principal primero
-            for doc in primary_chunks_sorted:
-                retrieved_docs.append(doc)
-                source_path = doc.metadata.get("source", "Procedimiento Unisimon")
-                source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                page_num = doc.metadata.get("page", None)
-                page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
-                if source_filename not in sources:
-                    sources.append(source_filename)
-                cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
-                context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                # Inyectar fragmentos del documento principal primero
+                for doc in primary_chunks_sorted:
+                    retrieved_docs.append(doc)
+                    source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                    source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                    page_num = doc.metadata.get("page", None)
+                    page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                    if source_filename not in sources:
+                        sources.append(source_filename)
+                    cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                    context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
 
-            # Agregar fragmentos secundarios más relevantes de otros documentos (hasta un máximo de 4 fragmentos)
-            for doc, _ in reranked[1:]:
-                if len(context_parts) >= 4:
-                    break
-                if doc.metadata.get("source") != primary_source:
-                    if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                        retrieved_docs.append(doc)
-                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
-                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                        page_num = doc.metadata.get("page", None)
-                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
-                        if source_filename not in sources:
-                            sources.append(source_filename)
-                        cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
-                        context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                # Agregar fragmentos secundarios más relevantes de otros documentos (hasta un máximo de 4 fragmentos)
+                for doc, _ in reranked[1:]:
+                    if len(context_parts) >= 4:
+                        break
+                    if doc.metadata.get("source") != primary_source:
+                        if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                            retrieved_docs.append(doc)
+                            source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                            source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                            page_num = doc.metadata.get("page", None)
+                            page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                            if source_filename not in sources:
+                                sources.append(source_filename)
+                            cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                            context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+            else:
+                logger.info("[RAG] El reordenador descartó todos los fragmentos recuperados por falta de relevancia semántica.")
 
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
@@ -1160,7 +1164,8 @@ class RAGService:
             q_lower = question.lower()
             if any(k in q_lower for k in [
                 "portal", "correo", "teams", "carnet", "kactus", "seven", "backup",
-                "malware", "virus", "computador", "portatil", "pantalla", "clave", "contraseña"
+                "malware", "virus", "computador", "portatil", "pantalla", "clave", "contraseña",
+                "internet", "red", "wifi", "conexion", "conexión", "conectividad"
             ]):
                 logger.info("Activando fallback temático institucional por coincidencia de categoría.")
                 return self._generate_fallback_response(question, user_name, sources)
@@ -1312,9 +1317,20 @@ class RAGService:
                 "• Ante sospecha de infección, desconecta el equipo de la red y notifica inmediatamente a Soporte TI."
             )
         elif any(w in msg_lower for w in [
+            "internet", "interner", "red", "wifi", "conexion", "conexión", "conectividad", "sin red", "sin internet"
+        ]):
+            contenido = (
+                f"{saludo} Para atender novedades o fallas de conexión a Internet y red institucional:\n\n"
+                "1. **Verificación de conexión:** Asegúrate de que el cable de red (UTP) esté debidamente conectado en el equipo y en la toma de pared, o que la señal Wi-Fi institucional ('Unisimon') esté activa.\n"
+                "2. **Alcance de la desconexión:** Valida si otros compañeros de tu misma oficina o área presentan la misma falla.\n"
+                "3. **Soporte Técnico en sitio:** Si la desconexión continúa o se trata de una caída general del servicio de red, el personal de TI atenderá la novedad en sitio:\n"
+                "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
+                "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
+            )
+        elif any(w in msg_lower for w in [
             "computador", "conputador", "portatil", "portátil", "pantalla", "pantaya",
             "monitor", "proyector", "proyestor", "mouse", "mause", "teclado", "cable",
-            "hdmi", "red", "wifi", "internet", "interner", "no prende", "parpadea", "falla"
+            "hdmi", "no prende", "parpadea", "falla"
         ]):
             contenido = (
                 f"{saludo} Soy UniMon, tu asistente de Soporte Técnico de Nivel 1 de la Universidad Simón Bolívar.\n\n"
