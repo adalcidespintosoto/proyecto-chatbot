@@ -1752,6 +1752,8 @@ class RouterLogic:
             # Si el RAG confiesa no tener documentación relevante, forzar de inmediato OFRECIENDO_RADICACION
             if rag_res.get("has_context") is False or \
                resp_text == MENSAJE_NO_DOCUMENTADO or \
+               "capacidad de responder" in resp_text or \
+               "capacidad de brindarte" in resp_text or \
                "No dispongo de un procedimiento documentado" in resp_text or \
                "No dispongo de un instructivo" in resp_text:
                 session.estado = EstadoTicket.OFRECIENDO_RADICACION
