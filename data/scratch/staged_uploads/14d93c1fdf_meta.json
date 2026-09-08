@@ -1,0 +1,20 @@
+{
+  "staged_id": "14d93c1fdf",
+  "filename": "Generación del Informe de Matrícula Completa Media Matrícula.pdf",
+  "audience": "general",
+  "staged_path": "data\\scratch\\staged_uploads\\14d93c1fdf_Generación del Informe de Matrícula Completa Media Matrícula.pdf",
+  "primary_overlapping_source": "Generación del Informe de Matrícula Completa Media Matrícula.pdf",
+  "overlapping_sources": [
+    "Generación del Informe de Matrícula Completa Media Matrícula.pdf"
+  ],
+  "metrics": {
+    "total_chunks": 5,
+    "novel_chunks": 0,
+    "ambiguous_chunks": 0,
+    "redundant_chunks": 5,
+    "ambiguity_ratio": 0.0,
+    "redundancy_ratio": 100.0
+  },
+  "overall_status": "redundant",
+  "created_at": "2026-09-08T16:18:34.344352"
+}
