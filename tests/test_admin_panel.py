@@ -100,3 +100,181 @@ async def test_user_index_html_rendering_and_secret_admin_trigger():
         assert "data.mensaje" in html or "botText" in html
         assert "Ctrl + Alt + A" in html or "ctrlKey" in html
 
+
+@pytest.mark.asyncio
+async def test_admin_audit_doc_and_cancel():
+    """Verifica que /api/admin/audit-doc analice el archivo y que resolve-upload cancele la operación."""
+    test_content = b"Procedimiento Institucional de Gestion TI UniMon. Soporte y Mantenimiento de Equipos."
+    files = {
+        "file": ("test_audit_doc.pdf", io.BytesIO(test_content), "application/pdf")
+    }
+    data = {
+        "audience": "general",
+        "threshold": "0.85"
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Auditar documento
+        audit_res = await client.post("/api/admin/audit-doc", files=files, data=data)
+        assert audit_res.status_code == 200
+        audit_json = audit_res.json()
+        assert audit_json["status"] == "success"
+        assert "staged_id" in audit_json
+        assert "metrics" in audit_json
+        assert "total_chunks" in audit_json["metrics"]
+        assert "redundancy_ratio" in audit_json["metrics"]
+        assert "overlapping_sources" in audit_json
+        assert "detailed_chunks" in audit_json
+
+        staged_id = audit_json["staged_id"]
+
+        # 2. Cancelar la subida
+        resolve_res = await client.post(
+            "/api/admin/resolve-upload",
+            json={"staged_id": staged_id, "action": "cancel"}
+        )
+        assert resolve_res.status_code == 200
+        resolve_json = resolve_res.json()
+        assert resolve_json["status"] == "cancelled"
+        assert resolve_json["action"] == "cancel"
+
+
+@pytest.mark.asyncio
+async def test_admin_resolve_upload_force_and_cleanup():
+    """Verifica resolución forzada (force) de documento y posterior limpieza."""
+    test_content = b"Documento de Prueba Unitaria para Ingesta Forzada en ChromaDB UniMon USB."
+    files = {
+        "file": ("test_force_doc.pdf", io.BytesIO(test_content), "application/pdf")
+    }
+    data = {
+        "audience": "general",
+        "threshold": "0.85"
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Auditar
+        audit_res = await client.post("/api/admin/audit-doc", files=files, data=data)
+        assert audit_res.status_code == 200
+        staged_id = audit_res.json()["staged_id"]
+
+        # 2. Resolver con 'force'
+        resolve_res = await client.post(
+            "/api/admin/resolve-upload",
+            json={"staged_id": staged_id, "action": "force"}
+        )
+        assert resolve_res.status_code == 200
+        resolve_json = resolve_res.json()
+        assert resolve_json["status"] == "success"
+        assert resolve_json["action"] == "force"
+
+        # 3. Verificar que aparezca en el listado
+        list_res = await client.get("/api/admin/docs")
+        docs = [d["filename"] for d in list_res.json().get("documents", [])]
+        assert "test_force_doc.pdf" in docs
+
+        # 4. Eliminar documento
+        del_res = await client.delete("/api/admin/docs/test_force_doc.pdf")
+        assert del_res.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_admin_resolve_upload_deduplicate_and_replace():
+    """Verifica los endpoints de deduplicate y replace."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Probar deduplicate
+        files1 = {"file": ("test_dedup_doc.pdf", io.BytesIO(b"Contenido deduplicado de prueba"), "application/pdf")}
+        audit1 = await client.post("/api/admin/audit-doc", files=files1, data={"audience": "estudiante"})
+        assert audit1.status_code == 200
+        staged_id1 = audit1.json()["staged_id"]
+
+        res_dedup = await client.post(
+            "/api/admin/resolve-upload",
+            json={"staged_id": staged_id1, "action": "deduplicate"}
+        )
+        assert res_dedup.status_code == 200
+        assert res_dedup.json()["action"] == "deduplicate"
+
+        # Limpiar
+        await client.delete("/api/admin/docs/test_dedup_doc.pdf")
+
+        # Probar replace
+        files2 = {"file": ("test_replace_doc.pdf", io.BytesIO(b"Contenido reemplazado de prueba"), "application/pdf")}
+        audit2 = await client.post("/api/admin/audit-doc", files=files2, data={"audience": "profesor"})
+        assert audit2.status_code == 200
+        staged_id2 = audit2.json()["staged_id"]
+
+        res_replace = await client.post(
+            "/api/admin/resolve-upload",
+            json={"staged_id": staged_id2, "action": "replace", "target_to_replace": "test_replace_doc.pdf"}
+        )
+        assert res_replace.status_code == 200
+        assert res_replace.json()["action"] == "replace"
+
+        # Limpiar
+        await client.delete("/api/admin/docs/test_replace_doc.pdf")
+
+
+@pytest.mark.asyncio
+async def test_admin_html_contains_redundancy_modal():
+    """Verifica que admin.html contenga todos los elementos de la interfaz modal de redundancia y el panel inline."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/admin")
+        assert res.status_code == 200
+        html = res.text
+        assert "redundancyModal" in html
+        assert "Alta Redundancia y Ambigüedad Detectada" in html
+        assert "Inspección Detallada de Fragmentos" in html
+        assert "Actualizar / Reemplazar Documento Existente" in html
+        assert "Guardar como Nuevo (con Deduplicación de Fragmentos)" in html
+        assert "Forzar Indexación Completa (Sin Filtrado)" in html
+        assert "Descartar Archivo (Cancelar)" in html
+        # Verificaciones del panel inline y nuevos botones
+        assert "Analizar Ambigüedad y Redundancia" in html
+        assert "Subir Directo" in html
+        assert "inlineAuditCard" in html
+        assert "auditActionReplace" in html
+        assert "auditActionDedup" in html
+        assert "auditActionForce" in html
+
+
+@pytest.mark.asyncio
+async def test_admin_audit_ambiguity_metrics():
+    """Verifica que el endpoint /api/admin/audit-doc retorne métricas completas de ambigüedad."""
+    test_content = b"Procedimiento de Activacion y Restablecimiento de Credenciales de Usuario Institucional."
+    files = {
+        "file": ("test_ambiguity_check.pdf", io.BytesIO(test_content), "application/pdf")
+    }
+    data = {
+        "audience": "general",
+        "threshold": "0.85",
+        "ambiguity_threshold": "0.65"
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        audit_res = await client.post("/api/admin/audit-doc", files=files, data=data)
+        assert audit_res.status_code == 200
+        audit_json = audit_res.json()
+        assert audit_json["status"] == "success"
+        assert "ambiguity_detected" in audit_json
+        assert "redundancy_detected" in audit_json
+        assert "overall_status" in audit_json
+        assert "ambiguity_ratio" in audit_json["metrics"]
+        assert "ambiguous_chunks" in audit_json["metrics"]
+        assert "redundancy_ratio" in audit_json["metrics"]
+        assert "novel_chunks" in audit_json["metrics"]
+
+        # Limpiar staging
+        staged_id = audit_json["staged_id"]
+        res_cancel = await client.post(
+            "/api/admin/resolve-upload",
+            json={"staged_id": staged_id, "action": "cancel"}
+        )
+        assert res_cancel.status_code == 200
+
+
+

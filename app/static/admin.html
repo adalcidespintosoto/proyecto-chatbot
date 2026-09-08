@@ -528,6 +528,466 @@
       text-align: center;
       background: var(--bg-dark);
     }
+
+    /* ========================================================================= */
+    /* PANEL Y MODAL DE REDUNDANCIA Y AMBIGÜEDAD (PRE-INGESTA)                   */
+    /* ========================================================================= */
+    .analysis-result-panel {
+      background: #0B132B;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .badge-status-clean {
+      background: rgba(16, 185, 129, 0.18);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      color: #34D399;
+      border-radius: 9999px;
+      padding: 4px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-status-ambiguous {
+      background: rgba(245, 158, 11, 0.18);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #FBBF24;
+      border-radius: 9999px;
+      padding: 4px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-status-redundant {
+      background: rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #F87171;
+      border-radius: 9999px;
+      padding: 4px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .redundancy-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(3, 7, 18, 0.84);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 1.25rem;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .redundancy-modal-backdrop.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .redundancy-modal {
+      background: #0B132B;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 650px;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(245, 158, 11, 0.15);
+      padding: 1.75rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+      animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(24px) scale(0.96); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .redundancy-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .redundancy-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .redundancy-title-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+
+    .redundancy-title-text {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: -0.3px;
+    }
+
+    .badge-solapamiento-alto {
+      background: rgba(30, 58, 138, 0.45);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #60A5FA;
+      border-radius: 9999px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .redundancy-desc {
+      font-size: 0.88rem;
+      color: #94A3B8;
+      line-height: 1.55;
+    }
+
+    .redundancy-progress-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .redundancy-progress-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.84rem;
+    }
+
+    .redundancy-progress-track {
+      width: 100%;
+      height: 9px;
+      background: #1E293B;
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .redundancy-progress-fill {
+      height: 100%;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #F59E0B 0%, #EA580C 55%, #EF4444 100%);
+      transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .redundancy-chips-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .redundancy-chip {
+      background: #131E35;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 7px 14px;
+      font-size: 0.83rem;
+      font-weight: 600;
+      color: #F8FAFC;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .redundancy-chip.novel {
+      color: #34D399;
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+
+    .redundancy-chip.redundant {
+      color: #F87171;
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+
+    .redundancy-section-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #F1F5F9;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .overlapping-docs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .overlapping-doc-item {
+      background: #101B30;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .overlapping-doc-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #E2E8F0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .overlapping-doc-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .pill-solapados {
+      background: rgba(30, 58, 138, 0.6);
+      color: #93C5FD;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+
+    .sim-rate-text {
+      color: #94A3B8;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* Inspection drawer */
+    .chunks-inspection-bar {
+      background: #101B30;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .chunks-inspection-bar:hover {
+      background: #142340;
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .inspection-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: #F8FAFC;
+    }
+
+    .badge-chunks-count {
+      background: rgba(37, 99, 235, 0.3);
+      color: #93C5FD;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+    }
+
+    .inspection-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: #94A3B8;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    .chunks-drawer-content {
+      background: #070D18;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chunk-card {
+      background: #0E182A;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.78rem;
+    }
+
+    .chunk-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .chunk-card-text {
+      color: #94A3B8;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.75rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      max-height: 70px;
+      overflow-y: auto;
+    }
+
+    /* Action Cards */
+    .action-card {
+      width: 100%;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      border: none;
+      text-align: left;
+    }
+
+    .action-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .action-card-replace {
+      background: #FFFFFF;
+      color: #0F172A;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+
+    .action-card-replace:hover {
+      background: #F8FAFC;
+      box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+    }
+
+    .action-card-dedup {
+      background: #1D4ED8;
+      color: #FFFFFF;
+      box-shadow: 0 4px 14px rgba(29, 78, 216, 0.3);
+    }
+
+    .action-card-dedup:hover {
+      background: #2563EB;
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+    }
+
+    .action-card-force {
+      background: #142036;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #FFFFFF;
+    }
+
+    .action-card-force:hover {
+      background: #1A2A47;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .action-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .icon-box-replace {
+      background: #E0E7FF;
+      color: #2563EB;
+    }
+
+    .icon-box-dedup {
+      background: #1E3A8A;
+      color: #93C5FD;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .icon-box-force {
+      background: #20304C;
+      color: #CBD5E1;
+    }
+
+    .action-title {
+      font-weight: 800;
+      font-size: 0.92rem;
+      line-height: 1.25;
+      margin-bottom: 2px;
+    }
+
+    .action-desc {
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    .action-card-replace .action-title { color: #0F172A; }
+    .action-card-replace .action-desc { color: #475569; }
+
+    .action-card-dedup .action-title { color: #FFFFFF; }
+    .action-card-dedup .action-desc { color: #BFDBFE; }
+
+    .action-card-force .action-title { color: #F1F5F9; }
+    .action-card-force .action-desc { color: #94A3B8; }
+
+    .btn-cancel-modal {
+      width: 100%;
+      background: #B91C1C;
+      color: #FFFFFF;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(185, 28, 28, 0.3);
+    }
+
+    .btn-cancel-modal:hover {
+      background: #DC2626;
+      box-shadow: 0 6px 18px rgba(220, 38, 38, 0.45);
+      transform: translateY(-1px);
+    }
   </style>
 </head>
 <body>
@@ -677,7 +1137,7 @@
             <span class="badge">PDF / DOCX / PPTX</span>
           </div>
 
-          <form id="uploadDocForm" onsubmit="handleDocUpload(event)">
+          <form id="uploadDocForm" onsubmit="event.preventDefault(); runDocumentAudit();">
             <div class="upload-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
               <div class="upload-icon">📁</div>
               <div style="font-weight: 700; margin-bottom: 4px;">Arrastra un archivo aquí o haz clic para examinar</div>
@@ -686,7 +1146,7 @@
               <input type="file" id="fileInput" style="display: none;" accept=".pdf,.docx,.pptx,.txt" onchange="updateSelectedFile(this)">
             </div>
 
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 0.75rem;">
               <label class="form-label" for="audienceSelect">Audiencia Objetivo / Rol Documental</label>
               <select id="audienceSelect" class="form-select">
                 <option value="estudiante">🎓 Estudiantes (1_estudiantes)</option>
@@ -696,20 +1156,138 @@
               </select>
             </div>
 
-            <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
-              <input type="checkbox" id="autoIndexCheck" style="cursor: pointer;">
-              <label for="autoIndexCheck" style="font-size: 0.85rem; cursor: pointer; color: var(--text-secondary);">
-                Indexar inmediatamente en ChromaDB tras guardar
-              </label>
-            </div>
+            <input type="checkbox" id="autoIndexCheck" style="display: none;" checked>
 
-            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;" id="uploadSubmitBtn">
-              ⬆️ Guardar en Base de Conocimiento
-            </button>
+            <!-- Botones de Acción: Analizar Ambigüedad y Redundancia / Subir Directo -->
+            <div style="display: flex; gap: 10px; margin-top: 0.75rem;">
+              <button type="button" class="btn btn-primary" style="flex: 1; justify-content: center; font-weight: 700;" id="uploadSubmitBtn" onclick="runDocumentAudit()">
+                🔍 Analizar Ambigüedad y Redundancia
+              </button>
+              <button type="button" class="btn btn-secondary" style="justify-content: center; background: #131E35; border: 1px solid rgba(255,255,255,0.12); font-weight: 700;" id="uploadDirectBtn" onclick="subirDirecto()">
+                ⚡ Subir Directo
+              </button>
+            </div>
           </form>
 
           <div class="progress-bar-container" id="uploadProgressContainer">
             <div class="progress-bar" id="uploadProgressBar"></div>
+          </div>
+
+          <!-- PANEL INLINE DE RESULTADOS DE ANÁLISIS DE AMBIGÜEDAD Y REDUNDANCIA -->
+          <div id="inlineAuditCard" class="analysis-result-panel" style="display: none; margin-top: 1.25rem;">
+            
+            <!-- Encabezado del Análisis -->
+            <div class="analysis-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="auditHeaderIcon" style="font-size: 1.4rem;">✨</span>
+                <span id="auditHeaderTitle" style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF;">Contenido Novedoso y Limpio</span>
+              </div>
+              <div id="auditStatusBadge" class="badge-status-clean">
+                Limpio (0.0% redundancia)
+              </div>
+            </div>
+
+            <!-- Descripción Contextual -->
+            <p id="auditDescText" style="font-size: 0.88rem; color: #94A3B8; line-height: 1.55; margin-bottom: 0.85rem;">
+              Excelente. El documento aporta contenido original con mínima o nula colisión con los vectores ya registrados en ChromaDB.
+            </p>
+
+            <!-- Nivel de Solapamiento con ChromaDB -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem;">
+                <span style="color: #94A3B8;">Nivel de Solapamiento con ChromaDB</span>
+                <span style="color: #F8FAFC; font-weight: 700;" id="auditOverlapText">0.0% (0 de 0 fragmentos)</span>
+              </div>
+              <div class="redundancy-progress-track">
+                <div class="redundancy-progress-fill" id="auditProgressFill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Chips de Métricas -->
+            <div class="redundancy-chips-row" style="margin-bottom: 1.1rem;">
+              <div class="redundancy-chip">
+                <span>📄</span>
+                <span><span id="auditTotalChunks">0</span> Chunks Totales</span>
+              </div>
+              <div class="redundancy-chip novel">
+                <span>✨</span>
+                <span><span id="auditNovelChunks">0</span> Novedosos</span>
+              </div>
+              <div class="redundancy-chip" id="auditAmbiguousChip" style="display: none; color: #FBBF24; border-color: rgba(245, 158, 11, 0.25);">
+                <span>⚠️</span>
+                <span><span id="auditAmbiguousChunks">0</span> Ambiguos</span>
+              </div>
+              <div class="redundancy-chip redundant" id="auditRedundantChip">
+                <span>♻️</span>
+                <span><span id="auditRedundantChunks">0</span> Redundantes</span>
+              </div>
+            </div>
+
+            <!-- Documentos existentes que ya contienen esta información -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.1rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem;">
+              <div class="redundancy-section-title">
+                <span>📁</span> Documentos existentes que ya contienen esta información:
+              </div>
+              <div id="auditOverlappingDocsList" class="overlapping-docs-list">
+                <div style="color: #64748B; font-size: 0.82rem; padding: 4px;">No se detectaron colisiones directas con otros archivos.</div>
+              </div>
+            </div>
+
+            <!-- Inspección Detallada de Fragmentos (Colapsable) -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.1rem;">
+              <div class="chunks-inspection-bar" onclick="toggleAuditChunks()">
+                <div class="inspection-bar-left">
+                  <span>🔍</span> Inspección Detallada de Fragmentos
+                  <span class="badge-chunks-count" id="auditChunksCountBadge">0 chunks</span>
+                </div>
+                <div class="inspection-bar-right" id="auditChunksToggleText">
+                  👁️ Ver contenido de cada chunk
+                </div>
+              </div>
+              <div class="chunks-drawer-content" id="auditChunksDrawer" style="display: none;">
+                <!-- Fragmentos dinámicos -->
+              </div>
+            </div>
+
+            <!-- ¿Qué deseas hacer con este documento? -->
+            <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem;">
+              <div class="redundancy-section-title">
+                <span>⚡</span> ¿Qué deseas hacer con este documento?
+              </div>
+
+              <!-- Opción 1: Reemplazar documento existente -->
+              <button type="button" class="action-card action-card-replace" id="auditActionReplace" onclick="executeInlineResolve('replace')" style="display: none;">
+                <div class="action-icon-box icon-box-replace">🔄</div>
+                <div>
+                  <div class="action-title">Actualizar / Reemplazar Documento Existente</div>
+                  <div class="action-desc">Purga los fragmentos previos de '<span id="auditTargetDocName" style="font-weight: 700;">documento.pdf</span>' en ChromaDB y carga esta nueva versión.</div>
+                </div>
+              </button>
+
+              <!-- Opción 2: Guardar como nuevo con deduplicación -->
+              <button type="button" class="action-card action-card-dedup" id="auditActionDedup" onclick="executeInlineResolve('deduplicate')">
+                <div class="action-icon-box icon-box-dedup">NEW</div>
+                <div>
+                  <div class="action-title">Guardar como Nuevo (con Deduplicación de Fragmentos)</div>
+                  <div class="action-desc">Indexa solo los fragmentos novedosos y descarta los repetidos para no saturar la base.</div>
+                </div>
+              </button>
+
+              <!-- Opción 3: Forzar indexación completa -->
+              <button type="button" class="action-card action-card-force" id="auditActionForce" onclick="executeInlineResolve('force')">
+                <div class="action-icon-box icon-box-force">📥</div>
+                <div>
+                  <div class="action-title">Forzar Indexación Completa (Sin Filtrado)</div>
+                  <div class="action-desc">Indexa todos los fragmentos sin aplicar filtros de redundancia.</div>
+                </div>
+              </button>
+
+              <!-- Opción 4: Descartar / Cancelar -->
+              <button type="button" class="btn-cancel-modal" style="width: 100%; border-radius: 12px; padding: 12px; font-weight: 700;" onclick="executeInlineResolve('cancel')">
+                <span>❌</span> Descartar Archivo (Cancelar)
+              </button>
+            </div>
+
           </div>
         </div>
 
@@ -799,6 +1377,121 @@
     </section>
 
   </main>
+
+  <!-- Modal de Alta Redundancia y Ambigüedad Detectada -->
+  <div class="redundancy-modal-backdrop" id="redundancyModalBackdrop" onclick="if(event.target === this) executeResolve('cancel')">
+    <div class="redundancy-modal" id="redundancyModal" onclick="event.stopPropagation()">
+      
+      <!-- Encabezado con Icono y Badge -->
+      <div class="redundancy-modal-header">
+        <div class="redundancy-title-wrap">
+          <span class="redundancy-title-icon">⚠️</span>
+          <span class="redundancy-title-text">Alta Redundancia y Ambigüedad Detectada</span>
+        </div>
+        <div class="badge-solapamiento-alto">
+          Solapamiento Alto (<span id="modalOverlapPercentBadge">0.0%</span>)
+        </div>
+      </div>
+
+      <!-- Descripción Contextual -->
+      <p class="redundancy-desc">
+        Este documento contiene información que ya existe casi en su totalidad en la base de conocimiento (<b id="modalDescHighlight" style="color: #F8FAFC;">0.0% idéntico o similar</b>). Indexarlo como nuevo podría generar respuestas repetidas o inconsistentes en UniMon.
+      </p>
+
+      <!-- Nivel de Solapamiento y Barra de Progreso -->
+      <div class="redundancy-progress-section">
+        <div class="redundancy-progress-labels">
+          <span style="color: #94A3B8;">Nivel de Solapamiento con ChromaDB</span>
+          <span style="color: #F8FAFC; font-weight: 700;" id="modalOverlapRatioText">0.0% (0 de 0 fragmentos)</span>
+        </div>
+        <div class="redundancy-progress-track">
+          <div class="redundancy-progress-fill" id="modalProgressFill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Chips de Métricas (Totales, Novedosos, Redundantes) -->
+      <div class="redundancy-chips-row">
+        <div class="redundancy-chip">
+          <span>📄</span>
+          <span><span id="modalTotalChunks">0</span> Chunks Totales</span>
+        </div>
+        <div class="redundancy-chip novel">
+          <span>✨</span>
+          <span><span id="modalNovelChunks">0</span> Novedosos</span>
+        </div>
+        <div class="redundancy-chip redundant">
+          <span>♻️</span>
+          <span><span id="modalRedundantChunks">0</span> Redundantes</span>
+        </div>
+      </div>
+
+      <!-- Documentos Existentes Solapados -->
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="redundancy-section-title">
+          <span>📁</span> Documentos existentes que ya contienen esta información:
+        </div>
+        <div class="overlapping-docs-list" id="modalOverlappingDocsList">
+          <!-- Elementos generados dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Inspección Detallada de Fragmentos (Colapsable) -->
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="chunks-inspection-bar" onclick="toggleChunksInspection()">
+          <div class="inspection-bar-left">
+            <span>🔍</span> Inspección Detallada de Fragmentos
+            <span class="badge-chunks-count" id="modalChunksCountBadge">0 chunks</span>
+          </div>
+          <div class="inspection-bar-right" id="chunksToggleBtnText">
+            👁️ Ver contenido de cada chunk
+          </div>
+        </div>
+        <div class="chunks-drawer-content" id="modalChunksDrawer" style="display: none;">
+          <!-- Lista de fragmentos generada dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Selector de Acciones -->
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 4px;">
+        <div class="redundancy-section-title">
+          <span>⚡</span> ¿Qué deseas hacer con este documento?
+        </div>
+
+        <!-- Opción 1: Actualizar / Reemplazar -->
+        <button type="button" class="action-card action-card-replace" onclick="executeResolve('replace')">
+          <div class="action-icon-box icon-box-replace">🔄</div>
+          <div>
+            <div class="action-title">Actualizar / Reemplazar Documento Existente</div>
+            <div class="action-desc">Purga los fragmentos previos de '<span id="modalTargetDocName" style="font-weight: 700;">documento.pdf</span>' en ChromaDB y carga esta nueva versión.</div>
+          </div>
+        </button>
+
+        <!-- Opción 2: Guardar como Nuevo con Deduplicación -->
+        <button type="button" class="action-card action-card-dedup" onclick="executeResolve('deduplicate')">
+          <div class="action-icon-box icon-box-dedup">NEW</div>
+          <div>
+            <div class="action-title">Guardar como Nuevo (con Deduplicación de Fragmentos)</div>
+            <div class="action-desc">Indexa solo los fragmentos novedosos y descarta los repetidos para no saturar la base.</div>
+          </div>
+        </button>
+
+        <!-- Opción 3: Forzar Indexación Completa -->
+        <button type="button" class="action-card action-card-force" onclick="executeResolve('force')">
+          <div class="action-icon-box icon-box-force">🗳️</div>
+          <div>
+            <div class="action-title">Forzar Indexación Completa (Sin Filtrado)</div>
+            <div class="action-desc">Indexa todos los fragmentos sin aplicar filtros de redundancia.</div>
+          </div>
+        </button>
+
+        <!-- Opción 4: Cancelar / Descartar -->
+        <button type="button" class="btn-cancel-modal" onclick="executeResolve('cancel')">
+          <span>❌</span> Descartar Archivo (Cancelar)
+        </button>
+      </div>
+
+    </div>
+  </div>
 
   <!-- Toast Notification -->
   <div class="toast" id="toast">
@@ -990,6 +1683,7 @@
     // 3. SUBIDA DE ARCHIVOS
     // ==========================================
     function updateSelectedFile(input) {
+      resetInlineAudit();
       const display = document.getElementById('selectedFileName');
       if (input.files && input.files[0]) {
         display.innerText = `Archivo seleccionado: ${input.files[0].name} (${(input.files[0].size/1024).toFixed(1)} KB)`;
@@ -1015,8 +1709,249 @@
       }
     });
 
-    async function handleDocUpload(e) {
-      e.preventDefault();
+    let currentAuditData = null;
+    let currentInlineAuditData = null;
+
+    function resetInlineAudit() {
+      currentInlineAuditData = null;
+      const card = document.getElementById('inlineAuditCard');
+      if (card) card.style.display = 'none';
+      const chunksDrawer = document.getElementById('auditChunksDrawer');
+      if (chunksDrawer) chunksDrawer.style.display = 'none';
+    }
+
+    function toggleAuditChunks() {
+      const drawer = document.getElementById('auditChunksDrawer');
+      const toggleText = document.getElementById('auditChunksToggleText');
+      if (!drawer) return;
+      if (drawer.style.display === 'none' || !drawer.style.display) {
+        drawer.style.display = 'flex';
+        if (toggleText) toggleText.innerHTML = '🔼 Ocultar fragmentos';
+      } else {
+        drawer.style.display = 'none';
+        if (toggleText) toggleText.innerHTML = '👁️ Ver contenido de cada chunk';
+      }
+    }
+
+    async function runDocumentAudit() {
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files || !fileInput.files[0]) {
+        showToast('Por favor selecciona un archivo PDF o documento para auditar', 'error');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const audience = document.getElementById('audienceSelect').value;
+      const submitBtn = document.getElementById('uploadSubmitBtn');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('audience', audience);
+      formData.append('threshold', '0.85');
+      formData.append('ambiguity_threshold', '0.65');
+
+      submitBtn.disabled = true;
+      const originalText = submitBtn.innerHTML;
+      submitBtn.innerHTML = '🔍 Analizando ambigüedad y redundancia...';
+
+      try {
+        const res = await fetch('/api/admin/audit-doc', {
+          method: 'POST',
+          body: formData
+        });
+        const auditResult = await res.json();
+        if (!res.ok) throw new Error(auditResult.detail || `Error HTTP ${res.status}`);
+
+        renderInlineAuditCard(auditResult);
+        showToast('Auditoría completada. Revisa los resultados antes de cargar.', 'info');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
+    }
+
+    function renderInlineAuditCard(data) {
+      currentInlineAuditData = data;
+      currentAuditData = data; // Compatibilidad
+      const card = document.getElementById('inlineAuditCard');
+      if (!card) return;
+
+      const ratio = data.metrics ? Number(data.metrics.redundancy_ratio) : 0;
+      const ambRatio = data.metrics ? Number(data.metrics.ambiguity_ratio || 0) : 0;
+      const total = data.metrics ? data.metrics.total_chunks : 0;
+      const novel = data.metrics ? data.metrics.novel_chunks : 0;
+      const redCount = data.metrics ? data.metrics.redundant_chunks : 0;
+      const ambCount = data.metrics ? (data.metrics.ambiguous_chunks || 0) : 0;
+
+      // Status Badge & Header
+      const headerIcon = document.getElementById('auditHeaderIcon');
+      const headerTitle = document.getElementById('auditHeaderTitle');
+      const statusBadge = document.getElementById('auditStatusBadge');
+      const descText = document.getElementById('auditDescText');
+      const progressFill = document.getElementById('auditProgressFill');
+
+      if (data.overall_status === 'redundant' || data.redundancy_detected) {
+        headerIcon.innerText = '🚨';
+        headerTitle.innerText = 'Alta Redundancia y Solapamiento Detectado';
+        statusBadge.className = 'badge-status-redundant';
+        statusBadge.innerText = `Alta Redundancia (${ratio.toFixed(1)}%)`;
+        descText.innerText = `Este documento contiene información que ya existe casi en su totalidad en la base de conocimiento (${ratio.toFixed(1)}% idéntico o similar). Indexarlo como nuevo podría generar respuestas repetidas o inconsistentes en UniMon.`;
+        progressFill.style.background = 'linear-gradient(90deg, #F59E0B 0%, #EA580C 55%, #EF4444 100%)';
+      } else if (data.overall_status === 'ambiguous' || data.ambiguity_detected) {
+        headerIcon.innerText = '⚠️';
+        headerTitle.innerText = 'Posible Ambigüedad y Solapamiento Detectado';
+        statusBadge.className = 'badge-status-ambiguous';
+        statusBadge.innerText = `Ambigüedad Media (${ambRatio.toFixed(1)}%)`;
+        descText.innerText = `Se detectaron fragmentos temáticamente muy similares a documentos ya cargados. Podría generar ambigüedades o contradicciones normativas en las respuestas de UniMon si coexisten sin conciliar.`;
+        progressFill.style.background = 'linear-gradient(90deg, #3B82F6 0%, #F59E0B 100%)';
+      } else {
+        headerIcon.innerText = '✨';
+        headerTitle.innerText = 'Contenido Novedoso y Limpio';
+        statusBadge.className = 'badge-status-clean';
+        statusBadge.innerText = `Limpio (${ratio.toFixed(1)}% redundancia)`;
+        descText.innerText = 'Excelente. El documento aporta contenido original con mínima o nula colisión con los vectores ya registrados en ChromaDB.';
+        progressFill.style.background = 'linear-gradient(90deg, #10B981 0%, #059669 100%)';
+      }
+
+      // Overlap progress
+      document.getElementById('auditOverlapText').innerText = `${ratio.toFixed(1)}% (${redCount} de ${total} fragmentos)`;
+      progressFill.style.width = `${Math.min(100, Math.max(redCount > 0 ? 8 : (total > 0 ? 4 : 0), ratio))}%`;
+
+      // Chips
+      document.getElementById('auditTotalChunks').innerText = total;
+      document.getElementById('auditNovelChunks').innerText = novel;
+      document.getElementById('auditRedundantChunks').innerText = redCount;
+      
+      const ambChip = document.getElementById('auditAmbiguousChip');
+      if (ambCount > 0) {
+        ambChip.style.display = 'inline-flex';
+        document.getElementById('auditAmbiguousChunks').innerText = ambCount;
+      } else {
+        ambChip.style.display = 'none';
+      }
+
+      document.getElementById('auditChunksCountBadge').innerText = `${total} chunks`;
+
+      // Overlapping docs list
+      const docsListEl = document.getElementById('auditOverlappingDocsList');
+      docsListEl.innerHTML = '';
+      const primarySrc = data.primary_overlapping_source || (data.overlapping_sources && data.overlapping_sources[0] ? data.overlapping_sources[0].source : null);
+      
+      const replaceBtn = document.getElementById('auditActionReplace');
+      const targetDocSpan = document.getElementById('auditTargetDocName');
+
+      if (data.overlapping_sources && data.overlapping_sources.length > 0) {
+        data.overlapping_sources.forEach(doc => {
+          const item = document.createElement('div');
+          item.className = 'overlapping-doc-item';
+          item.innerHTML = `
+            <div class="overlapping-doc-name">
+              <span>📄</span>
+              <span title="${doc.source}">${doc.source}</span>
+            </div>
+            <div class="overlapping-doc-badges">
+              <span class="pill-solapados">${doc.matched_chunks} solapados</span>
+              <span class="sim-rate-text" style="color:#60A5FA; font-weight:700;">${doc.max_similarity}% sim</span>
+            </div>
+          `;
+          docsListEl.appendChild(item);
+        });
+
+        if (primarySrc) {
+          targetDocSpan.innerText = primarySrc;
+          replaceBtn.style.display = 'flex';
+        } else {
+          replaceBtn.style.display = 'none';
+        }
+      } else {
+        docsListEl.innerHTML = '<div style="color: #64748B; font-size: 0.82rem; padding: 4px;">No se detectaron colisiones directas con otros archivos.</div>';
+        replaceBtn.style.display = 'none';
+      }
+
+      // Detailed chunks
+      const chunksContainer = document.getElementById('auditChunksDrawer');
+      chunksContainer.innerHTML = '';
+      chunksContainer.style.display = 'none';
+      const toggleText = document.getElementById('auditChunksToggleText');
+      if (toggleText) toggleText.innerHTML = '👁️ Ver contenido de cada chunk';
+
+      if (data.detailed_chunks && data.detailed_chunks.length > 0) {
+        data.detailed_chunks.forEach(chk => {
+          const cardEl = document.createElement('div');
+          cardEl.className = 'chunk-card';
+          let badgeColor = '#34D399';
+          let badgeLabel = `✨ Fragmento #${chk.index} (Novedoso)`;
+          if (chk.is_redundant) {
+            badgeColor = '#F87171';
+            badgeLabel = `♻️ Fragmento #${chk.index} (Redundante ${chk.similarity}%)`;
+          } else if (chk.is_ambiguous) {
+            badgeColor = '#FBBF24';
+            badgeLabel = `⚠️ Fragmento #${chk.index} (Ambigüedad ${chk.similarity}%)`;
+          }
+
+          const cleanSnippet = (chk.content_snippet || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const matchedSnippet = chk.matched_chunk_snippet ? `<div style="margin-top:6px; padding:6px 8px; background:rgba(0,0,0,0.3); border-left:2px solid #60A5FA; border-radius:4px; font-size:0.75rem; color:#93C5FD;"><b style="color:#BFDBFE;">Fragmento coincidente en [${chk.matched_source}]:</b><br>${chk.matched_chunk_snippet.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>` : '';
+
+          cardEl.innerHTML = `
+            <div class="chunk-card-header">
+              <span style="font-weight: 700; color: ${badgeColor};">${badgeLabel}</span>
+              <span style="color: #94A3B8; font-size: 0.72rem;">${chk.matched_source ? chk.matched_source : 'Sin solapamiento'}</span>
+            </div>
+            <div class="chunk-card-text">${cleanSnippet}</div>
+            ${matchedSnippet}
+          `;
+          chunksContainer.appendChild(cardEl);
+        });
+      }
+
+      card.style.display = 'flex';
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function executeInlineResolve(action) {
+      if (!currentInlineAuditData || !currentInlineAuditData.staged_id) {
+        resetInlineAudit();
+        return;
+      }
+
+      const stagedId = currentInlineAuditData.staged_id;
+      const targetToReplace = document.getElementById('auditTargetDocName') ? document.getElementById('auditTargetDocName').innerText : null;
+      const card = document.getElementById('inlineAuditCard');
+      const btns = card.querySelectorAll('button');
+      btns.forEach(b => b.disabled = true);
+
+      try {
+        const res = await fetch('/api/admin/resolve-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            staged_id: stagedId,
+            action: action,
+            target_to_replace: targetToReplace
+          })
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || 'Error resolviendo la subida');
+
+        if (action === 'cancel') {
+          showToast('Operación cancelada. Archivo descartado.', 'info');
+        } else {
+          showToast(result.message || 'Documento indexado con éxito', 'success');
+          loadDocuments();
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btns.forEach(b => b.disabled = false);
+        resetInlineAudit();
+        document.getElementById('fileInput').value = '';
+        document.getElementById('selectedFileName').innerText = '';
+      }
+    }
+
+    async function subirDirecto() {
       const fileInput = document.getElementById('fileInput');
       if (!fileInput.files || !fileInput.files[0]) {
         showToast('Por favor selecciona un archivo PDF o documento', 'error');
@@ -1025,16 +1960,16 @@
 
       const file = fileInput.files[0];
       const audience = document.getElementById('audienceSelect').value;
-      const autoIndex = document.getElementById('autoIndexCheck').checked;
-      const submitBtn = document.getElementById('uploadSubmitBtn');
+      const directBtn = document.getElementById('uploadDirectBtn');
 
       const formData = new FormData();
       formData.append('file', file);
       formData.append('audience', audience);
-      formData.append('auto_index', autoIndex);
+      formData.append('auto_index', 'true');
 
-      submitBtn.disabled = true;
-      submitBtn.innerText = '⏳ Subiendo y guardando...';
+      directBtn.disabled = true;
+      const originalText = directBtn.innerHTML;
+      directBtn.innerHTML = '⚡ Subiendo e indexando...';
 
       try {
         const res = await fetch('/api/admin/upload-doc', {
@@ -1042,18 +1977,153 @@
           body: formData
         });
         const result = await res.json();
-        if (!res.ok) throw new Error(result.detail || `Error HTTP ${res.status}`);
+        if (!res.ok) throw new Error(result.detail || 'Error al subir archivo');
 
-        showToast(`Documento '${file.name}' guardado exitosamente`, 'success');
+        showToast(result.message || `Documento '${file.name}' guardado e indexado`, 'success');
+        resetInlineAudit();
         fileInput.value = '';
         document.getElementById('selectedFileName').innerText = '';
         loadDocuments();
       } catch (err) {
         showToast(err.message, 'error');
       } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerText = '⬆️ Guardar en Base de Conocimiento';
+        directBtn.disabled = false;
+        directBtn.innerHTML = originalText;
       }
+    }
+
+    function openRedundancyModal(data) {
+      currentAuditData = data;
+      const backdrop = document.getElementById('redundancyModalBackdrop');
+      const ratio = data.metrics.redundancy_ratio;
+      
+      document.getElementById('modalOverlapPercentBadge').innerText = `${ratio}%`;
+      document.getElementById('modalDescHighlight').innerText = `${ratio}% idéntico o similar`;
+      document.getElementById('modalOverlapRatioText').innerText = `${ratio}% (${data.metrics.redundant_chunks} de ${data.metrics.total_chunks} fragmentos)`;
+      document.getElementById('modalProgressFill').style.width = `${Math.min(100, Math.max(8, ratio))}%`;
+
+      document.getElementById('modalTotalChunks').innerText = data.metrics.total_chunks;
+      document.getElementById('modalNovelChunks').innerText = data.metrics.novel_chunks;
+      document.getElementById('modalRedundantChunks').innerText = data.metrics.redundant_chunks;
+      document.getElementById('modalChunksCountBadge').innerText = `${data.metrics.total_chunks} chunks`;
+
+      const primarySrc = data.primary_overlapping_source || (data.overlapping_sources && data.overlapping_sources[0] ? data.overlapping_sources[0].source : data.filename);
+      document.getElementById('modalTargetDocName').innerText = primarySrc;
+
+      // Render overlapping sources list
+      const docsListEl = document.getElementById('modalOverlappingDocsList');
+      docsListEl.innerHTML = '';
+      if (data.overlapping_sources && data.overlapping_sources.length > 0) {
+        data.overlapping_sources.forEach(doc => {
+          const item = document.createElement('div');
+          item.className = 'overlapping-doc-item';
+          item.innerHTML = `
+            <div class="overlapping-doc-name">
+              <span>📄</span>
+              <span title="${doc.source}">${doc.source}</span>
+            </div>
+            <div class="overlapping-doc-badges">
+              <span class="pill-solapados">${doc.matched_chunks} solapados</span>
+              <span class="sim-rate-text">${doc.max_similarity}% sim</span>
+            </div>
+          `;
+          docsListEl.appendChild(item);
+        });
+      } else {
+        docsListEl.innerHTML = '<div style="color: #64748B; font-size: 0.8rem; padding: 4px;">No se identificaron fuentes directas con alta similitud.</div>';
+      }
+
+      // Render chunk detailed list
+      const chunksContainer = document.getElementById('modalChunksDrawer');
+      chunksContainer.innerHTML = '';
+      chunksContainer.style.display = 'none';
+      const toggleBtnText = document.getElementById('chunksToggleBtnText');
+      if (toggleBtnText) toggleBtnText.innerHTML = '👁️ Ver contenido de cada chunk';
+
+      if (data.detailed_chunks && data.detailed_chunks.length > 0) {
+        data.detailed_chunks.forEach(chk => {
+          const card = document.createElement('div');
+          card.className = 'chunk-card';
+          const isRed = chk.is_redundant;
+          const cleanSnippet = (chk.content_snippet || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          card.innerHTML = `
+            <div class="chunk-card-header">
+              <span style="font-weight: 700; color: ${isRed ? '#F87171' : '#34D399'};">
+                ${isRed ? '♻️ Fragmento #' + chk.index + ' (Redundante ' + chk.similarity + '%)' : '✨ Fragmento #' + chk.index + ' (Novedoso)'}
+              </span>
+              <span style="color: #94A3B8; font-size: 0.72rem;">${chk.matched_source ? chk.matched_source : 'Sin solapamiento'}</span>
+            </div>
+            <div class="chunk-card-text">${cleanSnippet}</div>
+          `;
+          chunksContainer.appendChild(card);
+        });
+      }
+
+      backdrop.classList.add('active');
+    }
+
+    function closeRedundancyModal() {
+      const backdrop = document.getElementById('redundancyModalBackdrop');
+      backdrop.classList.remove('active');
+    }
+
+    function toggleChunksInspection() {
+      const drawer = document.getElementById('modalChunksDrawer');
+      const toggleText = document.getElementById('chunksToggleBtnText');
+      if (drawer.style.display === 'none' || !drawer.style.display) {
+        drawer.style.display = 'flex';
+        if (toggleText) toggleText.innerHTML = '🔼 Ocultar fragmentos';
+      } else {
+        drawer.style.display = 'none';
+        if (toggleText) toggleText.innerHTML = '👁️ Ver contenido de cada chunk';
+      }
+    }
+
+    async function executeResolve(action) {
+      if (!currentAuditData || !currentAuditData.staged_id) {
+        closeRedundancyModal();
+        return;
+      }
+
+      const stagedId = currentAuditData.staged_id;
+      const targetToReplace = document.getElementById('modalTargetDocName').innerText;
+      const modal = document.getElementById('redundancyModal');
+      const btns = modal.querySelectorAll('button');
+      btns.forEach(b => b.disabled = true);
+
+      try {
+        const res = await fetch('/api/admin/resolve-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            staged_id: stagedId,
+            action: action,
+            target_to_replace: targetToReplace
+          })
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || 'Error resolviendo la subida');
+
+        if (action === 'cancel') {
+          showToast('Operación cancelada. Archivo descartado.', 'info');
+        } else {
+          showToast(result.message || 'Documento procesado con éxito', 'success');
+          loadDocuments();
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btns.forEach(b => b.disabled = false);
+        closeRedundancyModal();
+        currentAuditData = null;
+        document.getElementById('fileInput').value = '';
+        document.getElementById('selectedFileName').innerText = '';
+      }
+    }
+
+    async function handleDocUpload(e) {
+      e.preventDefault();
+      await runDocumentAudit();
     }
 
     async function deleteDocument(filename) {

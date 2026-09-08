@@ -522,22 +522,28 @@ def calculate_chunk_redundancy(
     vector_store: Chroma,
     embeddings: HuggingFaceEmbeddings,
     threshold: float = 0.88,
+    ambiguity_threshold: float = 0.65,
     exclude_source: Optional[str] = None,
     batch_size: int = 32
 ) -> dict:
     """
-    Evalúa la redundancia semántica de una lista de fragmentos contra ChromaDB.
-    Usa embeddings normalizados: Similitud Coseno = 1.0 - distancia.
+    Evalúa la redundancia y ambigüedad semántica de una lista de fragmentos contra ChromaDB.
+    - Redundancia alta: similitud >= threshold (default 0.88 o 0.85)
+    - Ambigüedad semántica: similitud >= ambiguity_threshold y < threshold (default 0.65)
+    - Novedoso: similitud < ambiguity_threshold
     """
     total_chunks = len(chunks)
     if total_chunks == 0:
         return {
             "total_chunks": 0,
             "redundant_count": 0,
+            "ambiguous_count": 0,
             "novel_count": 0,
             "redundancy_ratio": 0.0,
+            "ambiguity_ratio": 0.0,
             "overlapping_sources": {},
             "redundant_indices": set(),
+            "ambiguous_indices": set(),
             "novel_indices": set(),
             "chunk_results": []
         }
@@ -553,18 +559,22 @@ def calculate_chunk_redundancy(
         return {
             "total_chunks": total_chunks,
             "redundant_count": 0,
+            "ambiguous_count": 0,
             "novel_count": total_chunks,
             "redundancy_ratio": 0.0,
+            "ambiguity_ratio": 0.0,
             "overlapping_sources": {},
             "redundant_indices": set(),
+            "ambiguous_indices": set(),
             "novel_indices": set(range(total_chunks)),
-            "chunk_results": [{"chunk": c, "similarity": 0.0, "matched_source": None, "is_redundant": False} for c in chunks]
+            "chunk_results": [{"chunk": c, "similarity": 0.0, "matched_source": None, "matched_chunk_snippet": "", "is_redundant": False, "is_ambiguous": False, "status": "novel"} for c in chunks]
         }
 
     texts = [c.page_content for c in chunks]
     chunk_embeddings = embeddings.embed_documents(texts)
 
     redundant_indices = set()
+    ambiguous_indices = set()
     novel_indices = set()
     overlapping_sources = {}
     chunk_results = []
@@ -579,64 +589,95 @@ def calculate_chunk_redundancy(
             results = col.query(
                 query_embeddings=batch_embs,
                 n_results=n_results,
-                include=["distances", "metadatas"]
+                include=["distances", "metadatas", "documents"]
             )
-        except Exception as exc:
-            logger.warning(f"Error consultando ChromaDB para redundancia: {exc}")
-            continue
+        except Exception:
+            try:
+                results = col.query(
+                    query_embeddings=batch_embs,
+                    n_results=n_results,
+                    include=["distances", "metadatas"]
+                )
+            except Exception as exc:
+                logger.warning(f"Error consultando ChromaDB para redundancia y ambigüedad: {exc}")
+                continue
 
         for i, chunk in enumerate(batch_chunks):
             global_idx = start_idx + i
             distances = results["distances"][i] if i < len(results["distances"]) else []
             metadatas = results["metadatas"][i] if i < len(results["metadatas"]) else []
+            docs = results.get("documents", [[]])[i] if ("documents" in results and i < len(results["documents"])) else []
 
             best_dist = 999.0
             best_meta = {}
-            for dist, meta in zip(distances, metadatas):
+            best_matched_doc = ""
+            for k, (dist, meta) in enumerate(zip(distances, metadatas)):
                 src = meta.get("source") if meta else ""
                 if exclude_source and src == exclude_source:
                     continue
                 best_dist = dist
                 best_meta = meta or {}
+                if k < len(docs) and docs[k]:
+                    best_matched_doc = str(docs[k]).strip()
                 break
 
             similarity = max(0.0, 1.0 - best_dist) if best_dist < 900.0 else 0.0
             matched_src = best_meta.get("source", "desconocido") if best_meta else None
 
             is_redundant = (similarity >= threshold) and (matched_src is not None)
+            is_ambiguous = (similarity >= ambiguity_threshold and not is_redundant) and (matched_src is not None)
 
             if is_redundant:
                 redundant_indices.add(global_idx)
+            elif is_ambiguous:
+                ambiguous_indices.add(global_idx)
+            else:
+                novel_indices.add(global_idx)
+
+            if (is_redundant or is_ambiguous) and matched_src:
                 if matched_src not in overlapping_sources:
                     overlapping_sources[matched_src] = {
                         "count": 0,
+                        "redundant_count": 0,
+                        "ambiguous_count": 0,
                         "max_similarity": 0.0,
-                        "sample_snippet": chunk.page_content[:100].strip()
+                        "sample_snippet": chunk.page_content[:150].strip(),
+                        "matched_sample_snippet": best_matched_doc[:150].strip()
                     }
                 overlapping_sources[matched_src]["count"] += 1
+                if is_redundant:
+                    overlapping_sources[matched_src]["redundant_count"] += 1
+                if is_ambiguous:
+                    overlapping_sources[matched_src]["ambiguous_count"] += 1
                 overlapping_sources[matched_src]["max_similarity"] = max(
                     overlapping_sources[matched_src]["max_similarity"],
                     similarity
                 )
-            else:
-                novel_indices.add(global_idx)
 
+            status_str = "redundant" if is_redundant else ("ambiguous" if is_ambiguous else "novel")
             chunk_results.append({
                 "chunk": chunk,
                 "similarity": similarity,
                 "matched_source": matched_src,
-                "is_redundant": is_redundant
+                "matched_chunk_snippet": best_matched_doc[:260],
+                "is_redundant": is_redundant,
+                "is_ambiguous": is_ambiguous,
+                "status": status_str
             })
 
-    redundancy_ratio = (len(redundant_indices) / total_chunks) * 100.0 if total_chunks > 0 else 0.0
+    redundancy_ratio = round((len(redundant_indices) / total_chunks) * 100.0, 1) if total_chunks > 0 else 0.0
+    ambiguity_ratio = round((len(ambiguous_indices) / total_chunks) * 100.0, 1) if total_chunks > 0 else 0.0
 
     return {
         "total_chunks": total_chunks,
         "redundant_count": len(redundant_indices),
+        "ambiguous_count": len(ambiguous_indices),
         "novel_count": len(novel_indices),
         "redundancy_ratio": redundancy_ratio,
+        "ambiguity_ratio": ambiguity_ratio,
         "overlapping_sources": overlapping_sources,
         "redundant_indices": redundant_indices,
+        "ambiguous_indices": ambiguous_indices,
         "novel_indices": novel_indices,
         "chunk_results": chunk_results
     }
