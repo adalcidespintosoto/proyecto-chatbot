@@ -392,7 +392,7 @@ async def audit_document(
         detailed_chunks = []
         for idx, item in enumerate(rep.get("chunk_results", [])):
             chunk_obj = item.get("chunk")
-            snippet = chunk_obj.page_content[:260].strip() if chunk_obj else ""
+            snippet = chunk_obj.page_content.strip() if chunk_obj else ""
             detailed_chunks.append({
                 "index": idx + 1,
                 "content_snippet": snippet,

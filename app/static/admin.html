@@ -533,14 +533,16 @@
     /* PANEL Y MODAL DE REDUNDANCIA Y AMBIGÜEDAD (PRE-INGESTA)                   */
     /* ========================================================================= */
     .analysis-result-panel {
+      grid-column: 1 / -1;
+      width: 100%;
       background: #0B132B;
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 16px;
-      padding: 1.5rem;
+      padding: 1.75rem 2rem;
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      gap: 1rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 25px rgba(10, 88, 202, 0.1);
       animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
@@ -604,7 +606,7 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 20px;
       width: 100%;
-      max-width: 650px;
+      max-width: min(1180px, 95vw);
       max-height: 92vh;
       overflow-y: auto;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(245, 158, 11, 0.15);
@@ -828,23 +830,248 @@
     }
 
     .chunks-drawer-content {
-      background: #070D18;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      padding: 10px;
-      max-height: 220px;
+      background: #060B15;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 14px;
+      max-height: 560px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
+      gap: 14px;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Side-by-Side Diff Card Container */
+    .chunk-diff-card {
+      background: #0D172B;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .chunk-diff-card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    }
+
+    .chunk-diff-card.is-redundant {
+      border-left: 4px solid #EF4444;
+    }
+
+    .chunk-diff-card.is-ambiguous {
+      border-left: 4px solid #F59E0B;
+    }
+
+    .chunk-diff-card.is-novel {
+      border-left: 4px solid #10B981;
+    }
+
+    /* Encabezado superior de resumen para cada fragmento */
+    .chunk-diff-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .chunk-diff-header-left {
+      display: flex;
+      align-items: center;
       gap: 8px;
     }
 
+    .chunk-main-badge {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chunk-main-badge.redundant {
+      background: rgba(239, 68, 68, 0.2);
+      color: #F87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
+    .chunk-main-badge.ambiguous {
+      background: rgba(245, 158, 11, 0.2);
+      color: #FBBF24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    .chunk-main-badge.novel {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .chunk-diff-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: #94A3B8;
+    }
+
+    /* Disposición en 2 columnas (Side-by-Side Diff) */
+    .chunk-diff-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      width: 100%;
+    }
+
+    @media (min-width: 768px) {
+      .chunk-diff-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Envoltorio de cada columna */
+    .chunk-diff-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    /* Encabezados distintivos por columna */
+    .diff-col-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    .diff-col-header.new-doc {
+      background: rgba(30, 58, 138, 0.35);
+      color: #93C5FD;
+      border: 1px solid rgba(59, 130, 246, 0.35);
+    }
+
+    .diff-col-header.matched-doc {
+      background: rgba(15, 23, 42, 0.65);
+      color: #E2E8F0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .diff-similarity-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .diff-similarity-pill.pill-red {
+      background: #EF4444;
+      color: #FFFFFF;
+    }
+
+    .diff-similarity-pill.pill-amber {
+      background: #F59E0B;
+      color: #0F172A;
+    }
+
+    .diff-similarity-pill.pill-green {
+      background: #10B981;
+      color: #FFFFFF;
+    }
+
+    .diff-similarity-pill.pill-gray {
+      background: rgba(148, 163, 184, 0.2);
+      color: #94A3B8;
+    }
+
+    /* Tema claro / Alto contraste para cajas de contenido */
+    .chunk-text-box {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: #0F172A; /* text-slate-900 / alta legibilidad */
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 220px;
+      overflow-y: auto;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .chunk-text-box.matched-redundant {
+      background: #FEF2F2;
+      border-color: #FECACA;
+      color: #7F1D1D;
+    }
+
+    .chunk-text-box.matched-ambiguous {
+      background: #FFFBEB;
+      border-color: #FDE68A;
+      color: #78350F;
+    }
+
+    .chunk-text-box::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .chunk-text-box::-webkit-scrollbar-track {
+      background: #F1F5F9;
+      border-radius: 4px;
+    }
+
+    .chunk-text-box::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+
+    .chunk-text-box::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+
+    /* Estado vacío cuando no hay coincidencia en ChromaDB (Novedoso) */
+    .chunk-no-match-box {
+      background: #F8FAFC;
+      border: 1px dashed #CBD5E1;
+      border-radius: 8px;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 6px;
+      color: #64748B;
+      font-size: 0.8rem;
+      min-height: 120px;
+      height: 100%;
+    }
+
+    /* Clases de compatibilidad */
     .chunk-card {
       background: #0E182A;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 0.78rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
     }
 
     .chunk-card-header {
@@ -855,13 +1082,7 @@
     }
 
     .chunk-card-text {
-      color: #94A3B8;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 0.75rem;
-      line-height: 1.4;
-      white-space: pre-wrap;
-      max-height: 70px;
-      overflow-y: auto;
+      color: #0F172A;
     }
 
     /* Action Cards */
@@ -1172,123 +1393,6 @@
           <div class="progress-bar-container" id="uploadProgressContainer">
             <div class="progress-bar" id="uploadProgressBar"></div>
           </div>
-
-          <!-- PANEL INLINE DE RESULTADOS DE ANÁLISIS DE AMBIGÜEDAD Y REDUNDANCIA -->
-          <div id="inlineAuditCard" class="analysis-result-panel" style="display: none; margin-top: 1.25rem;">
-            
-            <!-- Encabezado del Análisis -->
-            <div class="analysis-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span id="auditHeaderIcon" style="font-size: 1.4rem;">✨</span>
-                <span id="auditHeaderTitle" style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF;">Contenido Novedoso y Limpio</span>
-              </div>
-              <div id="auditStatusBadge" class="badge-status-clean">
-                Limpio (0.0% redundancia)
-              </div>
-            </div>
-
-            <!-- Descripción Contextual -->
-            <p id="auditDescText" style="font-size: 0.88rem; color: #94A3B8; line-height: 1.55; margin-bottom: 0.85rem;">
-              Excelente. El documento aporta contenido original con mínima o nula colisión con los vectores ya registrados en ChromaDB.
-            </p>
-
-            <!-- Nivel de Solapamiento con ChromaDB -->
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem;">
-                <span style="color: #94A3B8;">Nivel de Solapamiento con ChromaDB</span>
-                <span style="color: #F8FAFC; font-weight: 700;" id="auditOverlapText">0.0% (0 de 0 fragmentos)</span>
-              </div>
-              <div class="redundancy-progress-track">
-                <div class="redundancy-progress-fill" id="auditProgressFill" style="width: 0%;"></div>
-              </div>
-            </div>
-
-            <!-- Chips de Métricas -->
-            <div class="redundancy-chips-row" style="margin-bottom: 1.1rem;">
-              <div class="redundancy-chip">
-                <span>📄</span>
-                <span><span id="auditTotalChunks">0</span> Chunks Totales</span>
-              </div>
-              <div class="redundancy-chip novel">
-                <span>✨</span>
-                <span><span id="auditNovelChunks">0</span> Novedosos</span>
-              </div>
-              <div class="redundancy-chip" id="auditAmbiguousChip" style="display: none; color: #FBBF24; border-color: rgba(245, 158, 11, 0.25);">
-                <span>⚠️</span>
-                <span><span id="auditAmbiguousChunks">0</span> Ambiguos</span>
-              </div>
-              <div class="redundancy-chip redundant" id="auditRedundantChip">
-                <span>♻️</span>
-                <span><span id="auditRedundantChunks">0</span> Redundantes</span>
-              </div>
-            </div>
-
-            <!-- Documentos existentes que ya contienen esta información -->
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.1rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem;">
-              <div class="redundancy-section-title">
-                <span>📁</span> Documentos existentes que ya contienen esta información:
-              </div>
-              <div id="auditOverlappingDocsList" class="overlapping-docs-list">
-                <div style="color: #64748B; font-size: 0.82rem; padding: 4px;">No se detectaron colisiones directas con otros archivos.</div>
-              </div>
-            </div>
-
-            <!-- Inspección Detallada de Fragmentos (Colapsable) -->
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.1rem;">
-              <div class="chunks-inspection-bar" onclick="toggleAuditChunks()">
-                <div class="inspection-bar-left">
-                  <span>🔍</span> Inspección Detallada de Fragmentos
-                  <span class="badge-chunks-count" id="auditChunksCountBadge">0 chunks</span>
-                </div>
-                <div class="inspection-bar-right" id="auditChunksToggleText">
-                  👁️ Ver contenido de cada chunk
-                </div>
-              </div>
-              <div class="chunks-drawer-content" id="auditChunksDrawer" style="display: none;">
-                <!-- Fragmentos dinámicos -->
-              </div>
-            </div>
-
-            <!-- ¿Qué deseas hacer con este documento? -->
-            <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem;">
-              <div class="redundancy-section-title">
-                <span>⚡</span> ¿Qué deseas hacer con este documento?
-              </div>
-
-              <!-- Opción 1: Reemplazar documento existente -->
-              <button type="button" class="action-card action-card-replace" id="auditActionReplace" onclick="executeInlineResolve('replace')" style="display: none;">
-                <div class="action-icon-box icon-box-replace">🔄</div>
-                <div>
-                  <div class="action-title">Actualizar / Reemplazar Documento Existente</div>
-                  <div class="action-desc">Purga los fragmentos previos de '<span id="auditTargetDocName" style="font-weight: 700;">documento.pdf</span>' en ChromaDB y carga esta nueva versión.</div>
-                </div>
-              </button>
-
-              <!-- Opción 2: Guardar como nuevo con deduplicación -->
-              <button type="button" class="action-card action-card-dedup" id="auditActionDedup" onclick="executeInlineResolve('deduplicate')">
-                <div class="action-icon-box icon-box-dedup">NEW</div>
-                <div>
-                  <div class="action-title">Guardar como Nuevo (con Deduplicación de Fragmentos)</div>
-                  <div class="action-desc">Indexa solo los fragmentos novedosos y descarta los repetidos para no saturar la base.</div>
-                </div>
-              </button>
-
-              <!-- Opción 3: Forzar indexación completa -->
-              <button type="button" class="action-card action-card-force" id="auditActionForce" onclick="executeInlineResolve('force')">
-                <div class="action-icon-box icon-box-force">📥</div>
-                <div>
-                  <div class="action-title">Forzar Indexación Completa (Sin Filtrado)</div>
-                  <div class="action-desc">Indexa todos los fragmentos sin aplicar filtros de redundancia.</div>
-                </div>
-              </button>
-
-              <!-- Opción 4: Descartar / Cancelar -->
-              <button type="button" class="btn-cancel-modal" style="width: 100%; border-radius: 12px; padding: 12px; font-weight: 700;" onclick="executeInlineResolve('cancel')">
-                <span>❌</span> Descartar Archivo (Cancelar)
-              </button>
-            </div>
-
-          </div>
         </div>
 
         <!-- Acciones de Indexación -->
@@ -1313,6 +1417,123 @@
           </div>
 
           <div class="log-terminal" id="indexingTerminalLog"></div>
+        </div>
+
+        <!-- PANEL INLINE DE RESULTADOS DE ANÁLISIS DE AMBIGÜEDAD Y REDUNDANCIA (ANCHO COMPLETO) -->
+        <div id="inlineAuditCard" class="analysis-result-panel" style="display: none; margin-top: 0.5rem;">
+          
+          <!-- Encabezado del Análisis -->
+          <div class="analysis-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span id="auditHeaderIcon" style="font-size: 1.4rem;">✨</span>
+              <span id="auditHeaderTitle" style="font-size: 1.15rem; font-weight: 800; color: #FFFFFF;">Contenido Novedoso y Limpio</span>
+            </div>
+            <div id="auditStatusBadge" class="badge-status-clean">
+              Limpio (0.0% redundancia)
+            </div>
+          </div>
+
+          <!-- Descripción Contextual -->
+          <p id="auditDescText" style="font-size: 0.88rem; color: #94A3B8; line-height: 1.55; margin-bottom: 0.85rem;">
+            Excelente. El documento aporta contenido original con mínima o nula colisión con los vectores ya registrados en ChromaDB.
+          </p>
+
+          <!-- Nivel de Solapamiento con ChromaDB -->
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem;">
+              <span style="color: #94A3B8;">Nivel de Solapamiento con ChromaDB</span>
+              <span style="color: #F8FAFC; font-weight: 700;" id="auditOverlapText">0.0% (0 de 0 fragmentos)</span>
+            </div>
+            <div class="redundancy-progress-track">
+              <div class="redundancy-progress-fill" id="auditProgressFill" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Chips de Métricas -->
+          <div class="redundancy-chips-row" style="margin-bottom: 1.1rem;">
+            <div class="redundancy-chip">
+              <span>📄</span>
+              <span><span id="auditTotalChunks">0</span> Chunks Totales</span>
+            </div>
+            <div class="redundancy-chip novel">
+              <span>✨</span>
+              <span><span id="auditNovelChunks">0</span> Novedosos</span>
+            </div>
+            <div class="redundancy-chip" id="auditAmbiguousChip" style="display: none; color: #FBBF24; border-color: rgba(245, 158, 11, 0.25);">
+              <span>⚠️</span>
+              <span><span id="auditAmbiguousChunks">0</span> Ambiguos</span>
+            </div>
+            <div class="redundancy-chip redundant" id="auditRedundantChip">
+              <span>♻️</span>
+              <span><span id="auditRedundantChunks">0</span> Redundantes</span>
+            </div>
+          </div>
+
+          <!-- Documentos existentes que ya contienen esta información -->
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.1rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem;">
+            <div class="redundancy-section-title">
+              <span>📁</span> Documentos existentes que ya contienen esta información:
+            </div>
+            <div id="auditOverlappingDocsList" class="overlapping-docs-list">
+              <div style="color: #64748B; font-size: 0.82rem; padding: 4px;">No se detectaron colisiones directas con otros archivos.</div>
+            </div>
+          </div>
+
+          <!-- Inspección Detallada de Fragmentos (Colapsable) -->
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.1rem;">
+            <div class="chunks-inspection-bar" onclick="toggleAuditChunks()">
+              <div class="inspection-bar-left">
+                <span>🔍</span> Inspección Detallada de Fragmentos
+                <span class="badge-chunks-count" id="auditChunksCountBadge">0 chunks</span>
+              </div>
+              <div class="inspection-bar-right" id="auditChunksToggleText">
+                👁️ Ver contenido de cada chunk
+              </div>
+            </div>
+            <div class="chunks-drawer-content" id="auditChunksDrawer" style="display: none;">
+              <!-- Fragmentos dinámicos -->
+            </div>
+          </div>
+
+          <!-- ¿Qué deseas hacer con este documento? -->
+          <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem;">
+            <div class="redundancy-section-title">
+              <span>⚡</span> ¿Qué deseas hacer con este documento?
+            </div>
+
+            <!-- Opción 1: Reemplazar documento existente -->
+            <button type="button" class="action-card action-card-replace" id="auditActionReplace" onclick="executeInlineResolve('replace')" style="display: none;">
+              <div class="action-icon-box icon-box-replace">🔄</div>
+              <div>
+                <div class="action-title">Actualizar / Reemplazar Documento Existente</div>
+                <div class="action-desc">Purga los fragmentos previos de '<span id="auditTargetDocName" style="font-weight: 700;">documento.pdf</span>' en ChromaDB y carga esta nueva versión.</div>
+              </div>
+            </button>
+
+            <!-- Opción 2: Guardar como nuevo con deduplicación -->
+            <button type="button" class="action-card action-card-dedup" id="auditActionDedup" onclick="executeInlineResolve('deduplicate')">
+              <div class="action-icon-box icon-box-dedup">NEW</div>
+              <div>
+                <div class="action-title">Guardar como Nuevo (con Deduplicación de Fragmentos)</div>
+                <div class="action-desc">Indexa solo los fragmentos novedosos y descarta los repetidos para no saturar la base.</div>
+              </div>
+            </button>
+
+            <!-- Opción 3: Forzar indexación completa -->
+            <button type="button" class="action-card action-card-force" id="auditActionForce" onclick="executeInlineResolve('force')">
+              <div class="action-icon-box icon-box-force">📥</div>
+              <div>
+                <div class="action-title">Forzar Indexación Completa (Sin Filtrado)</div>
+                <div class="action-desc">Indexa todos los fragmentos sin aplicar filtros de redundancia.</div>
+              </div>
+            </button>
+
+            <!-- Opción 4: Descartar / Cancelar -->
+            <button type="button" class="btn-cancel-modal" style="width: 100%; border-radius: 12px; padding: 12px; font-weight: 700;" onclick="executeInlineResolve('cancel')">
+              <span>❌</span> Descartar Archivo (Cancelar)
+            </button>
+          </div>
+
         </div>
 
       </div>
@@ -1870,6 +2091,128 @@
         replaceBtn.style.display = 'none';
       }
 
+    function escapeChunkHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function createChunkDiffCard(chk) {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'chunk-diff-card chunk-card';
+
+      // Clasificación de estado
+      let statusClass = 'is-novel';
+      let mainBadgeClass = 'novel';
+      let mainBadgeIcon = '✨';
+      let mainBadgeText = `Fragmento #${chk.index} · Novedoso`;
+      let simPillClass = 'pill-green';
+      let rightBoxClass = '';
+
+      if (chk.is_redundant) {
+        statusClass = 'is-redundant';
+        mainBadgeClass = 'redundant';
+        mainBadgeIcon = '♻️';
+        mainBadgeText = `Fragmento #${chk.index} · Redundante (${chk.similarity}% similitud)`;
+        simPillClass = 'pill-red';
+        rightBoxClass = 'matched-redundant';
+      } else if (chk.is_ambiguous) {
+        statusClass = 'is-ambiguous';
+        mainBadgeClass = 'ambiguous';
+        mainBadgeIcon = '⚠️';
+        mainBadgeText = `Fragmento #${chk.index} · Ambigüedad Media (${chk.similarity}% similitud)`;
+        simPillClass = 'pill-amber';
+        rightBoxClass = 'matched-ambiguous';
+      } else if (chk.similarity > 0) {
+        simPillClass = 'pill-green';
+      } else {
+        simPillClass = 'pill-gray';
+      }
+
+      cardEl.classList.add(statusClass);
+
+      const hasMatch = Boolean(chk.matched_chunk_snippet && chk.matched_chunk_snippet.trim().length > 0);
+      const matchedSource = (chk.matched_source && chk.matched_source !== 'Ninguno') ? chk.matched_source : null;
+
+      const cleanSnippet = escapeChunkHtml(chk.content_snippet);
+      const matchedSnippet = escapeChunkHtml(chk.matched_chunk_snippet);
+
+      // Columna derecha: fragmento coincidente en ChromaDB o estado vacío informativo
+      let rightColContentHtml = '';
+      if (hasMatch) {
+        rightColContentHtml = `
+          <div class="chunk-text-box chunk-card-text bg-white border border-slate-200 text-slate-800 ${rightBoxClass}">
+            <div style="font-size: 0.72rem; font-weight: 700; color: #64748B; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+              Origen: ${escapeChunkHtml(matchedSource || 'ChromaDB')}
+            </div>
+            ${matchedSnippet}
+          </div>
+        `;
+      } else {
+        rightColContentHtml = `
+          <div class="chunk-no-match-box">
+            <span style="font-size: 1.3rem;">✨</span>
+            <span style="font-weight: 700; color: #475569;">Sin colisión previa en ChromaDB</span>
+            <span style="font-size: 0.76rem; color: #64748B;">Este fragmento aporta información novedosa y única. No se detectaron vectores solapados.</span>
+          </div>
+        `;
+      }
+
+      cardEl.innerHTML = `
+        <!-- Encabezado general del fragmento -->
+        <div class="chunk-diff-header chunk-card-header">
+          <div class="chunk-diff-header-left">
+            <span class="chunk-main-badge ${mainBadgeClass}">
+              <span>${mainBadgeIcon}</span> ${mainBadgeText}
+            </span>
+          </div>
+          <div class="chunk-diff-header-right">
+            <span>📁 ${matchedSource ? `Coincide con: <strong style="color:#E2E8F0;">${escapeChunkHtml(matchedSource)}</strong>` : 'Sin solapamiento previo'}</span>
+          </div>
+        </div>
+
+        <!-- Disposición en 2 Columnas (Side-by-Side Diff) -->
+        <div class="chunk-diff-grid grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Columna Izquierda: Fragmento del nuevo documento cargado -->
+          <div class="chunk-diff-col">
+            <div class="diff-col-header new-doc">
+              <span style="display:flex; align-items:center; gap:6px;">
+                <span>📄</span>
+                <span>Nuevo / Subido</span>
+              </span>
+              <span style="font-size: 0.72rem; font-weight: 600; opacity: 0.85;">Documento en análisis</span>
+            </div>
+            <div class="chunk-text-box chunk-card-text bg-white border border-slate-200 text-slate-800">
+              <div style="font-size: 0.72rem; font-weight: 700; color: #64748B; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                Contenido del Archivo Cargado:
+              </div>
+              ${cleanSnippet || '<em style="color:#94A3B8;">(Fragmento vacío)</em>'}
+            </div>
+          </div>
+
+          <!-- Columna Derecha: Fragmento coincidente existente en ChromaDB -->
+          <div class="chunk-diff-col">
+            <div class="diff-col-header matched-doc">
+              <span style="display:flex; align-items:center; gap:6px;">
+                <span>🏛️</span>
+                <span>Existente en ChromaDB</span>
+              </span>
+              <span class="diff-similarity-pill ${simPillClass}">
+                ${hasMatch ? `${chk.similarity}% similitud` : '0% colisión'}
+              </span>
+            </div>
+            ${rightColContentHtml}
+          </div>
+        </div>
+      `;
+
+      return cardEl;
+    }
+
       // Detailed chunks
       const chunksContainer = document.getElementById('auditChunksDrawer');
       chunksContainer.innerHTML = '';
@@ -1879,30 +2222,7 @@
 
       if (data.detailed_chunks && data.detailed_chunks.length > 0) {
         data.detailed_chunks.forEach(chk => {
-          const cardEl = document.createElement('div');
-          cardEl.className = 'chunk-card';
-          let badgeColor = '#34D399';
-          let badgeLabel = `✨ Fragmento #${chk.index} (Novedoso)`;
-          if (chk.is_redundant) {
-            badgeColor = '#F87171';
-            badgeLabel = `♻️ Fragmento #${chk.index} (Redundante ${chk.similarity}%)`;
-          } else if (chk.is_ambiguous) {
-            badgeColor = '#FBBF24';
-            badgeLabel = `⚠️ Fragmento #${chk.index} (Ambigüedad ${chk.similarity}%)`;
-          }
-
-          const cleanSnippet = (chk.content_snippet || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const matchedSnippet = chk.matched_chunk_snippet ? `<div style="margin-top:6px; padding:6px 8px; background:rgba(0,0,0,0.3); border-left:2px solid #60A5FA; border-radius:4px; font-size:0.75rem; color:#93C5FD;"><b style="color:#BFDBFE;">Fragmento coincidente en [${chk.matched_source}]:</b><br>${chk.matched_chunk_snippet.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>` : '';
-
-          cardEl.innerHTML = `
-            <div class="chunk-card-header">
-              <span style="font-weight: 700; color: ${badgeColor};">${badgeLabel}</span>
-              <span style="color: #94A3B8; font-size: 0.72rem;">${chk.matched_source ? chk.matched_source : 'Sin solapamiento'}</span>
-            </div>
-            <div class="chunk-card-text">${cleanSnippet}</div>
-            ${matchedSnippet}
-          `;
-          chunksContainer.appendChild(cardEl);
+          chunksContainer.appendChild(createChunkDiffCard(chk));
         });
       }
 
@@ -2042,20 +2362,7 @@
 
       if (data.detailed_chunks && data.detailed_chunks.length > 0) {
         data.detailed_chunks.forEach(chk => {
-          const card = document.createElement('div');
-          card.className = 'chunk-card';
-          const isRed = chk.is_redundant;
-          const cleanSnippet = (chk.content_snippet || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          card.innerHTML = `
-            <div class="chunk-card-header">
-              <span style="font-weight: 700; color: ${isRed ? '#F87171' : '#34D399'};">
-                ${isRed ? '♻️ Fragmento #' + chk.index + ' (Redundante ' + chk.similarity + '%)' : '✨ Fragmento #' + chk.index + ' (Novedoso)'}
-              </span>
-              <span style="color: #94A3B8; font-size: 0.72rem;">${chk.matched_source ? chk.matched_source : 'Sin solapamiento'}</span>
-            </div>
-            <div class="chunk-card-text">${cleanSnippet}</div>
-          `;
-          chunksContainer.appendChild(card);
+          chunksContainer.appendChild(createChunkDiffCard(chk));
         });
       }
 

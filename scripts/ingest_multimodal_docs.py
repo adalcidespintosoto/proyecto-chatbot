@@ -659,7 +659,7 @@ def calculate_chunk_redundancy(
                 "chunk": chunk,
                 "similarity": similarity,
                 "matched_source": matched_src,
-                "matched_chunk_snippet": best_matched_doc[:260],
+                "matched_chunk_snippet": best_matched_doc.strip(),
                 "is_redundant": is_redundant,
                 "is_ambiguous": is_ambiguous,
                 "status": status_str
