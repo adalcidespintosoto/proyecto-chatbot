@@ -376,3 +376,47 @@ def get_kpis_summary() -> Dict[str, Any]:
             "top_documentos_referenciados": top_documents,
             "top_preguntas_frecuentes": top_queries
         }
+
+
+def reset_telemetry_db() -> Dict[str, Any]:
+    """
+    Elimina todos los registros históricos de telemetría (sesiones, interacciones y tickets)
+    en data/analytics.db para permitir una medición limpia de desempeño.
+    """
+    try:
+        if not DB_PATH.exists():
+            init_telemetry_db()
+            return {
+                "status": "success",
+                "interactions_cleared": 0,
+                "sessions_cleared": 0,
+                "tickets_cleared": 0,
+                "message": "Base de datos inicializada sin registros previos."
+            }
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()]
+            counts = {}
+            for t in ["telemetry_interactions", "telemetry_sessions", "telemetry_tickets"]:
+                if t in tables:
+                    counts[t] = cursor.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                    cursor.execute(f"DELETE FROM {t};")
+                else:
+                    counts[t] = 0
+
+            conn.commit()
+            cursor.execute("VACUUM;")
+            logger.info("Base de datos de telemetría reseteada con éxito: %s", counts)
+
+        return {
+            "status": "success",
+            "interactions_cleared": counts.get("telemetry_interactions", 0),
+            "sessions_cleared": counts.get("telemetry_sessions", 0),
+            "tickets_cleared": counts.get("telemetry_tickets", 0),
+            "message": "Métricas y telemetría histórica reseteadas exitosamente."
+        }
+    except Exception as e:
+        logger.error("Error al resetear la base de datos de telemetría: %s", e)
+        return {"status": "error", "message": str(e)}
+

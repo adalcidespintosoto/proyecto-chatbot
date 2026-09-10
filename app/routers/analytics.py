@@ -8,7 +8,8 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, status, Response, Query
 from pydantic import BaseModel, Field
 
-from app.services.telemetry_service import get_kpis_summary
+from app.services.telemetry_service import get_kpis_summary, reset_telemetry_db
+from app.services.golden_cache_service import clear_golden_cache
 from app.services.clustering_service import get_query_clusters as fetch_clusters, export_dpo_dataset, export_dpo_dataset_jsonl
 
 logger = logging.getLogger("unimon.analytics_router")
@@ -81,5 +82,26 @@ async def export_dpo(
             "Content-Disposition": "attachment; filename=dpo_preference_dataset.jsonl"
         }
     )
+
+
+@router.post(
+    "/reset-metrics",
+    status_code=status.HTTP_200_OK,
+    summary="Limpiar y Reiniciar Métricas de Telemetría",
+    description="Elimina el historial de consultas, sesiones y tickets de analytics.db. Opcionalmente purga Golden Cache."
+)
+async def reset_metrics(
+    include_golden_cache: bool = Query(default=False, description="Si es True, purga también la colección de Semantic Golden Cache")
+) -> Dict[str, Any]:
+    """
+    Reinicia las métricas históricas para permitir una evaluación limpia del desempeño actual del chatbot.
+    """
+    res = reset_telemetry_db()
+    if include_golden_cache:
+        golden_purged = clear_golden_cache()
+        res["golden_cache_purged"] = golden_purged
+
+    return res
+
 
 
