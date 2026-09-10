@@ -368,6 +368,7 @@ async def async_generate_multi_query_variants(
         "Reglas:\n"
         "- Responde ÚNICAMENTE 3 líneas numeradas (1, 2, 3).\n"
         "- Usa terminología formal universitaria (ej. SIAAF, Portal Estudiantes, Horario Académico, Asignaturas, Notas, Matrícula, Microsoft Teams, Restablecimiento de Contraseña).\n"
+        "- Si la consulta menciona una plataforma o aplicativo específico (ej. UpToDate, Kactus, Seven, SIAAF, Teams), mantén siempre el nombre de esa plataforma en las 3 variantes.\n"
         "- Sin explicaciones, saludos ni comentarios."
     )
 
@@ -502,10 +503,12 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
      * REGLA DE NO-PARADOJA: Para recuperación de contraseñas/correo, NUNCA exijas tener la contraseña activa ni la sesión iniciada. Los requisitos son documento de identidad y acceso al correo personal o celular registrado.
      * Luego detalla el procedimiento cronológico (**Paso 1**, **Paso 2**, etc.) con botones y enlaces en negrita.
      * Si en el contexto NO hay requisitos especiales, ve directamente al paso a paso sin inventar nada.
+     * PROHIBICIÓN ESTRICTA DE REQUISITOS FALSOS: NUNCA generes el encabezado '**⚠️ Requisitos y Restricciones Previas:**' si el texto del contexto no contiene requisitos previos normativos explícitos. PROHIBIDO reutilizar requisitos de equipos de cómputo en trámites de SIAAF, cursos de énfasis, portales, calificaciones o votaciones.
 
-   - C. DOTACIÓN Y RENOVACIÓN DE PUESTO DE TRABAJO (PC, Portátil de oficina, Cambio o asignación de equipo):
-     * Aplica a: Profesores y Administrativos.
-     * **⚠️ Requisitos y Restricciones Previas:**
+   - C. DOTACIÓN Y RENOVACIÓN DE PUESTO DE TRABAJO (SOLO para solicitudes físicas de computador, portátil de oficina, periféricos o cambio de equipo):
+     * Aplica EXCLUSIVAMENTE cuando el usuario solicita una dotación física, cambio o asignación de un computador o portátil de trabajo.
+     * PROHIBICIÓN ESTRICTA: NUNCA menciones requisitos de equipos de cómputo ni visto bueno de jefatura para hardware en consultas sobre SIAAF, Portal, Teams, notas, cursos de énfasis, liquidaciones o solicitudes de acceso a software.
+     * **⚠️ Requisitos y Restricciones Previas (SOLO para PC/Portátil físico):**
        - Toda solicitud o renovación de equipos de cómputo para puesto de trabajo DEBE ser radicada o contar con el visto bueno/aval del Jefe de Dependencia o Jefatura inmediata.
        - Estar justificada por necesidades del cargo o por obsolescencia/falla técnica del equipo actual.
      * **Datos obligatorios a incluir en la solicitud formal a TI:**
@@ -539,7 +542,7 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
 
 3. JERARQUÍA ESTRICTA DE RESPUESTA:
    - Para instructivos y trámites de autoservicio:
-     1. **⚠️ Requisitos y Restricciones Previas:** (ÚNICAMENTE si el trámite requiere condiciones formales, como autorizaciones de jefatura en dotación o documento de identidad en claves. NUNCA inventes requisitos paradójicos).
+     1. **⚠️ Requisitos y Restricciones Previas:** (ÚNICAMENTE si el trámite específico documentado exige formalmente condiciones previas en el contexto, como autorizaciones de jefatura en dotación de PC o documento en claves. Si no hay requisitos previos en el texto, OMITIR por completo este encabezado e iniciar directamente con el paso a paso).
      2. **Procedimiento Paso a Paso:** (Paso 1, Paso 2, Paso 3 en orden cronológico).
      3. **Canales de Soporte / Escalado:** (Al final, para reporte de errores en el proceso).
    - Para reportes de fallas de infraestructura o servicio (sin autoservicio):
@@ -551,9 +554,11 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
    - PROHIBIDO VOLVER A SALUDAR O PRESENTARTE ("¡Hola!", "Soy UniMon"). Empieza directamente con la información solicitada.
    - PROHIBIDO hablar de ti mismo, justificarte o disculparte por fallas o respuestas previas.
 
-5. FIDELIDAD AL CONTEXTO Y GROUNDING:
+5. FIDELIDAD AL CONTEXTO, GROUNDING Y ABSTENCIÓN:
    - Limítate estrictamente a los hechos extraídos del contexto provisto.
    - Usa ÚNICAMENTE las URLs especificadas en el contexto formateadas como [Nombre](URL). NUNCA inventes placeholders.
+   - PROHIBICIÓN ABSOLUTA DE ADAPTAR INSTRUCTIVOS A OTRAS PLATAFORMAS (ABSTENCIÓN ESTRICTA):
+     * Si la consulta menciona una plataforma, software, base de datos o aplicativo específico (ej. UpToDate, Scopus, Moodle, Canvas, etc.) y dicha plataforma NO APARECE en el [CONTEXTO INSTITUCIONAL DOCUMENTADO], ESTÁ TERMINANTEMENTE PROHIBIDO inventar pasos o reutilizar instructivos de otros sistemas (como Portal Estudiantes o SIAAF). Responde indicando con honestidad que no dispones de un instructivo institucional para dicha plataforma y proporciona los canales de Soporte TI.
 
 6. FINALIZA SIEMPRE PREGUNTANDO:
    "¿Pudiste resolver tu problema con estos pasos?
@@ -578,7 +583,7 @@ Los canales oficiales de atención de Soporte Técnico TI de la Universidad Sim�
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
 
-[EJEMPLO 2: Trámite con Requisitos Previos (Dotación/PC)]
+[EJEMPLO 2: Trámite Físico de Dotación de Equipos (Aplica ÚNICAMENTE si la consulta es sobre computador o portátil)]
 Pregunta: Soy administrativo y necesito solicitar un portátil de oficina.
 Respuesta:
 **⚠️ Requisitos y Restricciones Previas:**
@@ -901,6 +906,52 @@ def strip_chunk_boilerplate(content: str) -> str:
     return cleaned.strip()
 
 
+# Lista de plataformas, herramientas o bases de datos no documentadas en el catálogo institucional
+KNOWN_EXTERNAL_PLATFORMS = [
+    "uptodate", "up to date", "scopus", "moodle", "canvas", "blackboard",
+    "turnitin", "proquest", "ebsco", "spydus", "sciencedirect", "springer",
+    "pubmed", "zoom", "google classroom", "schoology", "duolingo"
+]
+
+# Palabras funcionales o genéricas que no deben tomarse como nombres de plataformas
+GENERIC_SYSTEM_TERMS = {
+    "de", "del", "la", "el", "los", "las", "un", "una", "para", "web", "institucional",
+    "institucionales", "movil", "móvil", "en", "con", "por", "que", "y", "o", "mi", "tu",
+    "su", "sus", "nuestra", "nuestro", "notas", "correo", "clave", "contraseña", "contrasena",
+    "soporte", "acceso", "ayuda", "atención", "atencion", "servicio", "servicios", "solicitud",
+    "solicitudes", "portal", "portales", "usuario", "usuarios", "cuenta", "cuentas",
+    "computo", "cómputo", "red", "internet", "wifi", "nuevo", "nueva", "desde", "hasta",
+    "como", "cómo", "información", "informacion", "trámite", "tramite", "procedimiento"
+}
+
+
+def extract_queried_platform_or_system(query: str) -> Optional[str]:
+    """
+    Identifica si la consulta del usuario se refiere explícitamente a una plataforma,
+    sistema, software o base de datos específica.
+    """
+    if not query:
+        return None
+    q_lower = query.lower()
+
+    # 1. Chequeo de plataformas externas o académicas conocidas
+    for kp in KNOWN_EXTERNAL_PLATFORMS:
+        if re.search(rf"\b{re.escape(kp)}\b", q_lower):
+            return "UpToDate" if kp in ["uptodate", "up to date"] else kp
+
+    # 2. Patrones sintácticos: "plataforma X", "aplicativo X", "sistema X", "software X"
+    match = re.search(
+        r"\b(?:plataforma|aplicativo|aplicacion|aplicación|app|sistema|software|herramienta|base de datos)\s+(?:de\s+|del\s+)?([a-záéíóúñ0-9_.\-]+)",
+        q_lower
+    )
+    if match:
+        candidate = match.group(1).strip().lower()
+        if candidate not in GENERIC_SYSTEM_TERMS and len(candidate) > 2:
+            return candidate
+
+    return None
+
+
 class RAGService:
     """
     Servicio RAG local para recuperación de contexto con ChromaDB y generación con Ollama.
@@ -1076,6 +1127,23 @@ class RAGService:
             except Exception as exc:
                 logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
 
+        # Verificación estricta de entidad o plataforma consultada (Entity & Platform Grounding)
+        target_platform = extract_queried_platform_or_system(question)
+        if target_platform and valid_docs_with_scores:
+            target_platform_lower = target_platform.lower()
+            platform_in_docs = any(
+                target_platform_lower in doc.page_content.lower() or 
+                target_platform_lower in doc.metadata.get("source", "").lower()
+                for doc, _ in valid_docs_with_scores
+            )
+            if not platform_in_docs:
+                logger.info(
+                    f"[PlatformGrounding] Consulta menciona explícitamente la plataforma o aplicativo '{target_platform}', "
+                    f"pero ningún fragmento recuperado la contiene. Descartando {len(valid_docs_with_scores)} "
+                    f"fragmentos espurios para evitar alucinaciones."
+                )
+                valid_docs_with_scores = []
+
         # 3. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
         if valid_docs_with_scores:
             rerank_query = query_variants[0] if query_variants else question
@@ -1160,6 +1228,30 @@ class RAGService:
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
         if not context_parts:
+            # Si se consultó una plataforma específica no documentada en el catálogo institucional
+            if target_platform:
+                logger.info(f"[PlatformGrounding] Retornando mensaje oficial para plataforma no documentada '{target_platform}'.")
+                platform_display = target_platform.title() if len(target_platform) > 4 else target_platform.upper()
+                if target_platform.lower() in ["uptodate", "up to date"]:
+                    platform_display = "UpToDate"
+                msg = (
+                    f"Actualmente no me encuentro en la capacidad de responder a tu solicitud, ya que no dispongo de conocimiento, "
+                    f"instructivo o procedimiento institucional documentado sobre la plataforma **{platform_display}**.\n\n"
+                    f"Puedes comunicarte directamente con los canales oficiales de soporte técnico TI para verificar el acceso y estado de tu cuenta:\n"
+                    f"📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
+                    f"📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n"
+                    f"¿O prefieres que radique un caso de soporte técnico por ti ahora mismo?"
+                )
+                return {
+                    "response": msg,
+                    "sources": [],
+                    "source": "unimon_platform_not_documented",
+                    "model": None,
+                    "retrieved_chunks": 0,
+                    "has_context": False,
+                    "quick_replies": QUICK_REPLIES_DIAGNOSTICO
+                }
+
             # Si contiene palabras clave temáticas conocidas, entregar respuesta guiada temática
             q_lower = question.lower()
             if any(k in q_lower for k in [
