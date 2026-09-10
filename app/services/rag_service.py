@@ -527,6 +527,31 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
        2. Proporciona los canales oficiales de ambas sedes.
        3. Entrega OBLIGATORIAMENTE la plantilla de solicitud (Nombre, Documento, Rol, Equipo, Motivo, Fecha/Horario, Salón).
 
+   - E. INSTALACIÓN Y CONFIGURACIÓN DE SOFTWARE / SOPORTE A EQUIPOS O LABORATORIOS (ej. GlobalProtect, VPN, programas especializados en portátiles o salas):
+     * Aplica cuando el usuario solicita la instalación, configuración o alistamiento de un software, VPN o conexión remota en un equipo institucional (computador, portátil, sala o laboratorio).
+     * Explica con claridad que la instalación de software y configuración de acceso a la red interna en equipos de la institución debe ser gestionada y realizada por el equipo de Soporte Técnico TI.
+     * Entrega la lista de datos requeridos para procesar la solicitud:
+       - Nombre completo, documento de identidad y cargo o dependencia del solicitante.
+       - Identificación del equipo (tipo de equipo, portátil o placa de inventario) y ubicación exacta (oficina o laboratorio, ej. MC202).
+       - Nombre del aplicativo o software requerido y motivo/justificación (ej. GlobalProtect para conexión remota a la red interna y plataformas institucionales).
+     * Suministra los canales oficiales de radicación de Soporte TI de Barranquilla y Cúcuta.
+     * PROHIBICIÓN ESTRICTA: NUNCA respondas que la plataforma no está documentada si lo que pide el usuario es la instalación de un software o soporte a un equipo institucional.
+
+   - F. REINGRESO O REACTIVACIÓN DE CUENTAS TRAS VACACIONES O LICENCIAS (P-GT-02):
+     * Aplica cuando el usuario consulta cómo reactivar o desbloquear la cuenta o accesos de un empleado que regresa de vacaciones, incapacidad o licencia médica.
+     * Explica el procedimiento institucional oficial de acuerdo con la norma P-GT-02:
+       1. Toda reactivación de credenciales operativas requiere que la Jefatura Inmediata o Talento Humano notifique formalmente el reingreso vía correo electrónico directamente a Soporte Técnico TI para rehabilitar las cuentas en el sistema.
+       2. Datos requeridos en la notificación:
+          - Nombre completo y documento de identidad del funcionario.
+          - Cargo y Dependencia.
+          - Fecha exacta de reintegro laboral tras las vacaciones o incapacidad.
+       3. Soporte Técnico TI procede a reactivar las credenciales operativas en Active Directory y plataformas correspondientes.
+     * PROHIBICIÓN ESTRICTA DE CORREOS DE OTRAS DEPENDENCIAS:
+       - NUNCA inventes correos electrónicos de Talento Humano o Recursos Humanos (ej. NUNCA generes talentohumano@..., rh.cucuta@..., o extensiones falsas como 8001/8002).
+       - La solicitud se envía EXCLUSIVAMENTE a los canales oficiales de Soporte TI:
+         • Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | Tel: `(605) 3444333 Ext. 8003/8004`
+         • Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
+
 2. PROCEDIMIENTOS DE AUTOSERVICIO VS. INCIDENCIAS Y FALLAS TÉCNICAS:
    A. CASOS DE AUTOSERVICIO DOCUMENTADO (El usuario puede resolverlo por su cuenta):
       - Si la consulta del usuario corresponde a un procedimiento, trámite o configuración documentado en el contexto (ej. restablecimiento de contraseña, ingreso a Teams, consulta de notas, carnet digital, matrícula, aplicativos institucionales):
@@ -558,7 +583,12 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
    - Limítate estrictamente a los hechos extraídos del contexto provisto.
    - Usa ÚNICAMENTE las URLs especificadas en el contexto formateadas como [Nombre](URL). NUNCA inventes placeholders.
    - PROHIBICIÓN ABSOLUTA DE ADAPTAR INSTRUCTIVOS A OTRAS PLATAFORMAS (ABSTENCIÓN ESTRICTA):
-     * Si la consulta menciona una plataforma, software, base de datos o aplicativo específico (ej. UpToDate, Scopus, Moodle, Canvas, etc.) y dicha plataforma NO APARECE en el [CONTEXTO INSTITUCIONAL DOCUMENTADO], ESTÁ TERMINANTEMENTE PROHIBIDO inventar pasos o reutilizar instructivos de otros sistemas (como Portal Estudiantes o SIAAF). Responde indicando con honestidad que no dispones de un instructivo institucional para dicha plataforma y proporciona los canales de Soporte TI.
+     * Si la consulta menciona una plataforma, software, base de datos o aplicativo específico (ej. UpToDate, Scopus, Moodle, Canvas, etc.) y dicha plataforma NO APARECE en el [CONTEXTO INSTITUCIONAL DOCUMENTADO], ESTÁ TERMINANTEMENTE PROHIBIDO inventar pasos o reutilizar instructivos de otros sistemas (como Portal Estudiantes o SIAAF). Responde indicando con honestidad que no dispongas de un instructivo institucional para dicha plataforma y proporciona los canales de Soporte TI.
+   - PROHIBICIÓN ESTRICTA DE CORREOS Y CONTACTOS HALLUCINADOS (CONTACT GROUNDING):
+     * Los ÚNICOS correos institucionales de radicación y soporte autorizados son:
+       - Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | Tel: `(605) 3444333 Ext. 8003/8004` | WhatsApp: `3172683922`
+       - Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
+     * Queda TERMINANTEMENTE PROHIBIDO inventar correos terminados en `@unisimon.edu.co` para otras dependencias (ej. NUNCA inventes talentohumano@..., rh.cucuta@..., admisiones@...). Si un trámite involucra áreas externas como Talento Humano, la gestión técnica en sistemas siempre la realiza Soporte Técnico TI.
 
 6. FINALIZA SIEMPRE PREGUNTANDO:
    "¿Pudiste resolver tu problema con estos pasos?
@@ -774,6 +804,43 @@ def sanitize_markdown_links(text: str) -> str:
     return re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)', replace_link, text)
 
 
+def sanitize_hallucinated_emails_and_contacts(text: str) -> str:
+    """
+    Reemplaza correos y extensiones institucionales inventados por el LLM
+    (ej. talentohumano@unisimon.edu.co, rh.cucuta@unisimon.edu.co, ext 8001/8002)
+    por los canales oficiales verificados de Soporte Técnico TI.
+    """
+    if not text:
+        return ""
+
+    ALLOWED_EMAILS = {
+        "solicitudcomputo@unisimon.edu.co",
+        "helpdesk@unisimon.edu.co",
+        "soporte@unisimon.edu.co",
+        "soportetecnico@unisimon.edu.co",
+        "contacto@unisimon.edu.co",
+        "seguridadinformatica@unisimon.edu.co",
+    }
+
+    def replace_email(match):
+        email = match.group(0)
+        if email.lower() in ALLOWED_EMAILS:
+            return email
+        # Si menciona cucuta o rh, mapear a helpdesk
+        if any(k in email.lower() for k in ["cucuta", "cúcuta", "rh"]):
+            return "helpdesk@unisimon.edu.co"
+        # En cualquier otro caso (ej. talentohumano@...), redirigir al canal de radicación TI oficial
+        return "solicitudcomputo@unisimon.edu.co"
+
+    text = re.sub(r"\b[a-zA-Z0-9._%+-]+@unisimon\.edu\.co\b", replace_email, text, flags=re.IGNORECASE)
+
+    # Normalizar extensiones inventadas para PBX Barranquilla (8001/8002 -> 8003 / 8004)
+    text = re.sub(r"(?i)\bExt\.?\s*8001\s*/\s*8002\b", "Ext. 8003 / 8004", text)
+    text = re.sub(r"(?i)\bExt\.?\s*800[12]\b", "Ext. 8003", text)
+
+    return text
+
+
 def clean_llm_response(text: str) -> str:
     """
     Sanitiza y normaliza la respuesta del LLM:
@@ -783,6 +850,7 @@ def clean_llm_response(text: str) -> str:
     4. Corrige enlaces Markdown redundantes donde el texto visible y la URL son idénticos: [http...](http...) -> http...
     5. Elimina frases de fuga y meta-lenguaje ("según el documento proporcionado...").
     6. Elimina fugas de directivas internas del prompt.
+    7. Elimina correos y extensiones institucionales inventados por el LLM.
     """
     if not text:
         return ""
@@ -875,6 +943,10 @@ def clean_llm_response(text: str) -> str:
         "",
         text
     )
+
+    # 9. Sanitizar correos y contactos institucionales inventados
+    text = sanitize_hallucinated_emails_and_contacts(text)
+
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
@@ -925,23 +997,56 @@ GENERIC_SYSTEM_TERMS = {
 }
 
 
+def is_software_installation_or_it_service_request(query: str) -> bool:
+    """
+    Detecta si la consulta es una petición formal de servicio, instalación de software,
+    configuración técnica o soporte a equipos/laboratorios (P-GT-01 / Soporte TI),
+    en lugar de una consulta de instructivo paso a paso de autoservicio de una plataforma web.
+    """
+    if not query:
+        return False
+    q_lower = query.lower()
+
+    has_action = any(k in q_lower for k in [
+        "instalaci", "instalar", "configura", "soporte", "apoyo con", "ayuda con la instalaci",
+        "ayuda con la configura", "solicito su apoyo", "solicito apoyo", "solicito colaboraci",
+        "solicito amablemente su apoyo", "solicito amablemente", "requiero la instalaci",
+        "requiero instalar", "necesito instalar", "necesito que instalen",
+        "favor instalar", "favor configurar", "alistamiento"
+    ])
+    has_target = any(k in q_lower for k in [
+        "equipo", "portatil", "portátil", "computador", "pc", "laboratorio", "oficina",
+        "sala", "puesto de trabajo", "red interna", "conexión remota", "conexion remota",
+        "vpn", "máquina", "maquina"
+    ])
+
+    return has_action and (has_target or "en el" in q_lower or "en un" in q_lower or "en mi" in q_lower)
+
+
 def extract_queried_platform_or_system(query: str) -> Optional[str]:
     """
     Identifica si la consulta del usuario se refiere explícitamente a una plataforma,
-    sistema, software o base de datos específica.
+    sistema o base de datos externa de autoservicio no documentada (ej. UpToDate, Scopus).
+    Si el usuario solicita instalación de software o soporte a un equipo/laboratorio institucional,
+    retorna None para permitir el flujo regular de soporte técnico de TI.
     """
     if not query:
         return None
+
+    # Si es una solicitud de instalación de software o soporte técnico en equipo/laboratorio, NO tratarlo como plataforma no documentada
+    if is_software_installation_or_it_service_request(query):
+        return None
+
     q_lower = query.lower()
 
-    # 1. Chequeo de plataformas externas o académicas conocidas
+    # 1. Chequeo de plataformas externas o académicas conocidas que requieren autoservicio
     for kp in KNOWN_EXTERNAL_PLATFORMS:
         if re.search(rf"\b{re.escape(kp)}\b", q_lower):
             return "UpToDate" if kp in ["uptodate", "up to date"] else kp
 
-    # 2. Patrones sintácticos: "plataforma X", "aplicativo X", "sistema X", "software X"
+    # 2. Patrón sintáctico estricto para plataformas de autoservicio (ej. 'plataforma X')
     match = re.search(
-        r"\b(?:plataforma|aplicativo|aplicacion|aplicación|app|sistema|software|herramienta|base de datos)\s+(?:de\s+|del\s+)?([a-záéíóúñ0-9_.\-]+)",
+        r"\b(?:plataforma|portal)\s+(?:de\s+|del\s+)?([a-záéíóúñ0-9_.\-]+)",
         q_lower
     )
     if match:
@@ -1228,6 +1333,33 @@ class RAGService:
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
         if not context_parts:
+            # Si es una petición de instalación de software o soporte técnico a equipos/laboratorios
+            if is_software_installation_or_it_service_request(question):
+                logger.info("Activando respuesta institucional de soporte técnico para instalación/configuración de software.")
+                msg = (
+                    "Para la **instalación y configuración de aplicativos, software o conexiones remotas (VPN)** en equipos institucionales "
+                    "o laboratorios (como portátiles o puestos de trabajo), el procedimiento se gestiona formalmente a través de **Soporte Técnico TI**.\n\n"
+                    "**Datos requeridos para atender tu solicitud:**\n"
+                    "1. Nombre completo, documento de identidad y cargo o dependencia del solicitante.\n"
+                    "2. Identificación del equipo (tipo de equipo, portátil o placa de inventario) y ubicación exacta (ej. Laboratorio MC202 u oficina).\n"
+                    "3. Nombre del aplicativo o software requerido y justificación del uso (ej. GlobalProtect para conexión remota a la red interna y plataformas institucionales).\n\n"
+                    "**Canales oficiales de radicación:**\n"
+                    "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
+                    "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n"
+                    "¿Deseas que radique este caso de soporte técnico por ti ahora mismo?"
+                )
+                return {
+                    "response": msg,
+                    "sources": ["P-GT-01 Soporte Técnico y Mantenimiento TI"],
+                    "source": "unimon_software_install_service",
+                    "model": None,
+                    "retrieved_chunks": 0,
+                    "has_context": False,
+                    "quick_replies": [
+                        {"label": "🎫 Generar reporte", "payload": "CREATE_TICKET"}
+                    ]
+                }
+
             # Si se consultó una plataforma específica no documentada en el catálogo institucional
             if target_platform:
                 logger.info(f"[PlatformGrounding] Retornando mensaje oficial para plataforma no documentada '{target_platform}'.")

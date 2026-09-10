@@ -509,6 +509,24 @@ class TestIntegralRestrictionsAndPrerequisites:
         assert "solicitudcomputo@unisimon.edu.co" in cleaned
         assert "helpdesk@unisimon.edu.co" in cleaned
 
+    def test_clean_llm_response_sanitizes_hallucinated_emails_and_contacts(self):
+        """Valida que clean_llm_response intercepte correos inventados como talentohumano@... y extensiones falsas."""
+        from app.services.rag_service import clean_llm_response
+
+        text_with_fakes = (
+            "Canales oficiales de contacto:\n"
+            "- Sede Barranquilla: talentohumano@unisimon.edu.co | Teléfono: (605) 3444333 Ext. 8001/8002\n"
+            "- Sede Cúcuta: rh.cucuta@unisimon.edu.co | Teléfono: (607) 5827070 Ext. 129\n"
+        )
+        cleaned = clean_llm_response(text_with_fakes)
+
+        assert "talentohumano@unisimon.edu.co" not in cleaned
+        assert "rh.cucuta@unisimon.edu.co" not in cleaned
+        assert "solicitudcomputo@unisimon.edu.co" in cleaned
+        assert "helpdesk@unisimon.edu.co" in cleaned
+        assert "Ext. 8001/8002" not in cleaned
+        assert "Ext. 8003 / 8004" in cleaned
+
     @pytest.mark.asyncio
     async def test_direct_directory_query_adaptive_routing(self):
         """Valida que consultas directas de contacto respondan con canales sin inventar requisitos ni pasos falsos."""
