@@ -18,12 +18,16 @@ class Settings(BaseSettings):
     environment: str = "development"
     port: int = 8000
     host: str = "0.0.0.0"
-    debug: bool = True
+    debug: bool = False
 
-    # Configuración de GLPI REST API
+    # Credenciales de Administración (/admin y APIs protegidas)
+    admin_username: str = "admin"
+    admin_password: str = "UniMonAdmin2026*"
+
+    # Configuración de GLPI REST API (deben definirse en .env)
     glpi_base_url: str = "https://pruebas.us5.glpi-network.cloud/api.php/v1"
-    glpi_app_token: str = "4l3q2EMwU12pdL0RCUtxcI8botN7tODo58XxD3MJ"
-    glpi_user_token: str = "1YfLnz0S6OIjs4yFV2rIPk9PMXIndhW7YpBagyCI"
+    glpi_app_token: str = ""
+    glpi_user_token: str = ""
     glpi_timeout: float = 15.0
 
     # Configuración de Ollama (RAG / LLM)
@@ -41,6 +45,9 @@ class Settings(BaseSettings):
     chroma_db_dir: str = "./chroma_db"
     docs_dir: str = "./data/docs"
     embedding_model: str = "intfloat/multilingual-e5-base"
+
+    # Límites de Seguridad
+    max_upload_size_mb: int = 15
 
     model_config = SettingsConfigDict(
         env_file=".env",

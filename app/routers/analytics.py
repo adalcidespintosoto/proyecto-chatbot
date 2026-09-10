@@ -5,9 +5,10 @@ Provee endpoints REST para consultar la observabilidad del sistema en tiempo rea
 
 import logging
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, status, Response, Query
+from fastapi import APIRouter, status, Response, Query, Depends
 from pydantic import BaseModel, Field
 
+from app.security import require_admin_auth
 from app.services.telemetry_service import get_kpis_summary, reset_telemetry_db
 from app.services.golden_cache_service import clear_golden_cache
 from app.services.clustering_service import get_query_clusters as fetch_clusters, export_dpo_dataset, export_dpo_dataset_jsonl
@@ -57,6 +58,7 @@ async def get_query_clusters(
 @router.get(
     "/export-dpo-dataset",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_admin_auth)],
     summary="Exportar Dataset DPO (Direct Preference Optimization)",
     description="Exporta pares de preferencia (prompt, chosen, rejected) en formato JSONL para alineación y fine-tuning de modelos."
 )
@@ -87,6 +89,7 @@ async def export_dpo(
 @router.post(
     "/reset-metrics",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_admin_auth)],
     summary="Limpiar y Reiniciar Métricas de Telemetría",
     description="Elimina el historial de consultas, sesiones y tickets de analytics.db. Opcionalmente purga Golden Cache."
 )

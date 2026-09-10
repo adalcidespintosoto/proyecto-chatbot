@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, BackgroundTasks, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, BackgroundTasks, Query, Depends
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,7 @@ import json
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.config import get_settings
+from app.security import require_admin_auth
 from app.services.rag_service import rag_service
 from app.services.telemetry_service import get_kpis_summary
 from scripts.ingest_multimodal_docs import (
@@ -34,7 +35,8 @@ from scripts.apply_document_taxonomy import run_taxonomy_update as apply_taxonom
 logger = logging.getLogger("unimon.admin_router")
 
 router = APIRouter(
-    tags=["Panel de Administración UniMon"]
+    tags=["Panel de Administración UniMon"],
+    dependencies=[Depends(require_admin_auth)]
 )
 
 settings = get_settings()
@@ -331,6 +333,15 @@ async def audit_document(
         with open(staged_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        # Validar tamaño máximo permitido
+        max_bytes = settings.max_upload_size_mb * 1024 * 1024
+        if staged_file_path.stat().st_size > max_bytes:
+            staged_file_path.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=f"El archivo excede el tamaño máximo permitido de {settings.max_upload_size_mb} MB."
+            )
+
         # Extraer fragmentos para pre-auditoría
         chunks = extract_chunks_from_staged_file(staged_file_path)
         total_chunks = len(chunks)
@@ -459,6 +470,8 @@ async def audit_document(
             "detailed_chunks": detailed_chunks
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error auditando documento '{filename}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error durante la auditoría del documento: {str(e)}")

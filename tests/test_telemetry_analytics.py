@@ -161,13 +161,18 @@ def test_reset_telemetry_db_clears_all_records():
 async def test_reset_metrics_api_endpoint():
     """Verifica el endpoint POST /api/analytics/reset-metrics con y sin Golden Cache."""
     from app.services.telemetry_service import reset_telemetry_db
+    from app.config import get_settings
 
     log_interaction(session_id="api_s1", role="administrativo", query="q_api", intent="DIAGNOSTICO", source="test", latency_ms=150.0)
 
+    settings = get_settings()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         with patch("app.routers.analytics.clear_golden_cache", return_value=True) as mock_clear_gc:
-            response = await client.post("/api/analytics/reset-metrics?include_golden_cache=true")
+            response = await client.post(
+                "/api/analytics/reset-metrics?include_golden_cache=true",
+                auth=(settings.admin_username, settings.admin_password)
+            )
             assert response.status_code == 200
             data = response.json()
             assert data["status"] == "success"
