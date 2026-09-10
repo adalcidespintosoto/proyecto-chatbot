@@ -1329,6 +1329,9 @@
         <div class="panel-header">
           <h3 class="panel-title">❓ Top 5 Preguntas Más Frecuentes de Usuarios</h3>
           <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary" style="border-color: #EF4444; color: #EF4444;" onclick="handleResetMetrics()">
+              🧹 Limpiar Métricas
+            </button>
             <a href="/api/analytics/export-dpo-dataset?format=jsonl" class="btn btn-secondary" download>
               📥 Exportar DPO Dataset
             </a>
@@ -2482,6 +2485,28 @@
     function confirmWipeAndReindex() {
       if (confirm('ADVERTENCIA: Esto borrará todos los vectores en ChromaDB y reconstruirá la base desde cero. ¿Deseas continuar?')) {
         triggerReindex(false, true);
+      }
+    }
+
+    async function handleResetMetrics() {
+      const includeCache = confirm("¿Deseas incluir también la purga de Golden Cache (respuestas resueltas cacheadas)?\n\n• 'Aceptar' para reiniciar métricas Y vaciar el Golden Cache.\n• 'Cancelar' para reiniciar ÚNICAMENTE las métricas y consultas.");
+
+      const confirmFinal = confirm("ADVERTENCIA: Esta acción eliminará todas las interacciones, sesiones y KPIs registrados hasta ahora para comenzar una medición limpia desde cero.\n\n¿Estás seguro de continuar?");
+      if (!confirmFinal) return;
+
+      try {
+        const res = await fetch(`/api/analytics/reset-metrics?include_golden_cache=${includeCache}`, {
+          method: 'POST'
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          showToast(`Métricas reseteadas: ${data.interactions_cleared || 0} consultas eliminadas`, 'success');
+          loadKPIs();
+        } else {
+          showToast(`Error al resetear métricas: ${data.message || 'Error desconocido'}`, 'error');
+        }
+      } catch (err) {
+        showToast(`Error de conexión: ${err.message}`, 'error');
       }
     }
 

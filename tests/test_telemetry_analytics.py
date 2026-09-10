@@ -133,3 +133,45 @@ async def test_chat_pipeline_records_telemetry_automatically():
     assert kpis["total_sesiones"] >= 1
     assert kpis["total_consultas"] >= 1
     assert kpis["latencia_promedio_ms"] > 0
+
+
+def test_reset_telemetry_db_clears_all_records():
+    """Verifica que reset_telemetry_db limpie completamente las tablas y deje los KPIs en cero."""
+    from app.services.telemetry_service import reset_telemetry_db
+
+    log_interaction(session_id="s1", role="estudiante", query="q1", intent="DIAGNOSTICO", source="test", latency_ms=100.0)
+    log_interaction(session_id="s2", role="profesor", query="q2", intent="DIAGNOSTICO", source="test", latency_ms=200.0)
+
+    kpis_before = get_kpis_summary()
+    assert kpis_before["total_consultas"] == 2
+    assert kpis_before["total_sesiones"] == 2
+
+    res = reset_telemetry_db()
+    assert res["status"] == "success"
+    assert res["interactions_cleared"] == 2
+    assert res["sessions_cleared"] == 2
+
+    kpis_after = get_kpis_summary()
+    assert kpis_after["total_consultas"] == 0
+    assert kpis_after["total_sesiones"] == 0
+    assert kpis_after["total_tokens_gastados"] == 0
+
+
+@pytest.mark.asyncio
+async def test_reset_metrics_api_endpoint():
+    """Verifica el endpoint POST /api/analytics/reset-metrics con y sin Golden Cache."""
+    from app.services.telemetry_service import reset_telemetry_db
+
+    log_interaction(session_id="api_s1", role="administrativo", query="q_api", intent="DIAGNOSTICO", source="test", latency_ms=150.0)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        with patch("app.routers.analytics.clear_golden_cache", return_value=True) as mock_clear_gc:
+            response = await client.post("/api/analytics/reset-metrics?include_golden_cache=true")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "success"
+            assert data["interactions_cleared"] >= 1
+            assert data["golden_cache_purged"] is True
+            mock_clear_gc.assert_called_once()
+
