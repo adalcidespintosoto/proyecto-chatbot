@@ -202,7 +202,8 @@ async def test_placeholder_sanitization_in_rag_service():
             "content": "Para solucionar el problema ingresa a [URL del GLPI] y asigna tu caso en GLPI o usa [Link]."
         }
     }
-    with patch("httpx.AsyncClient.post") as mock_post:
+    with patch("httpx.AsyncClient.post") as mock_post, \
+         patch("app.services.rag_service.async_generate_multi_query_variants", new=AsyncMock(return_value=["falla de monitor"])):
         mock_response = AsyncMock()
         mock_response.status_code = 200
         mock_response.json = MagicMock(return_value=fake_ollama_resp)
