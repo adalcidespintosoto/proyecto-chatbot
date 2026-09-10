@@ -5,9 +5,10 @@ Define los esquemas de validación Pydantic y procesa las peticiones de los usua
 
 import logging
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends, Request, UploadFile, File
 from pydantic import BaseModel, Field
 
+from app.security import require_admin_auth
 from app.services.router_logic import router_logic, RouterLogic, EstadoTicket, IntentType
 from app.services.glpi_service import glpi_client, GLPIService, GLPIException, is_valid_email
 from app.services.rag_service import rag_service, RAGService
@@ -89,8 +90,29 @@ INJECTION_PATTERNS = [
 ]
 
 
+def get_client_ip(request: Optional[Request]) -> str:
+    """Extrae la dirección IP real del cliente soportando Cloudflare Tunnel, Nginx y Load Balancers."""
+    if not request:
+        return "127.0.0.1"
+    # Encabezado Cloudflare Tunnel / CDN
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+    # Encabezado estándar de proxy
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    # Encabezado X-Real-IP
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
+
 def check_rate_limit(key: str):
-    """Verifica si la IP o session_id ha superado el límite de 25 peticiones por minuto."""
+    """Verifica si la IP ha superado el límite de peticiones por minuto."""
     now = time.time()
     timestamps = RATE_LIMIT_BUCKET.get(key, [])
     # Limpiar marcas de tiempo fuera de la ventana de 60s
@@ -126,7 +148,7 @@ def sanitize_input_text(text: str) -> str:
 async def process_chat(request: ChatRequest, raw_request: Request = None) -> ChatResponse:
     """
     Endpoint principal para interacción con el Asistente Virtual UniMon.
-    Aplica limitación de tasa (25 req/min), sanitización de entrada y registro de telemetría.
+    Aplica limitación de tasa (25 req/min por IP), sanitización de entrada y registro de telemetría.
     """
     raw_texto = request.get_texto()
     if not raw_texto:
@@ -137,10 +159,9 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
 
     session_id = request.session_id or "default_session"
 
-    # Aplicar Rate Limiting por session_id / IP cliente
-    client_ip = raw_request.client.host if raw_request and raw_request.client else session_id
-    rate_key = f"{session_id}_{client_ip}"
-    check_rate_limit(rate_key)
+    # Aplicar Rate Limiting estricto por IP real del cliente
+    client_ip = get_client_ip(raw_request)
+    check_rate_limit(client_ip)
 
     # Sanitizar y validar longitud del mensaje (máx 600 chars)
     texto = sanitize_input_text(raw_texto)
@@ -230,6 +251,7 @@ from scripts.ingest_multimodal_docs import ingest_multimodal
 @router.post(
     "/admin/upload",
     tags=["Administración RAG"],
+    dependencies=[Depends(require_admin_auth)],
     summary="Subir documento PDF o PPTX e indexar automáticamente",
     description="Recibe un archivo PDF o PPTX, lo almacena en ./data/docs/ y ejecuta la reindexación multimodal automática inmediata en ChromaDB (con interpretación visual de imágenes si el Vision-LLM está disponible)."
 )
@@ -251,14 +273,23 @@ async def upload_document(
     docs_dir = Path(settings.docs_dir)
     docs_dir.mkdir(parents=True, exist_ok=True)
 
-    target_path = docs_dir / file.filename
+    target_path = docs_dir / Path(file.filename).name
 
-    # Guardar archivo en disco
+    # Guardar archivo en disco validando tamaño máximo
     try:
         content = await file.read()
+        max_bytes = settings.max_upload_size_mb * 1024 * 1024
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=f"El archivo excede el tamaño máximo permitido de {settings.max_upload_size_mb} MB."
+            )
+
         with open(target_path, "wb") as f:
             f.write(content)
         logger.info(f"Nuevo documento guardado en: {target_path} ({len(content) / 1024:.1f} KB)")
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(f"Error al escribir archivo en disco: {exc}")
         raise HTTPException(
@@ -286,6 +317,7 @@ async def upload_document(
 @router.post(
     "/admin/reindex",
     tags=["Administración RAG"],
+    dependencies=[Depends(require_admin_auth)],
     summary="Forzar reindexación multimodal completa de documentos",
     description="Ejecuta la limpieza y reindexación multimodal de todos los PDFs y PPTX en ./data/docs/ con interpretación visual de imágenes y recarga ChromaDB en memoria."
 )
