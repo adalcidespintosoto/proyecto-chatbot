@@ -38,6 +38,8 @@ INVALID_RESPONSE_PATTERNS = [
     r"ocurri[oó] un inconveniente",
     r"no se pudo conectar",
     r"kactus\.unisimon\.edu\.co",
+    r"estudiantes\.unisimon\.edu\.co",
+    r"actividades ilegales o dañinas",
     r"\[(?:url|link|enlace)\]",
 ]
 
@@ -135,6 +137,17 @@ def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
         if re.search(pat, resp_lower):
             logger.info(f"[GoldenCache] Descartado por patrón de baja confianza/fallback: '{pat}'")
             return False
+
+    # Descartar consultas sobre elecciones que no contengan la URL canónica
+    if any(k in user_query.lower() for k in ["eleccion", "elecciones", "votar", "votacion", "candidato"]):
+        if "https://elecciones.unisimon.edu.co" not in bot_response:
+            logger.info("[GoldenCache] Descartado: consulta electoral sin URL canónica https://elecciones.unisimon.edu.co")
+            return False
+
+    # Descartar reclamos de notas (trámites fuera de alcance TI)
+    if any(k in user_query.lower() for k in ["cambiar nota", "corregir nota", "subir nota", "reclamo calificacion", "clavaron"]):
+        logger.info("[GoldenCache] Descartado: trámite académico fuera de alcance TI.")
+        return False
 
     return True
 
@@ -250,6 +263,19 @@ def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[
             if similarity >= threshold:
                 matched_query = results["metadatas"][0][0].get("user_query", "")
                 matched_response = results["documents"][0][0]
+                matched_lower = matched_response.lower()
+
+                # Descartar si la respuesta contiene patrones inválidos
+                if any(re.search(pat, matched_lower) for pat in INVALID_RESPONSE_PATTERNS):
+                    logger.warning("[GoldenCache] Coincidencia descartada por contener patrón no permitido.")
+                    return None
+
+                # Descartar si la consulta es electoral y la respuesta carece de la URL canónica
+                if any(k in user_query.lower() for k in ["eleccion", "elecciones", "votar", "votacion", "candidato"]):
+                    if "https://elecciones.unisimon.edu.co" not in matched_response:
+                        logger.warning("[GoldenCache] Coincidencia electoral descartada por carecer de https://elecciones.unisimon.edu.co")
+                        return None
+
                 logger.info(
                     f"[GoldenCache] Coincidencia encontrada (similitud={similarity:.4f}): "
                     f"'{matched_query[:50]}...'"

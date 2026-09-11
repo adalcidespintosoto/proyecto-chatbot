@@ -753,6 +753,35 @@ class TestIntegralRestrictionsAndPrerequisites:
         # No debe limitarse a pedir un correo de soporte como única respuesta
         assert "paso" in text.lower() or "1." in text or "ingresar" in text.lower()
 
+    @pytest.mark.asyncio
+    async def test_ambiguous_student_password_query_disambiguates_seniority_and_avoids_email_paradox(self):
+        """Valida que ante una consulta ambigua de clave sin semestre, se desambigüe primer ingreso vs regular,
+        se use la etiqueta exacta 'Olvidé mi Usuario / Contraseña' y se envíe el enlace al correo personal."""
+        from app.services.rag_service import rag_service
+
+        query = "Colega, ando embalao: la página no me deja entrar y me dice que la clave está mala. ¿Qué hago ahí?"
+        res = await rag_service.query_rag(query, user_role="estudiante")
+        text = res.get("response", "")
+        sources = res.get("sources", [])
+
+        text_lower = text.lower()
+        # 1. Debe desambiguar primer semestre / nuevo ingreso vs regular
+        assert "primer semestre" in text_lower or "nuevo ingreso" in text_lower
+        assert "unisimon" in text_lower
+        assert "regular" in text_lower or "segundo semestre" in text_lower
+
+        # 2. Debe usar la etiqueta exacta del enlace de autoservicio
+        assert "olvidé mi usuario / contraseña" in text_lower or "olvide mi usuario / contraseña" in text_lower
+
+        # 3. No debe caer en la paradoja de exigir correo institucional para recuperar la clave perdida
+        assert "correo personal" in text_lower
+        assert "revisa tu correo institucional para encontrar" not in text_lower
+
+        # 4. Ambas fuentes documentales clave deben ser recuperadas
+        assert any("primer semestre" in s.lower() or "activar usuario" in s.lower() for s in sources)
+        assert any("restablecimiento" in s.lower() for s in sources)
+
+
 
 
 
