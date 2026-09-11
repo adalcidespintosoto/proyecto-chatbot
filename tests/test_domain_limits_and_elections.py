@@ -172,3 +172,82 @@ def test_rag_fallback_responses():
     resp_nota = service._generate_fallback_response("el profesor me clavó la nota y la quiero cambiar")
     assert "Aviso de Alcance Institucional" in resp_nota["response"]
     assert "docente de la asignatura" in resp_nota["response"]
+
+
+# =============================================================================
+# 6. PRUEBAS DE PERIFÉRICOS, HARDWARE Y ERRADICACIÓN DE RESPUESTAS HUÉRFANAS
+# =============================================================================
+
+def test_clean_llm_response_purges_orphan_courtesy_questions():
+    """Verifica que clean_llm_response descarte frases huérfanas de cortesía sin contenido sustantivo."""
+    orphan_1 = "¿Hay algo más con lo que pueda ayudarte?"
+    assert clean_llm_response(orphan_1) == ""
+
+    orphan_2 = "¡Hola! ¿En qué más puedo ayudarte?"
+    assert clean_llm_response(orphan_2) == ""
+
+    orphan_3 = "Lo siento, no tengo información sobre teclados en este momento. ¿Hay algo más con lo que pueda ayudarte?"
+    assert clean_llm_response(orphan_3) == ""
+
+    valid_resp = "Para solicitar un teclado, contacta a Soporte Técnico TI en solicitudcomputo@unisimon.edu.co."
+    assert "solicitudcomputo@unisimon.edu.co" in clean_llm_response(valid_resp)
+
+
+def test_is_peripheral_or_hardware_request_detection():
+    """Verifica la correcta discriminación de solicitudes de periféricos y recursos de hardware."""
+    from app.services.rag_service import is_peripheral_or_hardware_request
+
+    assert is_peripheral_or_hardware_request("préstamo de teclado") is True
+    assert is_peripheral_or_hardware_request("necesito un teclado y mouse") is True
+    assert is_peripheral_or_hardware_request("préstamo de cable hdmi") is True
+    assert is_peripheral_or_hardware_request("prestamo de videobeam para clase") is True
+    assert is_peripheral_or_hardware_request("solicitar ratón usb") is True
+
+    # No debe confundirse con trámites académicos ni financieros
+    assert is_peripheral_or_hardware_request("préstamo o crédito interno en siaaf") is False
+    assert is_peripheral_or_hardware_request("cómo hago para cambiar la nota") is False
+    assert is_peripheral_or_hardware_request("cómo votar en las elecciones") is False
+
+
+def test_rag_fallback_peripherals():
+    """Verifica que el fallback institucional atienda solicitudes de periféricos con Soporte TI oficial."""
+    service = RAGService()
+    resp = service._generate_fallback_response("préstamo de teclado")
+
+    assert "solicitudcomputo@unisimon.edu.co" in resp["response"]
+    assert "helpdesk@unisimon.edu.co" in resp["response"]
+    assert "3172683922" in resp["response"]
+    assert "Soporte Técnico TI" in resp["response"]
+    assert "Periférico o accesorio requerido" in resp["response"]
+
+
+def test_rerank_chunks_filters_spurious_financial_docs():
+    """Verifica que el reranker penalice fuertemente documentos financieros/créditos en consultas de periféricos."""
+    from langchain_core.documents import Document
+    from app.services.rag_service import rerank_chunks
+
+    doc_financiero = Document(
+        page_content="Procedimiento para la solicitud y aprobación de créditos internos y préstamos en SIAAF.",
+        metadata={"source": "MANUAL DE GESTIÓN Y APROBACIÓN DE SOLICITUDES DE CRÉDITO INTERNO EN SIAAF.pdf"}
+    )
+    doc_cartera = Document(
+        page_content="Condonación de saldos de cartera castigada y acuerdos de pago en SIAAF.",
+        metadata={"source": "INSTRUCTIVO PARA CONDONACIÓN DE SALDO DE CARTERA CASTIGADA EN SIAAF.pdf"}
+    )
+    doc_mantenimiento = Document(
+        page_content="Procedimiento marco para el soporte técnico, mantenimiento correctivo y equipos de cómputo.",
+        metadata={"source": "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf"}
+    )
+
+    retrieved = [
+        (doc_financiero, 0.70),
+        (doc_cartera, 0.65),
+        (doc_mantenimiento, 0.60)
+    ]
+
+    reranked = rerank_chunks("préstamo de teclado", retrieved, top_k=3, original_query="préstamo de teclado")
+
+    # Ningún documento de crédito ni cartera debe figurar en los resultados
+    reranked_sources = [d.metadata["source"] for d, _ in reranked]
+    assert "MANUAL DE GESTIÓN Y APROBACIÓN DE SOLICITUDES DE CRÉDITO INTERNO EN SIAAF.pdf" not in reranked_sources
+    assert "INSTRUCTIVO PARA CONDONACIÓN DE SALDO DE CARTERA CASTIGADA EN SIAAF.pdf" not in reranked_sources

@@ -180,22 +180,22 @@ LOAN_REQUEST_VERBS = [
 
 # Nombres de recursos y equipos físicos institucionales
 EQUIPMENT_NOUNS = [
-    r"\b(equipo[s]?(\s+de\s+c[oó]mputo)?|recurso[s]?\s+f[ií]sico[s]?|pc|pcs|compu|computador|computadores|computadora|computadoras|port[aá]til|port[aá]tiles|laptop|laptops|ordenador|torre|pantalla|pantallas|monitor|monitores|display|micr[oó]fono|micr[oó]fonos|diadema|diademas|aud[ií]fonos|auriculares|parlante|parlantes|altavoz|altavoces|tablet|tablets|tableta|tabletas|ipad|ipads|video\s*beam|videobeam|proyector|proyectores|beamer|canon|cañ[oó]n|sala|sala\s+de\s+c[oó]mputo|auditorio|laboratorio|cargador|fuente|cable\s+de\s+poder)\b"
+    r"\b(equipo[s]?(\s+de\s+c[oó]mputo)?|recurso[s]?\s+f[ií]sico[s]?|pc|pcs|compu|computador|computadores|computadora|computadoras|port[aá]til|port[aá]tiles|laptop|laptops|ordenador|torre|pantalla|pantallas|monitor|monitores|display|teclado|teclados|mouse|mause|rat[oó]n|ratones|pad|perif[eé]rico|perif[eé]ricos|cable|cables|hdmi|vga|adaptador|adaptadores|convertidor|puntero|presentador|micr[oó]fono|micr[oó]fonos|diadema|diademas|aud[ií]fonos|auriculares|parlante|parlantes|altavoz|altavoces|tablet|tablets|tableta|tabletas|ipad|ipads|video\s*beam|videobeam|proyector|proyectores|beamer|canon|cañ[oó]n|sala|sala\s+de\s+c[oó]mputo|auditorio|laboratorio|cargador|fuente|cable\s+de\s+poder)\b"
 ]
 
 # Mensaje estructurado directo para solicitudes de préstamo / asignación de equipos
 MENSAJE_SOLICITUD_EQUIPOS = (
-    "Para solicitar préstamos o asignación de equipos de cómputo y recursos físicos (micrófonos, tablets, portátiles, proyectores), debes tramitar la solicitud con la Dirección de TI a través de los canales oficiales:\n\n"
+    "Para solicitar préstamos, reposición o asignación de equipos de cómputo y periféricos (teclados, mouse, cables HDMI/VGA, micrófonos, tablets, portátiles, proyectores), debes tramitar la solicitud con la Dirección de TI a través de los canales oficiales:\n\n"
     "📧 **Canales de Atención:**\n"
-    "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
+    "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
     "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n"
-    "📋 **Plantilla sugerida para tu correo:**\n"
-    "• **Asunto:** Solicitud de Préstamo de [Equipo] - [Tu Nombre]\n"
+    "📋 **Plantilla sugerida para tu solicitud:**\n"
+    "• **Asunto:** Solicitud de Préstamo / Reemplazo de [Equipo o Periférico] - [Tu Nombre]\n"
     "• **Cuerpo del mensaje:**\n"
-    "  - **Equipo solicitado y cantidad:** [Ej: 1 Micrófono inalámbrico]\n"
-    "  - **Motivo / Evento académico:** [Descripción breve]\n"
-    "  - **Fecha y Horario requerido:** [Fecha y rango de horas]\n"
-    "  - **Ubicación / Aula:** [Sede, Bloque, Salón]\n\n"
+    "  - **Equipo o periférico requerido:** [Ej: 1 Teclado USB / 1 Cable HDMI]\n"
+    "  - **Motivo / Uso:** [Descripción breve o clase/evento]\n"
+    "  - **Fecha y Horario:** [Fecha y rango de horas]\n"
+    "  - **Ubicación / Aula:** [Sede, Bloque, Salón u Oficina]\n\n"
     "¿Deseas que radique este requerimiento de servicio directamente por ti ahora mismo?"
 )
 
