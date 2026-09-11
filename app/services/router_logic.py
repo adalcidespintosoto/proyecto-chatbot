@@ -18,6 +18,8 @@ from app.services.rag_service import (
     rag_service,
     is_out_of_domain_response,
     is_out_of_domain_query,
+    is_prompt_injection_query,
+    MENSAJE_PROMPT_INJECTION,
     MENSAJE_NO_DOCUMENTADO,
     MENSAJE_FUERA_DE_DOMINIO
 )
@@ -918,6 +920,28 @@ class RouterLogic:
         logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Rol: {session.user_role} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje ({len(texto)} chars): '{texto}'")
 
         # -------------------------------------------------------------
+        # GUARDRAIL GLOBAL DE CIBERSEGURIDAD: Prompt Injection, Jailbreak y Desvío de Directrices
+        # Intercepta y neutraliza de forma inmediata e incondicional cualquier intento
+        # de manipulación del prompt, jailbreak (DAN/root), anulación de instrucciones o repetición forzada
+        # en CUALQUIER estado del flujo y sin importar si el usuario tiene rol o no.
+        # -------------------------------------------------------------
+        if is_prompt_injection_query(texto):
+            logger.warning(f"[SECURITY GUARDRAIL] Intento de Prompt Injection / Jailbreak interceptado en sesión '{session_id}': '{texto}'")
+            session.pending_query = None
+            cls.add_history(session_id, "user", texto)
+            cls.add_history(session_id, "assistant", MENSAJE_PROMPT_INJECTION)
+            return {
+                "tipo": "FUERA_DE_DOMINIO",
+                "state": session.estado.value if hasattr(session.estado, 'value') else str(session.estado),
+                "mensaje": MENSAJE_PROMPT_INJECTION,
+                "response": MENSAJE_PROMPT_INJECTION,
+                "reply": MENSAJE_PROMPT_INJECTION,
+                "ticket_id": None,
+                "source": "UniMon_Guardrail",
+                "quick_replies": []
+            }
+
+        # -------------------------------------------------------------
         # INTERCEPTOR OUT-OF-SCOPE: Trámites Académicos fuera de la competencia de TI (Reclamo de notas)
         # -------------------------------------------------------------
         aviso_academico = validar_tramite_academico(texto, user_role=session.user_role)
@@ -1351,8 +1375,8 @@ class RouterLogic:
             session.user_role = detected
             logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
 
-            # Si la consulta previa retenida era fuera de dominio, purgarla inmediatamente para evitar contaminación
-            if session.pending_query and is_out_of_domain_query(session.pending_query):
+            # Si la consulta previa retenida era fuera de dominio o inyección, purgarla inmediatamente
+            if session.pending_query and (is_prompt_injection_query(session.pending_query) or is_out_of_domain_query(session.pending_query)):
                 session.pending_query = None
 
             # Verificar si existía una pregunta técnica previa válida retenida
@@ -1361,6 +1385,7 @@ class RouterLogic:
                 and not cls.is_greeting(session.pending_query)
                 and len(session.pending_query.strip()) > 3
                 and not (cls.detect_user_role(session.pending_query) and len(session.pending_query.split()) <= 3)
+                and not is_prompt_injection_query(session.pending_query)
                 and not is_out_of_domain_query(session.pending_query)
             )
 

@@ -71,15 +71,11 @@ def is_anomalous_golden_pair(user_query: str, response: str) -> Tuple[bool, str]
     if any(k in uq_lower for k in ["contraseña", "contrasena", "clave", "login", "acceso al portal", "desbloqueo", "portal"]) and "jefe de dependencia" in resp_lower:
         return True, "Contraseña o acceso institucional no requiere aval de jefe de dependencia"
 
-    # 2. Periféricos menores con jefe de dependencia o renovación de PC
-    if any(k in uq_lower for k in ["mouse", "mause", "teclado", "cable", "pad", "ratón", "raton", "adaptador"]) and any(r in resp_lower for r in ["jefe de dependencia", "aval de la jefatura", "tipo de equipo requerido", "renovación de equipos de cómputo", "renovacion de equipos de computo"]):
-        return True, "Periférico menor no requiere dotación/renovación de PC ni aval de jefatura"
+    # 2. Caídas de internet o teléfono confundidas con dotación de PC
+    if any(k in uq_lower for k in ["se cayó el internet", "sin internet", "telefono fijo", "teléfono fijo", "onedrive", "sincronizar"]) and any(r in resp_lower for r in ["renovación de equipos de cómputo", "renovacion de equipos de computo", "tipo de equipo requerido (pc de escritorio o portátil)"]):
+        return True, "Falla de conectividad no debe confundirse con renovación de PC"
 
-    # 3. Fallas técnicas / reparaciones / internet / teléfono con renovación de PC o aval de jefe
-    if any(k in uq_lower for k in ["no enciende", "no prende", "dañó", "dano", "se cayó el internet", "sin internet", "telefono fijo", "teléfono fijo", "onedrive", "sincronizar"]) and any(r in resp_lower for r in ["renovación de equipos de cómputo", "renovacion de equipos de computo", "tipo de equipo requerido (pc de escritorio o portátil)", "jefe de dependencia"]):
-        return True, "Falla técnica o conectividad no debe confundirse con renovación de PC ni exigir jefe de dependencia"
-
-    # 4. Trámites académicos o inventados con aval de jefe
+    # 3. Trámites académicos o inventados con aval de jefe
     if any(k in uq_lower for k in ["cupo maximo", "grupo nuevo", "materia"]) and "jefe de dependencia" in resp_lower:
         return True, "Trámite académico fuera de alcance de TI no debe exigir aval de jefe en sistemas"
 
