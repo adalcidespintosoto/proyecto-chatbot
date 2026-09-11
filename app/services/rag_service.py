@@ -96,6 +96,8 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
     """
     if not retrieved_docs:
         return []
+    if len(retrieved_docs) <= 1:
+        return retrieved_docs[:top_k]
 
     reranker = get_reranker()
     if not reranker:
@@ -122,9 +124,8 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
         is_upper_semester_or_regular = bool(re.search(
             r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|semestres?\s+(?:avanzados?|superiores?)|"
             r"(?:[2-9]|10)\s*(?:do|er|ro|to|mo|vo|no|°)?\s*semestre|"
-            r"(?:segundo|tercer|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\s*semestre|"
-            r"\b(?:2do|3er|4to|5to|6to|7mo|8vo|9no|10mo)\b|"
-            r"\b(?:segundo|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\b|"
+            r"(?:segundo|tercer|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\s+semestre|"
+            r"\b(?:2do|3er|4to|5to|6to|7mo|8vo|9no|10mo)\s*semestre\b|"
             r"ya\s+tengo\s+(?:cuenta|correo)|no\s+soy\s+nuevo|no\s+soy\s+de\s+primer)\b",
             q_lower
         ))
@@ -147,12 +148,17 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
         ]) or (any(p in q_lower for p in ["prestamo", "préstamo", "prestar"]) and any(e in q_lower for e in [
             "teclado", "mouse", "mause", "raton", "ratón", "pantalla", "monitor", "cable", "equipo", "computador", "portatil", "portátil", "pc", "videobeam", "proyector", "microfono", "diadema", "recurso"
         ]))
-        is_teacher_grading_query = any(w in q_lower for w in [
+        is_teacher_grading_query = bool(re.search(
+            r"\b(subir|subo|sube|subiendo|cargar|cargo|carga|cargando|registrar|registro|asentar|asentamiento|ingreso|digitar|digitaci[oó]n|calificar)\b.*(nota|notas|calificaci|calificaciones|parcial|parciales|inasistencia|inasistencias|planilla|planillas|definitiva|definitivas|maestr[ií]a|posgrado)",
+            q_lower
+        )) or any(w in q_lower for w in [
             "subo las notas", "subo notas", "subir notas", "cargar notas", "cargo notas", "calificar",
             "fallas de mis alumnos", "inasistencias", "reporte de fallas", "reporte de las fallas",
             "mis alumnos", "mis estudiantes", "ingreso de calificaciones", "planillas de calificaciones",
             "cerrar el sistema", "cierre de sistema", "subir calificaciones", "cargar calificaciones",
-            "reporte de inasistencias", "inasistencias y consulta de listados", "autoevaluación docente"
+            "reporte de inasistencias", "inasistencias y consulta de listados", "autoevaluación docente",
+            "calificaciones de una maestría", "calificaciones de maestria", "calificaciones de posgrado",
+            "calificaciones de posgrados", "casillas de primer", "primer y segundo parcial"
         ])
         is_procedural_query = any(w in q_lower for w in [
             "cómo", "como", "pasos", "votar", "radicar", "ingresar", "activar", "descargar", 
@@ -258,11 +264,18 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             if is_teacher_grading_query:
                 if any(doc_name in source_lower for doc_name in [
                     "ingreso de calificaciones, inasistencias", "calificaciones posgrados", "registro y carga de calificaciones",
-                    "listados académicos y de asistencia", "listados academicos"
+                    "listados académicos y de asistencia", "listados academicos", "registro de calificaciones"
                 ]) or "docente" in source_lower or "profesor" in source_lower or "posgrado" in source_lower:
-                    final_score += 5.0
+                    final_score += 6.0
                 if "portal estudiantes" in source_lower or "estudiante" in source_lower or "consulta e impresión de calificaciones" in source_lower:
-                    final_score -= 5.0
+                    final_score -= 8.0
+
+            # Desambiguación para programas de Posgrados / Maestrías / Especializaciones
+            if any(p in q_lower for p in ["maestria", "maestría", "posgrado", "posgrados", "especializacion", "especialización", "doctorado"]):
+                if "posgrado" in source_lower or "posgrados" in source_lower:
+                    final_score += 6.0
+                if "pregrado" in source_lower:
+                    final_score -= 4.0
 
             # Bonificación procedimental: priorizar fragmentos con pasos e instructivos directos
             if is_procedural_query:
@@ -335,6 +348,14 @@ SEMANTIC_SYNONYM_DICTIONARY = [
             "Generación y pago de volante de matrícula portal estudiantes",
             "Consulta de liquidación matrícula y pagos financieros",
             "Procedimiento de pago de matrícula académica"
+        ]
+    },
+    {
+        "triggers": ["subir notas", "subir calificaciones", "asentar notas", "registrar calificaciones", "calificaciones posgrado", "calificaciones posgrados", "calificaciones maestria", "calificaciones maestría", "calificaciones de una maestria", "calificaciones de una maestría", "calificaciones de posgrado", "calificaciones de posgrados", "calificaciones profesor", "calificaciones docente"],
+        "variants": [
+            "Registro y Asentamiento de Calificaciones Definitivas para Cursos de Posgrados SIA",
+            "Instructivo de registro de calificaciones de posgrados en el sistema académico SIA",
+            "Ingreso de calificaciones definitivas docentes portal profesores posgrados maestrías"
         ]
     },
     {
@@ -510,6 +531,15 @@ async def async_generate_multi_query_variants(
         grade_target = "reclamo calificacion revision docente direccion de programa"
         if grade_target not in variants:
             variants.insert(0, grade_target)
+
+    is_posgrado_grading = any(p in q_low for p in ["posgrado", "posgrados", "maestria", "maestría", "especializacion", "especialización", "doctorado"]) and any(g in q_low for g in ["nota", "notas", "calificaci", "parcial", "definitiva", "asentar", "subir", "subiendo", "cargar"])
+    if is_posgrado_grading:
+        posgrado_target = "Registro y Asentamiento de Calificaciones Definitivas para Cursos de Posgrados SIA"
+        posgrado_instructivo = "INSTRUCTIVO DE REGISTRO DE CALIFICACIONES DE POSGRADOS EN EL SISTEMA ACADÉMICO (SIA)"
+        if posgrado_target not in variants:
+            variants.insert(0, posgrado_target)
+        if posgrado_instructivo not in variants:
+            variants.insert(1, posgrado_instructivo)
 
     logger.info(f"[MultiQuery] '{raw_query[:40]}' -> {len(variants)} variantes generadas: {variants}")
     return variants[:max_variants + 1]
@@ -703,6 +733,22 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
         4. Selecciona tu candidato o la opción de Voto en Blanco y presiona **Confirmar Voto**.
       * PROHIBICIÓN ESTRICTA: NUNCA sustituyas el aplicativo de elecciones por portal estudiantes, calificaciones ni certificados.
 
+    - J. CALIFICACIONES Y ASENTAMIENTO DE NOTAS (DOCENTES DE POSGRADO / MAESTRÍAS VS. PREGRADO EN SIA / SIAAF):
+      * En pregrado, el sistema maneja tres cortes: Primer Parcial, Segundo Parcial y Tercer Parcial/Final.
+      * En POSGRADOS (Especializaciones, Maestrías, Doctorados) en el sistema SIA / SIAAF:
+        - NO existen casillas de primer ni segundo parcial. La evaluación es modular y directa.
+        - Solo existe la columna de nota cuantitativa definitiva única ("Definitiva" / "Calificación"), en escala de 0.0 a 5.0.
+        - Si el docente pregunta si es normal ver solo la columna de nota final/definitiva sin parciales o si el sistema está fallando ("¿eso está malo o es así?"), RESPÓNDELE DIRECTAMENTE con total certeza: **Es completamente normal y es así por diseño institucional de posgrados**.
+        - Si requiere el procedimiento paso a paso:
+          1. Ingresa a [Portal Profesores y Administrativos](http://www.unisimon.edu.co/portales/administrativos) con tus credenciales institucionales y presiona **ACCEDER**.
+          2. En el catálogo unificado de servicios SIA, haz clic sobre el icono **Calificaciones**.
+          3. En la sección Registro de Calificaciones, selecciona la categoría de tu posgrado (ej. **MAESTRÍA**) y el programa académico correspondiente.
+          4. En la planilla del grupo y período, ubica la columna **Definitiva** y haz clic sobre el icono para abrir la planilla de estudiantes.
+          5. Marca la casilla de verificación aceptando las directrices de evaluación para habilitar la planilla.
+          6. En la columna **Calificación**, digita la nota definitiva de cada estudiante (rango de 0.0 a 5.0, sin dejar celdas en blanco).
+          7. Haz clic en el botón verde **Enviar** (esquina superior derecha) para asentar las calificaciones de forma oficial.
+      * PROHIBICIÓN ABSOLUTA: NUNCA le digas al usuario "te recomiendo consultar la documentación oficial", "revisa el manual" ni desvíes la consulta a soporte técnico cuando la respuesta institucional ya está documentada en el instructivo.
+
 2. PROCEDIMIENTOS DE AUTOSERVICIO VS. INCIDENCIAS Y FALLAS TÉCNICAS:
    A. CASOS DE AUTOSERVICIO DOCUMENTADO (El usuario puede resolverlo por su cuenta):
       - Si la consulta del usuario corresponde a un procedimiento, trámite o configuración documentado en el contexto (ej. restablecimiento de contraseña, ingreso a Teams, consulta de notas, carnet digital, matrícula, aplicativos institucionales):
@@ -746,7 +792,7 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
 
-7. EJEMPLOS CANÓNICOS DE FORMATO Y ESTRUCTURA:
+7. EJEMPLOS ILUSTRATIVOS DE FORMATO Y ESTRUCTURA (Guía de estilo, no excluyentes):
 
 [EJEMPLO 1: Consulta Directa de Canales / Directorio]
 Pregunta: ¿Cuáles son los números de soporte técnico y el WhatsApp?
@@ -858,11 +904,19 @@ El sufragio no se realiza en el Portal Estudiantes habitual ni en SIAAF, se real
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
 
+8. PROHIBICIÓN ABSOLUTA DE RESPUESTAS EVASIVAS Y DE ENVIAR A LEER MANUALES:
+- Tu función primordial como asistente oficial de soporte técnico es responder con claridad e inmediatez las dudas concretas fundamentándote en la información provista.
+- Queda TERMINANTEMENTE PROHIBIDO responder frases evasivas como:
+  * "Te recomiendo consultar la documentación oficial..."
+  * "Consulta el manual del sistema..."
+  * "Revisa la documentación proporcionada..."
+  * "Ponte en contacto con soporte técnico para conocer el procedimiento..." (a menos que se trate de una falla física, corte de red general o bloqueo sin autoservicio).
+- Si la consulta es una pregunta de validación o confirmación conceptual sobre el funcionamiento de una plataforma (ej. "¿es así o está malo?"), confirma directamente con total certeza (ej. "Es completamente normal y es así...") y fundamenta tu respuesta en los hechos documentados.
+
 [CONTEXTO INSTITUCIONAL DOCUMENTADO]:
 {context}
 
-Pregunta del usuario: {query}
-Respuesta adaptativa directa de soporte:"""
+Consulta institucional a responder: {query}"""
 
 
 OUT_OF_DOMAIN_PATTERNS = [
@@ -1108,23 +1162,38 @@ def clean_llm_response(text: str) -> str:
     text = re.sub(r"(?im)^\s*\[[A-Za-z0-9_.\- \u00C0-\u017F]+\.pdf(?:\s*\(Pág\.\s*\d+\))?\]\s*\n*", "", text)
     text = re.sub(r"(?im)^---\s*\n*", "", text)
     text = re.sub(r"(?im)^\s*Pregunta\s+del\s+usuario:?[^\n]*\n*", "", text)
-    text = re.sub(r"(?im)^\s*Respuesta\s+(?:adaptativa\s+)?directa\s+(?:de\s+soporte)?:?\s*\n*", "", text)
+    text = re.sub(r"(?im)^\s*(?:\*\*)?Respuesta\s+(?:adaptativa\s+)?directa\s+(?:de\s+soporte)?:?(?:\*\*)?\s*\n*", "", text)
     text = re.sub(r"(?im)^\s*\[CASO\s+(?:PREVIO\s+VALIDADO|INSTITUCIONAL\s+PREVIO|DE\s+REFERENCIA\s+VALIDADO)[^\n\]]*\]:?(?:\s*Pregunta\s+previa:?[^\n]*->\s*Respuesta\s+validada:?\s*'?|\s*)", "", text)
     text = re.sub(r"(?im)^\s*Ejemplo\s+institucional\s+de\s+referencia:?\s*\n*(?:-\s*Consulta\s+similar:?[^\n]*\n*)*(?:-\s*Soluci[oó]n\s+validada:?\s*\n*)*", "", text)
 
     # 7. Eliminar justificaciones, disculpas, coletillas de modelo o meta-lenguaje inicial
     text = re.sub(
-        r"(?im)^(?:¡?(?:lo siento|disculpa|disculpas)[,!.]*(?:\s*pero)?\s*[^.\n]*(?:no puedo|no tengo|como modelo|asistencia directa)[^.\n]*[.\n]+(?:\s*sin embargo[^.\n]*[.\n]+)?)",
+        r"(?im)^¡?(?:lo\s+siento|disculpa|disculpas)[^.\n]*[.\n]+",
         "",
         text
     )
     text = re.sub(
-        r"(?i)\b(?:lo siento|disculpa|disculpas)?[^.,\n]*(?:no puedo proporcionar informaci[oó]n sobre el rol|hubo un error en la respuesta anterior|como modelo de lenguaje|no tengo informaci[oó]n sobre mi rol)[^.,\n]*[.,]?",
+        r"(?i)\b(?:parece\s+que\s+la\s+respuesta\s+a\s+tu\s+consulta\s+está\s+disponible\s+en\s+el\s+procedimiento\s+documentado\.?)\b",
+        "",
+        text
+    )
+    text = re.sub(
+        r"(?i)\b(?:parece\s+haber\s+un\s+problema\s+con\s+la\s+respuesta\s+anterior\.?)\b",
+        "",
+        text
+    )
+    text = re.sub(
+        r"(?i)\b(?:lo siento|disculpa|disculpas)?[^.,\n]*(?:no puedo proporcionar informaci[oó]n sobre el rol|hubo un error en la respuesta anterior|como modelo de lenguaje|no tengo informaci[oó]n sobre mi rol|no se ajusta a los ejemplos)[^.,\n]*[.,]?",
         "",
         text
     )
     text = re.sub(
         r"(?i)\b(?:hubo un error en la respuesta anterior|en la respuesta anterior hubo un error)[^.,\n]*[.,]?",
+        "",
+        text
+    )
+    text = re.sub(
+        r"(?i)\b(?:te\s+recomiendo|te\s+recomendar[ií]a|se\s+recomienda)\s+(?:consultar|revisar|leer)\s+(?:directamente\s+)?(?:la\s+documentaci[oó]n\s+oficial|el\s+manual|los\s+instructivos|la\s+gu[ií]a)[^\n.]*[.\n]?",
         "",
         text
     )
@@ -1134,6 +1203,11 @@ def clean_llm_response(text: str) -> str:
         r"(?i)\n*¿(?:pudiste resolver tu problema|te sirvieron estos pasos)[^\n]*(?:\n\s*-[^\n]*)*\??",
         "",
         text
+    )
+    text = re.sub(
+        r"(?i)\n*¿?(?:(?:puedo|te\s+puedo)\s+ayudar(?:te)?\s+a\s+completar\s+el\s+proceso|(?:en\s+qué\s+más|hay\s+algo\s+más\s+en\s+lo\s+que|cómo)\s+(?:te\s+puedo|puedo)\s+ayudar|deseas\s+que\s+(?:te\s+ayude|radique)|requieres\s+ayuda\s+adicional)\??\s*$",
+        "",
+        text.rstrip()
     )
 
     # 9. Sanitizar correos y contactos institucionales inventados
@@ -1297,8 +1371,8 @@ def is_peripheral_or_hardware_request(query: str) -> bool:
 
     has_action = any(w in q_lower for w in [
         "prestamo", "préstamo", "prestar", "solicitar", "pedir", "dotacion", "dotación",
-        "cambio", "cambiar", "reemplazo", "reemplazar", "necesito", "requiero", "suministro",
-        "asignar", "asignacion", "asignación"
+        "cambio", "cambiar", "cambien", "reemplazo", "reemplazar", "necesito", "requiero", "suministro",
+        "asignar", "asignacion", "asignación", "dañó", "daño", "dañado", "dañada", "averiado", "averiada", "roto", "rota"
     ]) or "de " in q_lower or "un " in q_lower or "el " in q_lower
 
     return has_peripheral and (has_action or len(q_lower.split()) <= 4)
@@ -1422,7 +1496,7 @@ class RAGService:
             }
         elif role_lower in ["profesor", "profesora", "docente"]:
             return {
-                "audience": {"$in": ["general", "profesor", "docente", "estudiante"]}
+                "audience": {"$in": ["general", "profesor", "docente"]}
             }
         elif role_lower in ["estudiante", "alumno", "alumna"]:
             return {
@@ -1478,6 +1552,34 @@ class RAGService:
                 "retrieved_chunks": 0,
                 "has_context": True,
                 "quick_replies": []
+            }
+
+        # 0.B Interceptor Oficial Institucional: Periféricos y Recursos Físicos Menores
+        if is_peripheral_or_hardware_request(question):
+            logger.info(f"Interceptor institucional activado en query_rag para periféricos menores: '{question}'")
+            saludo_txt = f"Hola {user_name}. " if user_name else ""
+            msg = (
+                f"{saludo_txt}Para el **suministro, reposición o préstamo temporal de periféricos y recursos físicos** "
+                "(como teclados, mouse, cables de video HDMI/VGA, adaptadores o proyectores) en aulas o puestos de trabajo, "
+                "la atención y entrega la realiza directamente el equipo de **Soporte Técnico TI** (no requiere visto bueno ni aval previo de jefatura):\n\n"
+                "📋 **Datos para radicar tu requerimiento:**\n"
+                "1. Nombre completo y documento de identidad del solicitante.\n"
+                "2. Rol institucional (Profesor, Colaborador o Administrativo) y Dependencia.\n"
+                "3. Periférico o accesorio requerido (ej. Teclado USB, mouse, cable HDMI).\n"
+                "4. Ubicación exacta (Sede, Bloque, Piso y Aula u Oficina donde se necesita el periférico).\n"
+                "5. Motivo del requerimiento (daño técnico del periférico actual, clase o reunión de trabajo).\n\n"
+                "📧 **Canales oficiales de radicación y atención:**\n"
+                "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
+                "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
+            )
+            return {
+                "response": msg + CLOSING_FEEDBACK_QUESTION,
+                "sources": ["P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf"],
+                "source": "unimon_peripheral_hardware_service",
+                "model": "rule_based_institutional_standard",
+                "retrieved_chunks": 0,
+                "has_context": True,
+                "quick_replies": QUICK_REPLIES_DIAGNOSTICO
             }
 
         filter_condition = self._build_role_filter(user_role)
@@ -1556,9 +1658,8 @@ class RAGService:
         is_upper_sem = bool(re.search(
             r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|semestres?\s+(?:avanzados?|superiores?)|"
             r"(?:[2-9]|10)\s*(?:do|er|ro|to|mo|vo|no|°)?\s*semestre|"
-            r"(?:segundo|tercer|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\s*semestre|"
-            r"\b(?:2do|3er|4to|5to|6to|7mo|8vo|9no|10mo)\b|"
-            r"\b(?:segundo|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\b|"
+            r"(?:segundo|tercer|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\s+semestre|"
+            r"\b(?:2do|3er|4to|5to|6to|7mo|8vo|9no|10mo)\s*semestre\b|"
             r"ya\s+tengo\s+(?:cuenta|correo)|no\s+soy\s+nuevo|no\s+soy\s+de\s+primer)\b",
             clean_q_low
         ))
@@ -1875,6 +1976,16 @@ class RAGService:
 
         context_text = "\n\n---\n\n".join(context_parts)
 
+        # Enriquecimiento de contexto institucional para notas de posgrados / maestrías
+        q_posgrado_check = question.lower()
+        if any(p in q_posgrado_check for p in ["posgrado", "posgrados", "maestria", "maestría", "especializacion", "especialización"]) and any(g in q_posgrado_check for g in ["nota", "notas", "calificaci", "parcial", "definitiva", "casilla", "subir", "subiendo"]):
+            context_text += (
+                "\n\n---\n\n[DIRECTRIZ OFICIAL INSTITUCIONAL DE POSGRADOS]:\n"
+                "En los programas de posgrado y maestrías en SIAAF/SIA, la evaluación es modular y directa. "
+                "Por diseño del sistema, NO existen cortes ni casillas de primer ni segundo parcial (los parciales aplican únicamente a pregrado). "
+                "Es completamente normal y es así: los docentes únicamente ingresan la nota final en la columna Definitiva / Calificación (escala de 0.0 a 5.0) y hacen clic en Enviar."
+            )
+
         # 5. Ensamblar System Prompt estricto + Golden Cache few-shot + historial y User Prompt
         full_context = context_text
         if golden_context:
@@ -1920,9 +2031,11 @@ class RAGService:
                     # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
                     bot_message = clean_llm_response(bot_message)
 
-                    # Si la respuesta tras limpieza quedó vacía o insuficiente (ej. el modelo solo se disculpó o quedó reducida a cortesía)
-                    if not bot_message or len(bot_message.strip()) < 35:
-                        logger.info("Respuesta de Ollama vacía o reducida a cortesía tras sanitización. Invocando fallback institucional.")
+                    # Si la respuesta tras limpieza quedó vacía o insuficiente (ej. el modelo solo se disculpó, contra-pregunta o recomendación evasiva de leer manuales)
+                    is_placeholder = bool(re.match(r"^\s*¿?(?:en qué|cómo|hay algo más|puedes proporcionar|podrías proporcionar|indícame|indicame)[^?]+\??\s*$", bot_message, re.IGNORECASE))
+                    is_evasion = bool(re.search(r"(?i)\b(?:consultar|revisar)\s+(?:la\s+documentaci[oó]n\s+oficial|el\s+manual|los\s+instructivos)\b", bot_message)) and not bool(re.search(r"\b(?:paso\s+1|paso\s+2|es\s+completamente\s+normal|definitiva)\b", bot_message, re.IGNORECASE))
+                    if not bot_message or len(bot_message.strip()) < 35 or is_placeholder or is_evasion:
+                        logger.info("Respuesta de Ollama vacía, placeholder, evasiva o reducida a cortesía tras sanitización. Invocando fallback institucional.")
                         return self._generate_fallback_response(question, user_name, sources)
 
                     # Ubicar el pie de confirmación estrictamente al final del mensaje
@@ -1995,6 +2108,20 @@ class RAGService:
                 "  - Correo: `helpdesk@unisimon.edu.co`\n"
                 "  - Teléfono: `(607) 5827070` Ext. `129`\n\n"
                 "También puedes radicar un caso directamente con nuestro equipo describiendo tu solicitud."
+            )
+        elif any(w in msg_lower for w in ["maestria", "maestría", "posgrado", "posgrados"]) and any(w in msg_lower for w in ["calificaciones", "calificar", "subir", "subiendo", "nota", "notas", "parcial", "definitiva", "asentar"]):
+            contenido = (
+                f"{saludo} Para el registro de calificaciones en **programas de Posgrado y Maestrías** (en el sistema SIA / SIAAF):\n\n"
+                "• **¿Es normal ver solo la columna de nota final / definitiva?:**\n"
+                "  **Sí, es completamente normal y es así.** En posgrados y maestrías la evaluación es modular y directa; **no existen casillas de primer ni segundo parcial** (los parciales aplican exclusivamente a pregrado). Solo se asienta la calificación cuantitativa definitiva (en escala de **0.0 a 5.0**).\n\n"
+                "📋 **Procedimiento de Registro de Calificaciones:**\n"
+                "1. Ingresa al [Portal Profesores y Administrativos](http://www.unisimon.edu.co/portales/administrativos) con tus credenciales institucionales y presiona **ACCEDER**.\n"
+                "2. En el catálogo unificado de servicios SIA, haz clic sobre el icono **Calificaciones**.\n"
+                "3. En la sección Registro de Calificaciones, selecciona la categoría de tu posgrado (ej. **MAESTRÍA**) y el programa académico correspondiente.\n"
+                "4. En la planilla del grupo y período, ubica la columna **Definitiva** y haz clic sobre el icono para abrir la planilla de estudiantes.\n"
+                "5. Marca la casilla de verificación aceptando las directrices de evaluación.\n"
+                "6. En la columna **Calificación**, digita la nota definitiva de cada estudiante (rango de **0.0 a 5.0**, sin dejar celdas en blanco).\n"
+                "7. Dirígete a la esquina superior derecha y haz clic sobre el botón verde **Enviar** para asentar las calificaciones de forma oficial en el sistema."
             )
         elif any(w in msg_lower for w in ["calificaciones", "ver notas", "consultar notas", "sabana de notas", "sábana de notas"]):
             contenido = (
