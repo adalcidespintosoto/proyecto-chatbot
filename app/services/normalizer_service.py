@@ -44,11 +44,14 @@ SYNONYM_MAP = {
     r"\b(pac)\b": "diligenciamiento de pac profesores plan de actividad académica",
     r"\b(carnet|carné|carnet digital|app unisim[oó]n|app)\b": "carnetización app unisimon carnet estudiante",
     r"\b(supletorio|supletorios|examen supletorio|ex[aá]menes supletorios)\b": "gestión y autorización de exámenes supletorios en siaaf",
-    r"\b(intersemestral|intersemestrales|cursos de [eé]nfasis)\b": "autorización de inscripción para cursos intersemestrales en siaaf",
-    r"\b(votaci[oó]n|[oó]rganos colegiados|votar|elecciones)\b": "votación electrónica aplicativo institucional elecciones órganos colegiados",
+    # Elecciones Institucionales y Votaciones
+    r"\b(votaci[oó]n|votaciones|[oó]rganos colegiados|votar|elecci[oó]n|elecciones|representante|representantes|candidato|candidatos|sufragio)\b": "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/",
+    
+    # Reclamos y Cambio de Notas (Límite de Dominio Académico)
+    r"\b(me\s+clavaron|me\s+clav[oó]|cambiar\s+nota|cambie\s+la\s+nota|subir\s+nota|suba\s+la\s+nota|corregir\s+nota|reclamo\s+calificaci[oó]n|reclamo\s+nota|reclamar\s+nota|nota\s+injusta|calificaci[oó]n\s+injusta|revisi[oó]n\s+de\s+nota)\b": "reclamo calificacion revision docente direccion de programa",
     
     # Errores, Accesos y Fallas Comunes
-    r"\b(datos incorrectos|clave incorrecta|no me deja entrar|no entra|clave invalida|datos invalidos|no me coge la clave)\b": "problemas de acceso restablecimiento de contraseña credenciales incorrectas",
+    r"\b(datos incorrectos|clave incorrecta|clave mala|clave est[aá] mala|clave no sirve|no me deja entrar|no entra|clave invalida|datos invalidos|no me coge la clave|ando embalao)\b": "problemas de acceso restablecimiento de contraseña credenciales incorrectas",
     r"\b(se traba|se congela|se cuelga|lento|muy lento|pesado)\b": "rendimiento bajo fallas de ejecución del sistema",
     r"\b(pantalla azul|se reinicia|se apaga solo)\b": "falla crítica del sistema operativo hardware",
     r"\b(no prende|no enciende|no da video|muerto|no arranca)\b": "falla de encendido hardware equipo de cómputo",

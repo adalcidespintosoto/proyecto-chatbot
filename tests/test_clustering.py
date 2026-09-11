@@ -131,12 +131,12 @@ def test_api_export_dpo_endpoint(temp_analytics_db):
         client = TestClient(app)
         
         # Test formato JSONL por defecto
-        res_jsonl = client.get("/api/analytics/export-dpo-dataset")
+        res_jsonl = client.get("/api/analytics/export-dpo-dataset", auth=("admin", "UniMonAdmin2026*"))
         assert res_jsonl.status_code == 200
         assert res_jsonl.headers.get("content-type", "").startswith("application/x-ndjson")
 
         # Test formato JSON estructurado
-        res_json = client.get("/api/analytics/export-dpo-dataset?format=json")
+        res_json = client.get("/api/analytics/export-dpo-dataset?format=json", auth=("admin", "UniMonAdmin2026*"))
         assert res_json.status_code == 200
         data = res_json.json()
         assert data["status"] == "success"

@@ -126,6 +126,10 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
             r"ya\s+tengo\s+(?:cuenta|correo)|no\s+soy\s+nuevo|no\s+soy\s+de\s+primer)\b",
             q_lower
         ))
+        is_first_semester_explicit = bool(re.search(
+            r"\b(primer\s+semestre|1er\s+semestre|1\s*°?\s*semestre|nuevo\s+ingreso|estudiante\s+nuevo|soy\s+nuevo|reci[eé]n\s+ingresado|primipar[oa])\b",
+            q_lower
+        ))
         is_hardware_dotation_query = any(w in q_lower for w in [
             "portatil", "portátil", "laptop", "computador", "pc", "equipo de computo",
             "dotacion", "dotación", "solicitar un portatil", "solicitar un computador", "pedir computador",
@@ -194,10 +198,24 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
                 if any(p in content_lower for p in ["portal estudiantes", "cambio de contraseña", "passwordreset", "passwordreset.microsoftonline.com", "autogestión de contraseñas", "restablecimiento"]):
                     final_score += 4.0
 
-            # Desambiguación de Semestres Avanzados vs Primer Semestre (-6.0 a guías de primer ingreso)
-            if is_upper_semester_or_regular or (is_password_recovery_query and any(w in q_lower for w in ["olvidé", "olvide", "olvido", "restablecer", "recuperar", "cambiar clave", "cambiar contraseña", "error de contraseña", "clave incorrecta", "portal"])):
+            # Desambiguación de Semestres Avanzados vs Primer Semestre
+            if is_upper_semester_or_regular:
+                # Penalizar guías de primer semestre ÚNICAMENTE si el usuario es explícitamente de semestre superior o regular
                 if any(ps in content_lower for ps in ["primer semestre", "estudiantes de primer semestre", "primer ingreso", "activación de usuario para estudiantes de primer semestre"]):
                     final_score -= 6.0
+            elif is_first_semester_explicit:
+                # Penalizar guías de restablecimiento regular si es explícitamente de primer ingreso
+                if any(rs in content_lower for rs in ["restablecimiento y recuperación de contraseña unificada", "olvidé mi usuario / contraseña"]):
+                    final_score -= 4.0
+            elif is_password_recovery_query:
+                # Consulta AMBIGUA de credenciales sin semestre: bonificar AMBOS documentos para que los dos se recuperen
+                if any(doc_tag in content_lower for doc_tag in [
+                    "primer semestre", "activación de cuenta", "recibo oficial de matrícula",
+                    "restablecimiento y recuperación de contraseña unificada", "olvidé mi usuario / contraseña"
+                ]) or any(doc_src in source_lower for doc_src in [
+                    "primer semestre", "activar usuario", "restablecimiento"
+                ]):
+                    final_score += 4.5
 
             # Desambiguación entre dotación/préstamo de hardware (P-GT-01 / Asignación) y proyectos de software/Jira (P-GT-13)
             if is_hardware_dotation_query and not any(k in q_lower for k in ["software", "desarrollo", "jira", "proyecto", "solución tecnológica"]):
@@ -229,6 +247,18 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
                     "teams", "microsoft teams", "kactus", "seven", "calificaciones", "votación", "votacion", "carnet"
                 ]):
                     final_score -= 6.0
+
+            # Desambiguación para Elecciones Institucionales y Votaciones
+            is_election_query = any(w in q_lower for w in [
+                "votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"
+            ])
+            if is_election_query:
+                if any(e in source_lower or e in content_lower for e in [
+                    "elecciones", "gestión electoral", "gestion electoral", "aplicativo de elecciones", "elecciones.unisimon.edu.co", "votar"
+                ]):
+                    final_score += 5.0
+                if any(other in source_lower for other in ["certificado", "calificaciones", "teams", "kactus"]):
+                    final_score -= 5.0
 
             scored_docs.append((doc, original_score, final_score))
 
@@ -288,7 +318,8 @@ SEMANTIC_SYNONYM_DICTIONARY = [
     {
         "triggers": ["clave", "contraseña", "contrasena", "olvide", "olvidé", "bloqueo", "desbloquear", "restablecer", "recuperar", "usuario", "correo", "login", "ingresar", "acceder"],
         "variants": [
-            "Restablecimiento de contraseña portal estudiantes y correo institucional",
+            "Restablecimiento de contraseña portal estudiantes y correo institucional enlace Olvidé mi Usuario / Contraseña correo personal",
+            "Procedimiento activación de cuenta usuario primer semestre recibo de matrícula clave temporal unisimon",
             "Recuperación de acceso cuenta de usuario portal institucional",
             "Autogestión de contraseñas estudiantes Microsoft 365"
         ]
@@ -322,11 +353,19 @@ SEMANTIC_SYNONYM_DICTIONARY = [
         ]
     },
     {
-        "triggers": ["votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "colegiados", "organos colegiados"],
+        "triggers": ["votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "colegiados", "organos colegiados", "sufragio"],
         "variants": [
-            "Votación electrónica para elecciones de órganos colegiados",
-            "Acceso al portal de elecciones institucionales",
-            "Procedimiento de votación representantes estudiantiles"
+            "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/",
+            "Manual de gestión electoral para el módulo estudiantes en el aplicativo de elecciones botón votar",
+            "Procedimiento de votación electrónica elecciones institucionales https://elecciones.unisimon.edu.co/"
+        ]
+    },
+    {
+        "triggers": ["me clavaron", "cambiar nota", "cambie la nota", "subir nota", "suba la nota", "corregir nota", "reclamo calificacion", "reclamo nota", "reclamar nota", "nota injusta", "calificacion injusta", "revision de nota"],
+        "variants": [
+            "reclamo calificacion revision docente direccion de programa",
+            "Trámite académico reclamo de calificaciones con docente y dirección de programa",
+            "Reglamento estudiantil revisión de notas y calificaciones"
         ]
     }
 ]
@@ -356,18 +395,30 @@ async def async_generate_multi_query_variants(
     """
     Genera 3 variantes de búsqueda formal/institucional a partir de una frase informal/ambigua.
     Utiliza Ollama ('unimon:8b') de forma asíncrona y rápida, con fallback instantáneo a diccionario semántico.
+    Preserva estrictamente entidades críticas como elecciones institucionales y reclamos académicos.
     """
     cleaned_query = strip_query_header_noise(raw_query)
+    q_low = cleaned_query.lower()
     variants: List[str] = []
+
+    # Detección de entidades obligatorias: elecciones y reclamo de calificaciones
+    is_election_query = any(w in q_low for w in [
+        "votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"
+    ])
+    is_grade_complaint = bool(re.search(
+        r"(cambi(ar|e)|sub(ir|a)|clav(aron|o)|corregi(r|t)|reclam(ar|o)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)",
+        q_low
+    ))
 
     # 1. Intentar generación asíncrona con unimon:8b
     system_prompt = (
         "Eres un generador de consultas de búsqueda documental para la base de conocimientos de TI "
-        "de la Universidad Simón Bolívar (SIAAF, Portal Estudiantes, Teams, Kactus, etc.).\n"
+        "de la Universidad Simón Bolívar (SIAAF, Portal Estudiantes, Teams, Kactus, Elecciones, etc.).\n"
         "Tu tarea: traducir la consulta informal o ambigua del usuario en exactamente 3 variantes de búsqueda técnica e institucional.\n"
         "Reglas:\n"
         "- Responde ÚNICAMENTE 3 líneas numeradas (1, 2, 3).\n"
-        "- Usa terminología formal universitaria (ej. SIAAF, Portal Estudiantes, Horario Académico, Asignaturas, Notas, Matrícula, Microsoft Teams, Restablecimiento de Contraseña).\n"
+        "- Usa terminología formal universitaria (ej. SIAAF, Portal Estudiantes, Horario Académico, Asignaturas, Notas, Matrícula, Microsoft Teams, Restablecimiento de Contraseña, Elecciones Institucionales).\n"
+        "- Si la consulta menciona elecciones o votaciones, NUNCA la reemplaces por certificados ni portal estudiantes; dirígela a https://elecciones.unisimon.edu.co/.\n"
         "- Si la consulta menciona una plataforma o aplicativo específico (ej. UpToDate, Kactus, Seven, SIAAF, Teams), mantén siempre el nombre de esa plataforma en las 3 variantes.\n"
         "- Sin explicaciones, saludos ni comentarios."
     )
@@ -418,6 +469,18 @@ async def async_generate_multi_query_variants(
     if cleaned_query and cleaned_query not in variants:
         variants.append(cleaned_query)
 
+    # 5. Aplicar preservación estricta de entidades de elecciones y reclamo de notas
+    if is_election_query:
+        election_primary = "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
+        election_manual = "Manual de gestión electoral para el módulo estudiantes en el aplicativo de elecciones botón votar"
+        filtered_variants = [v for v in variants if "certificado" not in v.lower()]
+        variants = [election_primary, election_manual] + [v for v in filtered_variants if v not in [election_primary, election_manual]]
+
+    if is_grade_complaint:
+        grade_target = "reclamo calificacion revision docente direccion de programa"
+        if grade_target not in variants:
+            variants.insert(0, grade_target)
+
     logger.info(f"[MultiQuery] '{raw_query[:40]}' -> {len(variants)} variantes generadas: {variants}")
     return variants[:max_variants + 1]
 
@@ -435,6 +498,12 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
         Consulta normalizada a terminología institucional formal, o la original si falla.
     """
     cleaned_query = strip_query_header_noise(raw_query)
+    q_low = cleaned_query.lower()
+
+    if any(w in q_low for w in ["votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"]):
+        return "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
+    if re.search(r"(cambi(ar|e)|sub(ir|a)|clav(aron|o)|corregi(r|t)|reclam(ar|o)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)", q_low):
+        return "reclamo calificacion revision docente direccion de programa"
 
     system_prompt = (
         "Eres un asistente que normaliza consultas universitarias para búsqueda documental en base de conocimientos de TI.\n"
@@ -485,10 +554,22 @@ STRICT_SYSTEM_PROMPT_TEMPLATE = """Eres UniMon, el Asistente Virtual Oficial de 
 
 DIRECTRICES DE RESPUESTA:
 1. Interpreta la intención del usuario aunque use lenguaje informal, abreviaturas o sinónimos cotidianos (ej. 'profes', 'materias', 'horarios', 'portal').
-2. FIDELIDAD INSTITUCIONAL Y COHERENCIA DE ROL:
-   - Utiliza ÚNICAMENTE los procedimientos descritos en el contexto. ESTÁ ESTRICTAMENTE PROHIBIDO inventar botones, opciones de menú, portales o pasos web ficticios.
+2. GROUNDING ESTRICTO:
+   - Responde exclusivamente con la información provista en el contexto. Está estrictamente prohibido inventar botones, enlaces, menús o formularios si no aparecen en los fragmentos.
    - Si el rol del usuario es 'Administrativo' o 'Profesor', NUNCA lo envíes al 'Portal Estudiantes'. Respeta estrictamente el rol institucional del usuario.
-3. Si la consulta describe una falla técnica de infraestructura (ej. corte de internet, daño físico de cables o equipos) o un caso donde no existe procedimiento de autoservicio en el contexto, explica brevemente los descartes iniciales válidos y orienta directamente a los canales de Soporte TI de la sede sin inventar trámites web.
+3. LÍMITE DE DOMINIO - TRÁMITES ACADÉMICOS (RECLAMO DE NOTAS):
+   - Soporte TI NO califica, no modifica notas ni atiende desacuerdos evaluativos.
+   - El módulo de "Calificaciones" del Portal Estudiantes es EXCLUSIVAMENTE para consulta y descarga.
+   - Si un usuario pide corregir o subir una nota ("me clavaron", "cambiar nota", "corregir nota", "reclamo calificación"), indícale de inmediato que es un trámite académico que debe gestionar con el DOCENTE de la materia o ante la DIRECCIÓN DE PROGRAMA conforme al reglamento estudiantil.
+   - ESTÁ ESTRICTAMENTE PROHIBIDO abrir ticket en GLPI o derivar a Soporte TI por desacuerdos de notas.
+4. ELECCIONES INSTITUCIONALES (VOTACIONES):
+   - El sufragio NO se realiza en el Portal Estudiantes habitual ni en SIAAF.
+   - Se realiza únicamente en: https://elecciones.unisimon.edu.co/
+   - El procedimiento consiste en iniciar sesión con credenciales institucionales, ubicar la jornada electoral activa y hacer clic en el botón verde "VOTAR".
+   - Queda terminantemente prohibido desviar consultas de votaciones hacia "portal estudiantes" o "certificados".
+5. RESPUESTAS TRANSPARENTES:
+   - Si un procedimiento no cuenta con formulario de autoservicio o está fuera del alcance de TI, explícalo de forma concisa sin forzar una estructura de "Paso a Paso" ficticia.
+6. Si la consulta describe una falla técnica de infraestructura (ej. corte de internet, daño físico de cables o equipos) o un caso donde no existe procedimiento de autoservicio en el contexto, explica brevemente los descartes iniciales válidos y orienta directamente a los canales de Soporte TI de la sede sin inventar trámites web.
 
 DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
 
@@ -551,6 +632,48 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
        - La solicitud se envía EXCLUSIVAMENTE a los canales oficiales de Soporte TI:
          • Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | Tel: `(605) 3444333 Ext. 8003/8004`
          • Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
+
+   - G. CONSULTAS AMBIGUAS DE ACCESO O CLAVE DE ESTUDIANTES (Sin aclarar semestre o antigüedad):
+     * Si un estudiante manifiesta problemas de acceso ("no me deja entrar", "clave mala", "clave incorrecta", "olvidé mi contraseña", "no puedo ingresar al portal") SIN especificar si es estudiante nuevo de primer semestre o estudiante regular/antiguo:
+     * ES OBLIGATORIO estructurar la respuesta diferenciando con claridad ambos escenarios:
+
+       **Si eres estudiante de primer semestre (nuevo ingreso):**
+       1. Revisa el pie de página de tu **Recibo de Matrícula Financiera Web** para ubicar tu usuario institucional asignado y la contraseña inicial por defecto: `unisimon`.
+       2. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) (o https://estudiantes.unisimon.edu.co) y selecciona tu sede (Barranquilla o Cúcuta).
+       3. Digita tu usuario institucional y la contraseña temporal `unisimon`, y presiona **ACCEDER**.
+       4. En la ventana emergente obligatoria ("Por políticas de seguridad, usted debe cambiar su contraseña..."), digita `unisimon` en Contraseña actual y configura tu nueva clave personal segura.
+
+       **Si eres estudiante regular (segundo semestre en adelante):**
+       1. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) y selecciona tu sede (Barranquilla o Cúcuta).
+       2. Haz clic sobre el enlace exacto **Olvidé mi Usuario / Contraseña** (ubicado debajo del botón de acceso).
+       3. Digita tu número de documento de identidad o código estudiantil en el formulario y pulsa **Enviar**.
+       4. Ingresa a la bandeja de entrada de tu **correo personal registrado en el sistema** (revisa también la carpeta de Spam o Correo no deseado), abre el mensaje remitido por `informacion@unisimonbolivar.edu.co` y haz clic en **Reestablecer Contraseña** (enlace válido por 24 horas) para definir tu nueva clave unificada (entre 8 y 15 caracteres, con al menos 1 mayúscula, 1 minúscula y 1 número).
+
+     * REGLA DE NO-PARADOJA Y BUZÓN DE DESTINO:
+       - Para recuperación de clave en estudiantes regulares, el enlace se envía ÚNICAMENTE a su **correo personal registrado**.
+       - ESTÁ TOTALMENTE PROHIBIDO indicar revisar el correo institucional (un usuario con la clave mala o bloqueada NO puede entrar a su correo institucional).
+       - El nombre del enlace en el portal es EXACTAMENTE: **Olvidé mi Usuario / Contraseña** (PROHIBIDO usar "¿Olvidé mi contraseña? o Restablecer clave").
+
+    - H. RECLAMO O CORRECCIÓN DE CALIFICACIONES (TRÁMITES ACADÉMICOS FUERA DE ALCANCE TI):
+      * Aplica cuando el usuario solicita modificar, corregir, reclamar o subir una calificación ("me clavaron", "cambiar nota", "corregir nota", "reclamo calificación", "nota injusta").
+      * Informa de inmediato y con total claridad:
+        - El módulo de **Calificaciones en el Portal Estudiantes** es únicamente de consulta y descarga.
+        - La Mesa de Ayuda de TI no tiene facultades para calificar ni modificar notas.
+      * Entrega el canal reglamentario institucional:
+        1. Contactar directamente al **docente de la asignatura** (vía Teams o correo institucional) dentro del plazo de revisión de actas.
+        2. Si la inconformidad continúa, solicitar la revisión formal ante la **Dirección de su Programa Académico** según el Reglamento Estudiantil.
+      * PROHIBICIÓN ESTRICTA: ESTÁ ESTRICTAMENTE PROHIBIDO abrir ticket en GLPI o radicar caso de soporte por este motivo.
+
+    - I. ELECCIONES INSTITUCIONALES Y VOTACIONES (https://elecciones.unisimon.edu.co/):
+      * Aplica para consultas sobre cómo votar o participar en elecciones de representantes o directivos.
+      * Aclara que el sufragio NO se realiza en el Portal Estudiantes habitual ni en SIAAF.
+      * Se realiza ÚNICAMENTE en la plataforma oficial: https://elecciones.unisimon.edu.co/
+      * Detalla el procedimiento oficial:
+        1. Ingresa a la plataforma oficial: [Elecciones Unisimon](https://elecciones.unisimon.edu.co/).
+        2. Inicia sesión con tus credenciales institucionales (usuario y contraseña unificada).
+        3. Ubica la jornada electoral activa y haz clic sobre el botón verde **VOTAR**.
+        4. Selecciona tu candidato o la opción de Voto en Blanco y presiona **Confirmar Voto**.
+      * PROHIBICIÓN ESTRICTA: NUNCA sustituyas el aplicativo de elecciones por portal estudiantes, calificaciones ni certificados.
 
 2. PROCEDIMIENTOS DE AUTOSERVICIO VS. INCIDENCIAS Y FALLAS TÉCNICAS:
    A. CASOS DE AUTOSERVICIO DOCUMENTADO (El usuario puede resolverlo por su cuenta):
@@ -632,16 +755,22 @@ Respuesta:
 - Selecciona o escribe **Sí** si te funcionó.
 - Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
 
-[EJEMPLO 3: Restablecimiento de Contraseña / Acceso Portal]
-Pregunta: Olvidé mi contraseña del portal de estudiantes
+[EJEMPLO 3: Restablecimiento de Contraseña / Acceso Portal Estudiantes (Consulta Ambigua sin Semestre)]
+Pregunta: Colega, ando embalao: la página no me deja entrar y me dice que la clave está mala. ¿Qué hago ahí?
 Respuesta:
-Para restablecer tu contraseña del Portal Estudiantes, sigue estos pasos:
+Como estudiante de la Universidad Simón Bolívar (Sedes Barranquilla o Cúcuta), te comparto el procedimiento según tu condición académica:
 
-1. Ingresa al portal institucional en http://www.unisimon.edu.co/ y haz clic en **Portales**.
-2. Selecciona **Portal Estudiantes** y elige tu sede (Barranquilla o Cúcuta).
-3. Haz clic en la opción **¿Olvidó su contraseña?** o **Restablecer clave**.
-4. Digita tu documento de identidad o código estudiantil y presiona **Enviar**.
-5. Revisa tu correo personal registrado y abre el enlace de restablecimiento para definir tu nueva contraseña.
+**Si eres estudiante de primer semestre (nuevo ingreso):**
+1. Revisa el pie de página de tu **Recibo de Matrícula Financiera Web** para ubicar tu usuario institucional asignado y la contraseña inicial por defecto: `unisimon`.
+2. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) y selecciona tu sede (Barranquilla o Cúcuta).
+3. Escribe tu usuario institucional y la clave temporal `unisimon`, y presiona **ACCEDER**.
+4. En la ventana emergente obligatoria, digita `unisimon` como contraseña actual y establece tu nueva clave segura.
+
+**Si eres estudiante regular (segundo semestre en adelante):**
+1. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) y selecciona tu sede (Barranquilla o Cúcuta).
+2. Haz clic sobre el enlace **Olvidé mi Usuario / Contraseña** (debajo del botón de acceso).
+3. Digita tu documento de identidad o código estudiantil y pulsa **Enviar**.
+4. Ingresa a la bandeja de entrada de tu **correo personal registrado en el sistema** (revisa también Spam o Correo no deseado), abre el mensaje remitido por `informacion@unisimonbolivar.edu.co` y haz clic en **Reestablecer Contraseña** (enlace válido durante 24 horas) para definir tu nueva clave unificada.
 
 Si presentas inconvenientes durante el proceso, puedes contactar a Soporte TI:
 • **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333 Ext. 8003/8004`
@@ -664,6 +793,38 @@ Para descartar y atender la novedad de conexión en tu puesto de trabajo, te sug
 Si la falla continúa o es una caída general del servicio de red, el personal de TI atenderá la incidencia en sitio:
 • **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | Tel: `(605) 3444333` Ext. `8003 / 8004`
 • **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070` Ext. `129`
+
+¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
+
+[EJEMPLO 5: Trámite Académico - Reclamo o Cambio de Nota]
+Pregunta: El profesor me clavó un 2.0 y esa nota no es justa, corríjamela en el sistema.
+Respuesta:
+⚠️ **Aviso de Alcance Institucional:**
+
+El módulo de **Calificaciones en el Portal Estudiantes** es únicamente de consulta y descarga. La Mesa de Ayuda de TI no tiene facultades para calificar ni modificar notas.
+
+📌 **Canal reglamentario:**
+1. Contacta directamente al **docente de la asignatura** (vía Teams o correo institucional) dentro del plazo reglamentario de revisión de actas.
+2. Si la inconformidad continúa, solicita la revisión formal ante la **Dirección de tu Programa Académico** según el Reglamento Estudiantil.
+
+¿Pudiste resolver tu problema con estos pasos?
+- Selecciona o escribe **Sí** si te funcionó.
+- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.
+
+[EJEMPLO 6: Elecciones Institucionales y Votaciones]
+Pregunta: ¿Cómo hago para votar por los representantes estudiantiles?
+Respuesta:
+Para participar en las elecciones institucionales de la Universidad Simón Bolívar:
+
+El sufragio no se realiza en el Portal Estudiantes habitual ni en SIAAF, se realiza únicamente en el aplicativo institucional de elecciones:
+
+**Procedimiento de Votación:**
+1. Ingresa a la plataforma oficial: [Elecciones Unisimon](https://elecciones.unisimon.edu.co/).
+2. Inicia sesión con tus credenciales institucionales (usuario y contraseña unificada).
+3. Ubica la jornada electoral activa y haz clic sobre el botón verde **VOTAR**.
+4. Selecciona tu candidato o la opción de Voto en Blanco y presiona **Confirmar Voto**.
 
 ¿Pudiste resolver tu problema con estos pasos?
 - Selecciona o escribe **Sí** si te funcionó.
@@ -760,6 +921,8 @@ def is_out_of_domain_response(response_text: str) -> bool:
 
 
 ALLOWED_DOMAINS_AND_URLS = [
+    "https://elecciones.unisimon.edu.co",
+    "http://elecciones.unisimon.edu.co",
     "https://portal.unisimon.edu.co",
     "http://portal.unisimon.edu.co",
     "https://www.unisimon.edu.co/portales",
@@ -791,8 +954,9 @@ def sanitize_markdown_links(text: str) -> str:
             allowed_clean = allowed.rstrip("/")
             if url_clean == allowed_clean:
                 return f"[{label}]({url})"
-            # Permitir subrutas únicamente para Microsoft Password Reset / Portales específicos
+            # Permitir subrutas únicamente para Microsoft Password Reset / Portales específicos / Elecciones
             if allowed_clean in [
+                "https://elecciones.unisimon.edu.co",
                 "https://passwordreset.microsoftonline.com",
                 "https://portal.unisimon.edu.co",
                 "https://www.unisimon.edu.co/portales"
@@ -947,6 +1111,56 @@ def clean_llm_response(text: str) -> str:
     # 9. Sanitizar correos y contactos institucionales inventados
     text = sanitize_hallucinated_emails_and_contacts(text)
 
+    # 10. Normalizar etiquetas del enlace de recuperación de contraseñas al nombre oficial
+    text = re.sub(
+        r"(?i)\b(?:¿?Olvid[eé]\s+mi\s+contrase[ñn]a\??\s*o\s*restablecer\s+clave|¿?Olvid[oó]\s+su\s+contrase[ñn]a\??\s*o\s*restablecer\s+clave|¿?Olvid[eé]\s+mi\s+contrase[ñn]a\??|¿?Olvid[oó]\s+su\s+contrase[ñn]a\??)\b",
+        "Olvidé mi Usuario / Contraseña",
+        text
+    )
+
+    # 11. Eliminar paradoja de acceso al buzón institucional en restablecimiento de contraseñas
+    text = re.sub(
+        r"(?i)Debes tener acceso a tu correo electr[oó]nico institucional personalizado[^\n]*\n*",
+        "Debes tener acceso a tu correo personal registrado en el sistema de la universidad.\n",
+        text
+    )
+    text = re.sub(
+        r"(?i)correo electr[oó]nico institucional personalizado(?:\s*\(revisa\s+tambi[eé]n\s+Spam[^\)]*\))?",
+        "correo personal registrado en el sistema (revisa también Spam o Correo no deseado)",
+        text
+    )
+    text = re.sub(
+        r"(?i)\bcorreo\s+electr[oó]nico\s+institucional\s+personalizado\b",
+        "correo personal registrado",
+        text
+    )
+    text = re.sub(
+        r"(?i)\benlace\s+de\s+restablecimiento\s+a\s+tu\s+correo\s+institucional\b",
+        "enlace de restablecimiento a tu correo personal registrado",
+        text
+    )
+
+    # 12. Normalizar URL y canal de Elecciones Institucionales
+    text = re.sub(
+        r"(?i)https?://(?:www\.)?unisimon\.edu\.co/elecciones/?",
+        "https://elecciones.unisimon.edu.co/",
+        text
+    )
+    if re.search(r"(?i)\b(?:votar|votaci[oó]n|elecci[oó]n|elecciones|sufragio)\b", text):
+        text = re.sub(
+            r"(?i)(?:ingresa|accede)\s+(?:al|en\s+el)\s+(?:Portal\s+Estudiantes|SIAAF)\s+(?:para\s+votar|a\s+votar)",
+            "Ingresa únicamente a https://elecciones.unisimon.edu.co/ (el sufragio no se realiza en el Portal Estudiantes habitual ni en SIAAF)",
+            text
+        )
+
+    # 13. Prevenir desvíos de tickets de TI para trámites evaluativos / reclamos de notas
+    if re.search(r"(?i)(?:cambi(ar|o)|sub(ir|a)|clav(aron|o)|corregi(r|t)|reclam(ar|o)|injusta).*(?:nota|calificaci[oó]n|parcial|definitiva)", text):
+        text = re.sub(
+            r"(?i)(?:puedes\s+(?:radicar|abrir|generar)\s+un\s+(?:ticket|caso|reporte)[^\n.]*(?:Mesa de Ayuda|Soporte\s+TI)[^\n.]*\.?)",
+            "Recuerda que este es un trámite estrictamente académico que debe gestionarse directamente con el docente de la materia o ante la Dirección de Programa conforme al reglamento estudiantil.",
+            text
+        )
+
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
@@ -993,7 +1207,8 @@ GENERIC_SYSTEM_TERMS = {
     "soporte", "acceso", "ayuda", "atención", "atencion", "servicio", "servicios", "solicitud",
     "solicitudes", "portal", "portales", "usuario", "usuarios", "cuenta", "cuentas",
     "computo", "cómputo", "red", "internet", "wifi", "nuevo", "nueva", "desde", "hasta",
-    "como", "cómo", "información", "informacion", "trámite", "tramite", "procedimiento"
+    "como", "cómo", "información", "informacion", "trámite", "tramite", "procedimiento",
+    "elecciones", "votacion", "votación", "votaciones", "calificaciones", "calificacion", "calificación"
 }
 
 
@@ -1184,6 +1399,21 @@ class RAGService:
                 "quick_replies": []
             }
 
+        # 0.A Interceptor de Trámite Académico Fuera de Alcance de TI (Reclamo de Notas)
+        from app.services.router_logic import validar_tramite_academico
+        aviso_academico = validar_tramite_academico(question)
+        if aviso_academico:
+            logger.info(f"Interceptor de trámite académico activado en query_rag para: '{question}'")
+            return {
+                "response": aviso_academico,
+                "sources": [],
+                "source": "unimon_aviso_academico",
+                "model": "rule_based_academic_boundary",
+                "retrieved_chunks": 0,
+                "has_context": True,
+                "quick_replies": []
+            }
+
         filter_condition = self._build_role_filter(user_role)
 
         # 1. Expansión Multi-Consulta asíncrona tolerante a jerga
@@ -1249,84 +1479,225 @@ class RAGService:
                 )
                 valid_docs_with_scores = []
 
+        # Detección de consulta ambigua de credenciales de estudiantes (sin aclarar semestre o antigüedad)
+        clean_q_low = strip_query_header_noise(question).lower()
+        is_pwd_query = any(w in clean_q_low for w in [
+            "clave", "contraseña", "contrasena", "olvidé", "olvide", "desbloquear", "restablecer",
+            "recuperar", "no me deja entrar", "no puedo entrar", "no puedo ingresar", "no me deja ingresar",
+            "clave mala", "clave incorrecta", "datos incorrectos", "ando embalao"
+        ])
+        is_student_user = not user_role or user_role.lower() in ["estudiante", "alumno", "alumna", "general"]
+        is_upper_sem = bool(re.search(
+            r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|semestres?\s+(?:avanzados?|superiores?)|"
+            r"(?:[2-9]|10)\s*(?:do|er|ro|to|mo|vo|no|°)?\s*semestre|"
+            r"(?:segundo|tercer|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\s*semestre|"
+            r"\b(?:2do|3er|4to|5to|6to|7mo|8vo|9no|10mo)\b|"
+            r"\b(?:segundo|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\b|"
+            r"ya\s+tengo\s+(?:cuenta|correo)|no\s+soy\s+nuevo|no\s+soy\s+de\s+primer)\b",
+            clean_q_low
+        ))
+        is_first_sem = bool(re.search(
+            r"\b(primer\s+semestre|1er\s+semestre|1\s*°?\s*semestre|nuevo\s+ingreso|estudiante\s+nuevo|soy\s+nuevo|reci[eé]n\s+ingresado|primipar[oa])\b",
+            clean_q_low
+        ))
+        is_ambiguous_student_pwd = is_pwd_query and is_student_user and not is_upper_sem and not is_first_sem
+
+        if is_ambiguous_student_pwd and self.vector_store is not None:
+            has_first_doc = any("primer semestre" in (doc.metadata.get("source") or "").lower() or "activar usuario" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
+            has_reset_doc = any("restablecimiento" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
+
+            if not has_first_doc:
+                try:
+                    q_first = format_e5_query("activacion de usuario primer semestre recibo de matricula clave temporal unisimon")
+                    if filter_condition:
+                        extra_first = self.vector_store.similarity_search_with_relevance_scores(q_first, k=2, filter=filter_condition)
+                    else:
+                        extra_first = self.vector_store.similarity_search_with_relevance_scores(q_first, k=2)
+                    for fdoc, fscore in extra_first:
+                        if fscore is not None and fscore >= self.min_relevance_score:
+                            valid_docs_with_scores.append((fdoc, fscore))
+                except Exception as exc:
+                    logger.debug(f"Error cargando doc primer semestre: {exc}")
+
+            if not has_reset_doc:
+                try:
+                    q_reset = format_e5_query("restablecimiento y recuperacion de contrasena unificada estudiantes olvide mi usuario contrasena correo personal")
+                    if filter_condition:
+                        extra_reset = self.vector_store.similarity_search_with_relevance_scores(q_reset, k=2, filter=filter_condition)
+                    else:
+                        extra_reset = self.vector_store.similarity_search_with_relevance_scores(q_reset, k=2)
+                    for rdoc, rscore in extra_reset:
+                        if rscore is not None and rscore >= self.min_relevance_score:
+                            valid_docs_with_scores.append((rdoc, rscore))
+                except Exception as exc:
+                    logger.debug(f"Error cargando doc restablecimiento: {exc}")
+
+        # Asegurar recuperación de documento de elecciones si la consulta es sobre votaciones
+        is_election_query = any(w in question.lower() for w in [
+            "votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"
+        ])
+        if is_election_query and self.vector_store is not None:
+            has_elec_doc = any("elecciones" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
+            if not has_elec_doc:
+                try:
+                    q_elec = format_e5_query("manual de gestion electoral modulo estudiantes aplicativo de elecciones boton votar")
+                    if filter_condition:
+                        extra_elec = self.vector_store.similarity_search_with_relevance_scores(q_elec, k=3, filter=filter_condition)
+                    else:
+                        extra_elec = self.vector_store.similarity_search_with_relevance_scores(q_elec, k=3)
+                    for edoc, escore in extra_elec:
+                        if escore is not None and escore >= self.min_relevance_score:
+                            valid_docs_with_scores.append((edoc, escore))
+                except Exception as exc:
+                    logger.debug(f"Error cargando doc elecciones: {exc}")
+
         # 3. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
         if valid_docs_with_scores:
-            rerank_query = query_variants[0] if query_variants else question
-            reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=3)
+            if is_election_query:
+                rerank_query = "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
+            elif is_ambiguous_student_pwd:
+                rerank_query = "restablecimiento de contraseña portal estudiantes y activación de usuario primer semestre"
+            elif query_variants:
+                rerank_query = query_variants[0]
+            else:
+                rerank_query = normalize_and_expand_query(question)
 
-            if reranked:
-                # Identificar el documento principal con mayor relevancia semántica
-                primary_doc, _ = reranked[0]
-                primary_source = primary_doc.metadata.get("source")
+            top_k_val = 4 if (is_ambiguous_student_pwd or is_election_query) else 3
+            reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=top_k_val)
 
-                # Recolectar fragmentos del documento principal disponibles
-                primary_chunks = []
-                for doc, _ in valid_docs_with_scores:
-                    if doc.metadata.get("source") == primary_source:
-                        if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                            primary_chunks.append(doc)
+            if reranked or is_ambiguous_student_pwd or is_election_query:
+                if is_ambiguous_student_pwd:
+                    # Ensamblado balanceado para consultas ambiguas de credenciales de estudiantes:
+                    # Garantizar inclusión de fragmentos de primer semestre y de restablecimiento regular
+                    first_sem_chunks = [
+                        doc for doc, _ in valid_docs_with_scores
+                        if any(k in (doc.metadata.get("source") or "").lower() for k in ["primer semestre", "activar usuario"])
+                    ]
+                    reset_chunks = [
+                        doc for doc, _ in valid_docs_with_scores
+                        if any(k in (doc.metadata.get("source") or "").lower() for k in ["restablecimiento", "contraseña unificada"])
+                    ]
 
-                # Si solo hay 1 fragmento del documento principal y ChromaDB está activo,
-                # recuperar proactivamente fragmentos complementarios (requisitos/pasos) del mismo archivo
-                if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
-                    try:
-                        search_q = format_e5_query(rerank_query)
-                        extra_docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
-                            search_q,
-                            k=4,
-                            filter={"source": primary_source}
-                        )
-                        for edoc, escore in extra_docs_with_scores:
-                            if escore is not None and escore >= self.min_relevance_score:
-                                if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                                    primary_chunks.append(edoc)
-                    except Exception as exc:
-                        logger.debug(f"No se pudieron cargar fragmentos complementarios para {primary_source}: {exc}")
+                    selected_docs = []
+                    for d in first_sem_chunks:
+                        if len([x for x in selected_docs if any(k in (x.metadata.get("source") or "").lower() for k in ["primer semestre", "activar usuario"])]) < 2:
+                            selected_docs.append(d)
+                    for d in reset_chunks:
+                        if len([x for x in selected_docs if any(k in (x.metadata.get("source") or "").lower() for k in ["restablecimiento", "contraseña unificada"])]) < 2:
+                            selected_docs.append(d)
 
-                # Ordenar fragmentos del documento principal en orden lógico estructural
-                def chunk_logical_rank(chunk_doc):
-                    c_lower = chunk_doc.page_content.lower()
-                    if any(k in c_lower for k in ["1. generalidades", "1. objetivo", "1. alcance"]):
-                        return 1
-                    if any(k in c_lower for k in ["2. requisitos", "requisitos previos", "restricciones", "roles autorizados"]):
-                        return 2
-                    if any(k in c_lower for k in ["3. procedimiento", "procedimiento paso a paso", "paso 1"]):
-                        return 3
-                    if any(k in c_lower for k in ["4. reglas", "4. políticas", "4. politicas"]):
-                        return 4
-                    if any(k in c_lower for k in ["5. canales", "canales de escalado", "canales de soporte"]):
-                        return 5
-                    return 6
+                    for doc, _ in (reranked or []):
+                        if len(selected_docs) >= 4:
+                            break
+                        if not any(doc.page_content.strip() == sd.page_content.strip() for sd in selected_docs):
+                            selected_docs.append(doc)
 
-                primary_chunks_sorted = sorted(primary_chunks, key=chunk_logical_rank)
+                    for doc in selected_docs:
+                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                        retrieved_docs.append(doc)
+                        if source_filename not in sources:
+                            sources.append(source_filename)
+                        page_num = doc.metadata.get("page", None)
+                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                        cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                        context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                elif is_election_query:
+                    # Priorizar fragmentos del aplicativo oficial de elecciones institucionales
+                    elec_chunks = [
+                        doc for doc, _ in valid_docs_with_scores
+                        if "elecciones" in (doc.metadata.get("source") or "").lower() or "elecciones.unisimon.edu.co" in doc.page_content.lower()
+                    ]
+                    selected_docs = elec_chunks[:3]
+                    for doc, _ in (reranked or []):
+                        if len(selected_docs) >= 3:
+                            break
+                        if not any(doc.page_content.strip() == sd.page_content.strip() for sd in selected_docs):
+                            selected_docs.append(doc)
 
-                # Inyectar fragmentos del documento principal primero
-                for doc in primary_chunks_sorted:
-                    retrieved_docs.append(doc)
-                    source_path = doc.metadata.get("source", "Procedimiento Unisimon")
-                    source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                    page_num = doc.metadata.get("page", None)
-                    page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
-                    if source_filename not in sources:
-                        sources.append(source_filename)
-                    cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
-                    context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                    for doc in selected_docs:
+                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                        retrieved_docs.append(doc)
+                        if source_filename not in sources:
+                            sources.append(source_filename)
+                        page_num = doc.metadata.get("page", None)
+                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                        cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                        context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                else:
+                    # Identificar el documento principal con mayor relevancia semántica
+                    primary_doc, _ = reranked[0]
+                    primary_source = primary_doc.metadata.get("source")
 
-                # Agregar fragmentos secundarios más relevantes de otros documentos (hasta un máximo de 4 fragmentos)
-                for doc, _ in reranked[1:]:
-                    if len(context_parts) >= 4:
-                        break
-                    if doc.metadata.get("source") != primary_source:
-                        if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                            retrieved_docs.append(doc)
-                            source_path = doc.metadata.get("source", "Procedimiento Unisimon")
-                            source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                            page_num = doc.metadata.get("page", None)
-                            page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
-                            if source_filename not in sources:
-                                sources.append(source_filename)
-                            cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
-                            context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                    # Recolectar fragmentos del documento principal disponibles
+                    primary_chunks = []
+                    for doc, _ in valid_docs_with_scores:
+                        if doc.metadata.get("source") == primary_source:
+                            if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                                primary_chunks.append(doc)
+
+                    # Si solo hay 1 fragmento del documento principal y ChromaDB está activo,
+                    # recuperar proactivamente fragmentos complementarios (requisitos/pasos) del mismo archivo
+                    if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
+                        try:
+                            search_q = format_e5_query(rerank_query)
+                            extra_docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
+                                search_q,
+                                k=4,
+                                filter={"source": primary_source}
+                            )
+                            for edoc, escore in extra_docs_with_scores:
+                                if escore is not None and escore >= self.min_relevance_score:
+                                    if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                                        primary_chunks.append(edoc)
+                        except Exception as exc:
+                            logger.debug(f"No se pudieron cargar fragmentos complementarios para {primary_source}: {exc}")
+
+                    # Ordenar fragmentos del documento principal en orden lógico estructural
+                    def chunk_logical_rank(chunk_doc):
+                        c_lower = chunk_doc.page_content.lower()
+                        if any(k in c_lower for k in ["1. generalidades", "1. objetivo", "1. alcance"]):
+                            return 1
+                        if any(k in c_lower for k in ["2. requisitos", "requisitos previos", "restricciones", "roles autorizados"]):
+                            return 2
+                        if any(k in c_lower for k in ["3. procedimiento", "procedimiento paso a paso", "paso 1"]):
+                            return 3
+                        if any(k in c_lower for k in ["4. reglas", "4. políticas", "4. politicas"]):
+                            return 4
+                        if any(k in c_lower for k in ["5. canales", "canales de escalado", "canales de soporte"]):
+                            return 5
+                        return 6
+
+                    primary_chunks_sorted = sorted(primary_chunks, key=chunk_logical_rank)
+
+                    # Inyectar fragmentos del documento principal primero
+                    for doc in primary_chunks_sorted:
+                        retrieved_docs.append(doc)
+                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                        page_num = doc.metadata.get("page", None)
+                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                        if source_filename not in sources:
+                            sources.append(source_filename)
+                        cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                        context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+
+                    # Agregar fragmentos secundarios más relevantes de otros documentos (hasta un máximo de 4 fragmentos)
+                    for doc, _ in reranked[1:]:
+                        if len(context_parts) >= 4:
+                            break
+                        if doc.metadata.get("source") != primary_source:
+                            if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                                retrieved_docs.append(doc)
+                                source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                                source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                                page_num = doc.metadata.get("page", None)
+                                page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                                if source_filename not in sources:
+                                    sources.append(source_filename)
+                                cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                                context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
             else:
                 logger.info("[RAG] El reordenador descartó todos los fragmentos recuperados por falta de relevancia semántica.")
 
@@ -1486,7 +1857,31 @@ class RAGService:
         saludo = f"¡Hola {user_name}!" if user_name else "¡Hola!"
         msg_lower = user_message.lower()
 
-        if any(w in msg_lower for w in ["contacto", "canal", "canales", "telefono", "teléfono", "correo", "atención", "atencion", "wasap", "whatsapp", "directorio"]):
+        # Validar límite de dominio para trámites académicos (reclamo de notas)
+        from app.services.router_logic import validar_tramite_academico
+        aviso_academico = validar_tramite_academico(user_message)
+        if aviso_academico:
+            return {
+                "response": aviso_academico,
+                "sources": [],
+                "source": "knowledge_base_academic_boundary",
+                "model": "rule_based_institutional_unisimon",
+                "retrieved_chunks": 0,
+                "has_context": True,
+                "quick_replies": []
+            }
+
+        if any(w in msg_lower for w in ["eleccion", "elección", "elecciones", "votar", "votacion", "votación", "sufragio", "candidato", "representante"]):
+            contenido = (
+                f"{saludo} Para el proceso de **Elecciones Institucionales y Votaciones** en la Universidad Simón Bolívar:\n\n"
+                "• El sufragio **no** se realiza en el Portal Estudiantes habitual ni en SIAAF.\n"
+                "• Se realiza exclusivamente en: https://elecciones.unisimon.edu.co/\n\n"
+                "**Procedimiento:**\n"
+                "1. Ingresa a https://elecciones.unisimon.edu.co/ e inicia sesión con tus credenciales institucionales (usuario y contraseña).\n"
+                "2. Ubica la jornada electoral activa correspondiente.\n"
+                "3. Selecciona tu candidato o la opción de tu preferencia y haz clic en el botón verde **VOTAR** para confirmar tu sufragio."
+            )
+        elif any(w in msg_lower for w in ["contacto", "canal", "canales", "telefono", "teléfono", "correo", "atención", "atencion", "wasap", "whatsapp", "directorio"]):
             contenido = (
                 f"{saludo} Los canales oficiales de atención y soporte técnico TI de la **Universidad Simón Bolívar (Colombia)** son:\n\n"
                 "• **Sede Barranquilla:**\n"
@@ -1498,7 +1893,14 @@ class RAGService:
                 "  - Teléfono: `(607) 5827070` Ext. `129`\n\n"
                 "También puedes radicar un caso directamente con nuestro equipo describiendo tu solicitud."
             )
-        elif any(w in msg_lower for w in ["portal", "portal web", "pagina", "notas", "matricula", "matrícula"]):
+        elif any(w in msg_lower for w in ["calificaciones", "ver notas", "consultar notas", "sabana de notas", "sábana de notas"]):
+            contenido = (
+                f"{saludo} El módulo de **Calificaciones en el Portal Estudiantes** es **exclusivamente para consulta y descarga** de tus notas registradas:\n\n"
+                "1. Ingresa al [Portal Estudiantes](https://www.unisimon.edu.co/portales) con tu usuario y contraseña institucional.\n"
+                "2. Accede a la opción **Calificaciones** para visualizar tus notas parciales o definitivas.\n\n"
+                "⚠️ *Aviso de Alcance Institucional:* La Mesa de Ayuda de TI no califica, no modifica notas ni atiende desacuerdos evaluativos. Cualquier inconformidad debe gestionarse directamente con el docente de la asignatura o ante la Dirección de Programa."
+            )
+        elif any(w in msg_lower for w in ["portal", "portal web", "pagina", "matricula", "matrícula"]):
             contenido = (
                 f"{saludo} Para el acceso a los **Portales Institucionales Unisimon** (Estudiantes y Docentes):\n\n"
                 "1. Ingresa a la página oficial: `https://unisimon.edu.co` y selecciona el Portal correspondiente.\n"
@@ -1525,14 +1927,30 @@ class RAGService:
                 "• La Universidad realiza copias de seguridad periódicas y programadas de los sistemas y bases de datos institucionales.\n"
                 "• Para solicitudes de restauración de información o requerimientos de respaldo específico, comunícate con el área de TI o radica un ticket de servicio."
             )
-        elif any(w in msg_lower for w in [
-            "kactus", "katuc", "kaktu", "seven", "seben", "erp", "nómina", "nomina",
-            "contraseña", "contrasena", "clave", "clabe", "bloqueo", "desbloquear", "login"
-        ]):
+        elif any(w in msg_lower for w in ["kactus", "katuc", "kaktu", "seven", "seben", "erp", "nómina", "nomina"]):
             contenido = (
                 f"{saludo} Para soporte en los sistemas institucionales **Kactus / Seven** (Procedimiento **P-GT-11** y **P-GT-12**):\n\n"
                 "• Las incidencias y requerimientos deben ser radicados indicando el módulo afectado, captura de pantalla del error y usuario solicitante.\n"
                 "• El equipo de soporte de aplicaciones gestionará el requerimiento conforme a los acuerdos de nivel de servicio (SLA)."
+            )
+        elif any(w in msg_lower for w in [
+            "contraseña", "contrasena", "clave", "clabe", "bloqueo", "desbloquear", "login", "acceso", "portal", "portales"
+        ]):
+            contenido = (
+                f"{saludo} Para gestionar el acceso o restablecimiento de tu contraseña en las plataformas institucionales:\n\n"
+                "• **Si eres estudiante de primer semestre (nuevo ingreso):**\n"
+                "  1. Consulta el pie de página de tu Recibo de Matrícula Financiera Web para conocer tu usuario institucional.\n"
+                "  2. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) con tu usuario y contraseña temporal por defecto: `unisimon`.\n"
+                "  3. El sistema te solicitará obligatoriamente cambiar la contraseña en la ventana emergente.\n\n"
+                "• **Si eres estudiante regular (segundo semestre en adelante):**\n"
+                "  1. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) y selecciona tu sede (Barranquilla o Cúcuta).\n"
+                "  2. Haz clic en el enlace **Olvidé mi Usuario / Contraseña**.\n"
+                "  3. Digita tu documento de identidad o código y pulsa **Enviar**.\n"
+                "  4. Recibirás un enlace de restablecimiento (válido por 24 horas remitido por `informacion@unisimonbolivar.edu.co`) en tu **correo personal registrado en el sistema**.\n"
+                "  5. Abre el enlace y define tu nueva contraseña cumpliendo las políticas de seguridad.\n\n"
+                "Si presentas inconvenientes, puedes contactar a Soporte TI:\n"
+                "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
+                "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
             )
         elif any(w in msg_lower for w in ["virus", "malware", "antivirus", "amenaza", "infectado"]):
             contenido = (

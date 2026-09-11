@@ -14,6 +14,15 @@ if str(PROJECT_ROOT) not in sys.path:
 import pytest
 from httpx import AsyncClient, ASGITransport
 from app.main import app
+from app.security import require_admin_auth
+
+
+@pytest.fixture(autouse=True)
+def override_admin_auth():
+    """Omite la autenticación en las pruebas funcionales del panel administrativo."""
+    app.dependency_overrides[require_admin_auth] = lambda: "admin"
+    yield
+    app.dependency_overrides.pop(require_admin_auth, None)
 
 
 @pytest.mark.asyncio

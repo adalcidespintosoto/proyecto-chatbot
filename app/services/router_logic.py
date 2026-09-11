@@ -314,6 +314,29 @@ DESPEDIDA_INSTITUCIONAL = (
 )
 
 
+def validar_tramite_academico(mensaje: str, user_role: Optional[str] = None) -> Optional[str]:
+    """
+    Detecta si el mensaje corresponde a trámites académicos fuera de la competencia de TI
+    (ej. reclamo, corrección o subida de notas y calificaciones).
+    """
+    msg = mensaje.lower()
+    # Excluir consultas legítimas de docentes/profesores sobre el cargue de notas de sus estudiantes en SIAAF
+    if "mis estudiantes" in msg or "de los estudiantes" in msg or (user_role in ["docente", "profesor"] and "estudiantes" in msg):
+        return None
+    patron_reclamo = r"(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)"
+    patron_reclamo_inv = r"(nota|calificaci[oó]n|parcial|definitiva).*(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta)"
+    if re.search(patron_reclamo, msg) or re.search(patron_reclamo_inv, msg):
+        return (
+            "⚠️ **Aviso de Alcance Institucional:**\n\n"
+            "El módulo de **Calificaciones en el Portal Estudiantes** es únicamente de consulta y descarga. "
+            "La Mesa de Ayuda de TI no tiene facultades para modificar notas.\n\n"
+            "📌 **Canal reglamentario:**\n"
+            "1. Contacta directamente al **docente de la asignatura** (vía Teams o correo) dentro del plazo de revisión de actas.\n"
+            "2. Si la inconformidad continúa, solicita la revisión formal ante la **Dirección de tu Programa Académico** según el Reglamento Estudiantil."
+        )
+    return None
+
+
 class RouterLogic:
     """
     Motor de análisis conversacional de Nivel 1 y orquestación de tickets para UniMon.
@@ -893,6 +916,24 @@ class RouterLogic:
                 logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
 
         logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Rol: {session.user_role} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje ({len(texto)} chars): '{texto}'")
+
+        # -------------------------------------------------------------
+        # INTERCEPTOR OUT-OF-SCOPE: Trámites Académicos fuera de la competencia de TI (Reclamo de notas)
+        # -------------------------------------------------------------
+        aviso_academico = validar_tramite_academico(texto, user_role=session.user_role)
+        if aviso_academico:
+            cls.reset_session(session_id)
+            cls.add_history(session_id, "user", texto)
+            cls.add_history(session_id, "assistant", aviso_academico)
+            return {
+                "tipo": "FUERA_DE_DOMINIO",
+                "state": "FUERA_DE_DOMINIO",
+                "mensaje": aviso_academico,
+                "response": aviso_academico,
+                "ticket_id": None,
+                "source": "UniMon_Aviso_Academico",
+                "quick_replies": []
+            }
 
         # -------------------------------------------------------------
         # REGLA GLOBAL 1: Flujo de Cancelación Universal y Rechazo ("no", "cancelar")
