@@ -1209,6 +1209,379 @@
       box-shadow: 0 6px 18px rgba(220, 38, 38, 0.45);
       transform: translateY(-1px);
     }
+
+    /* ================================================================= */
+    /* ESTILOS: OBSERVABILIDAD AVANZADA, FILTROS Y RANKING DE BRECHAS    */
+    /* ================================================================= */
+    .time-control-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.1rem 1.4rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .time-presets-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .time-preset-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      padding: 6px 13px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .time-preset-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .time-preset-btn.active {
+      background: var(--usb-blue-light);
+      border-color: #3B82F6;
+      color: white;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
+    }
+
+    .time-custom-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .time-date-input {
+      background: #0B132B;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: white;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      border-radius: var(--radius-sm);
+      outline: none;
+    }
+    .time-date-input:focus {
+      border-color: #60A5FA;
+    }
+
+    .badge-period-active {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93C5FD;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    /* Ranking de Preguntas No Resueltas */
+    .unresolved-item-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.2s ease;
+      margin-bottom: 0.75rem;
+    }
+
+    .unresolved-item-card:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .unresolved-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .unresolved-query-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #F8FAFC;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-rank {
+      background: rgba(255, 255, 255, 0.1);
+      color: #E2E8F0;
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+
+    .badge-priority-alta {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #F87171;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    .badge-priority-media {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #FBBF24;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    .badge-priority-normal {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #60A5FA;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    .badge-reason {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      color: #CBD5E1;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* Scrollbar y Contenedor del Ranking de Preguntas No Resueltas */
+    #unresolvedQueriesContainer {
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 8px;
+      scroll-behavior: smooth;
+    }
+
+    #unresolvedQueriesContainer::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #unresolvedQueriesContainer::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 4px;
+    }
+
+    #unresolvedQueriesContainer::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+    }
+
+    #unresolvedQueriesContainer::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+
+    .btn-action-ia {
+      background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-action-ia:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.55);
+    }
+
+    /* Panel de Diagnóstico IA */
+    .ai-insights-panel {
+      background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.12), transparent 45%), var(--bg-card);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(124, 58, 237, 0.12);
+    }
+
+    .ai-insights-body {
+      background: rgba(11, 19, 43, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem;
+      color: #E2E8F0;
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+
+    .ai-insights-body h3 {
+      color: #A78BFA;
+      font-size: 1rem;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .ai-insights-body h3:first-child {
+      margin-top: 0;
+    }
+
+    .ai-pulse-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #A78BFA;
+      animation: spin 1s linear infinite;
+    }
+
+    /* Comparador de Períodos */
+    .comparator-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .comparator-selectors-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      align-items: flex-end;
+      margin-bottom: 1.5rem;
+    }
+
+    .comparator-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+    }
+
+    .comparator-deltas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1rem;
+    }
+
+    .delta-card {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .delta-title {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .delta-values-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .delta-main-val {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: white;
+    }
+
+    .delta-pill {
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .delta-pill.better {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34D399;
+    }
+
+    .delta-pill.worse {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #F87171;
+    }
+
+    .delta-pill.neutral {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      color: #94A3B8;
+    }
+
+    /* Modal Generador RAG */
+    .draft-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .draft-modal-backdrop.show {
+      display: flex;
+    }
+
+    .draft-modal {
+      background: #0B132B;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 850px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -1260,12 +1633,48 @@
     <!-- ================================================================= -->
     <section id="tab-telemetry" class="tab-content active">
 
-      <!-- KPI Summary Cards -->
+      <!-- 1. Barra de Filtros Temporales Dinámicos -->
+      <div class="time-control-card">
+        <div class="time-presets-group">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-right: 4px;">Período:</span>
+          <button type="button" class="time-preset-btn active" id="btnPresetToday" onclick="setTimeFilter('today', this)">
+            📅 Hoy
+          </button>
+          <button type="button" class="time-preset-btn" onclick="setTimeFilter('yesterday', this)">
+            ⏮️ Ayer
+          </button>
+          <button type="button" class="time-preset-btn" onclick="setTimeFilter('week', this)">
+            📊 7 Días
+          </button>
+          <button type="button" class="time-preset-btn" onclick="setTimeFilter('month', this)">
+            🗓️ Este Mes
+          </button>
+          <button type="button" class="time-preset-btn" onclick="setTimeFilter('all', this)">
+            🌐 Histórico
+          </button>
+        </div>
+
+        <div class="time-custom-group">
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Personalizado:</span>
+          <input type="date" id="filterStartDate" class="time-date-input" title="Fecha Inicio">
+          <span style="color: var(--text-muted); font-size: 0.8rem;">a</span>
+          <input type="date" id="filterEndDate" class="time-date-input" title="Fecha Fin">
+          <button type="button" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;" onclick="applyCustomDateFilter()">
+            🔍 Filtrar
+          </button>
+          <div class="badge-period-active" id="activeFilterBadge">
+            <span class="status-dot" style="width: 6px; height: 6px;"></span>
+            <span id="activeFilterText">Mostrando: Hoy</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. KPI Summary Cards -->
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-title">💬 Consultas Totales</div>
           <div class="kpi-value" id="kpiTotalConsultas">0</div>
-          <div class="kpi-subtext" id="kpiTotalSesionesSubtext">0 sesiones auditadas</div>
+          <div class="kpi-subtext" id="kpiTotalSesionesSubtext">0 sesiones en el período</div>
         </div>
 
         <div class="kpi-card success">
@@ -1293,13 +1702,13 @@
         </div>
 
         <div class="kpi-card">
-          <div class="kpi-title">👥 Sesiones Activas</div>
+          <div class="kpi-title">👥 Sesiones Auditadas</div>
           <div class="kpi-value" id="kpiTotalSesiones">0</div>
-          <div class="kpi-subtext">Histórico total en SQLite</div>
+          <div class="kpi-subtext" id="kpiSesionesRangoSubtext">En período seleccionado</div>
         </div>
       </div>
 
-      <!-- Breakdown Panels -->
+      <!-- 3. Breakdown Panels -->
       <div class="panel-grid">
         <!-- Distribución por Rol -->
         <div class="panel-card">
@@ -1324,10 +1733,10 @@
         </div>
       </div>
 
-      <!-- Top 5 Preguntas y Exportadores -->
+      <!-- 4. Top 5 Preguntas Más Frecuentes y Exportadores -->
       <div class="panel-card" style="margin-bottom: 2rem;">
         <div class="panel-header">
-          <h3 class="panel-title">❓ Top 5 Preguntas Más Frecuentes de Usuarios</h3>
+          <h3 class="panel-title">❓ Top 5 Preguntas Más Frecuentes en el Período</h3>
           <div style="display: flex; gap: 8px;">
             <button type="button" class="btn btn-secondary" style="border-color: #EF4444; color: #EF4444;" onclick="handleResetMetrics()">
               🧹 Limpiar Métricas
@@ -1343,6 +1752,151 @@
         <ul class="item-list" id="topQueriesList">
           <li class="item-row"><span class="item-label">Cargando preguntas frecuentes...</span></li>
         </ul>
+      </div>
+
+      <!-- 5. Ranking de Preguntas No Resueltas (Knowledge Gaps) -->
+      <div class="panel-card" style="margin-bottom: 2rem;">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">⚠️ Ranking de Preguntas No Resueltas (Knowledge Gaps)</h3>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+              Consultas sin resolver por el chatbot para identificar vacíos y redactar procedimientos en la base RAG.
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="filterUnresolvedInput" placeholder="🔍 Filtrar brechas..." oninput="filterUnresolvedQueriesUI()" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff; width: 175px;">
+            <span class="badge" id="unresolvedTotalBadge" style="background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+              0 brechas detectadas
+            </span>
+            <button type="button" class="btn btn-secondary" onclick="exportUnresolvedCSV()" title="Descargar ranking en CSV compatible con Excel">
+              📥 Exportar CSV
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="loadUnresolvedQueries()" title="Recargar Ranking">
+              🔄 Actualizar
+            </button>
+          </div>
+        </div>
+
+        <div id="unresolvedQueriesContainer">
+          <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+            Cargando ranking de preguntas no resueltas...
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Diagnóstico y Recomendaciones con IA -->
+      <div class="ai-insights-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #EDE9FE; display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+              🤖 Diagnóstico y Recomendaciones con IA
+              <span style="font-size: 0.72rem; font-weight: 700; background: rgba(124, 58, 237, 0.25); color: #C4B5FD; padding: 2px 8px; border-radius: 9999px; border: 1px solid rgba(124, 58, 237, 0.4);">
+                Ollama • unimon:8b Local
+              </span>
+            </h3>
+            <div style="font-size: 0.82rem; color: #C4B5FD;">
+              Análisis ejecutivo automatizado sobre la salud del asistente, brechas detectadas y plan de acción para TI.
+            </div>
+          </div>
+          <button type="button" class="btn-action-ia" id="btnRunAIInsights" onclick="runAIInsights()" style="padding: 8px 16px; font-size: 0.85rem;">
+            <span id="aiInsightsBtnIcon">🤖</span>
+            <span id="aiInsightsBtnText">Analizar Período con IA</span>
+          </button>
+        </div>
+
+        <div id="aiInsightsContainer" class="ai-insights-body">
+          <div style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+            Haz clic en <strong>"Analizar Período con IA"</strong> para que el modelo local evalúe las métricas del período actual y proponga mejoras documentales.
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Comparativa de Rendimiento entre Períodos -->
+      <div class="comparator-container">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">⚖️ Comparativa de Rendimiento entre Períodos</h3>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+              Compara dos días o meses para auditar la evolución de la tasa de resolución, escalado, volumen y latencia.
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="runPeriodComparison()">
+            ⚖️ Comparar Períodos
+          </button>
+        </div>
+
+        <div class="comparator-selectors-grid">
+          <!-- Período 1 -->
+          <div class="comparator-box">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #94A3B8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <span>Período 1 (Base):</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="time-preset-btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="setComparatorPreset(1, 'yesterday')">Ayer</button>
+                <button type="button" class="time-preset-btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="setComparatorPreset(1, 'last_month')">Mes Pasado</button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="date" id="compP1Start" class="time-date-input" style="flex: 1;" title="Inicio Período 1">
+              <span style="color: var(--text-muted); font-size: 0.8rem;">a</span>
+              <input type="date" id="compP1End" class="time-date-input" style="flex: 1;" title="Fin Período 1">
+            </div>
+          </div>
+
+          <!-- Período 2 -->
+          <div class="comparator-box">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #94A3B8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <span>Período 2 (Comparado):</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="time-preset-btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="setComparatorPreset(2, 'today')">Hoy</button>
+                <button type="button" class="time-preset-btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="setComparatorPreset(2, 'this_month')">Este Mes</button>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="date" id="compP2Start" class="time-date-input" style="flex: 1;" title="Inicio Período 2">
+              <span style="color: var(--text-muted); font-size: 0.8rem;">a</span>
+              <input type="date" id="compP2End" class="time-date-input" style="flex: 1;" title="Fin Período 2">
+            </div>
+          </div>
+        </div>
+
+        <!-- Resultados de la Comparativa -->
+        <div class="comparator-deltas-grid" id="comparatorResultsGrid">
+          <div class="delta-card">
+            <div class="delta-title">🎯 Tasa Resolución N1</div>
+            <div class="delta-values-row">
+              <span class="delta-main-val" id="deltaResMain">--</span>
+              <span class="delta-pill neutral" id="deltaResPill">--</span>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);" id="deltaResSub">P1: -- | P2: --</div>
+          </div>
+
+          <div class="delta-card">
+            <div class="delta-title">🎫 Escalado GLPI</div>
+            <div class="delta-values-row">
+              <span class="delta-main-val" id="deltaEscMain">--</span>
+              <span class="delta-pill neutral" id="deltaEscPill">--</span>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);" id="deltaEscSub">P1: -- | P2: --</div>
+          </div>
+
+          <div class="delta-card">
+            <div class="delta-title">💬 Volumen Consultas</div>
+            <div class="delta-values-row">
+              <span class="delta-main-val" id="deltaQueriesMain">--</span>
+              <span class="delta-pill neutral" id="deltaQueriesPill">--</span>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);" id="deltaQueriesSub">P1: -- | P2: --</div>
+          </div>
+
+          <div class="delta-card">
+            <div class="delta-title">⚡ Latencia Media GPU</div>
+            <div class="delta-values-row">
+              <span class="delta-main-val" id="deltaLatMain">--</span>
+              <span class="delta-pill neutral" id="deltaLatPill">--</span>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);" id="deltaLatSub">P1: -- | P2: --</div>
+          </div>
+        </div>
       </div>
 
     </section>
@@ -1717,6 +2271,70 @@
     </div>
   </div>
 
+  <!-- Modal Redactar y Guardar Procedimiento Institucional RAG -->
+  <div class="draft-modal-backdrop" id="draftProcedureModalBackdrop" onclick="if(event.target === this) closeDraftProcedureModal()">
+    <div class="draft-modal" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 0.75rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: white; display: flex; align-items: center; gap: 8px;">
+            ✨ Redactar Guía Institucional RAG con IA
+          </h3>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+            Revisa la propuesta generada por el LLM, ajusta los detalles y guárdala directamente en la base documental indexada.
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="closeDraftProcedureModal()">
+          ✕ Cerrar
+        </button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label style="font-size: 0.8rem; font-weight: 700; color: #94A3B8; display: block; margin-bottom: 4px;">
+            Título del Procedimiento (Código y Nombre):
+          </label>
+          <input type="text" id="draftProcedureTitle" class="time-date-input" style="width: 100%; font-size: 0.9rem; padding: 8px 12px;" placeholder="PT-TI: Título del Procedimiento">
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <div style="flex: 1;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #94A3B8; display: block; margin-bottom: 4px;">
+              Carpeta / Perfil Objetivo:
+            </label>
+            <select id="draftProcedureRoleSelect" class="time-date-input" style="width: 100%; font-size: 0.85rem; padding: 8px;">
+              <option value="1_estudiantes">1_estudiantes (Portal, Carnet, Notas, Matrícula)</option>
+              <option value="2_profesores">2_profesores (Aulas, Proyector, Equipos, Seven)</option>
+              <option value="3_funcionarios_gestion">3_funcionarios_gestion (Kactus, Backups, Cuentas)</option>
+              <option value="4_general_normativa" selected>4_general_normativa (Trámites Generales TI USB)</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: #94A3B8; display: block; margin-bottom: 4px;">
+              Consulta Original que Motivó la Guía:
+            </label>
+            <input type="text" id="draftProcedureQueryRef" class="time-date-input" style="width: 100%; font-size: 0.85rem; padding: 8px; opacity: 0.7;" readonly>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; font-weight: 700; color: #94A3B8; display: block; margin-bottom: 4px;">
+            Contenido del Procedimiento (Markdown):
+          </label>
+          <textarea id="draftProcedureContent" rows="14" style="width: 100%; background: #070D1F; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; color: #E2E8F0; font-family: monospace; font-size: 0.85rem; padding: 12px; line-height: 1.6; resize: vertical;"></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeDraftProcedureModal()">
+          Descartar
+        </button>
+        <button type="button" class="btn btn-primary" id="btnSaveDraftProcedure" onclick="saveDraftProcedure()">
+          💾 Guardar e Indexar en RAG
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast" id="toast">
     <span id="toastIcon">ℹ️</span>
@@ -1731,6 +2349,10 @@
   <!-- Scripts -->
   <script>
     let allDocuments = [];
+    let currentFilterStart = 'today';
+    let currentFilterEnd = 'today';
+    let activePeriodLabel = 'Hoy';
+    let currentUnresolvedList = [];
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -1740,7 +2362,10 @@
       const target = document.getElementById(tabId);
       if (target) target.classList.add('active');
 
-      if (tabId === 'tab-telemetry') loadKPIs();
+      if (tabId === 'tab-telemetry') {
+        loadKPIs();
+        loadUnresolvedQueries();
+      }
       if (tabId === 'tab-documents') loadDocuments();
       if (tabId === 'tab-system') loadSystemStatus();
     }
@@ -1760,19 +2385,106 @@
     }
 
     // ==========================================
-    // 1. CARGA DE KPIS Y OBSERVABILIDAD
+    // 1. GESTIÓN DE FILTROS TEMPORALES
+    // ==========================================
+    function setTimeFilter(preset, btnElement) {
+      document.querySelectorAll('.time-preset-btn').forEach(b => b.classList.remove('active'));
+      if (btnElement) btnElement.classList.add('active');
+
+      const now = new Date();
+      const formatDate = (d) => d.toISOString().split('T')[0];
+
+      if (preset === 'today') {
+        currentFilterStart = 'today';
+        currentFilterEnd = 'today';
+        activePeriodLabel = 'Hoy';
+        document.getElementById('filterStartDate').value = formatDate(now);
+        document.getElementById('filterEndDate').value = formatDate(now);
+      } else if (preset === 'yesterday') {
+        const y = new Date(now);
+        y.setDate(y.getDate() - 1);
+        const yStr = formatDate(y);
+        currentFilterStart = yStr;
+        currentFilterEnd = yStr;
+        activePeriodLabel = `Ayer (${yStr})`;
+        document.getElementById('filterStartDate').value = yStr;
+        document.getElementById('filterEndDate').value = yStr;
+      } else if (preset === 'week') {
+        const w = new Date(now);
+        w.setDate(w.getDate() - 7);
+        const wStr = formatDate(w);
+        const nStr = formatDate(now);
+        currentFilterStart = wStr;
+        currentFilterEnd = nStr;
+        activePeriodLabel = 'Últimos 7 días';
+        document.getElementById('filterStartDate').value = wStr;
+        document.getElementById('filterEndDate').value = nStr;
+      } else if (preset === 'month') {
+        const m = new Date(now.getFullYear(), now.getMonth(), 1);
+        const mStr = formatDate(m);
+        const nStr = formatDate(now);
+        currentFilterStart = mStr;
+        currentFilterEnd = nStr;
+        activePeriodLabel = 'Este Mes';
+        document.getElementById('filterStartDate').value = mStr;
+        document.getElementById('filterEndDate').value = nStr;
+      } else if (preset === 'all') {
+        currentFilterStart = '';
+        currentFilterEnd = '';
+        activePeriodLabel = 'Histórico Completo';
+        document.getElementById('filterStartDate').value = '';
+        document.getElementById('filterEndDate').value = '';
+      }
+
+      document.getElementById('activeFilterText').innerText = `Mostrando: ${activePeriodLabel}`;
+      loadKPIs();
+      loadUnresolvedQueries();
+    }
+
+    function applyCustomDateFilter() {
+      const s = document.getElementById('filterStartDate').value;
+      const e = document.getElementById('filterEndDate').value;
+      if (!s && !e) {
+        showToast('Por favor selecciona al menos una fecha para filtrar', 'info');
+        return;
+      }
+      document.querySelectorAll('.time-preset-btn').forEach(b => b.classList.remove('active'));
+      currentFilterStart = s;
+      currentFilterEnd = e;
+      if (s && e) {
+        activePeriodLabel = s === e ? s : `${s} a ${e}`;
+      } else if (s) {
+        activePeriodLabel = `Desde ${s}`;
+      } else {
+        activePeriodLabel = `Hasta ${e}`;
+      }
+      document.getElementById('activeFilterText').innerText = `Mostrando: ${activePeriodLabel}`;
+      loadKPIs();
+      loadUnresolvedQueries();
+    }
+
+    function buildTelemetryQueryParams() {
+      const params = new URLSearchParams();
+      if (currentFilterStart) params.append('start_date', currentFilterStart);
+      if (currentFilterEnd) params.append('end_date', currentFilterEnd);
+      return params.toString() ? `?${params.toString()}` : '';
+    }
+
+    // ==========================================
+    // 2. CARGA DE KPIS Y OBSERVABILIDAD
     // ==========================================
     async function loadKPIs() {
       try {
-        const res = await fetch('/api/analytics/kpis');
+        const queryParams = buildTelemetryQueryParams();
+        const res = await fetch(`/api/analytics/kpis${queryParams}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         const kpis = json.data || json || {};
 
-        // Métricas
+        // Métricas de tarjetas
         document.getElementById('kpiTotalConsultas').innerText = (kpis.total_queries ?? 0).toLocaleString();
         document.getElementById('kpiTotalSesiones').innerText = (kpis.total_sessions ?? 0).toLocaleString();
-        document.getElementById('kpiTotalSesionesSubtext').innerText = `${kpis.total_sessions ?? 0} conversaciones registradas`;
+        document.getElementById('kpiTotalSesionesSubtext').innerText = `${kpis.total_sessions ?? 0} sesiones en ${activePeriodLabel}`;
 
         document.getElementById('kpiTasaResolucion').innerText = `${kpis.resolution_rate ?? 0}%`;
         document.getElementById('kpiResolucionSubtext').innerText = `${kpis.resolved_count ?? 0} resueltas en Nivel 1`;
@@ -1795,7 +2507,7 @@
         document.getElementById('totalRolesBadge').innerText = `${roleKeys.length} perfiles`;
 
         if (roleKeys.length === 0) {
-          rolesContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">Sin sesiones registradas aún</li>';
+          rolesContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">Sin sesiones registradas en este período</li>';
         } else {
           roleKeys.forEach(r => {
             const li = document.createElement('li');
@@ -1812,7 +2524,7 @@
         const docs = kpis.top_documents || [];
         docsContainer.innerHTML = '';
         if (docs.length === 0) {
-          docsContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">No hay referencias documentales aún</li>';
+          docsContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">No hay referencias documentales en este período</li>';
         } else {
           docs.forEach(d => {
             const li = document.createElement('li');
@@ -1823,12 +2535,12 @@
           });
         }
 
-        // Top Preguntas
+        // Top Preguntas Frecuentes
         const queriesContainer = document.getElementById('topQueriesList');
         const queries = kpis.top_queries || [];
         queriesContainer.innerHTML = '';
         if (queries.length === 0) {
-          queriesContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">No hay consultas suficientes aún</li>';
+          queriesContainer.innerHTML = '<li class="item-row" style="color:var(--text-muted)">No hay consultas registradas en este período</li>';
         } else {
           queries.forEach(q => {
             const li = document.createElement('li');
@@ -1842,6 +2554,391 @@
       } catch (err) {
         console.error('Error cargando KPIs:', err);
         showToast('Error al conectar con el servidor de telemetría', 'error');
+      }
+    }
+
+    // ==========================================
+    // 3. RANKING DE PREGUNTAS NO RESUELTAS
+    // ==========================================
+    async function loadUnresolvedQueries() {
+      const container = document.getElementById('unresolvedQueriesContainer');
+      const badge = document.getElementById('unresolvedTotalBadge');
+      try {
+        const queryParams = buildTelemetryQueryParams();
+        const res = await fetch(`/api/analytics/unresolved-queries${queryParams}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const list = data.ranking || [];
+        currentUnresolvedList = list;
+
+        badge.innerText = `${data.total_unique_knowledge_gaps || 0} brechas (${data.total_unresolved_interactions || 0} intentos)`;
+
+        // Si hay texto en el input de búsqueda, aplicar filtro
+        const filterInput = document.getElementById('filterUnresolvedInput');
+        if (filterInput && filterInput.value.trim()) {
+          filterUnresolvedQueriesUI();
+        } else {
+          renderUnresolvedQueriesList(list);
+        }
+      } catch (err) {
+        console.error('Error cargando ranking no resueltas:', err);
+        container.innerHTML = '<div style="color: #EF4444; padding: 1rem;">Error al cargar las preguntas no resueltas.</div>';
+      }
+    }
+
+    function filterUnresolvedQueriesUI() {
+      const q = (document.getElementById('filterUnresolvedInput')?.value || '').toLowerCase().trim();
+      if (!q) {
+        renderUnresolvedQueriesList(currentUnresolvedList);
+        return;
+      }
+      const filtered = currentUnresolvedList.filter(item => 
+        (item.query || '').toLowerCase().includes(q) ||
+        (item.priority || '').toLowerCase().includes(q) ||
+        (item.roles || []).some(r => String(r).toLowerCase().includes(q)) ||
+        (item.reasons || []).some(rs => String(rs).toLowerCase().includes(q))
+      );
+      renderUnresolvedQueriesList(filtered);
+    }
+
+    function renderUnresolvedQueriesList(list) {
+      const container = document.getElementById('unresolvedQueriesContainer');
+      if (!container) return;
+
+      if (!list || list.length === 0) {
+        const hasSearch = (document.getElementById('filterUnresolvedInput')?.value || '').trim().length > 0;
+        if (hasSearch) {
+          container.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 2.5rem; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px dashed rgba(255, 255, 255, 0.1);">
+              <div style="font-size: 1.5rem; margin-bottom: 6px;">🔍</div>
+              <div style="font-weight: 700; font-size: 0.95rem; color: #E2E8F0;">No se encontraron brechas con esa búsqueda</div>
+              <div style="font-size: 0.8rem; margin-top: 4px;">Prueba con otra palabra clave o limpia el filtro.</div>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <div style="text-align: center; color: #34D399; padding: 2.5rem; background: rgba(16, 185, 129, 0.05); border-radius: 8px; border: 1px dashed rgba(16, 185, 129, 0.2);">
+            <div style="font-size: 1.8rem; margin-bottom: 6px;">🎉</div>
+            <div style="font-weight: 700; font-size: 1rem;">¡Excelente! No se registran preguntas no resueltas</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Todas las consultas atendidas en este período fueron resueltas satisfactoriamente.</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      list.forEach((item, idx) => {
+        const pClass = item.priority === 'ALTA' ? 'badge-priority-alta' : item.priority === 'MEDIA' ? 'badge-priority-media' : 'badge-priority-normal';
+        const pIcon = item.priority === 'ALTA' ? '🔴 ALTA' : item.priority === 'MEDIA' ? '🟡 MEDIA' : '🟢 NORMAL';
+
+        const rolesHtml = (item.roles || []).map(r => {
+          const rLower = String(r).toLowerCase();
+          const icon = rLower.includes('prof') || rLower.includes('doc') ? '👨‍🏫' : rLower.includes('est') ? '🎓' : '💼';
+          return `<span style="font-size:0.75rem; color:#94A3B8;">${icon} ${r}</span>`;
+        }).join(' · ');
+
+        const reasonsHtml = (item.reasons || []).map(reason => {
+          return `<span class="badge-reason">${reason}</span>`;
+        }).join(' ');
+
+        const safeQuery = item.query.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const primaryRole = (item.roles && item.roles[0]) || 'general';
+
+        html += `
+          <div class="unresolved-item-card">
+            <div class="unresolved-header-row">
+              <div class="unresolved-query-title">
+                <span class="badge-rank">#${item.rank || (idx + 1)}</span>
+                <span>"${item.query}"</span>
+                <span class="${pClass}">${pIcon}</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="badge" style="background: rgba(255,255,255,0.08); font-weight: 700;">
+                  ${item.count} ${item.count === 1 ? 'consulta' : 'consultas'}
+                </span>
+                <button type="button" class="btn-action-ia" onclick="openDraftProcedureModal('${safeQuery}', '${primaryRole}')" title="Pedirle a Ollama que redacte la guía institucional">
+                  ✨ Redactar Guía RAG
+                </button>
+                <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="toggleUnresolvedResponse(${idx})">
+                  👁️ Ver Detalle
+                </button>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.8rem;">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <span style="color: var(--text-muted);">Roles afectados:</span>
+                ${rolesHtml}
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <span style="color: var(--text-muted);">Causa:</span>
+                ${reasonsHtml}
+                <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 8px;">Última: ${item.last_seen || 'Hoy'}</span>
+              </div>
+            </div>
+
+            <div id="unresolvedDrawer_${idx}" style="display: none; margin-top: 8px; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; border-left: 3px solid #F59E0B; font-size: 0.8rem; color: #E2E8F0; line-height: 1.5;">
+              <div style="font-weight: 700; color: #F59E0B; margin-bottom: 4px;">💬 Respuesta que entregó el bot:</div>
+              <div>${item.sample_response || 'Sin registro detallado de respuesta.'}</div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function toggleUnresolvedResponse(idx) {
+      const el = document.getElementById(`unresolvedDrawer_${idx}`);
+      if (el) {
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    function exportUnresolvedCSV() {
+      const queryParams = buildTelemetryQueryParams();
+      window.location.href = `/api/analytics/export-unresolved-csv${queryParams}`;
+    }
+
+    // ==========================================
+    // 4. DIAGNÓSTICO Y RECOMENDACIONES CON IA
+    // ==========================================
+    async function runAIInsights() {
+      const btn = document.getElementById('btnRunAIInsights');
+      const text = document.getElementById('aiInsightsBtnText');
+      const icon = document.getElementById('aiInsightsBtnIcon');
+      const container = document.getElementById('aiInsightsContainer');
+
+      btn.disabled = true;
+      icon.innerHTML = '<span class="ai-pulse-spinner"></span>';
+      text.innerText = 'Analizando con unimon:8b...';
+
+      container.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; padding: 2rem; color: #A78BFA;">
+          <span class="ai-pulse-spinner" style="width: 20px; height: 20px;"></span>
+          <span>Analizando KPIs, brechas y formulando plan de acción estratégico con Ollama...</span>
+        </div>
+      `;
+
+      try {
+        const queryParams = buildTelemetryQueryParams();
+        const res = await fetch(`/api/analytics/ai-insights${queryParams}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const markdown = data.insights || 'No se recibieron recomendaciones.';
+
+        let formatted = markdown
+          .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+          .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+          .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+          .replace(/^\- (.*$)/gim, '<li style="margin-left: 20px; margin-bottom: 4px;">$1</li>')
+          .replace(/\n\n/gim, '<p style="margin-bottom: 12px;"></p>');
+
+        container.innerHTML = `
+          <div style="font-size: 0.78rem; color: #C4B5FD; margin-bottom: 1rem; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
+            <span>Diagnóstico generado para: <strong>${data.period || activePeriodLabel}</strong></span>
+            <span>Modelo: <code>${data.model || 'unimon:8b'}</code></span>
+          </div>
+          <div class="ai-report-content">${formatted}</div>
+        `;
+        showToast('Diagnóstico con IA generado con éxito', 'success');
+      } catch (err) {
+        console.error('Error generando diagnóstico IA:', err);
+        container.innerHTML = '<div style="color: #EF4444; padding: 1rem;">No fue posible contactar a la IA local en este momento. Verifique que Ollama esté ejecutándose.</div>';
+        showToast('Error al generar análisis con IA', 'error');
+      } finally {
+        btn.disabled = false;
+        icon.innerText = '🤖';
+        text.innerText = 'Analizar Período con IA';
+      }
+    }
+
+    // ==========================================
+    // 5. COMPARATIVA DE PERÍODOS
+    // ==========================================
+    function setComparatorPreset(colNum, preset) {
+      const now = new Date();
+      const formatDate = (d) => d.toISOString().split('T')[0];
+
+      let start = '', end = '';
+      if (preset === 'today') {
+        start = formatDate(now);
+        end = formatDate(now);
+      } else if (preset === 'yesterday') {
+        const y = new Date(now);
+        y.setDate(y.getDate() - 1);
+        start = formatDate(y);
+        end = formatDate(y);
+      } else if (preset === 'this_month') {
+        const m = new Date(now.getFullYear(), now.getMonth(), 1);
+        start = formatDate(m);
+        end = formatDate(now);
+      } else if (preset === 'last_month') {
+        const firstDayPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayPrev = new Date(now.getFullYear(), now.getMonth(), 0);
+        start = formatDate(firstDayPrev);
+        end = formatDate(lastDayPrev);
+      }
+
+      document.getElementById(`compP${colNum}Start`).value = start;
+      document.getElementById(`compP${colNum}End`).value = end;
+    }
+
+    async function runPeriodComparison() {
+      const p1Start = document.getElementById('compP1Start').value;
+      const p1End = document.getElementById('compP1End').value;
+      const p2Start = document.getElementById('compP2Start').value;
+      const p2End = document.getElementById('compP2End').value;
+
+      if (!p1Start || !p2Start) {
+        showToast('Por favor selecciona las fechas de ambos períodos para comparar', 'info');
+        return;
+      }
+
+      const params = new URLSearchParams({
+        p1_start: p1Start,
+        p1_end: p1End || p1Start,
+        p2_start: p2Start,
+        p2_end: p2End || p2Start
+      });
+
+      try {
+        const res = await fetch(`/api/analytics/compare?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const d = data.deltas || {};
+
+        // 1. Resolución Nivel 1
+        const resDelta = d.resolution_rate || {};
+        const resDiff = resDelta.diff ?? 0;
+        const resPill = document.getElementById('deltaResPill');
+        resPill.className = `delta-pill ${resDelta.trend || 'neutral'}`;
+        resPill.innerText = `${resDiff > 0 ? '▲ +' : resDiff < 0 ? '▼ ' : ''}${resDiff}%`;
+        document.getElementById('deltaResMain').innerText = `${resDelta.period_2 ?? 0}%`;
+        document.getElementById('deltaResSub').innerText = `P1: ${resDelta.period_1 ?? 0}% → P2: ${resDelta.period_2 ?? 0}%`;
+
+        // 2. Escalado GLPI
+        const escDelta = d.escalation_rate || {};
+        const escDiff = escDelta.diff ?? 0;
+        const escPill = document.getElementById('deltaEscPill');
+        escPill.className = `delta-pill ${escDelta.trend || 'neutral'}`;
+        escPill.innerText = `${escDiff > 0 ? '▲ +' : escDiff < 0 ? '▼ ' : ''}${escDiff}%`;
+        document.getElementById('deltaEscMain').innerText = `${escDelta.period_2 ?? 0}%`;
+        document.getElementById('deltaEscSub').innerText = `P1: ${escDelta.period_1 ?? 0}% → P2: ${escDelta.period_2 ?? 0}%`;
+
+        // 3. Consultas Totales
+        const qDelta = d.queries || {};
+        const qDiff = qDelta.diff ?? 0;
+        const qPill = document.getElementById('deltaQueriesPill');
+        qPill.className = 'delta-pill neutral';
+        qPill.innerText = `${qDiff > 0 ? '▲ +' : qDiff < 0 ? '▼ ' : ''}${qDiff} (${qDelta.pct_change ?? 0}%)`;
+        document.getElementById('deltaQueriesMain').innerText = `${qDelta.period_2 ?? 0}`;
+        document.getElementById('deltaQueriesSub').innerText = `P1: ${qDelta.period_1 ?? 0} → P2: ${qDelta.period_2 ?? 0}`;
+
+        // 4. Latencia Media
+        const latDelta = d.latency_ms || {};
+        const latDiff = latDelta.diff ?? 0;
+        const latPill = document.getElementById('deltaLatPill');
+        latPill.className = `delta-pill ${latDelta.trend || 'neutral'}`;
+        latPill.innerText = `${latDiff > 0 ? '▲ +' : latDiff < 0 ? '▼ ' : ''}${latDiff} ms`;
+        document.getElementById('deltaLatMain').innerText = `${latDelta.period_2 ?? 0} ms`;
+        document.getElementById('deltaLatSub').innerText = `P1: ${latDelta.period_1 ?? 0} ms → P2: ${latDelta.period_2 ?? 0} ms`;
+
+        showToast('Comparativa de períodos calculada exitosamente', 'success');
+      } catch (err) {
+        console.error('Error calculando comparativa:', err);
+        showToast('Error al comparar los períodos', 'error');
+      }
+    }
+
+    // ==========================================
+    // 6. GENERADOR DE GUÍAS Y GUARDADO RAG
+    // ==========================================
+    async function openDraftProcedureModal(query, role) {
+      const backdrop = document.getElementById('draftProcedureModalBackdrop');
+      backdrop.classList.add('show');
+
+      document.getElementById('draftProcedureQueryRef').value = query;
+      document.getElementById('draftProcedureTitle').value = 'Redactando borrador con Ollama...';
+      document.getElementById('draftProcedureContent').value = 'Generando propuesta institucional oficial con unimon:8b...\nPor favor espera unos segundos.';
+
+      const roleSelect = document.getElementById('draftProcedureRoleSelect');
+      const rLower = String(role || '').toLowerCase();
+      if (rLower.includes('prof') || rLower.includes('doc')) {
+        roleSelect.value = '2_profesores';
+      } else if (rLower.includes('est')) {
+        roleSelect.value = '1_estudiantes';
+      } else if (rLower.includes('admin') || rLower.includes('func')) {
+        roleSelect.value = '3_funcionarios_gestion';
+      } else {
+        roleSelect.value = '4_general_normativa';
+      }
+
+      try {
+        const res = await fetch('/api/analytics/draft-procedure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query, role: role || 'general' })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        document.getElementById('draftProcedureTitle').value = data.title || `PT-TI: Procedimiento para ${query.slice(0, 35)}`;
+        document.getElementById('draftProcedureContent').value = data.content || '';
+      } catch (err) {
+        console.error('Error generando borrador:', err);
+        document.getElementById('draftProcedureTitle').value = `PT-TI: Procedimiento para ${query.slice(0, 35)}`;
+        document.getElementById('draftProcedureContent').value = `# PT-TI: Procedimiento para ${query}\n\n## 1. OBJETIVO\nAtender solicitudes de soporte para: ${query}.\n\n## 2. PROCEDIMIENTO PASO A PASO\n1. Ingrese al portal institucional.\n2. Verifique sus credenciales.\n3. Radique su solicitud en la Mesa de Ayuda TI.`;
+        showToast('Aviso: Se aplicó plantilla base para el procedimiento', 'info');
+      }
+    }
+
+    function closeDraftProcedureModal() {
+      document.getElementById('draftProcedureModalBackdrop').classList.remove('show');
+    }
+
+    async function saveDraftProcedure() {
+      const title = document.getElementById('draftProcedureTitle').value.trim();
+      const content = document.getElementById('draftProcedureContent').value.trim();
+      const folderRole = document.getElementById('draftProcedureRoleSelect').value;
+      const saveBtn = document.getElementById('btnSaveDraftProcedure');
+
+      if (!title || !content) {
+        showToast('El título y contenido no pueden estar vacíos', 'error');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.innerText = '💾 Guardando e Indexando...';
+
+      try {
+        const res = await fetch('/api/analytics/save-procedure', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*')
+          },
+          body: JSON.stringify({
+            title: title,
+            content: content,
+            role: folderRole
+          })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        showToast(`✅ ${data.message || 'Procedimiento guardado e indexado exitosamente'}`, 'success');
+        closeDraftProcedureModal();
+        loadDocuments();
+        loadUnresolvedQueries();
+      } catch (err) {
+        console.error('Error guardando procedimiento:', err);
+        showToast('Error al guardar el procedimiento en RAG', 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerText = '💾 Guardar e Indexar en RAG';
       }
     }
 
@@ -2543,7 +3640,13 @@
     function loadAllData() {
       const btn = document.getElementById('refreshBtn');
       if (btn) btn.innerText = '⏳ Cargando...';
-      Promise.all([loadKPIs(), loadDocuments(), loadSystemStatus()]).finally(() => {
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      if (document.getElementById('filterStartDate') && !document.getElementById('filterStartDate').value) {
+        document.getElementById('filterStartDate').value = todayStr;
+        document.getElementById('filterEndDate').value = todayStr;
+      }
+      Promise.all([loadKPIs(), loadUnresolvedQueries(), loadDocuments(), loadSystemStatus()]).finally(() => {
         if (btn) btn.innerText = '🔄 Actualizar';
       });
     }

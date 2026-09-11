@@ -186,3 +186,148 @@ async def test_reset_metrics_api_endpoint():
             assert data["golden_cache_purged"] is True
             mock_clear_gc.assert_called_once()
 
+
+@pytest.mark.asyncio
+async def test_kpis_date_filtering_and_ranking():
+    """Verifica filtros de fecha y ranking de preguntas no resueltas."""
+    from app.services.telemetry_service import reset_telemetry_db, get_unresolved_queries_ranking, compare_kpi_periods
+
+    reset_telemetry_db()
+
+    # Inserciones con diferentes características
+    # 1. Consulta exitosa
+    log_interaction(session_id="sess_ok", role="estudiante", query="Como cambio mi clave", bot_response="Pasos para cambio de clave...", feedback="RESOLVED")
+    update_session_status("sess_ok", "FINALIZADO")
+
+    # 2. Consulta no resuelta por falta de documentación (Docente -> Prioridad ALTA)
+    log_interaction(
+        session_id="sess_fail1",
+        role="profesor",
+        query="Como configuro el proyector de la sala 402 para parcial",
+        bot_response="No dispongo de un procedimiento para proyector sala 402.",
+        source="UniMon_SinDocumentacion",
+        feedback="RETRY"
+    )
+    update_session_status("sess_fail1", "RADICANDO_TICKET", escalated=True)
+
+    # 3. Consulta no resuelta repetida (Estudiante -> Prioridad MEDIA)
+    log_interaction(
+        session_id="sess_fail2",
+        role="estudiante",
+        query="Como descargo mi carnet digital",
+        bot_response="No encuentro información sobre carnet digital.",
+        source="knowledge_base_fallback",
+        feedback="NONE"
+    )
+    log_interaction(
+        session_id="sess_fail3",
+        role="estudiante",
+        query="como descargo mi carnet digital",
+        bot_response="No encuentro información sobre carnet digital.",
+        source="knowledge_base_fallback",
+        feedback="NO"
+    )
+
+    # Test KPI con filtro 'today'
+    kpi_today = get_kpis_summary(start_date="today", end_date="today")
+    assert kpi_today["total_queries"] == 4
+    assert kpi_today["total_sessions"] == 4
+    assert kpi_today["escalated_count"] == 1
+
+    # Test Ranking de preguntas no resueltas
+    unresolved_res = get_unresolved_queries_ranking(start_date="today", end_date="today")
+    assert unresolved_res["status"] == "success"
+    assert unresolved_res["total_unresolved_interactions"] == 3
+    assert unresolved_res["total_unique_knowledge_gaps"] == 2
+
+    ranking = unresolved_res["ranking"]
+    # El carnet digital tiene 2 ocurrencias, proyector tiene 1 pero es de profesor con prioridad ALTA
+    carnet_item = next(r for r in ranking if "carnet" in r["query"].lower())
+    assert carnet_item["count"] == 2
+    assert "Sin Procedimiento en RAG" in carnet_item["reasons"]
+
+    proyector_item = next(r for r in ranking if "proyector" in r["query"].lower())
+    assert proyector_item["priority"] == "ALTA"
+    assert "profesor" in proyector_item["roles"]
+
+    # Test Comparativa de períodos
+    comp = compare_kpi_periods(p1_start="2026-01-01", p1_end="2026-01-02", p2_start="today", p2_end="today")
+    assert comp["status"] == "success"
+    assert "deltas" in comp
+    assert comp["deltas"]["queries"]["period_2"] == 4
+
+
+@pytest.mark.asyncio
+async def test_analytics_api_new_endpoints():
+    """Valida los endpoints HTTP /unresolved-queries, /compare, /ai-insights y /export-unresolved-csv."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. GET /api/analytics/unresolved-queries
+        res_unres = await client.get("/api/analytics/unresolved-queries?start_date=today&end_date=today")
+        assert res_unres.status_code == 200
+        json_unres = res_unres.json()
+        assert "ranking" in json_unres
+        assert "total_unresolved_interactions" in json_unres
+
+        # 2. GET /api/analytics/compare
+        res_comp = await client.get("/api/analytics/compare?p1_start=2026-01-01&p1_end=2026-01-02&p2_start=today&p2_end=today")
+        assert res_comp.status_code == 200
+        json_comp = res_comp.json()
+        assert "deltas" in json_comp
+
+        # 3. GET /api/analytics/ai-insights con mock de Ollama
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"response": "### 1. Diagnóstico General\nEl asistente opera con normalidad."}
+        with patch("httpx.post", return_value=mock_response):
+            res_ai = await client.get("/api/analytics/ai-insights?start_date=today&end_date=today")
+            assert res_ai.status_code == 200
+            json_ai = res_ai.json()
+            assert "insights" in json_ai
+            assert "Diagnóstico" in json_ai["insights"]
+
+        # 4. GET /api/analytics/export-unresolved-csv
+        res_csv = await client.get(
+            "/api/analytics/export-unresolved-csv?start_date=today&end_date=today",
+            auth=(settings.admin_username, settings.admin_password)
+        )
+        assert res_csv.status_code == 200
+        assert "text/csv" in res_csv.headers["content-type"]
+        assert "Consulta No Resuelta" in res_csv.text
+
+        # 5. POST /api/analytics/draft-procedure con mock de Ollama
+        mock_draft = MagicMock()
+        mock_draft.status_code = 200
+        mock_draft.json.return_value = {"response": "# PT-01: PERMISO DE PARQUEADERO\n\n## 1. OBJETIVO\nTramitar acceso vehicular."}
+        with patch("httpx.post", return_value=mock_draft):
+            res_draft = await client.post(
+                "/api/analytics/draft-procedure",
+                json={"query": "Como tramitar permiso de parqueadero", "role": "docente"}
+            )
+            assert res_draft.status_code == 200
+            json_draft = res_draft.json()
+            assert "content" in json_draft
+            assert "OBJETIVO" in json_draft["content"]
+
+        # 6. POST /api/analytics/save-procedure
+        with patch("scripts.ingest_multimodal_docs.ingest_multimodal", return_value=True):
+            res_save = await client.post(
+                "/api/analytics/save-procedure",
+                json={
+                    "title": "PT-TI: Prueba Procedimiento Automatizado",
+                    "content": "# PT-TI: Procedimiento de Prueba\n\n## 1. OBJETIVO\nValidar guardado.",
+                    "role": "profesor"
+                },
+                auth=(settings.admin_username, settings.admin_password)
+            )
+            assert res_save.status_code == 200
+            json_save = res_save.json()
+            assert json_save["status"] == "success"
+            assert "2_profesores" in json_save["folder"]
+
+
+
+

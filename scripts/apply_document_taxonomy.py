@@ -50,7 +50,7 @@ NORMATIVE_PATTERNS = [
 # Autoservicio para Estudiantes
 STUDENT_PATTERNS = [
     r"estudiante", r"estudiantes", r"aspirante", r"aspirantes",
-    r"reintegro", r"posgrado", r"pregrado",
+    r"reintegro", r"pregrado",
     r"matricula\s*antiguos", r"matr[ií]cula\s*antiguos",
     r"inscripci[oó]n", r"inscripcion",
     r"movilidad\s*acad[eé]mica.*estudiante",
@@ -70,6 +70,8 @@ TEACHER_PATTERNS = [
     r"servicios\s*institucionales.*profesores",
     r"evaluaci[oó]n\s*docente",
     r"autoevaluaci[oó]n", r"autoevaluacion",
+    r"registro.*calificaciones", r"calificaciones.*posgrado",
+    r"calificaciones.*profesor", r"inasistencias.*portal\s*profesor",
 ]
 
 # Funcionarios específicos (no admin_ti, pero sí usuario de sistemas internos)
@@ -107,9 +109,29 @@ def classify_document(source_name: str) -> dict:
     {"doc_type": ..., "audience": ..., "category": ...}
     """
     name = source_name.lower()
+    clean_src = Path(source_name).name
+
+    # ── 0. Verificación por carpeta física si el archivo existe en data/docs ──
+    folder_audience = None
+    folder_doc_type = None
+    for folder in ["1_estudiantes", "2_profesores", "3_funcionarios_gestion", "4_general_normativa"]:
+        if (Path("data/docs") / folder / clean_src).exists():
+            if folder == "2_profesores":
+                folder_audience = "profesor"
+                folder_doc_type = "autoservicio"
+            elif folder == "1_estudiantes":
+                folder_audience = "estudiante"
+                folder_doc_type = "autoservicio"
+            elif folder == "3_funcionarios_gestion":
+                folder_audience = "funcionario"
+                folder_doc_type = "gestion_interna"
+            elif folder == "4_general_normativa":
+                folder_audience = "general"
+                folder_doc_type = "normativa"
+            break
 
     # ── 1. Determinar doc_type ──
-    doc_type = "autoservicio"  # default
+    doc_type = folder_doc_type or "autoservicio"
 
     for pattern in NORMATIVE_PATTERNS:
         if re.search(pattern, name):
@@ -124,13 +146,15 @@ def classify_document(source_name: str) -> dict:
 
     # ── 2. Determinar audience ──
     if doc_type == "gestion_interna":
-        # Distinguir admin_ti vs funcionario general
         if any(re.search(p, name) for p in [r"permiso", r"c[oó]digo", r"parametrizaci[oó]n", r"bloqueos\s*\(admin\)", r"bloqueos\s*admin"]):
             audience = "admin_ti"
         else:
             audience = "funcionario"
     elif doc_type == "normativa":
         audience = "general"
+    elif folder_audience:
+        # Si la carpeta física lo define (ej. 2_profesores), respetar esa audiencia institucional
+        audience = folder_audience
     elif any(re.search(p, name) for p in TEACHER_PATTERNS):
         audience = "profesor"
     elif any(re.search(p, name) for p in STUDENT_PATTERNS):

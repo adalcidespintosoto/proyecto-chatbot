@@ -51,6 +51,46 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
+def is_anomalous_golden_pair(user_query: str, response: str) -> Tuple[bool, str]:
+    """
+    Evalúa si un par query/response almacenado en Golden Cache es anómalo,
+    alucinado o conceptualmente contradictorio:
+    1. Contraseñas/claves/login exigiendo visto bueno de jefe de dependencia.
+    2. Periféricos menores (mouse, teclado, cable, pad) exigiendo dotación/renovación de PC o aval de jefe.
+    3. Fallas técnicas / reparaciones / internet / teléfono confundidos con renovación de PC o aval de jefe.
+    4. Trámites académicos o inventados con aval de jefe de dependencia en TI.
+    5. Frases de disculpa o meta-lenguaje residual del LLM.
+    """
+    if not user_query or not response:
+        return False, ""
+
+    uq_lower = user_query.strip().lower()
+    resp_lower = response.strip().lower()
+
+    # 1. Contraseñas o acceso con jefe de dependencia
+    if any(k in uq_lower for k in ["contraseña", "contrasena", "clave", "login", "acceso al portal", "desbloqueo", "portal"]) and "jefe de dependencia" in resp_lower:
+        return True, "Contraseña o acceso institucional no requiere aval de jefe de dependencia"
+
+    # 2. Periféricos menores con jefe de dependencia o renovación de PC
+    if any(k in uq_lower for k in ["mouse", "mause", "teclado", "cable", "pad", "ratón", "raton", "adaptador"]) and any(r in resp_lower for r in ["jefe de dependencia", "aval de la jefatura", "tipo de equipo requerido", "renovación de equipos de cómputo", "renovacion de equipos de computo"]):
+        return True, "Periférico menor no requiere dotación/renovación de PC ni aval de jefatura"
+
+    # 3. Fallas técnicas / reparaciones / internet / teléfono con renovación de PC o aval de jefe
+    if any(k in uq_lower for k in ["no enciende", "no prende", "dañó", "dano", "se cayó el internet", "sin internet", "telefono fijo", "teléfono fijo", "onedrive", "sincronizar"]) and any(r in resp_lower for r in ["renovación de equipos de cómputo", "renovacion de equipos de computo", "tipo de equipo requerido (pc de escritorio o portátil)", "jefe de dependencia"]):
+        return True, "Falla técnica o conectividad no debe confundirse con renovación de PC ni exigir jefe de dependencia"
+
+    # 4. Trámites académicos o inventados con aval de jefe
+    if any(k in uq_lower for k in ["cupo maximo", "grupo nuevo", "materia"]) and "jefe de dependencia" in resp_lower:
+        return True, "Trámite académico fuera de alcance de TI no debe exigir aval de jefe en sistemas"
+
+    # 5. Frases de disculpa o meta-lenguaje residual del LLM
+    if any(p in resp_lower for p in ["lo siento", "lamento la confusión", "lamento la confusion", "como modelo de lenguaje", "hubo un error"]):
+        return True, "Respuesta contiene disculpas o meta-lenguaje de LLM"
+
+    return False, ""
+
+
+
 def get_embedding_model() -> SentenceTransformer:
     """Inicialización diferida (singleton) del modelo de embeddings para el Golden Cache en modo offline."""
     global _embedding_model
@@ -147,6 +187,11 @@ def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
     # Descartar reclamos de notas (trámites fuera de alcance TI)
     if any(k in user_query.lower() for k in ["cambiar nota", "corregir nota", "subir nota", "reclamo calificacion", "clavaron"]):
         logger.info("[GoldenCache] Descartado: trámite académico fuera de alcance TI.")
+        return False
+
+    is_anom, anom_reason = is_anomalous_golden_pair(user_query, bot_response)
+    if is_anom:
+        logger.info(f"[GoldenCache] Descartado por par anómalo/incompatible: {anom_reason}")
         return False
 
     return True
@@ -270,6 +315,14 @@ def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[
                     logger.warning("[GoldenCache] Coincidencia descartada por contener patrón no permitido.")
                     return None
 
+                # Descartar si el par (consulta actual, respuesta guardada) o (consulta guardada, respuesta guardada) es anómalo
+                is_anom, anom_reason = is_anomalous_golden_pair(user_query, matched_response)
+                if not is_anom:
+                    is_anom, anom_reason = is_anomalous_golden_pair(matched_query, matched_response)
+                if is_anom:
+                    logger.warning(f"[GoldenCache] Coincidencia descartada por incompatibilidad semántica: {anom_reason}")
+                    return None
+
                 # Descartar si la consulta es electoral y la respuesta carece de la URL canónica
                 if any(k in user_query.lower() for k in ["eleccion", "elecciones", "votar", "votacion", "candidato"]):
                     if "https://elecciones.unisimon.edu.co" not in matched_response:
@@ -316,9 +369,16 @@ def purge_anomalous_golden_entries() -> int:
             "hubo un error", "no puedo continuar con la conversación"
         ]
 
-        for doc_id, doc in zip(data["ids"], data["documents"]):
+        for doc_id, doc, meta in zip(data["ids"], data["documents"], data.get("metadatas", [])):
             doc_strip = doc.strip()
             doc_lower = doc_strip.lower()
+            uq = (meta or {}).get("user_query", "")
+
+            # Validación de par anómalo / contradictorio
+            is_anom, _ = is_anomalous_golden_pair(uq, doc)
+            if is_anom:
+                ids_to_delete.append(doc_id)
+                continue
 
             # Respuesta demasiado corta
             if len(doc_strip) < 60:

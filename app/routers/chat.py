@@ -193,10 +193,17 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
 
     # Registrar telemetría de la interacción
     try:
+        query_to_log = resultado.get("query") or texto
+        if not query_to_log or query_to_log.strip().lower() in ("estudiante", "profesor", "docente", "administrativo", "otros", "otro"):
+            if getattr(session_obj, "falla", None):
+                query_to_log = session_obj.falla
+            elif getattr(session_obj, "last_user_query", None):
+                query_to_log = session_obj.last_user_query
+
         log_interaction(
             session_id=session_id,
             role=user_role,
-            query=texto,
+            query=query_to_log,
             bot_response=mensaje_resp,
             intent=tipo,
             source=source,
