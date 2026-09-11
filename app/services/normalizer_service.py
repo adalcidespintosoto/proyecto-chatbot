@@ -33,6 +33,8 @@ SYNONYM_MAP = {
     r"\b(microfono|micrófono|micrófonos|diadema|audifonos|audífonos|auriculares|parlante|altavoz)\b": "micrófono equipo de audio",
     r"\b(cargador|cable de poder|adaptador|fuente de poder)\b": "cargador fuente de poder cable de energía",
     r"\b(pantalla|monitor|display)\b": "pantalla monitor de video",
+    r"\b(teclado|teclados|mouse|mause|rat[oó]n|ratones|pad|perif[eé]rico|perif[eé]ricos|periferico|perifericos|cable\s+hdmi|adaptador\s+hdmi|cable\s+vga|puntero|presentador)\b": "periféricos y accesorios de cómputo soporte técnico mantenimiento preventivo y correctivo de equipos p-gt-01",
+    r"\b(pr[eé]stamo\s+de\s+(?:teclado|mouse|mause|rat[oó]n|pantalla|monitor|cable|adaptador|videobeam|video\s*beam|proyector|micr[oó]fono|port[aá]til|computador|equipo)|prestar\s+(?:teclado|mouse|mause|rat[oó]n|pantalla|monitor|cable|adaptador|videobeam|video\s*beam|proyector|micr[oó]fono|port[aá]til|computador|equipo))\b": "solicitud préstamo de periféricos y recursos físicos soporte técnico ti mantenimiento preventivo y correctivo p-gt-01",
     
     # Plataformas y Sistemas
     r"\b(aula|campus virtual|moodle|aula virtual|como entro al aula)\b": "instructivo portales estudiantes siaaf acceso plataforma institucional aula extendida",

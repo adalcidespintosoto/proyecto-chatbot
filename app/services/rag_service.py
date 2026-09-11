@@ -78,7 +78,7 @@ def get_reranker() -> Optional[CrossEncoder]:
 get_reranker_model = get_reranker
 
 
-def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
+def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_query: Optional[str] = None) -> list:
     """
     Reordena los fragmentos recuperados mediante Cross-Encoder para máxima precisión semántica.
     - Bonifica fragmentos de activación y recuperación de contraseña en consultas de credenciales/claves.
@@ -89,12 +89,13 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         query: La consulta del usuario (expandida o normalizada).
         retrieved_docs: Lista de tuplas (doc, score) provenientes de ChromaDB.
         top_k: Número máximo de fragmentos a retornar tras el reranking.
+        original_query: Consulta original cruda del usuario para validación contextual.
     
     Returns:
         Lista de tuplas (doc, score) reordenadas por relevancia semántica real.
     """
-    if not retrieved_docs or len(retrieved_docs) <= top_k:
-        return retrieved_docs
+    if not retrieved_docs:
+        return []
 
     reranker = get_reranker()
     if not reranker:
@@ -105,7 +106,8 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         pairs = [[clean_q, doc.page_content.strip()] for doc, _ in retrieved_docs]
         scores = reranker.predict(pairs)
 
-        q_lower = clean_q.lower()
+        full_q = f"{clean_q} {original_query or ''}".strip()
+        q_lower = full_q.lower()
         is_specific_lab_query = bool(re.search(r"\b(laboratorio\s+de\s+[a-záéíóúñ]+|lab\s+de\s+[a-záéíóúñ]+|laboratorio\s+espec[ií]fico|laboratorio\s+biom[eé]dico|laboratorio\s+mac)\b", q_lower))
         is_general_campus_query = not is_specific_lab_query and any(w in q_lower for w in [
             "salon", "salones", "aula", "aulas", "oficina", "oficinas", "sede", "sedes", 
@@ -133,8 +135,18 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
         is_hardware_dotation_query = any(w in q_lower for w in [
             "portatil", "portátil", "laptop", "computador", "pc", "equipo de computo",
             "dotacion", "dotación", "solicitar un portatil", "solicitar un computador", "pedir computador",
-            "prestar", "préstamo", "prestamo", "reemplazo", "mientras arreglan", "otro equipo", "asignación de equipo"
+            "prestar", "préstamo", "prestamo", "reemplazo", "mientras arreglan", "otro equipo", "asignación de equipo",
+            "teclado", "mouse", "mause", "raton", "ratón", "periferico", "periférico", "perifericos", "periféricos"
         ])
+        is_peripheral_or_hardware_query = any(w in q_lower for w in [
+            "teclado", "teclados", "mouse", "mause", "raton", "ratón", "ratones", "pad",
+            "periferico", "periférico", "perifericos", "periféricos", "pantalla", "monitor",
+            "display", "cable", "cables", "hdmi", "vga", "adaptador", "videobeam", "video beam",
+            "proyector", "portatil", "portátil", "computador", "pc", "laptop", "diadema", "microfono",
+            "micrófono", "cargador", "equipo de computo", "equipos de computo", "dotacion", "dotación"
+        ]) or (any(p in q_lower for p in ["prestamo", "préstamo", "prestar"]) and any(e in q_lower for e in [
+            "teclado", "mouse", "mause", "raton", "ratón", "pantalla", "monitor", "cable", "equipo", "computador", "portatil", "portátil", "pc", "videobeam", "proyector", "microfono", "diadema", "recurso"
+        ]))
         is_teacher_grading_query = any(w in q_lower for w in [
             "subo las notas", "subo notas", "subir notas", "cargar notas", "cargo notas", "calificar",
             "fallas de mis alumnos", "inasistencias", "reporte de fallas", "reporte de las fallas",
@@ -217,12 +229,30 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3) -> list:
                 ]):
                     final_score += 4.5
 
-            # Desambiguación entre dotación/préstamo de hardware (P-GT-01 / Asignación) y proyectos de software/Jira (P-GT-13)
-            if is_hardware_dotation_query and not any(k in q_lower for k in ["software", "desarrollo", "jira", "proyecto", "solución tecnológica"]):
-                if any(m in content_lower for m in ["mantenimiento preventivo y correctivo de equipos de cómputo", "solicitud y asignación de equipos de cómputo", "asignación de equipo", "préstamo de equipo", "p-gt-01", "equipo de cómputo"]):
-                    final_score += 3.5
-                if any(j in content_lower for j in ["gestión de requerimientos de recursos y soluciones tecnológicas", "p-gt-13"]):
-                    final_score -= 3.0
+            # Desambiguación y Filtro Estricto ante consultas de hardware, dotación o periféricos
+            if is_peripheral_or_hardware_query or is_hardware_dotation_query:
+                is_it_hardware_doc = any(m in content_lower or m in source_lower for m in [
+                    "p-gt-01", "c-gt-01", "mantenimiento preventivo", "mantenimiento correctivo",
+                    "mantenimiento de equipos", "equipos de cómputo", "equipos de computo",
+                    "gestión de ti", "gestion de ti", "tecnologías de la información",
+                    "tecnologias de la informacion", "proceso de ti"
+                ])
+                if not is_it_hardware_doc:
+                    # Todo documento ajeno a soporte hardware/mantenimiento (certificados, matrículas, admisiones, notas, etc.) es penalizado
+                    final_score -= 10.0
+                else:
+                    final_score += 4.0
+
+                if any(fin in source_lower or fin in content_lower for fin in [
+                    "crédito interno", "credito interno", "cartera castigada", "condonación", "condonacion",
+                    "siaaf", "bienestar universitario", "liquidación", "liquidacion", "financiera",
+                    "aspirantes", "admisiones", "admitidos", "inscripción", "inscripcion", "certificado", "certificados"
+                ]):
+                    final_score -= 6.0
+
+                if not any(k in q_lower for k in ["software", "desarrollo", "jira", "proyecto", "solución tecnológica"]):
+                    if any(j in content_lower for j in ["gestión de requerimientos de recursos y soluciones tecnológicas", "p-gt-13"]):
+                        final_score -= 3.0
 
             # Desambiguación de Docentes ingresando calificaciones / inasistencias vs Estudiantes consultando
             if is_teacher_grading_query:
@@ -586,21 +616,19 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
      * Si en el contexto NO hay requisitos especiales, ve directamente al paso a paso sin inventar nada.
      * PROHIBICIÓN ESTRICTA DE REQUISITOS FALSOS: NUNCA generes el encabezado '**⚠️ Requisitos y Restricciones Previas:**' si el texto del contexto no contiene requisitos previos normativos explícitos. PROHIBIDO reutilizar requisitos de equipos de cómputo en trámites de SIAAF, cursos de énfasis, portales, calificaciones o votaciones.
 
-   - C. DOTACIÓN Y RENOVACIÓN DE PUESTO DE TRABAJO (SOLO para solicitudes físicas de computador, portátil de oficina, periféricos o cambio de equipo):
-     * Aplica EXCLUSIVAMENTE cuando el usuario solicita una dotación física, cambio o asignación de un computador o portátil de trabajo.
-     * PROHIBICIÓN ESTRICTA: NUNCA menciones requisitos de equipos de cómputo ni visto bueno de jefatura para hardware en consultas sobre SIAAF, Portal, Teams, notas, cursos de énfasis, liquidaciones o solicitudes de acceso a software.
-     * **⚠️ Requisitos y Restricciones Previas (SOLO para PC/Portátil físico):**
-       - Toda solicitud o renovación de equipos de cómputo para puesto de trabajo DEBE ser radicada o contar con el visto bueno/aval del Jefe de Dependencia o Jefatura inmediata.
-       - Estar justificada por necesidades del cargo o por obsolescencia/falla técnica del equipo actual.
-     * **Datos obligatorios a incluir en la solicitud formal a TI:**
-       - Nombre completo y documento de identidad del colaborador.
-       - Cargo y Dependencia/Programa.
-       - Tipo de equipo requerido (PC de escritorio o portátil).
-       - Placa de inventario del equipo actual (en caso de renovación o cambio).
-       - Justificación del requerimiento y aval de la Jefatura.
-     * **Canales oficiales de radicación:**
-       - Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | WhatsApp: 3172683922 | Tel: (605) 3444333 Ext. 8003/8004
-       - Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: (607) 5827070 Ext. 129
+   - C. DOTACIÓN Y RENOVACIÓN DE PUESTO DE TRABAJO (Computador, portátil de oficina) VS. PERIFÉRICOS MENORES (Teclado, Mouse, Cables, Adaptadores):
+     * Para dotación de computador completo o portátil de trabajo nuevo:
+       - **⚠️ Requisitos y Restricciones Previas (SOLO para PC/Portátil físico nuevo o cambio de máquina titular):**
+         • Toda solicitud o renovación de equipos de cómputo para puesto de trabajo DEBE ser radicada o contar con el visto bueno/aval del Jefe de Dependencia o Jefatura inmediata.
+         • Estar justificada por necesidades del cargo o por obsolescencia/falla técnica del equipo actual.
+       - Datos obligatorios: Nombre completo, documento, cargo, dependencia, tipo de equipo, placa actual (si es cambio) y aval de jefatura.
+     * Para suministro, reposición o préstamo temporal de periféricos o accesorios menores (teclado, mouse, cables HDMI/VGA, adaptadores, extensiones):
+       - Es gestionado DIRECTAMENTE por Soporte Técnico TI para el aula, oficina o puesto de trabajo. NO requiere visto bueno ni aval previo de jefatura para un periférico menor o reemplazo inmediato.
+       - Datos requeridos: Nombre completo, documento, rol institucional, periférico requerido, ubicación exacta (sede, bloque, salón u oficina) y motivo.
+       - Canales oficiales de radicación:
+         • Sede Barranquilla: `solicitudcomputo@unisimon.edu.co` | WhatsApp: 3172683922 | Tel: (605) 3444333 Ext. 8003/8004
+         • Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: (607) 5827070 Ext. 129
+     * PROHIBICIÓN ESTRICTA: NUNCA menciones requisitos de equipos de cómputo ni visto bueno de jefatura para hardware en consultas sobre SIAAF, Portal, Teams, notas o votaciones. NUNCA asocies solicitudes o préstamos de hardware/periféricos con créditos educativos en SIAAF, condonación de cartera ni bienestar universitario.
 
    - D. PRÉSTAMO TEMPORAL DE RECURSOS AUDIOVISUALES (Cámaras, Video Beam, Micrófonos, Tablets para clases/eventos):
      * Si el usuario solicita un préstamo temporal o reserva de equipos para clases o eventos:
@@ -1161,6 +1189,14 @@ def clean_llm_response(text: str) -> str:
             text
         )
 
+    # 14. Detectar y purgar respuestas huérfanas o vacías que solo contienen preguntas de cortesía residuales
+    stripped_lines = [line.strip() for line in text.split("\n") if line.strip()]
+    if len(stripped_lines) <= 2:
+        combined_lower = " ".join(stripped_lines).lower()
+        combined_lower = re.sub(r"^(?:¡?hola!?[,!.]*\s*|buenos\s+d[ií]as[!.]*\s*|buenas\s+tardes[!.]*\s*)+", "", combined_lower).strip()
+        if re.search(r"^(?:¿?(?:hay\s+algo\s+m[aá]s|en\s+qu[eé]\s+m[aá]s|te\s+puedo\s+colaborar\s+en\s+algo\s+m[aá]s|deseas\s+ayuda\s+con\s+algo\s+m[aá]s|puedo\s+ayudarte\s+en\s+algo\s+m[aá]s)[^?]*\??|\s*)$", combined_lower):
+            return ""
+
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
@@ -1238,6 +1274,36 @@ def is_software_installation_or_it_service_request(query: str) -> bool:
     return has_action and (has_target or "en el" in q_lower or "en un" in q_lower or "en mi" in q_lower)
 
 
+def is_peripheral_or_hardware_request(query: str) -> bool:
+    """
+    Detecta si la consulta del usuario es sobre solicitud, cambio, reposición o préstamo temporal
+    de periféricos y recursos de hardware (teclado, mouse, cables, monitores, proyectores, adaptadores).
+    """
+    if not query:
+        return False
+    q_lower = query.lower()
+
+    # Excluir consultas de créditos, calificaciones o elecciones
+    if any(ex in q_lower for ex in ["credito", "crédito", "cartera", "nota", "calificaci", "votar", "elecci"]):
+        return False
+
+    has_peripheral = any(w in q_lower for w in [
+        "teclado", "teclados", "mouse", "mause", "raton", "ratón", "ratones", "pad",
+        "periferico", "periférico", "perifericos", "periféricos",
+        "cable hdmi", "cable vga", "cable de red", "adaptador hdmi", "adaptador vga",
+        "adaptador", "convertidor", "puntero", "presentador", "videobeam", "video beam",
+        "proyector", "display", "monitor adicional", "segunda pantalla"
+    ])
+
+    has_action = any(w in q_lower for w in [
+        "prestamo", "préstamo", "prestar", "solicitar", "pedir", "dotacion", "dotación",
+        "cambio", "cambiar", "reemplazo", "reemplazar", "necesito", "requiero", "suministro",
+        "asignar", "asignacion", "asignación"
+    ]) or "de " in q_lower or "un " in q_lower or "el " in q_lower
+
+    return has_peripheral and (has_action or len(q_lower.split()) <= 4)
+
+
 def extract_queried_platform_or_system(query: str) -> Optional[str]:
     """
     Identifica si la consulta del usuario se refiere explícitamente a una plataforma,
@@ -1248,8 +1314,8 @@ def extract_queried_platform_or_system(query: str) -> Optional[str]:
     if not query:
         return None
 
-    # Si es una solicitud de instalación de software o soporte técnico en equipo/laboratorio, NO tratarlo como plataforma no documentada
-    if is_software_installation_or_it_service_request(query):
+    # Si es una solicitud de instalación de software o soporte técnico en equipo/laboratorio/periféricos, NO tratarlo como plataforma no documentada
+    if is_software_installation_or_it_service_request(query) or is_peripheral_or_hardware_request(query):
         return None
 
     q_lower = query.lower()
@@ -1557,13 +1623,15 @@ class RAGService:
                 rerank_query = "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
             elif is_ambiguous_student_pwd:
                 rerank_query = "restablecimiento de contraseña portal estudiantes y activación de usuario primer semestre"
+            elif is_peripheral_or_hardware_request(question):
+                rerank_query = normalize_and_expand_query(question)
             elif query_variants:
                 rerank_query = query_variants[0]
             else:
                 rerank_query = normalize_and_expand_query(question)
 
             top_k_val = 4 if (is_ambiguous_student_pwd or is_election_query) else 3
-            reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=top_k_val)
+            reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=top_k_val, original_query=question)
 
             if reranked or is_ambiguous_student_pwd or is_election_query:
                 if is_ambiguous_student_pwd:
@@ -1704,6 +1772,36 @@ class RAGService:
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
         if not context_parts:
+            # Si es una petición de préstamo, reposición o soporte a periféricos/accesorios de hardware
+            if is_peripheral_or_hardware_request(question):
+                logger.info("Activando respuesta institucional de soporte técnico para periféricos y recursos físicos de TI.")
+                msg = (
+                    "Para el **suministro, reposición o préstamo temporal de periféricos y recursos físicos** "
+                    "(como teclados, mouse, cables de video HDMI/VGA, adaptadores o proyectores) en aulas o puestos de trabajo, "
+                    "la gestión se realiza directamente a través de **Soporte Técnico TI**:\n\n"
+                    "📋 **Datos requeridos para atender tu solicitud:**\n"
+                    "1. Nombre completo y documento de identidad del solicitante.\n"
+                    "2. Rol institucional (Profesor, Colaborador o Administrativo).\n"
+                    "3. Periférico o accesorio requerido (ej. Teclado USB, mouse, cable HDMI).\n"
+                    "4. Ubicación exacta (Sede, Bloque, Piso y Aula u Oficina donde se necesita el periférico).\n"
+                    "5. Motivo del requerimiento (falla técnica del periférico actual, clase o reunión de trabajo).\n\n"
+                    "📧 **Canales oficiales de radicación y atención:**\n"
+                    "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003 / 8004\n"
+                    "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n"
+                    "¿Deseas que radique este requerimiento de servicio directamente por ti ahora mismo?"
+                )
+                return {
+                    "response": msg,
+                    "sources": ["P-GT-01 Soporte Técnico y Mantenimiento de Equipos TI"],
+                    "source": "unimon_peripheral_hardware_service",
+                    "model": None,
+                    "retrieved_chunks": 0,
+                    "has_context": True,
+                    "quick_replies": [
+                        {"label": "🎫 Generar reporte", "payload": "CREATE_TICKET"}
+                    ]
+                }
+
             # Si es una petición de instalación de software o soporte técnico a equipos/laboratorios
             if is_software_installation_or_it_service_request(question):
                 logger.info("Activando respuesta institucional de soporte técnico para instalación/configuración de software.")
@@ -1821,7 +1919,12 @@ class RAGService:
 
                     # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
                     bot_message = clean_llm_response(bot_message)
-                    
+
+                    # Si la respuesta tras limpieza quedó vacía o insuficiente (ej. el modelo solo se disculpó o quedó reducida a cortesía)
+                    if not bot_message or len(bot_message.strip()) < 35:
+                        logger.info("Respuesta de Ollama vacía o reducida a cortesía tras sanitización. Invocando fallback institucional.")
+                        return self._generate_fallback_response(question, user_name, sources)
+
                     # Ubicar el pie de confirmación estrictamente al final del mensaje
                     bot_message = bot_message.rstrip() + CLOSING_FEEDBACK_QUESTION
 
@@ -1966,6 +2069,21 @@ class RAGService:
                 "1. **Verificación de conexión:** Asegúrate de que el cable de red (UTP) esté debidamente conectado en el equipo y en la toma de pared, o que la señal Wi-Fi institucional ('Unisimon') esté activa.\n"
                 "2. **Alcance de la desconexión:** Valida si otros compañeros de tu misma oficina o área presentan la misma falla.\n"
                 "3. **Soporte Técnico en sitio:** Si la desconexión continúa o se trata de una caída general del servicio de red, el personal de TI atenderá la novedad en sitio:\n"
+                "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
+                "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
+            )
+        elif is_peripheral_or_hardware_request(user_message):
+            contenido = (
+                f"{saludo} Para el **suministro, reposición o préstamo temporal de periféricos y recursos físicos** "
+                "(como teclados, mouse, cables de video HDMI/VGA, adaptadores o proyectores) en aulas o puestos de trabajo:\n\n"
+                "La atención y entrega la realiza directamente el equipo de **Soporte Técnico TI**:\n\n"
+                "📋 **Datos para radicar tu requerimiento:**\n"
+                "1. Nombre completo y documento de identidad del solicitante.\n"
+                "2. Rol institucional (Profesor / Colaborador / Administrativo).\n"
+                "3. Periférico o accesorio requerido (ej. Teclado USB, mouse, cable HDMI).\n"
+                "4. Ubicación exacta (Sede, Bloque, Piso y Aula u Oficina donde se requiere).\n"
+                "5. Motivo del requerimiento (daño del periférico actual, clase o reunión de trabajo).\n\n"
+                "📧 **Canales oficiales de radicación y atención:**\n"
                 "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
                 "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
             )
