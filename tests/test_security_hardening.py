@@ -21,6 +21,21 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.main import app
 from app.config import get_settings
 from app.routers import chat
+from app.services import telemetry_service
+from app.services.telemetry_service import init_telemetry_db
+
+@pytest.fixture(autouse=True)
+def setup_test_db(tmp_path, monkeypatch):
+    """Asegura que las pruebas de seguridad usen una base de datos aislada temporal y no toquen la de producción."""
+    test_db = tmp_path / "test_sec_analytics.db"
+    monkeypatch.setattr(telemetry_service, "DB_PATH", test_db)
+    init_telemetry_db()
+    yield
+    if test_db.exists():
+        try:
+            test_db.unlink()
+        except Exception:
+            pass
 
 def get_auth_header(username: str, password: str) -> dict:
     creds = f"{username}:{password}".encode("utf-8")
