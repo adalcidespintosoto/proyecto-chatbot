@@ -77,9 +77,6 @@ import re
 from fastapi import Request
 from app.services.telemetry_service import log_interaction, update_session_status
 
-RATE_LIMIT_BUCKET: Dict[str, List[float]] = {}
-MAX_REQUESTS_PER_MINUTE = 25
-RATE_LIMIT_WINDOW = 60.0
 
 INJECTION_PATTERNS = [
     r"(?i)\bignora\s+(tus|las|todas\s+las)?\s*instrucciones\b",
@@ -111,19 +108,6 @@ def get_client_ip(request: Optional[Request]) -> str:
     return "127.0.0.1"
 
 
-def check_rate_limit(key: str):
-    """Verifica si la IP ha superado el límite de peticiones por minuto."""
-    now = time.time()
-    timestamps = RATE_LIMIT_BUCKET.get(key, [])
-    # Limpiar marcas de tiempo fuera de la ventana de 60s
-    timestamps = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
-    if len(timestamps) >= MAX_REQUESTS_PER_MINUTE:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiadas solicitudes. Por favor espera un momento."
-        )
-    timestamps.append(now)
-    RATE_LIMIT_BUCKET[key] = timestamps
 
 
 def sanitize_input_text(text: str) -> str:
@@ -159,9 +143,6 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
 
     session_id = request.session_id or "default_session"
 
-    # Aplicar Rate Limiting estricto por IP real del cliente
-    client_ip = get_client_ip(raw_request)
-    check_rate_limit(client_ip)
 
     # Sanitizar y validar longitud del mensaje (máx 600 chars)
     texto = sanitize_input_text(raw_texto)

@@ -322,11 +322,18 @@ def validar_tramite_academico(mensaje: str, user_role: Optional[str] = None) -> 
     (ej. reclamo, corrección o subida de notas y calificaciones).
     """
     msg = mensaje.lower()
+    
+    # Excluir consultas sobre adjuntar documentos (matrícula, diploma, certificados)
+    if any(w in msg for w in ["formato", "tamaño", "tamano", "peso", "pdf", "archivo", "archivos", "adjuntar", "papeles", "diploma", "cargar", "documento", "documentos"]):
+        return None
+
     # Excluir consultas legítimas de docentes/profesores sobre el cargue de notas de sus estudiantes en SIAAF
     if "mis estudiantes" in msg or "de los estudiantes" in msg or (user_role in ["docente", "profesor"] and "estudiantes" in msg):
         return None
-    patron_reclamo = r"(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)"
-    patron_reclamo_inv = r"(nota|calificaci[oó]n|parcial|definitiva).*(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta)"
+    # Se reemplaza .* (cero a infinitos caracteres) por una restricción de proximidad ({0,25} caracteres)
+    # Esto evita que 'subir documentos... mis notas' genere un falso positivo como queja de notas.
+    patron_reclamo = r"(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|modificar|injusta).{0,25}(nota|calificaci[oó]n|parcial|definitiva)"
+    patron_reclamo_inv = r"(nota|calificaci[oó]n|parcial|definitiva).{0,25}(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|modificar|injusta)"
     if re.search(patron_reclamo, msg) or re.search(patron_reclamo_inv, msg):
         return (
             "⚠️ **Aviso de Alcance Institucional:**\n\n"
