@@ -9,6 +9,7 @@
 | :--- | :--- | :--- | :--- |
 | **Lenguaje Base** | Python | `>= 3.10` (Recomendado 3.11 / 3.12) | Entorno de ejecución principal del backend. |
 | **Framework Web** | FastAPI | `>= 0.110.0` | Servidor REST asíncrono de alto rendimiento (ASGI). |
+| **Seguridad API** | slowapi | `>= 0.1.9` | Rate Limiting global (30 req/min) para prevención DoS. |
 | **Servidor ASGI** | Uvicorn (`[standard]`) | `>= 0.28.0` | Servidor HTTP concurrente para FastAPI. |
 | **Validación de Datos** | Pydantic / Pydantic-Settings | `>= 2.6.0` / `>= 2.2.0` | Modelado y validación de esquemas y variables de entorno. |
 | **Motor LLM Local** | Ollama (`unimon:8b`) | `>= 0.3.0` | LLM local basado en Llama 3.1 8B cuantizado en 4 bits (`Q4_K_M`). |
@@ -86,10 +87,10 @@ proyecto-chatbot/
 ```
                         [ USUARIO EN LA WEB ]
                                   │
-                                  │ POST /api/chat
+                                  │ POST /api/chat (Rate Limit 30 req/min)
                                   ▼
                      [ FastAPI: app/main.py ]
-                                  │
+                                  │ (Verificación CORS)
                                   ▼
              [ Orquestador: app/services/router_logic.py ]
                                   │
@@ -109,12 +110,15 @@ proyecto-chatbot/
               │                                       │
      [ golden_cache_service ]               [ glpi_service.py ]
      - Similitud >= 0.90                    - Auth initSession
-              │ (Miss)                              - POST /Ticket
-     [ rag_service.py ]                             - POST /Ticket_User
-     - Filtro por Rol                       - Cierre sesión
+     - Inyección Few-Shot LLM               - POST /Ticket
+              │ (Miss)                      - POST /Ticket_User
+     [ rag_service.py ]                     - Cierre sesión
+     - Multi-Query Expansion
+     - Filtro por Rol                       
      - ChromaDB Top-8
      - Cross-Encoder Reranker Top-3
-     - LLM unimon:8b
+     - LLM unimon:8b (Temp 0.0)
+     - Clean LLM Response (Output Guard)
               │
               └───────────────────┬───────────────────┘
                                   │
@@ -379,3 +383,39 @@ Para validar la integridad de todo el backend, ejecutar Pytest utilizando el ent
 * **`test_role_quick_replies.py`**: Comprueba normalización de roles, botones interactivos y filtros de acceso a documentos.
 * **`test_incremental_ingest.py`**: Comprueba cálculo de hashes SHA-256 para no re-indexar documentos sin cambios.
 * **`test_clustering.py`**: Comprueba agrupamiento con DBSCAN y exportación de datasets DPO.
+
+---
+
+### 7.7. Bloqueos por Rate Limiting (HTTP 429 Too Many Requests)
+* **Síntoma:** El chat en la web deja de responder o la API retorna código 429.
+* **Causa:** El middleware de seguridad `slowapi` detectó que la IP del usuario envió más de 30 peticiones en menos de un minuto.
+* **Solución Paso a Paso:**
+  1. El bloqueo es temporal. Esperar exactamente 60 segundos y la IP será liberada automáticamente por el servidor.
+  2. Si estás realizando pruebas de estrés (ej. JMeter, K6) y necesitas deshabilitarlo, comenta el decorador `@limiter.limit("30/minute")` en el archivo `app/routers/chat.py`.
+
+---
+
+## 8. PANEL DE ADMINISTRACIÓN Y GESTIÓN DE CONOCIMIENTO (Admin Console)
+
+El **UniMon Admin Console** es una interfaz web secreta e interactiva construida para los ingenieros y coordinadores de TI, permitiéndoles auditar el comportamiento del bot y gestionar el corpus documental en tiempo real. 
+
+### 8.1. Acceso al Panel
+Para acceder al panel, el administrador debe posicionarse en la pantalla de chat web (`http://localhost:8000`) y presionar el atajo de teclado discreto: **`Ctrl + Alt + A`**. Esto abrirá una nueva pestaña redirigiendo a la ruta segura `/admin.html`.
+
+### 8.2. Dashboard de Métricas (KPIs)
+La pantalla principal presenta cuatro cuadros de mando impulsados por `telemetry_service.py` y `analytics.db`:
+* **Tasa de Resolución:** Porcentaje de consultas resueltas exitosamente ("✅ Sí, me funcionó") versus las que requirieron escalar a ticket.
+* **Tiempo de Respuesta (Latencia):** Promedio en milisegundos que tarda Ollama en generar la respuesta técnica.
+* **Consumo de Tokens:** Volumen de palabras procesadas (ideal para calcular costos si a futuro se migra a un LLM de pago como OpenAI o Claude).
+* **Distribución de Tráfico y Documentos Top:** Muestra qué manuales PDF son los más consultados y por qué roles institucionales.
+
+### 8.3. Detección de Brechas y Generador IA de Procedimientos (Draft Procedure)
+El sistema agrupa automáticamente con Inteligencia Artificial (Algoritmo DBSCAN) aquellas preguntas que los usuarios hicieron pero que el bot no supo responder porque **no existía documento**. 
+* **Botón 🪄 (Draft Procedure):** Al lado de cada "Brecha documental", el administrador puede presionar este botón con el ícono de IA. El panel enviará una orden secreta a Ollama para que analice la pregunta no resuelta y redacte un **Borrador de Manual Institucional** de forma automática y técnica.
+* **Descartar Preguntas:** Si la pregunta huérfana era basura (ej. "chistes", "ayuda con tarea"), el administrador puede presionar el botón 🗑️ para **Descartar** la métrica, indicando un motivo (Fuera de Contexto, Lenguaje Inapropiado).
+
+### 8.4. Gestor Documental (Indexación Inteligente)
+En la sección de Documentos, el administrador puede subir nuevos archivos (PDF, DOCX) y administrar la base vectorial.
+* **Botón de Subida Inteligente (Smart Indexing):** Compara los hashes (SHA-256) de los párrafos nuevos contra los que ya existen en ChromaDB. Sólo sube los fragmentos "novedosos" para no saturar ni inflar la base de datos de embeddings innecesariamente.
+* **Botón de Indexación Forzada (Force Indexing):** Salta la validación de redundancia y reemplaza a la fuerza toda la información.
+* **Borrado de Documentos:** Permite purgar un manual viejo de la base de datos haciendo clic en el botón de la papelera junto al archivo, liberando al RAG de información obsoleta.

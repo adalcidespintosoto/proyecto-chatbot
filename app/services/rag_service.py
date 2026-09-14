@@ -1078,6 +1078,15 @@ def clean_llm_response(text: str) -> str:
     text = re.sub(r"\bGLPI\b", "Mesa de Ayuda TI", text)
     text = re.sub(r"\[(?:URL|Enlace|Link|Insertar URL)\]", "", text, flags=re.IGNORECASE)
 
+    # 3. Truncar fugas de contexto crudo inyectadas torpemente por el LLM
+    trunc_match_1 = re.search(r"\[DOCUMENTO INSTITUCIONAL COMPLETO:", text, flags=re.IGNORECASE)
+    if trunc_match_1:
+        text = text[:trunc_match_1.start()].strip()
+        
+    trunc_match_2 = re.search(r"FICHA T[EÉ]CNICA DEL DOCUMENTO", text, flags=re.IGNORECASE)
+    if trunc_match_2:
+        text = text[:trunc_match_2.start()].strip()
+
     # 3. Sanitizar URLs alucinadas fuera de la lista blanca oficial
     text = sanitize_markdown_links(text)
 
@@ -2085,14 +2094,18 @@ class RAGService:
                         logger.info("Respuesta de Ollama vacía o evasión del modelo genérico detectada. Invocando fallback institucional.")
                         return self._generate_fallback_response(question, user_name, sources)
 
-                    # Insertar canales de atención siempre y pie de confirmación
+                    # Insertar canales de atención siempre y pie de confirmación (si no están ya presentes)
                     contact_channels = (
                         "\n\n---\n"
                         "📌 **Canales Oficiales de Soporte TI:**\n"
                         "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n"
                         "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n"
                     )
-                    bot_message = bot_message.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
+                    
+                    if "solicitudcomputo@unisimon.edu.co" not in bot_message.lower() and "helpdesk@unisimon.edu.co" not in bot_message.lower():
+                        bot_message = bot_message.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
+                    else:
+                        bot_message = bot_message.rstrip() + "\n\n" + CLOSING_FEEDBACK_QUESTION
 
                     return {
                         "response": bot_message,
@@ -2290,7 +2303,10 @@ class RAGService:
                 "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n"
                 "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n"
             )
-            contenido = contenido.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
+            if "solicitudcomputo@unisimon.edu.co" not in contenido.lower() and "helpdesk@unisimon.edu.co" not in contenido.lower():
+                contenido = contenido.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
+            else:
+                contenido = contenido.rstrip() + "\n\n" + CLOSING_FEEDBACK_QUESTION
 
         return {
             "response": contenido,
