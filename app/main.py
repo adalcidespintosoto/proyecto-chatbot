@@ -80,6 +80,14 @@ async def lifespan(app: FastAPI):
     logger.info("Deteniendo el servicio UniMon Backend...")
 
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+# Limiter inicializado con límite global
+limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"])
+
 # Inicialización de la aplicación FastAPI
 app = FastAPI(
     title=settings.app_name,
@@ -91,15 +99,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configuración de CORS para permitir consumo desde frontends web y móviles
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Configuración de CORS para permitir consumo desde frontends web y móviles oficiales
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "https://www.unisimon.edu.co"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.middleware("http")
 async def add_security_headers(request, call_next):

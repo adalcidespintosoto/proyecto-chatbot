@@ -178,130 +178,12 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             content_lower = doc.page_content.lower()
             source_lower = doc.metadata.get("source", "").lower()
 
-            # Penalización a documentos con alcance específico de laboratorios particulares cuando la consulta es general
-            if is_general_campus_query and not is_specific_lab_query:
-                if any(lab in content_lower for lab in [
-                    "laboratorio de simulación", "laboratorio de simulacion", "laboratorios especializados",
-                    "laboratorio de cómputo avanzado", "laboratorio de biomédica", "laboratorio de fisica",
-                    "laboratorio de química", "laboratorio mac"
-                ]) or ("laboratorio" in source_lower and "mantenimiento" not in source_lower):
-                    final_score -= 3.5
-
-            # Priorizar manuales institucionales marco ('Caracterización del Proceso Institucional de Gestión de TI', 'Mantenimiento Preventivo y Correctivo General')
-            is_process_or_maintenance_query = (is_general_campus_query or any(w in q_lower for w in [
-                "proceso", "gestión", "gestion", "caracterización", "caracterizacion", "mantenimiento", 
-                "preventivo", "correctivo", "daño", "dañado", "falla", "equipo", "infraestructura", "ti"
-            ])) and not is_password_recovery_query
-
-            if is_process_or_maintenance_query:
-                if any(marco in content_lower for marco in [
-                    "caracterización del proceso", "caracterizacion del proceso",
-                    "caracterización del proceso institucional de gestión de ti",
-                    "caracterizacion del proceso institucional de gestion de ti",
-                    "mantenimiento preventivo y correctivo general",
-                    "mantenimiento preventivo y correctivo de equipos de cómputo",
-                    "p-gt-01", "c-gt-01"
-                ]) or any(marco_src in source_lower for marco_src in [
-                    "caracterizacion", "caracterización", "mantenimiento_preventivo", "p-gt-01", "c-gt-01"
-                ]):
-                    final_score += 2.5
-
-            # Enrutamiento estricto de recuperación de contraseñas y desambiguación de estudiante antiguo vs primer semestre
-            if is_password_recovery_query:
-                # Penalizar fuertemente guías de Teams para evitar mezclas
-                if any(t in content_lower for t in ["acceso a microsoft teams", "microsoft teams para estudiantes", "barra de aplicaciones y hacer clic sobre el ícono de teams"]):
-                    final_score -= 5.0
-
-                # Bonificar guías de recuperación de contraseña de Microsoft / Portal Estudiantes / autogestión
-                if any(p in content_lower for p in ["portal estudiantes", "cambio de contraseña", "passwordreset", "passwordreset.microsoftonline.com", "autogestión de contraseñas", "restablecimiento"]):
-                    final_score += 4.0
-
-            # Desambiguación de Semestres Avanzados vs Primer Semestre
-            if is_upper_semester_or_regular:
-                # Penalizar guías de primer semestre ÚNICAMENTE si el usuario es explícitamente de semestre superior o regular
-                if any(ps in content_lower for ps in ["primer semestre", "estudiantes de primer semestre", "primer ingreso", "activación de usuario para estudiantes de primer semestre"]):
-                    final_score -= 6.0
-            elif is_first_semester_explicit:
-                # Penalizar guías de restablecimiento regular si es explícitamente de primer ingreso
-                if any(rs in content_lower for rs in ["restablecimiento y recuperación de contraseña unificada", "olvidé mi usuario / contraseña"]):
-                    final_score -= 4.0
-            elif is_password_recovery_query:
-                # Consulta AMBIGUA de credenciales sin semestre: bonificar AMBOS documentos para que los dos se recuperen
-                if any(doc_tag in content_lower for doc_tag in [
-                    "primer semestre", "activación de cuenta", "recibo oficial de matrícula",
-                    "restablecimiento y recuperación de contraseña unificada", "olvidé mi usuario / contraseña"
-                ]) or any(doc_src in source_lower for doc_src in [
-                    "primer semestre", "activar usuario", "restablecimiento"
-                ]):
-                    final_score += 4.5
-
-            # Desambiguación y Filtro Estricto ante consultas de hardware, dotación o periféricos
-            if is_peripheral_or_hardware_query or is_hardware_dotation_query:
-                is_it_hardware_doc = any(m in content_lower or m in source_lower for m in [
-                    "p-gt-01", "c-gt-01", "mantenimiento preventivo", "mantenimiento correctivo",
-                    "mantenimiento de equipos", "equipos de cómputo", "equipos de computo",
-                    "gestión de ti", "gestion de ti", "tecnologías de la información",
-                    "tecnologias de la informacion", "proceso de ti"
-                ])
-                if not is_it_hardware_doc:
-                    # Todo documento ajeno a soporte hardware/mantenimiento (certificados, matrículas, admisiones, notas, etc.) es penalizado
-                    final_score -= 10.0
-                else:
-                    final_score += 4.0
-
-                if any(fin in source_lower or fin in content_lower for fin in [
-                    "crédito interno", "credito interno", "cartera castigada", "condonación", "condonacion",
-                    "siaaf", "bienestar universitario", "liquidación", "liquidacion", "financiera",
-                    "aspirantes", "admisiones", "admitidos", "inscripción", "inscripcion", "certificado", "certificados"
-                ]):
-                    final_score -= 6.0
-
-                if not any(k in q_lower for k in ["software", "desarrollo", "jira", "proyecto", "solución tecnológica"]):
-                    if any(j in content_lower for j in ["gestión de requerimientos de recursos y soluciones tecnológicas", "p-gt-13"]):
-                        final_score -= 3.0
-
-            # Desambiguación de Docentes ingresando calificaciones / inasistencias vs Estudiantes consultando
-            if is_teacher_grading_query:
-                if any(doc_name in source_lower for doc_name in [
-                    "ingreso de calificaciones, inasistencias", "calificaciones posgrados", "registro y carga de calificaciones",
-                    "listados académicos y de asistencia", "listados academicos", "registro de calificaciones"
-                ]) or "docente" in source_lower or "profesor" in source_lower or "posgrado" in source_lower:
-                    final_score += 6.0
-                if "portal estudiantes" in source_lower or "estudiante" in source_lower or "consulta e impresión de calificaciones" in source_lower:
-                    final_score -= 8.0
-
-            # Desambiguación para programas de Posgrados / Maestrías / Especializaciones
-            if any(p in q_lower for p in ["maestria", "maestría", "posgrado", "posgrados", "especializacion", "especialización", "doctorado"]):
-                if "posgrado" in source_lower or "posgrados" in source_lower:
-                    final_score += 6.0
-                if "pregrado" in source_lower:
-                    final_score -= 4.0
-
             # Bonificación procedimental: priorizar fragmentos con pasos e instructivos directos
             if is_procedural_query:
                 if any(m in content_lower for m in ["procedimiento paso a paso", "## 3.", "paso 1", "paso 2", "paso 3"]):
                     final_score += 2.0
                 if "requisitos previos" in content_lower and "procedimiento paso a paso" not in content_lower:
                     final_score -= 1.0
-
-            # Desambiguación de fallas o reportes de conectividad / red / internet vs manuales de software que solo mencionan internet como prerrequisito
-            if is_network_connectivity_query:
-                if any(app_doc in source_lower or app_doc in content_lower for app_doc in [
-                    "teams", "microsoft teams", "kactus", "seven", "calificaciones", "votación", "votacion", "carnet"
-                ]):
-                    final_score -= 6.0
-
-            # Desambiguación para Elecciones Institucionales y Votaciones
-            is_election_query = any(w in q_lower for w in [
-                "votar", "votacion", "votación", "sufragio"
-            ])
-            if is_election_query:
-                if any(e in source_lower or e in content_lower for e in [
-                    "elecciones", "gestión electoral", "gestion electoral", "aplicativo de elecciones", "elecciones.unisimon.edu.co", "votar"
-                ]):
-                    final_score += 5.0
-                if any(other in source_lower for other in ["certificado", "calificaciones", "teams", "kactus"]):
-                    final_score -= 5.0
 
             scored_docs.append((doc, original_score, final_score))
 
@@ -456,9 +338,9 @@ async def async_generate_multi_query_variants(
         "votar", "votacion", "votación", "sufragio"
     ])
     is_grade_complaint = bool(re.search(
-        r"(cambi(ar|e)|sub(ir|a)|clav(aron|o)|corregi(r|t)|reclam(ar|o)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)",
+        r"(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)",
         q_low
-    ))
+    )) and not any(w in q_low for w in ["formato", "tamaño", "tamano", "peso", "pdf", "archivo", "archivos", "adjuntar", "papeles", "diploma", "cargar", "documento", "documentos"])
 
     # 1. Intentar generación asíncrona con unimon:8b
     system_prompt = (
@@ -560,7 +442,8 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
 
     if any(w in q_low for w in ["votar", "votacion", "votación", "sufragio"]):
         return "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
-    if re.search(r"(cambi(ar|e)|sub(ir|a)|clav(aron|o)|corregi(r|t)|reclam(ar|o)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)", q_low):
+    is_grade_complaint = bool(re.search(r"(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)", q_low))
+    if is_grade_complaint and not any(w in q_low for w in ["formato", "tamaño", "tamano", "peso", "pdf", "archivo", "archivos", "adjuntar", "papeles", "diploma", "cargar", "documento", "documentos"]):
         return "reclamo calificacion revision docente direccion de programa"
 
     system_prompt = (
@@ -2195,15 +2078,21 @@ class RAGService:
                     # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
                     bot_message = clean_llm_response(bot_message)
 
-                    # Si la respuesta tras limpieza quedó vacía o insuficiente (ej. el modelo solo se disculpó, contra-pregunta o recomendación evasiva de leer manuales)
-                    is_placeholder = bool(re.match(r"^\s*¿?(?:en qué|cómo|hay algo más|puedes proporcionar|podrías proporcionar|indícame|indicame)[^?]+\??\s*$", bot_message, re.IGNORECASE))
-                    is_evasion = bool(re.search(r"(?i)\b(?:consultar|revisar)\s+(?:la\s+documentaci[oó]n\s+oficial|el\s+manual|los\s+instructivos)\b", bot_message)) and not bool(re.search(r"\b(?:paso\s+1|paso\s+2|es\s+completamente\s+normal|definitiva)\b", bot_message, re.IGNORECASE))
-                    if not bot_message or len(bot_message.strip()) < 35 or is_placeholder or is_evasion:
-                        logger.info("Respuesta de Ollama vacía, placeholder, evasiva o reducida a cortesía tras sanitización. Invocando fallback institucional.")
+                    # Se relajan las reglas de evasión y placeholder para permitir que el modelo interactúe de forma natural
+                    # cuando pide aclaraciones al usuario en vez de aplastar el diálogo con un mensaje de fallback duro.
+                    is_evasion = bool(re.search(r"(?i)\b(?:no\s+tengo\s+acceso\s+a\s+esa\s+informaci[oó]n|soy\s+solo\s+un\s+modelo\s+de\s+lenguaje)\b", bot_message))
+                    if not bot_message or len(bot_message.strip()) < 15 or is_evasion:
+                        logger.info("Respuesta de Ollama vacía o evasión del modelo genérico detectada. Invocando fallback institucional.")
                         return self._generate_fallback_response(question, user_name, sources)
 
-                    # Ubicar el pie de confirmación estrictamente al final del mensaje
-                    bot_message = bot_message.rstrip() + CLOSING_FEEDBACK_QUESTION
+                    # Insertar canales de atención siempre y pie de confirmación
+                    contact_channels = (
+                        "\n\n---\n"
+                        "📌 **Canales Oficiales de Soporte TI:**\n"
+                        "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n"
+                        "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n"
+                    )
+                    bot_message = bot_message.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
 
                     return {
                         "response": bot_message,
@@ -2395,7 +2284,13 @@ class RAGService:
 
         is_doc = (contenido != MENSAJE_NO_DOCUMENTADO)
         if is_doc and "¿pudiste resolver tu problema con estos pasos?" not in contenido.lower():
-            contenido = contenido.rstrip() + CLOSING_FEEDBACK_QUESTION
+            contact_channels = (
+                "\n\n---\n"
+                "📌 **Canales Oficiales de Soporte TI:**\n"
+                "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n"
+                "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n"
+            )
+            contenido = contenido.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
 
         return {
             "response": contenido,
