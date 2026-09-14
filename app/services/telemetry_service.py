@@ -63,6 +63,15 @@ def init_telemetry_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS telemetry_ignored_queries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    query_text TEXT NOT NULL,
+                    normalized_query TEXT UNIQUE NOT NULL,
+                    reason TEXT DEFAULT 'No relevante',
+                    dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             # Migración: asegurar existencia de bot_response si la tabla fue creada previamente
             cursor.execute("PRAGMA table_info(telemetry_interactions);")
             cols = [c[1] for c in cursor.fetchall()]
@@ -72,6 +81,12 @@ def init_telemetry_db():
             logger.info("Base de datos de telemetría inicializada en: %s", DB_PATH)
     except Exception as e:
         logger.error("Error al inicializar base de datos de telemetría: %s", e)
+
+
+def normalize_query_text(q: str) -> str:
+    """Normaliza una consulta eliminando signos de puntuación, mayúsculas y espacios repetidos."""
+    return re.sub(r'[\s\?\¿\!¡\.,]+', ' ', (q or '').lower()).strip()
+
 
 
 def log_ticket_activity(
@@ -474,6 +489,11 @@ def get_unresolved_queries_ranking(
         if "telemetry_interactions" not in tables:
             return {"status": "success", "total_unresolved": 0, "ranking": []}
 
+        ignored_keys = set()
+        if "telemetry_ignored_queries" in tables:
+            cursor.execute("SELECT normalized_query FROM telemetry_ignored_queries;")
+            ignored_keys = {r[0] for r in cursor.fetchall()}
+
         # Mapeo de sesión -> última consulta sustantiva real (para cuando la interacción registró solo el rol o acción)
         cursor.execute("""
             SELECT session_id, user_query
@@ -549,8 +569,11 @@ def get_unresolved_queries_ranking(
         if (final_st in ("FINALIZADO", "SOLUCIONADO", "RESOLVED")) and esc_ticket == 0 and "Sin Procedimiento en RAG" not in reasons:
             continue
 
+        norm_key = normalize_query_text(user_q)
+        if norm_key in ignored_keys:
+            continue
+
         total_unresolved_count += 1
-        norm_key = re.sub(r'[\s\?\¿\!¡\.,]+', ' ', user_q.lower()).strip()
 
         if norm_key not in groups:
             groups[norm_key] = {
@@ -613,6 +636,152 @@ def get_unresolved_queries_ranking(
         "total_unique_knowledge_gaps": len(ranking_list),
         "ranking": ranking_list[:limit]
     }
+
+
+def dismiss_unresolved_query(
+    query: str,
+    reason: str = "No relevante",
+    delete_interactions: bool = False
+) -> Dict[str, Any]:
+    """
+    Descarta una consulta del ranking de Knowledge Gaps marcándola como no relevante.
+    Opcionalmente elimina los registros de interacción correspondientes en telemetry_interactions.
+    """
+    if not DB_PATH.exists():
+        init_telemetry_db()
+
+    norm_key = normalize_query_text(query)
+    clean_query = (query or "").strip()
+    reason_clean = (reason or "No relevante").strip()
+
+    if not clean_query:
+        return {"status": "error", "message": "La consulta no puede estar vacía."}
+
+    deleted_count = 0
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS telemetry_ignored_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query_text TEXT NOT NULL,
+                normalized_query TEXT UNIQUE NOT NULL,
+                reason TEXT DEFAULT 'No relevante',
+                dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO telemetry_ignored_queries (query_text, normalized_query, reason, dismissed_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(normalized_query) DO UPDATE SET
+                query_text = excluded.query_text,
+                reason = excluded.reason,
+                dismissed_at = CURRENT_TIMESTAMP
+        """, (clean_query, norm_key, reason_clean))
+
+        if delete_interactions:
+            cursor.execute("SELECT id, user_query FROM telemetry_interactions")
+            rows = cursor.fetchall()
+            ids_to_delete = [
+                r[0] for r in rows
+                if normalize_query_text(r[1]) == norm_key or (r[1] and clean_query.lower() in r[1].lower())
+            ]
+            if ids_to_delete:
+                placeholders = ",".join(["?"] * len(ids_to_delete))
+                cursor.execute(
+                    f"DELETE FROM telemetry_interactions WHERE id IN ({placeholders})",
+                    ids_to_delete
+                )
+                deleted_count = len(ids_to_delete)
+
+        conn.commit()
+
+    logger.info("Pregunta '%s' descartada de Knowledge Gaps (delete_interactions=%s, deleted=%d)", clean_query, delete_interactions, deleted_count)
+    return {
+        "status": "success",
+        "message": f"Pregunta '{clean_query}' descartada del ranking exitosamente.",
+        "query": clean_query,
+        "normalized_query": norm_key,
+        "reason": reason_clean,
+        "interactions_deleted": deleted_count
+    }
+
+
+def get_dismissed_unresolved_queries() -> List[Dict[str, Any]]:
+    """
+    Retorna el listado de consultas que han sido descartadas del ranking de Knowledge Gaps.
+    """
+    if not DB_PATH.exists():
+        init_telemetry_db()
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS telemetry_ignored_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query_text TEXT NOT NULL,
+                normalized_query TEXT UNIQUE NOT NULL,
+                reason TEXT DEFAULT 'No relevante',
+                dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            SELECT id, query_text, normalized_query, reason, dismissed_at
+            FROM telemetry_ignored_queries
+            ORDER BY dismissed_at DESC
+        """)
+        rows = cursor.fetchall()
+
+    return [
+        {
+            "id": r["id"],
+            "query": r["query_text"],
+            "normalized_query": r["normalized_query"],
+            "reason": r["reason"] or "No relevante",
+            "dismissed_at": str(r["dismissed_at"])
+        }
+        for r in rows
+    ]
+
+
+def restore_dismissed_unresolved_query(
+    query: Optional[str] = None,
+    item_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Restaura una consulta previamente descartada para que vuelva a figurar en el ranking.
+    """
+    if not DB_PATH.exists():
+        init_telemetry_db()
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS telemetry_ignored_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query_text TEXT NOT NULL,
+                normalized_query TEXT UNIQUE NOT NULL,
+                reason TEXT DEFAULT 'No relevante',
+                dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        if item_id:
+            cursor.execute("DELETE FROM telemetry_ignored_queries WHERE id = ?", (item_id,))
+        elif query:
+            norm_key = normalize_query_text(query)
+            cursor.execute("DELETE FROM telemetry_ignored_queries WHERE normalized_query = ? OR query_text = ?", (norm_key, query.strip()))
+        else:
+            return {"status": "error", "message": "Debe especificar 'id' o 'query' para restaurar."}
+
+        affected = cursor.rowcount
+        conn.commit()
+
+    if affected > 0:
+        logger.info("Consulta restaurada en Knowledge Gaps (query=%s, id=%s)", query, item_id)
+        return {"status": "success", "message": "Pregunta restaurada en el ranking exitosamente."}
+    else:
+        return {"status": "warning", "message": "No se encontró ningún registro para restaurar."}
+
 
 
 def compare_kpi_periods(
@@ -977,7 +1146,7 @@ def reset_telemetry_db() -> Dict[str, Any]:
             cursor = conn.cursor()
             tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()]
             counts = {}
-            for t in ["telemetry_interactions", "telemetry_sessions", "telemetry_tickets"]:
+            for t in ["telemetry_interactions", "telemetry_sessions", "telemetry_tickets", "telemetry_ignored_queries"]:
                 if t in tables:
                     counts[t] = cursor.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                     cursor.execute(f"DELETE FROM {t};")

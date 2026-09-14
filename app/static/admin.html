@@ -1582,6 +1582,27 @@
       gap: 1rem;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.2);
     }
+
+    .btn-danger-outline {
+      background: rgba(239, 68, 68, 0.1);
+      color: #F87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-danger-outline:hover {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: #EF4444;
+      color: #FFF;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    }
   </style>
 </head>
 <body>
@@ -1768,6 +1789,9 @@
             <span class="badge" id="unresolvedTotalBadge" style="background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3);">
               0 brechas detectadas
             </span>
+            <button type="button" class="btn btn-secondary" onclick="openDismissedQueriesModal()" title="Ver y restaurar preguntas descartadas">
+              🚫 Ver Descartadas (<span id="dismissedCountBadge">0</span>)
+            </button>
             <button type="button" class="btn btn-secondary" onclick="exportUnresolvedCSV()" title="Descargar ranking en CSV compatible con Excel">
               📥 Exportar CSV
             </button>
@@ -2335,6 +2359,100 @@
     </div>
   </div>
 
+  <!-- Modal Descartar Pregunta No Resuelta -->
+  <div class="draft-modal-backdrop" id="dismissQueryModalBackdrop" onclick="if(event.target === this) closeDismissModal()">
+    <div class="draft-modal" style="max-width: 580px;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 0.75rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: #F87171; display: flex; align-items: center; gap: 8px; margin: 0;">
+            🗑️ Descartar Pregunta No Relevante
+          </h3>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+            Esta consulta se excluirá del ranking de brechas y del análisis ejecutivo de IA.
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="closeDismissModal()">
+          ✕ Cerrar
+        </button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 6px;">
+        <div style="background: rgba(239, 68, 68, 0.08); border-left: 3px solid #EF4444; border-radius: 6px; padding: 12px 14px;">
+          <div style="font-size: 0.75rem; font-weight: 700; color: #FCA5A5; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+            Consulta a descartar:
+          </div>
+          <div id="dismissModalQueryText" style="font-size: 0.95rem; font-weight: 700; color: #FFFFFF; font-style: italic;">
+            ""
+          </div>
+          <input type="hidden" id="dismissModalQueryInput">
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; font-weight: 700; color: #94A3B8; display: block; margin-bottom: 6px;">
+            Motivo del descarte:
+          </label>
+          <select id="dismissModalReasonSelect" class="time-date-input" style="width: 100%; font-size: 0.85rem; padding: 8px;" onchange="handleDismissReasonChange(this.value)">
+            <option value="No relevante / Fuera de alcance">No relevante / Fuera del alcance institucional</option>
+            <option value="Prueba de usuario / Ruido">Prueba de usuario / Ruido / Saludo</option>
+            <option value="Consulta ambigua o incoherente">Consulta ambigua o incoherente</option>
+            <option value="Procedimiento ya atendido por otro canal">Procedimiento ya atendido por otro canal</option>
+            <option value="custom">Otro motivo personalizado...</option>
+          </select>
+          <input type="text" id="dismissModalCustomReason" class="time-date-input" style="width: 100%; font-size: 0.85rem; padding: 8px; margin-top: 8px; display: none;" placeholder="Escribe el motivo específico...">
+        </div>
+
+        <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px;">
+          <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="dismissDeleteInteractionsCheck" style="margin-top: 3px; accent-color: #EF4444; width: 16px; height: 16px;">
+            <span style="font-size: 0.82rem; color: #CBD5E1; line-height: 1.4;">
+              <strong style="color: #F87171;">Eliminar permanentemente los registros de interacción</strong> asociados a esta pregunta de la base de datos de telemetría.
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1rem; margin-top: 4px;">
+        <button type="button" class="btn btn-secondary" onclick="closeDismissModal()">
+          Cancelar
+        </button>
+        <button type="button" class="btn" id="btnConfirmDismissQuery" onclick="executeDismissQuery()" style="background: #DC2626; color: white; border: none; font-weight: 700; padding: 8px 16px;">
+          🗑️ Confirmar Descarte
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Brechas Descartadas -->
+  <div class="draft-modal-backdrop" id="dismissedQueriesModalBackdrop" onclick="if(event.target === this) closeDismissedQueriesModal()">
+    <div class="draft-modal" style="max-width: 850px;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 0.75rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: white; display: flex; align-items: center; gap: 8px; margin: 0;">
+            🚫 Preguntas Descartadas (No Relevantes)
+          </h3>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+            Historial de consultas excluidas del ranking de Knowledge Gaps. Puedes restaurarlas en cualquier momento.
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="closeDismissedQueriesModal()">
+          ✕ Cerrar
+        </button>
+      </div>
+
+      <div id="dismissedQueriesListContainer" style="max-height: 400px; overflow-y: auto; margin: 10px 0;">
+        <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+          Cargando brechas descartadas...
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 0.75rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeDismissedQueriesModal()">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast" id="toast">
     <span id="toastIcon">ℹ️</span>
@@ -2572,6 +2690,7 @@
         currentUnresolvedList = list;
 
         badge.innerText = `${data.total_unique_knowledge_gaps || 0} brechas (${data.total_unresolved_interactions || 0} intentos)`;
+        loadDismissedBadgeCount();
 
         // Si hay texto en el input de búsqueda, aplicar filtro
         const filterInput = document.getElementById('filterUnresolvedInput');
@@ -2664,6 +2783,9 @@
                 <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="toggleUnresolvedResponse(${idx})">
                   👁️ Ver Detalle
                 </button>
+                <button type="button" class="btn-danger-outline" onclick="openDismissModal('${safeQuery}')" title="Descartar esta pregunta del ranking si no es relevante">
+                  🗑️ Descartar
+                </button>
               </div>
             </div>
 
@@ -2700,6 +2822,178 @@
     function exportUnresolvedCSV() {
       const queryParams = buildTelemetryQueryParams();
       window.location.href = `/api/analytics/export-unresolved-csv${queryParams}`;
+    }
+
+    // Gestión de descarte de brechas no relevantes
+    function openDismissModal(query) {
+      document.getElementById('dismissModalQueryText').innerText = `"${query}"`;
+      document.getElementById('dismissModalQueryInput').value = query;
+      document.getElementById('dismissModalReasonSelect').value = 'No relevante / Fuera de alcance';
+      document.getElementById('dismissModalCustomReason').value = '';
+      document.getElementById('dismissModalCustomReason').style.display = 'none';
+      document.getElementById('dismissDeleteInteractionsCheck').checked = false;
+      document.getElementById('dismissQueryModalBackdrop').classList.add('show');
+    }
+
+    function closeDismissModal() {
+      document.getElementById('dismissQueryModalBackdrop').classList.remove('show');
+    }
+
+    function handleDismissReasonChange(val) {
+      const customInput = document.getElementById('dismissModalCustomReason');
+      if (val === 'custom') {
+        customInput.style.display = 'block';
+        customInput.focus();
+      } else {
+        customInput.style.display = 'none';
+      }
+    }
+
+    async function executeDismissQuery() {
+      const query = document.getElementById('dismissModalQueryInput').value;
+      const selectVal = document.getElementById('dismissModalReasonSelect').value;
+      const customVal = document.getElementById('dismissModalCustomReason').value.trim();
+      const reason = selectVal === 'custom' ? (customVal || 'No relevante') : selectVal;
+      const deleteInteractions = document.getElementById('dismissDeleteInteractionsCheck').checked;
+      const btn = document.getElementById('btnConfirmDismissQuery');
+
+      if (!query) {
+        showToast('Error: consulta inválida', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = 'Descartando...';
+
+      try {
+        const res = await fetch('/api/analytics/unresolved-queries/dismiss', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*')
+          },
+          body: JSON.stringify({
+            query: query,
+            reason: reason,
+            delete_interactions: deleteInteractions
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          showToast(`Consulta descartada: "${query}"`, 'success');
+          closeDismissModal();
+          await loadUnresolvedQueries();
+          if (deleteInteractions) {
+            await loadKPIs();
+          }
+        } else {
+          showToast(`Error: ${data.message || 'No se pudo descartar la pregunta'}`, 'error');
+        }
+      } catch (err) {
+        console.error('Error al descartar pregunta:', err);
+        showToast(`Error de conexión: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '🗑️ Confirmar Descarte';
+      }
+    }
+
+    async function loadDismissedBadgeCount() {
+      try {
+        const res = await fetch('/api/analytics/unresolved-queries/dismissed', {
+          headers: { 'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*') }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const badge = document.getElementById('dismissedCountBadge');
+          if (badge) {
+            badge.innerText = data.total || 0;
+          }
+        }
+      } catch (err) {
+        console.warn('Error cargando conteo de descartadas:', err);
+      }
+    }
+
+    async function openDismissedQueriesModal() {
+      const backdrop = document.getElementById('dismissedQueriesModalBackdrop');
+      const container = document.getElementById('dismissedQueriesListContainer');
+      backdrop.classList.add('show');
+      container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Cargando preguntas descartadas...</div>';
+
+      try {
+        const res = await fetch('/api/analytics/unresolved-queries/dismissed', {
+          headers: { 'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*') }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const list = data.data || [];
+
+        if (list.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 2.5rem; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px dashed rgba(255, 255, 255, 0.1);">
+              <div style="font-size: 1.5rem; margin-bottom: 6px;">✨</div>
+              <div style="font-weight: 700; font-size: 0.95rem; color: #E2E8F0;">No hay preguntas descartadas</div>
+              <div style="font-size: 0.8rem; margin-top: 4px;">Todas las preguntas detectadas están activas en el ranking.</div>
+            </div>
+          `;
+          return;
+        }
+
+        let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+        list.forEach(item => {
+          html += `
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 700; color: #F1F5F9; font-size: 0.9rem; word-break: break-word;">
+                  "${item.query}"
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <span>Motivo: <strong style="color: #CBD5E1;">${item.reason || 'No relevante'}</strong></span>
+                  <span>Fecha: <strong>${item.dismissed_at || 'Desconocida'}</strong></span>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; white-space: nowrap;" onclick="restoreDismissedQuery(${item.id})">
+                ↩️ Restaurar al Ranking
+              </button>
+            </div>
+          `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      } catch (err) {
+        console.error('Error cargando descartadas:', err);
+        container.innerHTML = '<div style="color: #EF4444; padding: 1rem;">Error al cargar las preguntas descartadas.</div>';
+      }
+    }
+
+    function closeDismissedQueriesModal() {
+      document.getElementById('dismissedQueriesModalBackdrop').classList.remove('show');
+    }
+
+    async function restoreDismissedQuery(id) {
+      try {
+        const res = await fetch('/api/analytics/unresolved-queries/restore', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*')
+          },
+          body: JSON.stringify({ id: id })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          showToast('Pregunta restaurada al ranking exitosamente', 'success');
+          await openDismissedQueriesModal();
+          await loadUnresolvedQueries();
+        } else {
+          showToast(`Error: ${data.message || 'No se pudo restaurar'}`, 'error');
+        }
+      } catch (err) {
+        console.error('Error restaurando pregunta:', err);
+        showToast(`Error de conexión: ${err.message}`, 'error');
+      }
     }
 
     // ==========================================
@@ -3646,7 +3940,7 @@
         document.getElementById('filterStartDate').value = todayStr;
         document.getElementById('filterEndDate').value = todayStr;
       }
-      Promise.all([loadKPIs(), loadUnresolvedQueries(), loadDocuments(), loadSystemStatus()]).finally(() => {
+      Promise.all([loadKPIs(), loadUnresolvedQueries(), loadDocuments(), loadSystemStatus(), loadDismissedBadgeCount()]).finally(() => {
         if (btn) btn.innerText = '🔄 Actualizar';
       });
     }

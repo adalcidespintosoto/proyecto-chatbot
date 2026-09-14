@@ -329,5 +329,138 @@ async def test_analytics_api_new_endpoints():
             assert "2_profesores" in json_save["folder"]
 
 
+def test_dismiss_and_restore_unresolved_query():
+    """Valida la exclusión de preguntas no relevantes del ranking y su restauración."""
+    from app.services.telemetry_service import (
+        reset_telemetry_db,
+        log_interaction,
+        get_unresolved_queries_ranking,
+        dismiss_unresolved_query,
+        get_dismissed_unresolved_queries,
+        restore_dismissed_unresolved_query
+    )
+
+    reset_telemetry_db()
+
+    # Inserción de 2 preguntas no resueltas
+    log_interaction(
+        session_id="s_fail_1",
+        role="estudiante",
+        query="la impresora le falta tinta negra y no imprime bien",
+        bot_response="No poseo información para esa impresora.",
+        source="UniMon_SinDocumentacion",
+        feedback="RETRY"
+    )
+    log_interaction(
+        session_id="s_fail_2",
+        role="docente",
+        query="Como configuro el proyector de la sala 402",
+        bot_response="No dispongo de un procedimiento.",
+        source="knowledge_base_fallback",
+        feedback="NO"
+    )
+
+    ranking_before = get_unresolved_queries_ranking()
+    assert ranking_before["total_unique_knowledge_gaps"] == 2
+
+    # 1. Descartar pregunta de la impresora sin borrar interacciones
+    res_dismiss = dismiss_unresolved_query(
+        query="la impresora le falta tinta negra y no imprime bien",
+        reason="No relevante / Fuera de alcance",
+        delete_interactions=False
+    )
+    assert res_dismiss["status"] == "success"
+    assert res_dismiss["interactions_deleted"] == 0
+
+    # Verificar que ya no figura en el ranking
+    ranking_after = get_unresolved_queries_ranking()
+    assert ranking_after["total_unique_knowledge_gaps"] == 1
+    assert not any("impresora" in r["query"].lower() for r in ranking_after["ranking"])
+
+    # Verificar que aparece en la lista de descartadas
+    dismissed_list = get_dismissed_unresolved_queries()
+    assert len(dismissed_list) == 1
+    assert "impresora" in dismissed_list[0]["query"].lower()
+    assert dismissed_list[0]["reason"] == "No relevante / Fuera de alcance"
+
+    # 2. Restaurar la pregunta
+    res_restore = restore_dismissed_unresolved_query(query="la impresora le falta tinta negra y no imprime bien")
+    assert res_restore["status"] == "success"
+
+    ranking_restored = get_unresolved_queries_ranking()
+    assert ranking_restored["total_unique_knowledge_gaps"] == 2
+    assert any("impresora" in r["query"].lower() for r in ranking_restored["ranking"])
+
+    # 3. Descartar con delete_interactions=True
+    res_dismiss_del = dismiss_unresolved_query(
+        query="la impresora le falta tinta negra y no imprime bien",
+        reason="Prueba eliminada",
+        delete_interactions=True
+    )
+    assert res_dismiss_del["status"] == "success"
+    assert res_dismiss_del["interactions_deleted"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_dismiss_and_restore_api_endpoints():
+    """Valida los endpoints REST POST /dismiss, GET /dismissed y POST /restore con autenticación."""
+    from app.config import get_settings
+    from app.services.telemetry_service import reset_telemetry_db, log_interaction
+
+    reset_telemetry_db()
+    log_interaction(
+        session_id="s_api_01",
+        role="estudiante",
+        query="Pregunta de prueba no relevante",
+        bot_response="Sin documentación",
+        source="UniMon_SinDocumentacion",
+        feedback="RETRY"
+    )
+
+    settings = get_settings()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Sin autenticación -> 401
+        res_no_auth = await client.post(
+            "/api/analytics/unresolved-queries/dismiss",
+            json={"query": "Pregunta de prueba no relevante"}
+        )
+        assert res_no_auth.status_code == 401
+
+        # 2. Con autenticación -> 200 OK
+        res_dismiss = await client.post(
+            "/api/analytics/unresolved-queries/dismiss",
+            json={
+                "query": "Pregunta de prueba no relevante",
+                "reason": "Prueba de integración",
+                "delete_interactions": False
+            },
+            auth=(settings.admin_username, settings.admin_password)
+        )
+        assert res_dismiss.status_code == 200
+        data_dismiss = res_dismiss.json()
+        assert data_dismiss["status"] == "success"
+
+        # 3. GET /dismissed
+        res_list = await client.get(
+            "/api/analytics/unresolved-queries/dismissed",
+            auth=(settings.admin_username, settings.admin_password)
+        )
+        assert res_list.status_code == 200
+        data_list = res_list.json()
+        assert data_list["total"] >= 1
+        item_id = data_list["data"][0]["id"]
+
+        # 4. POST /restore por ID
+        res_restore = await client.post(
+            "/api/analytics/unresolved-queries/restore",
+            json={"id": item_id},
+            auth=(settings.admin_username, settings.admin_password)
+        )
+        assert res_restore.status_code == 200
+        assert res_restore.json()["status"] == "success"
+
+
+
 
 

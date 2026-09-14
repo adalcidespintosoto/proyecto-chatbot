@@ -14,6 +14,9 @@ from app.services.telemetry_service import (
     get_kpis_summary, 
     reset_telemetry_db,
     get_unresolved_queries_ranking,
+    dismiss_unresolved_query,
+    get_dismissed_unresolved_queries,
+    restore_dismissed_unresolved_query,
     compare_kpi_periods,
     generate_ai_observability_insights,
     draft_procedure_with_ai,
@@ -29,6 +32,17 @@ router = APIRouter(
     prefix="/api/analytics",
     tags=["Analítica & KPIs UniMon"]
 )
+
+
+class DismissQueryRequest(BaseModel):
+    query: str = Field(..., min_length=2, description="Consulta a descartar del ranking")
+    reason: Optional[str] = Field(default="No relevante", description="Motivo del descarte de la pregunta")
+    delete_interactions: Optional[bool] = Field(default=False, description="Si es True, elimina también los registros de interacción")
+
+
+class RestoreQueryRequest(BaseModel):
+    query: Optional[str] = Field(default=None, description="Consulta a restaurar")
+    id: Optional[int] = Field(default=None, description="ID del registro a restaurar")
 
 
 class DraftProcedureRequest(BaseModel):
@@ -77,6 +91,59 @@ async def get_unresolved_queries(
     Retorna el ranking de preguntas más frecuentes que no tuvieron respuesta satisfactoria.
     """
     return get_unresolved_queries_ranking(start_date=start_date, end_date=end_date, limit=limit)
+
+
+@router.post(
+    "/unresolved-queries/dismiss",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_admin_auth)],
+    summary="Descartar Pregunta No Resuelta del Ranking",
+    description="Descarta una consulta que el administrador no considera relevante para crear guías RAG. Opcionalmente elimina sus interacciones."
+)
+async def dismiss_unresolved(body: DismissQueryRequest) -> Dict[str, Any]:
+    """
+    Descarta una pregunta no resuelta para que no vuelva a aparecer en el ranking.
+    """
+    return dismiss_unresolved_query(
+        query=body.query,
+        reason=body.reason or "No relevante",
+        delete_interactions=bool(body.delete_interactions)
+    )
+
+
+@router.get(
+    "/unresolved-queries/dismissed",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_admin_auth)],
+    summary="Listar Preguntas No Resueltas Descartadas",
+    description="Retorna el listado de consultas que han sido marcadas como no relevantes por el administrador."
+)
+async def list_dismissed_unresolved() -> Dict[str, Any]:
+    """
+    Lista las preguntas descartadas del ranking de vacíos.
+    """
+    dismissed = get_dismissed_unresolved_queries()
+    return {
+        "status": "success",
+        "total": len(dismissed),
+        "data": dismissed
+    }
+
+
+@router.post(
+    "/unresolved-queries/restore",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_admin_auth)],
+    summary="Restaurar Pregunta No Resuelta Descartada",
+    description="Permite reintegrar una consulta previamente descartada al ranking de Knowledge Gaps."
+)
+async def restore_unresolved(body: RestoreQueryRequest) -> Dict[str, Any]:
+    """
+    Restaura una pregunta descartada para que vuelva a figurar en el ranking.
+    """
+    if not body.query and not body.id:
+        raise HTTPException(status_code=400, detail="Debe especificar 'query' o 'id' para restaurar.")
+    return restore_dismissed_unresolved_query(query=body.query, item_id=body.id)
 
 
 @router.get(

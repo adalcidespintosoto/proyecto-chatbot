@@ -293,7 +293,7 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
 
             # Desambiguación para Elecciones Institucionales y Votaciones
             is_election_query = any(w in q_lower for w in [
-                "votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"
+                "votar", "votacion", "votación", "sufragio"
             ])
             if is_election_query:
                 if any(e in source_lower or e in content_lower for e in [
@@ -404,10 +404,9 @@ SEMANTIC_SYNONYM_DICTIONARY = [
         ]
     },
     {
-        "triggers": ["votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "colegiados", "organos colegiados", "sufragio"],
+        "triggers": ["votar", "votacion", "votación", "sufragio"],
         "variants": [
             "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/",
-            "Manual de gestión electoral para el módulo estudiantes en el aplicativo de elecciones botón votar",
             "Procedimiento de votación electrónica elecciones institucionales https://elecciones.unisimon.edu.co/"
         ]
     },
@@ -454,7 +453,7 @@ async def async_generate_multi_query_variants(
 
     # Detección de entidades obligatorias: elecciones y reclamo de calificaciones
     is_election_query = any(w in q_low for w in [
-        "votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"
+        "votar", "votacion", "votación", "sufragio"
     ])
     is_grade_complaint = bool(re.search(
         r"(cambi(ar|e)|sub(ir|a)|clav(aron|o)|corregi(r|t)|reclam(ar|o)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)",
@@ -523,9 +522,8 @@ async def async_generate_multi_query_variants(
     # 5. Aplicar preservación estricta de entidades de elecciones y reclamo de notas
     if is_election_query:
         election_primary = "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
-        election_manual = "Manual de gestión electoral para el módulo estudiantes en el aplicativo de elecciones botón votar"
         filtered_variants = [v for v in variants if "certificado" not in v.lower()]
-        variants = [election_primary, election_manual] + [v for v in filtered_variants if v not in [election_primary, election_manual]]
+        variants = [election_primary] + [v for v in filtered_variants if v != election_primary]
 
     if is_grade_complaint:
         grade_target = "reclamo calificacion revision docente direccion de programa"
@@ -560,7 +558,7 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
     cleaned_query = strip_query_header_noise(raw_query)
     q_low = cleaned_query.lower()
 
-    if any(w in q_low for w in ["votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"]):
+    if any(w in q_low for w in ["votar", "votacion", "votación", "sufragio"]):
         return "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
     if re.search(r"(cambi(ar|e)|sub(ir|a)|clav(aron|o)|corregi(r|t)|reclam(ar|o)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)", q_low):
         return "reclamo calificacion revision docente direccion de programa"
@@ -1828,13 +1826,13 @@ class RAGService:
 
         # Asegurar recuperación de documento de elecciones si la consulta es sobre votaciones
         is_election_query = any(w in question.lower() for w in [
-            "votar", "votacion", "votación", "eleccion", "elecciones", "representante", "representantes", "candidato", "candidatos", "sufragio"
+            "votar", "votacion", "votación", "sufragio"
         ])
         if is_election_query and self.vector_store is not None:
             has_elec_doc = any("elecciones" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
             if not has_elec_doc:
                 try:
-                    q_elec = format_e5_query("manual de gestion electoral modulo estudiantes aplicativo de elecciones boton votar")
+                    q_elec = format_e5_query("aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/")
                     if filter_condition:
                         extra_elec = self.vector_store.similarity_search_with_relevance_scores(q_elec, k=3, filter=filter_condition)
                     else:
@@ -2253,7 +2251,7 @@ class RAGService:
                 "quick_replies": []
             }
 
-        if any(w in msg_lower for w in ["eleccion", "elección", "elecciones", "votar", "votacion", "votación", "sufragio", "candidato", "representante"]):
+        if any(w in msg_lower for w in ["votar", "votacion", "votación", "sufragio"]):
             contenido = (
                 f"{saludo} Para el proceso de **Elecciones Institucionales y Votaciones** en la Universidad Simón Bolívar:\n\n"
                 "• El sufragio **no** se realiza en el Portal Estudiantes habitual ni en SIAAF.\n"
