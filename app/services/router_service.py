@@ -29,19 +29,29 @@ Tu labor es clasificar el mensaje del usuario en UNA de dos categorías:
 
 1. AUTOSERVICIO:
 - Toda consulta informativa o procedimental sobre trámites, instructivos paso a paso, políticas, requisitos o canales de atención.
-- Solicitudes o preguntas sobre préstamo, asignación temporal o dotación de equipos de cómputo (portátiles, PCs, salas, proyectores, micrófonos), INCLUYENDO si el usuario menciona que su equipo actual falló o se dañó y pregunta si le pueden prestar o asignar otro mientras lo arreglan.
+- Solicitudes o preguntas sobre préstamo, asignación temporal o dotación de equipos de cómputo.
 - Trámites en plataformas web: SIAAF, Teams, Portal Estudiantes/Profesores/Administrativos, Kactus, Seven, subida de notas, reporte de inasistencias ("fallas a clase"), calificaciones, recuperación de contraseñas.
 
 2. SOPORTE_FISICO:
-- Reportes directos y explícitos de averías físicas donde el usuario ÚNICAMENTE informa que un equipo, periférico o cable se dañó/rompió/no prende y requiere revisión técnica presencial en sitio (ej: "mi monitor no prende", "el cable de red se rompió", "el torniquete está trabado"), SIN realizar preguntas informativas sobre procedimientos, trámites o préstamos.
+- Reportes explícitos de averías físicas donde un equipo, periférico, impresora, o punto de red presenta fallas, no prende o no tiene conexión, y que requieren revisión técnica presencial en sitio.
+- Si el usuario reporta un daño físico o de hardware, la categoría SIEMPRE es SOPORTE_FISICO, sin importar si el usuario menciona la palabra "trámites" o "urgencia" como contexto de su problema.
 
 REGLAS CLAVE:
-- Toda pregunta con interrogativos o verbos de trámite ("¿cómo...?", "¿dónde...?", "¿me pueden prestar...?", "¿cuál es el trámite...?", "¿puedo solicitar...?") es SIEMPRE AUTOSERVICIO.
-- Consultas sobre "fallas a clase", "reportar fallas", "subir notas" o "calificaciones" son SIEMPRE AUTOSERVICIO.
-- Preguntas sobre préstamo de equipos, asignación de portátiles o dotación son SIEMPRE AUTOSERVICIO.
+- Toda pregunta con interrogativos sobre trámites ("¿cómo...?", "¿dónde...?", "¿cuál es el trámite...?") es SIEMPRE AUTOSERVICIO.
+- Consultas sobre "fallas a clase", "reportar fallas", "subir notas" son SIEMPRE AUTOSERVICIO.
+- PERO, si el usuario está solicitando revisión de un hardware dañado (ej. impresora, PC, red), DEBE ser SOPORTE_FISICO.
 
 Responde ÚNICAMENTE un objeto JSON válido con la clave 'categoria':
 {"categoria": "AUTOSERVICIO"} o {"categoria": "SOPORTE_FISICO"}"""
+
+SYSTEM_TROUBLESHOOTING_PROMPT = """Eres un técnico de soporte de Nivel 1.
+Tu objetivo es dar 2 a 3 sugerencias de revisión rápida (troubleshooting básico) que el usuario pueda hacer por sí mismo para descartar problemas comunes antes de requerir un técnico en sitio.
+El usuario reportará un problema de hardware o red. 
+REGLAS:
+- Sé amable, directo y breve.
+- Usa una lista numerada.
+- No des procedimientos largos ni pidas que desarme nada.
+- No ofrezcas crear tickets ni des números de contacto (el sistema lo hará después)."""
 
 PROMPT_HARDWARE_DIRECT = (
     "Para fallas físicas, averías de hardware, puntos de red o problemas con torniquetes y equipos de cómputo, "
@@ -230,6 +240,38 @@ def is_physical_hardware_request(user_message: str, user_role: str = "general") 
     Determina si la solicitud del usuario es de soporte físico/hardware usando el clasificador semántico.
     """
     return classify_request_intent(user_message, user_role) == "SOPORTE_FISICO"
+
+
+async def generate_quick_troubleshooting_async(user_message: str) -> str:
+    """
+    Genera un diagnóstico/troubleshooting rápido utilizando Ollama
+    para que el usuario intente descartar el problema antes de radicar el caso.
+    """
+    prompt = f"El usuario reporta el siguiente problema: '{user_message}'. Sugiere 2 o 3 pasos rápidos de revisión básica."
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                OLLAMA_URL,
+                json={
+                    "model": MODEL_NAME,
+                    "prompt": prompt,
+                    "system": SYSTEM_TROUBLESHOOTING_PROMPT,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.3,
+                        "num_predict": 250
+                    }
+                },
+                timeout=12.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("response", "").strip()
+    except Exception as e:
+        logger.warning(f"Error generando troubleshooting rápido ({e}).")
+        
+    return ""
 
 
 RESOLVED_INTENTS = ["RESOLVED", "resolved"]
