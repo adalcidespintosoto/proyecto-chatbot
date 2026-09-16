@@ -498,6 +498,7 @@ DIRECTRICES DE RESPUESTA:
 2. GROUNDING ESTRICTO:
    - Responde exclusivamente con la información provista en el contexto. Está estrictamente prohibido inventar botones, enlaces, menús o formularios si no aparecen en los fragmentos.
    - Si el rol del usuario es 'Administrativo' o 'Profesor', NUNCA lo envíes al 'Portal Estudiantes'. Respeta estrictamente el rol institucional del usuario.
+   - NUNCA le digas al usuario que busque, lea o consulte un documento o archivo PDF (ej. "Busca el procedimiento P-GT-02.pdf"). Tu deber es extraer los pasos de la documentación y explicárselos directamente en el chat.
 3. LÍMITE DE DOMINIO - TRÁMITES ACADÉMICOS (RECLAMO DE NOTAS):
    - Soporte TI NO califica, no modifica notas ni atiende desacuerdos evaluativos.
    - El módulo de "Calificaciones" del Portal Estudiantes es EXCLUSIVAMENTE para consulta y descarga.
@@ -543,11 +544,12 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
           • Sede Cúcuta: `helpdesk@unisimon.edu.co` | Tel: `(607) 5827070 Ext. 129`
       * PROHIBICIÓN ESTRICTA: NUNCA menciones requisitos de equipos de cómputo ni visto bueno de jefatura para hardware en consultas sobre SIAAF, Portal, Teams, notas o votaciones. NUNCA asocies solicitudes o préstamos de hardware/periféricos con créditos educativos en SIAAF, condonación de cartera ni bienestar universitario.
 
-   - D. PRÉSTAMO TEMPORAL DE RECURSOS AUDIOVISUALES (Cámaras, Video Beam, Micrófonos, Tablets para clases/eventos):
-     * Si el usuario solicita un préstamo temporal o reserva de equipos para clases o eventos:
-       1. Aclara que la coordinación se realiza directamente con Soporte Técnico TI. NUNCA apruebes el préstamo ni inventes rutas en plataformas web.
-       2. Proporciona los canales oficiales de ambas sedes.
-       3. Entrega OBLIGATORIAMENTE la plantilla de solicitud (Nombre, Documento, Rol, Equipo, Motivo, Fecha/Horario, Salón).
+   - D. PRÉSTAMO TEMPORAL DE RECURSOS AUDIOVISUALES Y EQUIPOS (Cámaras, Video Beam, Micrófonos, Tablets para clases/eventos/proyectos):
+     * Si el usuario solicita un préstamo temporal o reserva de equipos:
+       1. Aclara primero que la coordinación del préstamo se realiza directamente con Soporte Técnico TI. NUNCA apruebes el préstamo tú mismo.
+       2. Indica claramente al usuario que debe enviar una solicitud formal por correo electrónico.
+       3. Muéstrale los datos que DEBE incluir en su correo (Nombre, Documento, Rol, Equipo requerido, Motivo, Fecha/Horario y Salón/Ubicación). IMPORTANTE: Enumera estos requisitos para que el usuario los envíe, NO redactes una carta ni llenes la plantilla por el usuario.
+       4. Proporciona los canales oficiales de Soporte TI de ambas sedes.
 
    - E. INSTALACIÓN Y CONFIGURACIÓN DE SOFTWARE / SOPORTE A EQUIPOS O LABORATORIOS (ej. GlobalProtect, VPN, programas especializados en portátiles o salas):
      * Aplica cuando el usuario solicita la instalación, configuración o alistamiento de un software, VPN o conexión remota en un equipo institucional (computador, portátil, sala o laboratorio).
@@ -2001,7 +2003,8 @@ class RAGService:
             if any(k in q_lower for k in [
                 "portal", "correo", "teams", "carnet", "kactus", "seven", "backup",
                 "malware", "virus", "computador", "portatil", "pantalla", "clave", "contraseña",
-                "internet", "red", "wifi", "conexion", "conexión", "conectividad"
+                "internet", "red", "wifi", "conexion", "conexión", "conectividad",
+                "licencia", "software", "programa", "aplicativo"
             ]):
                 logger.info("Activando fallback temático institucional por coincidencia de categoría.")
                 return self._generate_fallback_response(question, user_name, sources)
@@ -2291,6 +2294,20 @@ class RAGService:
                 "1. Verifica que los cables de poder, red o video estén firmemente conectados.\n"
                 "2. Reinicia el equipo o dispositivo y verifica si el comportamiento persiste.\n"
                 "3. Si el inconveniente es en un aplicativo institucional, cierra sesión y vuelve a ingresar."
+            )
+        elif any(w in msg_lower for w in ["licencia", "software", "programa", "aplicativo", "instalación", "renovación", "renovacion"]):
+            contenido = (
+                f"{saludo} Para solicitar la **instalación, dotación o renovación de licencias de software institucionales** "
+                "(como Educaplay, Office, Adobe, SPSS, entre otros) en equipos de la Universidad:\n\n"
+                "Todo software institucional debe ser licenciado y avalado por la Dirección de TI para garantizar el cumplimiento normativo. "
+                "Para tramitar tu solicitud, por favor comunícate a nuestros canales oficiales indicando:\n"
+                "1. Nombre completo y documento de identidad.\n"
+                "2. Nombre exacto del software o licencia que requieres.\n"
+                "3. Placa de inventario del equipo institucional donde se utilizará (si aplica).\n"
+                "4. Justificación o aval de tu jefatura para la adquisición/renovación de la licencia.\n\n"
+                "📧 **Canales oficiales de radicación:**\n"
+                "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
+                "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
             )
         else:
             contenido = MENSAJE_NO_DOCUMENTADO

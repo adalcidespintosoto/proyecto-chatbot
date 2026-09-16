@@ -40,6 +40,7 @@ from app.services.router_service import (
     HARDWARE_QUICK_REPLIES,
     classify_request_intent,
     classify_request_intent_async,
+    generate_quick_troubleshooting_async,
     is_physical_hardware_request,
     is_informative_procedure_query,
     ROLE_QUICK_REPLIES,
@@ -1412,14 +1413,20 @@ class RouterLogic:
                     session.estado = EstadoTicket.OFRECIENDO_RADICACION
                     session.nombre = None
                     session.correo = None
+                    quick_tips = await generate_quick_troubleshooting_async(query_to_run)
+                    if quick_tips:
+                        hardware_response = f"💡 **Sugerencias rápidas antes de radicar el caso:**\n\n{quick_tips}\n\n---\n\n{PROMPT_HARDWARE_DIRECT}"
+                    else:
+                        hardware_response = PROMPT_HARDWARE_DIRECT
+
                     cls.add_history(session_id, "user", texto)
-                    cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
+                    cls.add_history(session_id, "assistant", hardware_response)
                     return {
                         "tipo": "OFRECIENDO_RADICACION",
                         "state": "OFRECIENDO_RADICACION",
-                        "mensaje": PROMPT_HARDWARE_DIRECT,
-                        "response": PROMPT_HARDWARE_DIRECT,
-                        "reply": PROMPT_HARDWARE_DIRECT,
+                        "mensaje": hardware_response,
+                        "response": hardware_response,
+                        "reply": hardware_response,
                         "query": query_to_run,
                         "ticket_id": None,
                         "source": "UniMon_SemanticRouter_Hardware",
@@ -1987,14 +1994,20 @@ class RouterLogic:
                 session.estado = EstadoTicket.OFRECIENDO_RADICACION
                 session.nombre = None
                 session.correo = None
+                quick_tips = await generate_quick_troubleshooting_async(texto)
+                if quick_tips:
+                    hardware_response = f"💡 **Sugerencias rápidas antes de radicar el caso:**\n\n{quick_tips}\n\n---\n\n{PROMPT_HARDWARE_DIRECT}"
+                else:
+                    hardware_response = PROMPT_HARDWARE_DIRECT
+
                 cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", PROMPT_HARDWARE_DIRECT)
+                cls.add_history(session_id, "assistant", hardware_response)
                 return {
                     "tipo": "OFRECIENDO_RADICACION",
                     "state": "OFRECIENDO_RADICACION",
-                    "mensaje": PROMPT_HARDWARE_DIRECT,
-                    "response": PROMPT_HARDWARE_DIRECT,
-                    "reply": PROMPT_HARDWARE_DIRECT,
+                    "mensaje": hardware_response,
+                    "response": hardware_response,
+                    "reply": hardware_response,
                     "ticket_id": None,
                     "source": "UniMon_SemanticRouter_Hardware",
                     "quick_replies": HARDWARE_QUICK_REPLIES
