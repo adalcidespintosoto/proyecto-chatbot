@@ -499,6 +499,7 @@ DIRECTRICES DE RESPUESTA:
    - Responde exclusivamente con la información provista en el contexto. Está estrictamente prohibido inventar botones, enlaces, menús o formularios si no aparecen en los fragmentos.
    - Si el rol del usuario es 'Administrativo' o 'Profesor', NUNCA lo envíes al 'Portal Estudiantes'. Respeta estrictamente el rol institucional del usuario.
    - NUNCA le digas al usuario que busque, lea o consulte un documento o archivo PDF (ej. "Busca el procedimiento P-GT-02.pdf"). Tu deber es extraer los pasos de la documentación y explicárselos directamente en el chat.
+   - EXTRACCIÓN OBLIGATORIA: Si el contexto contiene un procedimiento o instructivo para resolver la duda del usuario (ej. restablecer contraseña, reportar virus, entrar a teams), DEBES extraer los pasos exactos y redactar la respuesta con ellos. ESTÁ ESTRICTAMENTE PROHIBIDO dar respuestas evasivas, cortas o coloquiales como "Si necesitas ayuda, dime". Tu función es dar la solución técnica detallada.
 3. LÍMITE DE DOMINIO - TRÁMITES ACADÉMICOS (RECLAMO DE NOTAS):
    - Soporte TI NO califica, no modifica notas ni atiende desacuerdos evaluativos.
    - El módulo de "Calificaciones" del Portal Estudiantes es EXCLUSIVAMENTE para consulta y descarga.
@@ -1235,7 +1236,7 @@ def clean_llm_response(text: str) -> str:
     stripped_lines = [line.strip() for line in text.split("\n") if line.strip()]
     if len(stripped_lines) <= 2:
         combined_lower = " ".join(stripped_lines).lower()
-        combined_lower = re.sub(r"^(?:¡?hola!?[,!.]*\s*|buenos\s+d[ií]as[!.]*\s*|buenas\s+tardes[!.]*\s*)+", "", combined_lower).strip()
+        combined_lower = re.sub(r"^(?:¡?hola!,!.]*\s*|buenos\s+d[ií]as[!.]*\s*|buenas\s+tardes[!.]*\s*)+", "", combined_lower).strip()
         if re.search(r"^(?:¿?(?:hay\s+algo\s+m[aá]s|en\s+qu[eé]\s+m[aá]s|te\s+puedo\s+colaborar\s+en\s+algo\s+m[aá]s|deseas\s+ayuda\s+con\s+algo\s+m[aá]s|puedo\s+ayudarte\s+en\s+algo\s+m[aá]s)[^?]*\??|\s*)$", combined_lower):
             return ""
 
@@ -2092,7 +2093,7 @@ class RAGService:
 
                     # Se relajan las reglas de evasión y placeholder para permitir que el modelo interactúe de forma natural
                     # cuando pide aclaraciones al usuario en vez de aplastar el diálogo con un mensaje de fallback duro.
-                    is_evasion = bool(re.search(r"(?i)\b(?:no\s+tengo\s+acceso\s+a\s+esa\s+informaci[oó]n|soy\s+solo\s+un\s+modelo\s+de\s+lenguaje)\b", bot_message))
+                    is_evasion = bool(re.search(r"(?i)\b(?:no\s+tengo\s+acceso\s+a\s+esa\s+informaci[oó]n|soy\s+solo\s+un\s+modelo\s+de\s+lenguaje|si\s+necesitas\s+ayuda|en\s+qu[eé]\s+m[aá]s\s+puedo|no\s+puedo\s+ayudar|no\s+hay\s+informaci[oó]n|el\s+contexto\s+no|no\s+proporciona)\b", bot_message))
                     if not bot_message or len(bot_message.strip()) < 15 or is_evasion:
                         logger.info("Respuesta de Ollama vacía o evasión del modelo genérico detectada. Invocando fallback institucional.")
                         return self._generate_fallback_response(question, user_name, sources)
@@ -2166,7 +2167,26 @@ class RAGService:
                 "2. Ubica la jornada electoral activa correspondiente.\n"
                 "3. Selecciona tu candidato o la opción de tu preferencia y haz clic en el botón verde **VOTAR** para confirmar tu sufragio."
             )
-        elif any(w in msg_lower for w in ["contacto", "canal", "canales", "telefono", "teléfono", "correo", "atención", "atencion", "wasap", "whatsapp", "directorio"]):
+        elif any(w in msg_lower for w in [
+            "contraseña", "contrasena", "clave", "clabe", "bloqueo", "desbloquear", "login", "acceso", "portal", "portales"
+        ]):
+            contenido = (
+                f"{saludo} Para gestionar el acceso o restablecimiento de tu contraseña en las plataformas institucionales:\n\n"
+                "• **Si eres estudiante de primer semestre (nuevo ingreso):**\n"
+                "  1. Consulta el pie de página de tu Recibo de Matrícula Financiera Web para conocer tu usuario institucional.\n"
+                "  2. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) con tu usuario y contraseña temporal por defecto: `unisimon`.\n"
+                "  3. El sistema te solicitará obligatoriamente cambiar la contraseña en la ventana emergente.\n\n"
+                "• **Si eres estudiante regular (segundo semestre en adelante):**\n"
+                "  1. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) y selecciona tu sede (Barranquilla o Cúcuta).\n"
+                "  2. Haz clic en el enlace **Olvidé mi Usuario / Contraseña**.\n"
+                "  3. Digita tu documento de identidad o código y pulsa **Enviar**.\n"
+                "  4. Recibirás un enlace de restablecimiento (válido por 24 horas remitido por `informacion@unisimonbolivar.edu.co`) en tu **correo personal registrado en el sistema**.\n"
+                "  5. Abre el enlace y define tu nueva contraseña cumpliendo las políticas de seguridad.\n\n"
+                "Si presentas inconvenientes, puedes contactar a Soporte TI:\n"
+                "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
+                "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
+            )
+        elif any(w in msg_lower for w in ["contacto", "canal", "canales", "telefono", "teléfono", "atención", "atencion", "wasap", "whatsapp", "directorio"]):
             contenido = (
                 f"{saludo} Los canales oficiales de atención y soporte técnico TI de la **Universidad Simón Bolívar (Colombia)** son:\n\n"
                 "• **Sede Barranquilla:**\n"
@@ -2232,25 +2252,7 @@ class RAGService:
                 "• Las incidencias y requerimientos deben ser radicados indicando el módulo afectado, captura de pantalla del error y usuario solicitante.\n"
                 "• El equipo de soporte de aplicaciones gestionará el requerimiento conforme a los acuerdos de nivel de servicio (SLA)."
             )
-        elif any(w in msg_lower for w in [
-            "contraseña", "contrasena", "clave", "clabe", "bloqueo", "desbloquear", "login", "acceso", "portal", "portales"
-        ]):
-            contenido = (
-                f"{saludo} Para gestionar el acceso o restablecimiento de tu contraseña en las plataformas institucionales:\n\n"
-                "• **Si eres estudiante de primer semestre (nuevo ingreso):**\n"
-                "  1. Consulta el pie de página de tu Recibo de Matrícula Financiera Web para conocer tu usuario institucional.\n"
-                "  2. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) con tu usuario y contraseña temporal por defecto: `unisimon`.\n"
-                "  3. El sistema te solicitará obligatoriamente cambiar la contraseña en la ventana emergente.\n\n"
-                "• **Si eres estudiante regular (segundo semestre en adelante):**\n"
-                "  1. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) y selecciona tu sede (Barranquilla o Cúcuta).\n"
-                "  2. Haz clic en el enlace **Olvidé mi Usuario / Contraseña**.\n"
-                "  3. Digita tu documento de identidad o código y pulsa **Enviar**.\n"
-                "  4. Recibirás un enlace de restablecimiento (válido por 24 horas remitido por `informacion@unisimonbolivar.edu.co`) en tu **correo personal registrado en el sistema**.\n"
-                "  5. Abre el enlace y define tu nueva contraseña cumpliendo las políticas de seguridad.\n\n"
-                "Si presentas inconvenientes, puedes contactar a Soporte TI:\n"
-                "• **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. `8003 / 8004`\n"
-                "• **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. `129`"
-            )
+
         elif any(w in msg_lower for w in ["virus", "malware", "antivirus", "amenaza", "infectado"]):
             contenido = (
                 f"{saludo} Según el procedimiento **P-GT-07** (*Protección de Código Malicioso*):\n\n"
