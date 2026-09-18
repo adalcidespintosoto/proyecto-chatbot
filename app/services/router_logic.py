@@ -1526,6 +1526,7 @@ class RouterLogic:
                     "sources": rag_res.get("sources"),
                     "source": rag_res.get("source", "ollama_rag"),
                     "prompt_tokens": rag_res.get("prompt_tokens", 0),
+                    "cached_tokens": rag_res.get("cached_tokens", 0),
                     "eval_tokens": rag_res.get("eval_tokens", 0),
                     "quick_replies": rag_res.get("quick_replies", [
                         {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
@@ -1889,6 +1890,7 @@ class RouterLogic:
                 "sources": rag_res.get("sources"),
                 "source": rag_res.get("source", "ollama_rag"),
                 "prompt_tokens": rag_res.get("prompt_tokens", 0),
+                "cached_tokens": rag_res.get("cached_tokens", 0),
                 "eval_tokens": rag_res.get("eval_tokens", 0),
                 "quick_replies": rag_res.get("quick_replies", [
                     {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
@@ -2115,6 +2117,7 @@ class RouterLogic:
                 "sources": rag_res.get("sources"),
                 "source": rag_res.get("source", "ollama_rag"),
                 "prompt_tokens": rag_res.get("prompt_tokens", 0),
+                "cached_tokens": rag_res.get("cached_tokens", 0),
                 "eval_tokens": rag_res.get("eval_tokens", 0),
                 "quick_replies": rag_res.get("quick_replies", [
                     {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
