@@ -1729,25 +1729,25 @@
         </div>
       </div>
 
-      <!-- Panel Detallado de Facturación y Tokens OpenAI / Cloud -->
+      <!-- Panel Detallado de Facturación y Tokens OpenAI / Gemini / Cloud -->
       <div class="panel-card" style="margin-bottom: 2rem; border: 1px solid rgba(124, 58, 237, 0.3); background: linear-gradient(135deg, rgba(124, 58, 237, 0.07) 0%, rgba(16, 185, 129, 0.03) 100%);">
         <div class="panel-header">
-          <h3 class="panel-title">⚡ Desglose de Tokens y Facturación IA (<span id="llmProviderDisplay" style="color:#A78BFA;">OpenAI GPT-5.6 Luna</span>)</h3>
-          <span class="badge" style="background:#7C3AED; color:#fff;" id="openaiModelBadge">gpt-5.6-luna</span>
+          <h3 class="panel-title">⚡ Desglose de Tokens y Facturación IA (<span id="llmProviderDisplay" style="color:#A78BFA;">Google Gemini</span>)</h3>
+          <span class="badge" style="background:#0284C7; color:#fff;" id="openaiModelBadge">gemini-flash-lite-latest</span>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; padding: 1.2rem;">
           <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-            <div style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 4px;">📥 Entrada Regular ($0.20 / 1M)</div>
+            <div style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 4px;" id="tokRegularLabel">📥 Entrada Regular ($0.075 / 1M)</div>
             <div style="font-size: 1.35rem; font-weight: 700; color: #60A5FA;" id="tokRegular">0 tokens</div>
             <div style="font-size: 0.78rem; color: #94A3B8; margin-top: 4px;" id="tokRegularCost">$0.0000 USD</div>
           </div>
           <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.35);">
-            <div style="font-size: 0.82rem; color: #10B981; margin-bottom: 4px;">⚡ Entrada en CACHÉ ($0.02 / 1M)</div>
+            <div style="font-size: 0.82rem; color: #10B981; margin-bottom: 4px;" id="tokCachedLabel">⚡ Entrada en CACHÉ ($0.018 / 1M)</div>
             <div style="font-size: 1.35rem; font-weight: 700; color: #10B981;" id="tokCached">0 tokens</div>
             <div style="font-size: 0.78rem; color: #10B981; margin-top: 4px;" id="tokCachedCost">$0.0000 USD (90% ahorro)</div>
           </div>
           <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-            <div style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 4px;">📤 Salida Generada ($1.20 / 1M)</div>
+            <div style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 4px;" id="tokOutputLabel">📤 Salida Generada ($0.30 / 1M)</div>
             <div style="font-size: 1.35rem; font-weight: 700; color: #A78BFA;" id="tokOutput">0 tokens</div>
             <div style="font-size: 0.78rem; color: #94A3B8; margin-top: 4px;" id="tokOutputCost">$0.0000 USD</div>
           </div>
@@ -2653,16 +2653,41 @@
         document.getElementById('kpiTokensSubtext').innerText = `${tokRegular.toLocaleString()} in (${tokCached.toLocaleString()} caché) / ${tokOut.toLocaleString()} out`;
 
         if (document.getElementById('tokRegular')) {
+          const pInfo = kpis.provider_info || {};
+          const pName = (pInfo.provider || 'gemini').toLowerCase();
+          const rateIn = pInfo.rate_regular_1m ?? (pName === 'gemini' ? 0.075 : (pName === 'openai' ? 0.20 : 0.0));
+          const rateCache = pInfo.rate_cached_1m ?? (pName === 'gemini' ? 0.01875 : (pName === 'openai' ? 0.02 : 0.0));
+          const rateOut = pInfo.rate_out_1m ?? (pName === 'gemini' ? 0.30 : (pName === 'openai' ? 1.20 : 0.0));
+          const pLabel = pInfo.label || (pName === 'gemini' ? 'Google Gemini' : (pName === 'openai' ? 'OpenAI' : 'Ollama Local'));
+          const pModel = pInfo.model || (pName === 'gemini' ? 'gemini-flash-lite-latest' : (pName === 'openai' ? 'gpt-5.6-luna' : 'unimon:8b'));
+
+          if (document.getElementById('llmProviderDisplay')) {
+            document.getElementById('llmProviderDisplay').innerText = `${pLabel} (${pModel})`;
+          }
+          if (document.getElementById('openaiModelBadge')) {
+            document.getElementById('openaiModelBadge').innerText = pModel;
+            document.getElementById('openaiModelBadge').style.background = pName === 'gemini' ? '#0284C7' : (pName === 'openai' ? '#7C3AED' : '#10B981');
+          }
+          if (document.getElementById('tokRegularLabel')) {
+            document.getElementById('tokRegularLabel').innerText = `📥 Entrada Regular ($${rateIn} / 1M)`;
+          }
+          if (document.getElementById('tokCachedLabel')) {
+            document.getElementById('tokCachedLabel').innerText = `⚡ Entrada en CACHÉ ($${rateCache} / 1M)`;
+          }
+          if (document.getElementById('tokOutputLabel')) {
+            document.getElementById('tokOutputLabel').innerText = `📤 Salida Generada ($${rateOut} / 1M)`;
+          }
+
           document.getElementById('tokRegular').innerText = `${tokRegular.toLocaleString()} tokens`;
-          const regCost = (tokRegular * 0.20 / 1000000).toFixed(4);
+          const regCost = (tokRegular * rateIn / 1000000).toFixed(4);
           document.getElementById('tokRegularCost').innerText = `$${regCost} USD`;
 
           document.getElementById('tokCached').innerText = `${tokCached.toLocaleString()} tokens`;
-          const cCost = (tokCached * 0.02 / 1000000).toFixed(4);
-          document.getElementById('tokCachedCost').innerText = `$${cCost} USD (90% ahorro)`;
+          const cCost = (tokCached * rateCache / 1000000).toFixed(4);
+          document.getElementById('tokCachedCost').innerText = `$${cCost} USD (ahorro)`;
 
           document.getElementById('tokOutput').innerText = `${tokOut.toLocaleString()} tokens`;
-          const outCost = (tokOut * 1.20 / 1000000).toFixed(4);
+          const outCost = (tokOut * rateOut / 1000000).toFixed(4);
           document.getElementById('tokOutputCost').innerText = `$${outCost} USD`;
 
           document.getElementById('tokTotalCost').innerText = `$${Number(costUsd).toFixed(4)} USD`;

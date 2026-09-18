@@ -358,8 +358,31 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             tokens_out = cursor.execute(f"SELECT SUM(eval_tokens) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
             tokens_regular = max(0, (tokens_in or 0) - (tokens_cached or 0))
 
-            # Cálculo de costo estimado en dólares y pesos (Tarifa GPT-5.6 Luna: $0.20 in, $0.02 cache, $1.20 out)
-            cost_usd = (tokens_regular * 0.20 / 1_000_000) + (tokens_cached * 0.02 / 1_000_000) + (tokens_out * 1.20 / 1_000_000)
+            # Cálculo de costo estimado dinámico según proveedor activo
+            from app.config import get_settings
+            _cfg = get_settings()
+            _prov = (_cfg.llm_provider or "gemini").lower().strip()
+
+            if _prov == "gemini":
+                rate_in = 0.075
+                rate_cache = 0.01875
+                rate_out = 0.30
+                provider_label = "Google Gemini"
+                active_model_name = _cfg.gemini_model
+            elif _prov == "openai":
+                rate_in = 0.20
+                rate_cache = 0.02
+                rate_out = 1.20
+                provider_label = "OpenAI"
+                active_model_name = _cfg.openai_model
+            else:
+                rate_in = 0.0
+                rate_cache = 0.0
+                rate_out = 0.0
+                provider_label = "Ollama Local"
+                active_model_name = _cfg.llm_model
+
+            cost_usd = (tokens_regular * rate_in / 1_000_000) + (tokens_cached * rate_cache / 1_000_000) + (tokens_out * rate_out / 1_000_000)
             cost_cop = cost_usd * 4150
 
             roles_data = cursor.execute(f"""
@@ -413,6 +436,14 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
         return {
             "period_start": norm_start,
             "period_end": norm_end,
+            "provider_info": {
+                "provider": _prov,
+                "label": provider_label,
+                "model": active_model_name,
+                "rate_regular_1m": rate_in,
+                "rate_cached_1m": rate_cache,
+                "rate_out_1m": rate_out
+            },
             "resolution_rate": rate_resolved,
             "escalation_rate": rate_escalated,
             "resolved_count": resolved,

@@ -30,12 +30,18 @@ class Settings(BaseSettings):
     glpi_user_token: str = ""
     glpi_timeout: float = 15.0
 
-    # Configuración de Proveedor LLM (openai | ollama)
-    llm_provider: str = "openai"
+    # Configuración de Proveedor LLM (gemini | openai | ollama)
+    llm_provider: str = "gemini"
     openai_api_key: str = ""
     openai_model: str = "gpt-5.6-luna"
     openai_base_url: str = "https://api.openai.com/v1"
     openai_timeout: float = 35.0
+
+    # Configuración de Google Gemini (Nube)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-flash-lite-latest"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    gemini_timeout: float = 35.0
 
     # Configuración de Ollama (RAG / LLM Local)
     ollama_base_url: str = "http://localhost:11434"

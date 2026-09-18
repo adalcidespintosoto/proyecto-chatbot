@@ -717,7 +717,7 @@ async def get_system_status() -> Dict[str, Any]:
     """Retorna información de diagnóstico y salud de la infraestructura."""
     import httpx
     
-    # Chequeo LLM activo (OpenAI / Ollama)
+    # Chequeo LLM activo (Gemini / OpenAI / Ollama)
     from app.services.llm_client import get_llm_client
     llm_client = get_llm_client()
     llm_health = await llm_client.check_health()
@@ -729,7 +729,7 @@ async def get_system_status() -> Dict[str, Any]:
         ollama_ok = llm_ok
         models_available = llm_health.get("models_in_server", [])
     else:
-        # Chequeo secundario a Ollama local si el principal es OpenAI
+        # Chequeo secundario a Ollama local si el principal es en la nube
         try:
             async with httpx.AsyncClient(timeout=1.5) as client:
                 r = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
@@ -739,8 +739,8 @@ async def get_system_status() -> Dict[str, Any]:
         except Exception:
             ollama_ok = False
 
-    # Chequeo GPU
-    gpu_info = "CPU / Cloud API (Modo Acelerado)" if llm_client.provider == "openai" else "CPU (Modo Fallback)"
+    # Chequeo GPU / Aceleración
+    gpu_info = f"CPU / Cloud API ({llm_client.provider.upper()})" if llm_client.provider in ("gemini", "openai") else "CPU (Modo Fallback)"
     try:
         import torch
         if torch.cuda.is_available():
@@ -756,6 +756,15 @@ async def get_system_status() -> Dict[str, Any]:
         for _, _, files in os.walk(DOCS_DIR):
             total_docs += len([f for f in files if f.endswith(('.pdf', '.docx', '.pptx', '.txt'))])
 
+    active_endpoint = llm_health.get("endpoint", "")
+    if not active_endpoint:
+        if llm_client.provider == "gemini":
+            active_endpoint = settings.gemini_base_url
+        elif llm_client.provider == "openai":
+            active_endpoint = settings.openai_base_url
+        else:
+            active_endpoint = settings.ollama_base_url
+
     return {
         "status": "online",
         "app_name": settings.app_name,
@@ -766,13 +775,13 @@ async def get_system_status() -> Dict[str, Any]:
             "provider": llm_client.provider,
             "active_model": llm_client.active_model,
             "active": llm_ok,
-            "endpoint": llm_health.get("endpoint", "")
+            "endpoint": active_endpoint
         },
         "ollama": {
-            "endpoint": settings.openai_base_url if llm_client.provider == "openai" else settings.ollama_base_url,
-            "active": llm_ok if llm_client.provider == "openai" else ollama_ok,
-            "model_configured": settings.openai_model if llm_client.provider == "openai" else settings.llm_model,
-            "models_in_server": [settings.openai_model] if llm_client.provider == "openai" else models_available
+            "endpoint": active_endpoint,
+            "active": llm_ok if llm_client.provider in ("gemini", "openai") else ollama_ok,
+            "model_configured": llm_client.active_model if llm_client.provider in ("gemini", "openai") else settings.llm_model,
+            "models_in_server": [llm_client.active_model] if llm_client.provider in ("gemini", "openai") else models_available
         },
         "glpi": {
             "endpoint": settings.glpi_base_url,
