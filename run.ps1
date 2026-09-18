@@ -57,23 +57,31 @@ try {
     }
 
     # -------------------------------------------------------------------------
-    # 2. COMPROBACION DE SERVICIOS E INFRAESTRUCTURA DE IA (OPENAI / OLLAMA)
+    # 2. COMPROBACION DE SERVICIOS E INFRAESTRUCTURA DE IA (GEMINI / OPENAI / OLLAMA)
     # -------------------------------------------------------------------------
     Write-Host "[2/5] Verificando proveedor de IA (LLM)..." -ForegroundColor Cyan
     
-    $provider = "openai"
+    $provider = "gemini"
     $openaiKey = ""
     $openaiModel = "gpt-5.6-luna"
+    $geminiKey = ""
+    $geminiModel = "gemini-flash-lite-latest"
     if (Test-Path ".env") {
         $envLines = Get-Content ".env"
         foreach ($line in $envLines) {
             if ($line -match '^\s*LLM_PROVIDER\s*=\s*(.+)') { $provider = $matches[1].Trim().ToLower() }
             if ($line -match '^\s*OPENAI_API_KEY\s*=\s*(.+)') { $openaiKey = $matches[1].Trim() }
             if ($line -match '^\s*OPENAI_MODEL\s*=\s*(.+)') { $openaiModel = $matches[1].Trim() }
+            if ($line -match '^\s*GEMINI_API_KEY\s*=\s*(.+)') { $geminiKey = $matches[1].Trim() }
+            if ($line -match '^\s*GEMINI_MODEL\s*=\s*(.+)') { $geminiModel = $matches[1].Trim() }
         }
     }
 
-    if ($provider -eq "openai" -and $openaiKey -and ($openaiKey -notmatch "tu_openai")) {
+    if ($provider -eq "gemini" -and $geminiKey -and ($geminiKey -notmatch "tu_gemini")) {
+        Write-Host "      [OK] Proveedor en la nube: Google Gemini ($geminiModel)" -ForegroundColor Green
+        Write-Host "           [ESTRICTO] Modelo local (Ollama) DESHABILITADO. Modo 100% Cloud activo." -ForegroundColor Yellow
+        Write-Host "           Toda inferencia y generacion se procesa exclusivamente con Gemini." -ForegroundColor DarkGray
+    } elseif ($provider -eq "openai" -and $openaiKey -and ($openaiKey -notmatch "tu_openai")) {
         Write-Host "      [OK] Proveedor en la nube: OpenAI ($openaiModel)" -ForegroundColor Green
         Write-Host "           [ESTRICTO] Modelo local (Ollama) DESHABILITADO. Modo 100% Cloud activo." -ForegroundColor Yellow
         Write-Host "           Toda inferencia y generacion se procesa exclusivamente con OpenAI." -ForegroundColor DarkGray

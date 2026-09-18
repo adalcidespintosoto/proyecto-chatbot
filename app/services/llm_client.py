@@ -26,7 +26,9 @@ class LLMClient:
 
     @property
     def active_model(self) -> str:
-        if self.provider == "openai":
+        if self.provider == "gemini":
+            return self.settings.gemini_model
+        elif self.provider == "openai":
             return self.settings.openai_model
         return self.settings.llm_model
 
@@ -40,9 +42,14 @@ class LLMClient:
         """
         Ejecuta una consulta conversacional completa con el LLM activo.
         
-        En modo 'openai', el fallback a Ollama está COMPLETAMENTE DESHABILITADO
-        para garantizar que el 100% de las inferencias provengan de la nube.
+        En modo 'gemini' u 'openai', el fallback a Ollama está COMPLETAMENTE DESHABILITADO
+        para garantizar que el 100% de las inferencias provengan del proveedor cloud configurado.
         """
+        if self.provider == "gemini":
+            if not self.settings.gemini_api_key:
+                raise RuntimeError("LLM_PROVIDER está configurado como 'gemini', pero no se encontró GEMINI_API_KEY en .env")
+            return await self._call_gemini_chat(messages, max_tokens=max_tokens)
+
         if self.provider == "openai":
             if not self.settings.openai_api_key:
                 raise RuntimeError("LLM_PROVIDER está configurado como 'openai', pero no se encontró OPENAI_API_KEY en .env")
@@ -51,6 +58,70 @@ class LLMClient:
 
         # Modo Ollama local directo (únicamente si LLM_PROVIDER=ollama)
         return await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
+
+    async def _call_gemini_chat(
+        self,
+        messages: List[Dict[str, Any]],
+        max_tokens: int = 768
+    ) -> Dict[str, Any]:
+        """Llamada asíncrona a la API de Google Gemini (mediante su endpoint compatible con OpenAI)."""
+        headers = {
+            "Authorization": f"Bearer {self.settings.gemini_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        url = f"{self.settings.gemini_base_url.rstrip('/')}/chat/completions"
+        model_name = self.settings.gemini_model
+
+        payload: Dict[str, Any] = {
+            "model": model_name,
+            "messages": messages,
+            "max_completion_tokens": max(max_tokens, 600)
+        }
+
+        timeout = self.settings.gemini_timeout or 35.0
+
+        print(f"\n[GEMINI CLOUD] >>> Enviando consulta al modelo: '{model_name}' en {url}...", flush=True)
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                choice = data.get("choices", [{}])[0]
+                content = choice.get("message", {}).get("content", "").strip()
+                usage = data.get("usage", {})
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                cached_tokens = usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)
+                regular_input = max(0, prompt_tokens - cached_tokens)
+
+                print(
+                    f"[GEMINI CLOUD] <<< Respuesta exitosa de '{model_name}'!\n"
+                    f"               - Entrada regular ($0.075/1M):  {regular_input} tokens\n"
+                    f"               - Entrada en CACHÉ ($0.018/1M): {cached_tokens} tokens\n"
+                    f"               - Salida generada ($0.30/1M):   {completion_tokens} tokens\n",
+                    flush=True
+                )
+
+                logger.info(
+                    "[LLMClient] Gemini '%s' respondió exitosamente (tokens: in=%s, cached=%s, out=%s).",
+                    model_name, regular_input, cached_tokens, completion_tokens
+                )
+
+                return {
+                    "content": content,
+                    "prompt_tokens": prompt_tokens,
+                    "cached_tokens": cached_tokens,
+                    "eval_tokens": completion_tokens,
+                    "model": model_name,
+                    "provider": "gemini",
+                    "source": f"gemini_{model_name}"
+                }
+
+            error_text = response.text
+            print(f"[GEMINI CLOUD] [ERROR] Código {response.status_code}: {error_text}\n", flush=True)
+            logger.error("[LLMClient] Error HTTP %s de Gemini: %s", response.status_code, error_text)
+            raise RuntimeError(f"Gemini API error {response.status_code}: {error_text}")
 
     async def _call_openai_chat(
         self,
@@ -175,6 +246,28 @@ class LLMClient:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        if self.provider == "gemini" and self.settings.gemini_api_key:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {self.settings.gemini_api_key}",
+                    "Content-Type": "application/json"
+                }
+                url = f"{self.settings.gemini_base_url.rstrip('/')}/chat/completions"
+                payload: Dict[str, Any] = {
+                    "model": self.settings.gemini_model,
+                    "messages": messages,
+                    "max_completion_tokens": max(max_tokens, 450)
+                }
+                async with httpx.AsyncClient(timeout=timeout or self.settings.gemini_timeout) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    if resp.status_code == 200:
+                        return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    logger.error("[LLMClient] Error HTTP %s de Gemini en generate_async: %s", resp.status_code, resp.text)
+                    raise RuntimeError(f"Gemini error {resp.status_code}: {resp.text}")
+            except Exception as e:
+                logger.error("[LLMClient] Falló generate_async con Gemini: %s", e)
+                raise e
+
         if self.provider == "openai" and self.settings.openai_api_key:
             try:
                 headers = {
@@ -232,6 +325,28 @@ class LLMClient:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        if self.provider == "gemini" and self.settings.gemini_api_key:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {self.settings.gemini_api_key}",
+                    "Content-Type": "application/json"
+                }
+                url = f"{self.settings.gemini_base_url.rstrip('/')}/chat/completions"
+                payload = {
+                    "model": self.settings.gemini_model,
+                    "messages": messages,
+                    "max_completion_tokens": max(max_tokens, 450)
+                }
+                with httpx.Client(timeout=timeout or self.settings.gemini_timeout) as client:
+                    resp = client.post(url, json=payload, headers=headers)
+                    if resp.status_code == 200:
+                        return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    logger.error("[LLMClient] Error HTTP %s de Gemini en generate_sync: %s", resp.status_code, resp.text)
+                    raise RuntimeError(f"Gemini error {resp.status_code}: {resp.text}")
+            except Exception as e:
+                logger.error("[LLMClient] Falló generate_sync con Gemini: %s", e)
+                raise e
+
         if self.provider == "openai" and self.settings.openai_api_key:
             try:
                 headers = {
@@ -278,6 +393,40 @@ class LLMClient:
 
     async def check_health(self) -> Dict[str, Any]:
         """Comprueba la disponibilidad del proveedor activo."""
+        if self.provider == "gemini":
+            if not self.settings.gemini_api_key:
+                return {
+                    "active": False,
+                    "provider": "gemini",
+                    "model": self.settings.gemini_model,
+                    "error": "No hay GEMINI_API_KEY configurada en .env"
+                }
+            try:
+                headers = {"Authorization": f"Bearer {self.settings.gemini_api_key}"}
+                url = f"{self.settings.gemini_base_url.rstrip('/')}/models"
+                async with httpx.AsyncClient(timeout=4.0) as client:
+                    r = await client.get(url, headers=headers)
+                    if r.status_code == 200:
+                        return {
+                            "active": True,
+                            "provider": "gemini",
+                            "model": self.settings.gemini_model,
+                            "endpoint": self.settings.gemini_base_url
+                        }
+                    return {
+                        "active": False,
+                        "provider": "gemini",
+                        "model": self.settings.gemini_model,
+                        "error": f"Gemini HTTP {r.status_code}"
+                    }
+            except Exception as e:
+                return {
+                    "active": False,
+                    "provider": "gemini",
+                    "model": self.settings.gemini_model,
+                    "error": str(e)
+                }
+
         if self.provider == "openai":
             if not self.settings.openai_api_key:
                 return {

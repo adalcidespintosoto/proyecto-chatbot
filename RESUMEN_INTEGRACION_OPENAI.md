@@ -143,11 +143,39 @@ En la pantalla de OpenAI que estabas revisando:
    * Agrupa el gasto en dólares por cada concepto específico.
 
 ### C. En el Panel Administrativo Oficial (`http://localhost:8000/admin`)
-Se añadió una tarjeta visual en la pestaña de **Métricas y Telemetría** que muestra en vivo:
-* 📥 **Entrada Regular:** Tokens no cacheados y costo en USD ($0.20 / 1M).
-* ⚡ **Entrada en CACHÉ:** Tokens leídos de memoria caché con indicador de 90% de ahorro ($0.02 / 1M).
-* 📤 **Salida Generada:** Tokens de respuesta y costo en USD ($1.20 / 1M).
+Se añadió una tarjeta visual en la pestaña de **Métricas y Telemetría** que se adapta dinámicamente al proveedor activo (Gemini, OpenAI u Ollama) y muestra en vivo:
+* 📥 **Entrada Regular:** Tokens no cacheados y costo en USD según tarifa del proveedor activo.
+* ⚡ **Entrada en CACHÉ:** Tokens leídos de memoria caché con indicador de ahorro.
+* 📤 **Salida Generada:** Tokens de respuesta y costo en USD.
 * 💰 **Gasto Estimado en Período:** Total acumulado en USD y su conversión aproximada a pesos colombianos (COP).
-* En la pestaña **Diagnóstico y Servidor**, se muestra `Proveedor IA Activo: OPENAI` con el modelo `gpt-5.6-luna` y estado `🟢 En línea`.
+* En la pestaña **Diagnóstico y Servidor**, se muestra el `Proveedor IA Activo` (`GEMINI`, `OPENAI` u `OLLAMA`) con su modelo configurado y estado de conexión `🟢 En línea`.
+
+---
+
+## 8. Integración Adicional: Google Gemini Cloud (`gemini-flash-lite-latest`)
+
+Se añadió soporte nativo para **Google Gemini** utilizando la clave de API oficial:
+* **Modelo activo calibrado:** `gemini-flash-lite-latest` (el modelo más rápido y económico de Google para inferencia continua).
+* **Compatibilidad:** Implementado mediante el endpoint de Google AI Studio compatible con OpenAI (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`).
+* **Tarifas ultra bajas:**
+  * Entrada: **$0.075 USD / 1M tokens** (~62% más económico que GPT-5.6 Luna).
+  * Entrada en caché: **$0.01875 USD / 1M tokens**.
+  * Salida: **$0.30 USD / 1M tokens** (~75% más económico que GPT-5.6 Luna).
+* **Consola en vivo:** Muestra `[GEMINI CLOUD] >>> Enviando...` y `[GEMINI CLOUD] <<< Respuesta exitosa...` con desglose exacto de tokens consumidos.
+
+### Alternar entre Proveedores en `.env`
+
+El sistema ahora soporta cambio instantáneo entre 3 motores sin tocar código fuente:
+
+```env
+# Opción 1: Google Gemini (Actualmente activo - Ultrarrápido y ultraeconómico)
+LLM_PROVIDER=gemini
+
+# Opción 2: OpenAI (GPT-5.6 Luna)
+# LLM_PROVIDER=openai
+
+# Opción 3: Ollama Local (GPU / Offline)
+# LLM_PROVIDER=ollama
+```
 
 
