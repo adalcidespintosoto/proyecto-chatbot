@@ -1729,6 +1729,36 @@
         </div>
       </div>
 
+      <!-- Panel Detallado de Facturación y Tokens OpenAI / Cloud -->
+      <div class="panel-card" style="margin-bottom: 2rem; border: 1px solid rgba(124, 58, 237, 0.3); background: linear-gradient(135deg, rgba(124, 58, 237, 0.07) 0%, rgba(16, 185, 129, 0.03) 100%);">
+        <div class="panel-header">
+          <h3 class="panel-title">⚡ Desglose de Tokens y Facturación IA (<span id="llmProviderDisplay" style="color:#A78BFA;">OpenAI GPT-5.6 Luna</span>)</h3>
+          <span class="badge" style="background:#7C3AED; color:#fff;" id="openaiModelBadge">gpt-5.6-luna</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; padding: 1.2rem;">
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 4px;">📥 Entrada Regular ($0.20 / 1M)</div>
+            <div style="font-size: 1.35rem; font-weight: 700; color: #60A5FA;" id="tokRegular">0 tokens</div>
+            <div style="font-size: 0.78rem; color: #94A3B8; margin-top: 4px;" id="tokRegularCost">$0.0000 USD</div>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.35);">
+            <div style="font-size: 0.82rem; color: #10B981; margin-bottom: 4px;">⚡ Entrada en CACHÉ ($0.02 / 1M)</div>
+            <div style="font-size: 1.35rem; font-weight: 700; color: #10B981;" id="tokCached">0 tokens</div>
+            <div style="font-size: 0.78rem; color: #10B981; margin-top: 4px;" id="tokCachedCost">$0.0000 USD (90% ahorro)</div>
+          </div>
+          <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 4px;">📤 Salida Generada ($1.20 / 1M)</div>
+            <div style="font-size: 1.35rem; font-weight: 700; color: #A78BFA;" id="tokOutput">0 tokens</div>
+            <div style="font-size: 0.78rem; color: #94A3B8; margin-top: 4px;" id="tokOutputCost">$0.0000 USD</div>
+          </div>
+          <div style="background: rgba(124, 58, 237, 0.15); padding: 1rem; border-radius: 8px; border: 1px solid rgba(124, 58, 237, 0.5);">
+            <div style="font-size: 0.82rem; color: #DDD6FE; margin-bottom: 4px;">💰 Gasto Estimado en Período</div>
+            <div style="font-size: 1.45rem; font-weight: 800; color: #FBBF24;" id="tokTotalCost">$0.0000 USD</div>
+            <div style="font-size: 0.78rem; color: #DDD6FE; margin-top: 4px;" id="tokCopCost">≈ $0 COP</div>
+          </div>
+        </div>
+      </div>
+
       <!-- 3. Breakdown Panels -->
       <div class="panel-grid">
         <!-- Distribución por Rol -->
@@ -2614,8 +2644,30 @@
 
         const tokIn = kpis.tokens_in ?? 0;
         const tokOut = kpis.tokens_out ?? 0;
+        const tokCached = kpis.tokens_cached ?? 0;
+        const tokRegular = kpis.tokens_regular ?? Math.max(0, tokIn - tokCached);
+        const costUsd = kpis.estimated_cost_usd ?? (kpis.gasto_estimado_usd ?? 0.0);
+        const costCop = kpis.estimated_cost_cop ?? (kpis.gasto_estimado_cop ?? 0);
+
         document.getElementById('kpiTokens').innerText = (kpis.total_tokens ?? 0).toLocaleString();
-        document.getElementById('kpiTokensSubtext').innerText = `${tokIn.toLocaleString()} in / ${tokOut.toLocaleString()} out`;
+        document.getElementById('kpiTokensSubtext').innerText = `${tokRegular.toLocaleString()} in (${tokCached.toLocaleString()} caché) / ${tokOut.toLocaleString()} out`;
+
+        if (document.getElementById('tokRegular')) {
+          document.getElementById('tokRegular').innerText = `${tokRegular.toLocaleString()} tokens`;
+          const regCost = (tokRegular * 0.20 / 1000000).toFixed(4);
+          document.getElementById('tokRegularCost').innerText = `$${regCost} USD`;
+
+          document.getElementById('tokCached').innerText = `${tokCached.toLocaleString()} tokens`;
+          const cCost = (tokCached * 0.02 / 1000000).toFixed(4);
+          document.getElementById('tokCachedCost').innerText = `$${cCost} USD (90% ahorro)`;
+
+          document.getElementById('tokOutput').innerText = `${tokOut.toLocaleString()} tokens`;
+          const outCost = (tokOut * 1.20 / 1000000).toFixed(4);
+          document.getElementById('tokOutputCost').innerText = `$${outCost} USD`;
+
+          document.getElementById('tokTotalCost').innerText = `$${Number(costUsd).toFixed(4)} USD`;
+          document.getElementById('tokCopCost').innerText = `≈ $${Number(costCop).toLocaleString()} COP`;
+        }
 
         // Roles
         const rolesContainer = document.getElementById('rolesList');
@@ -3912,11 +3964,17 @@
         const res = await fetch('/api/admin/system-status');
         const data = await res.json();
 
+        const prov = (data.llm ? data.llm.provider : 'openai').toUpperCase();
+        const activeMod = data.llm ? data.llm.active_model : data.ollama.model_configured;
+        const activeOk = data.llm ? data.llm.active : data.ollama.active;
+        const endp = data.llm ? data.llm.endpoint : data.ollama.endpoint;
+
         diag.innerHTML = `
           <div><strong>Aplicación:</strong> ${data.app_name} (v${data.app_version})</div>
           <div><strong>Aceleración Hardware:</strong> ⚡ ${data.gpu_active}</div>
-          <div><strong>Ollama Endpoint:</strong> <code>${data.ollama.endpoint}</code> (${data.ollama.active ? '🟢 En línea' : '🔴 Desconectado'})</div>
-          <div><strong>Modelo LLM Configurado:</strong> <code>${data.ollama.model_configured}</code></div>
+          <div><strong>Proveedor IA Activo:</strong> <code>${prov}</code> (${activeOk ? '🟢 En línea' : '🔴 Desconectado'})</div>
+          <div><strong>Modelo Configurado:</strong> <code>${activeMod}</code></div>
+          <div><strong>Endpoint Inferencia:</strong> <code>${endp}</code></div>
           <div><strong>Archivos Fuente en Disco:</strong> ${data.knowledge_base.total_source_files} documentos</div>
         `;
 

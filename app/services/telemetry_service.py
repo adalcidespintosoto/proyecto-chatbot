@@ -72,11 +72,13 @@ def init_telemetry_db():
                     dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            # Migración: asegurar existencia de bot_response si la tabla fue creada previamente
+            # Migración: asegurar existencia de bot_response y cached_tokens si la tabla fue creada previamente
             cursor.execute("PRAGMA table_info(telemetry_interactions);")
             cols = [c[1] for c in cursor.fetchall()]
             if "bot_response" not in cols:
                 cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN bot_response TEXT;")
+            if "cached_tokens" not in cols:
+                cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN cached_tokens INTEGER DEFAULT 0;")
             conn.commit()
             logger.info("Base de datos de telemetría inicializada en: %s", DB_PATH)
     except Exception as e:
@@ -163,6 +165,7 @@ def log_interaction(
     docs: Optional[List[str]] = None,
     latency_ms: float = 0.0,
     prompt_tokens: int = 0,
+    cached_tokens: int = 0,
     eval_tokens: int = 0,
     feedback: str = "NONE"
 ):
@@ -184,8 +187,8 @@ def log_interaction(
             cursor.execute("""
                 INSERT INTO telemetry_interactions (
                     session_id, user_query, bot_response, intent_category, source_used,
-                    referenced_docs, latency_ms, prompt_tokens, eval_tokens, feedback
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    referenced_docs, latency_ms, prompt_tokens, cached_tokens, eval_tokens, feedback
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session_id, 
                 query, 
@@ -195,6 +198,7 @@ def log_interaction(
                 docs_str, 
                 latency_ms, 
                 prompt_tokens, 
+                cached_tokens,
                 eval_tokens, 
                 feedback
             ))
@@ -347,7 +351,16 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             avg_lat_row = cursor.execute(f"SELECT AVG(latency_ms) FROM telemetry_interactions WHERE latency_ms > 0{and_int}", int_params).fetchone()[0]
             avg_latency = avg_lat_row or 0.0
             tokens_in = cursor.execute(f"SELECT SUM(prompt_tokens) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
+            try:
+                tokens_cached = cursor.execute(f"SELECT SUM(COALESCE(cached_tokens, 0)) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
+            except Exception:
+                tokens_cached = 0
             tokens_out = cursor.execute(f"SELECT SUM(eval_tokens) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
+            tokens_regular = max(0, (tokens_in or 0) - (tokens_cached or 0))
+
+            # Cálculo de costo estimado en dólares y pesos (Tarifa GPT-5.6 Luna: $0.20 in, $0.02 cache, $1.20 out)
+            cost_usd = (tokens_regular * 0.20 / 1_000_000) + (tokens_cached * 0.02 / 1_000_000) + (tokens_out * 1.20 / 1_000_000)
+            cost_cop = cost_usd * 4150
 
             roles_data = cursor.execute(f"""
                 SELECT COALESCE(role, 'No especificado') as role, COUNT(*) as count 
@@ -407,7 +420,11 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             "avg_latency_ms": round(avg_latency, 1),
             "tokens_in": tokens_in or 0,
             "tokens_out": tokens_out or 0,
+            "tokens_cached": tokens_cached or 0,
+            "tokens_regular": tokens_regular or 0,
             "total_tokens": total_tokens_val,
+            "estimated_cost_usd": round(cost_usd, 4),
+            "estimated_cost_cop": round(cost_cop, 0),
             "total_sessions": total_sessions,
             "total_queries": total_queries,
             "role_distribution": role_distribution,
@@ -420,8 +437,12 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             "sesiones_escaladas": escalated,
             "latencia_promedio_ms": round(avg_latency, 1),
             "total_prompt_tokens": tokens_in or 0,
+            "total_cached_tokens": tokens_cached or 0,
+            "total_regular_tokens": tokens_regular or 0,
             "total_eval_tokens": tokens_out or 0,
             "total_tokens_gastados": total_tokens_val,
+            "gasto_estimado_usd": round(cost_usd, 4),
+            "gasto_estimado_cop": round(cost_cop, 0),
             "total_sesiones": total_sessions,
             "total_consultas": total_queries,
             "distribucion_roles": role_distribution,
@@ -889,32 +910,18 @@ Por favor, genera un INFORME EJECUTIVO DE OBSERVABILIDAD Y MEJORA CONTINUA en fo
 Mantén un tono profesional, analítico y enfocado en la mejora continua del servicio de TI de la Universidad Simón Bolívar."""
 
     try:
-        ollama_url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
-        response = httpx.post(
-            ollama_url,
-            json={
-                "model": settings.llm_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.25,
-                    "num_predict": 700
-                }
-            },
-            timeout=min(settings.ollama_timeout, 45.0)
-        )
-        if response.status_code == 200:
-            insights_text = response.json().get("response", "").strip()
+        from app.services.llm_client import get_llm_client
+        llm_client = get_llm_client()
+        insights_text = llm_client.generate_sync(prompt=prompt, max_tokens=1000, timeout=45.0)
+        if insights_text:
             return {
                 "status": "success",
                 "insights": insights_text,
                 "period": period_label,
-                "model": settings.llm_model
+                "model": llm_client.active_model
             }
-        else:
-            logger.warning("Ollama status code %s al generar insights", response.status_code)
     except Exception as e:
-        logger.warning("Error generando diagnóstico de IA con Ollama: %s", e)
+        logger.warning("Error generando diagnóstico de IA con LLMClient: %s", e)
 
     # Fallback analítico determinista si Ollama no está disponible o timeout
     res_rate = kpis.get('resolution_rate', 0)
@@ -981,22 +988,10 @@ Estructura obligatoria del documento Markdown:
 Redacta únicamente el documento Markdown institucional, sin preámbulos ni explicaciones adicionales."""
 
     try:
-        ollama_url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
-        response = httpx.post(
-            ollama_url,
-            json={
-                "model": settings.llm_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.2,
-                    "num_predict": 800
-                }
-            },
-            timeout=min(settings.ollama_timeout, 45.0)
-        )
-        if response.status_code == 200:
-            content = response.json().get("response", "").strip()
+        from app.services.llm_client import get_llm_client
+        llm_client = get_llm_client()
+        content = llm_client.generate_sync(prompt=prompt, max_tokens=1200, timeout=45.0)
+        if content:
             first_line = content.split("\n")[0].replace("#", "").strip()
             title = first_line if first_line else f"Procedimiento para {unresolved_query[:40]}"
             return {
@@ -1007,7 +1002,7 @@ Redacta únicamente el documento Markdown institucional, sin preámbulos ni expl
                 "role": target_role
             }
     except Exception as e:
-        logger.warning("Error redactando borrador de procedimiento con Ollama: %s", e)
+        logger.warning("Error redactando borrador de procedimiento con LLMClient: %s", e)
 
     clean_title = f"PT-TI: Procedimiento para {unresolved_query.capitalize()}"
     fallback_content = f"""# {clean_title}

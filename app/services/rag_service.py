@@ -22,6 +22,7 @@ from sentence_transformers import CrossEncoder
 
 from app.config import get_settings
 from app.services.normalizer_service import normalize_and_expand_query, strip_query_header_noise
+from app.services.llm_client import get_llm_client
 
 logger = logging.getLogger("unimon.rag_service")
 
@@ -342,7 +343,7 @@ async def async_generate_multi_query_variants(
         q_low
     )) and not any(w in q_low for w in ["formato", "tamaño", "tamano", "peso", "pdf", "archivo", "archivos", "adjuntar", "papeles", "diploma", "cargar", "documento", "documentos"])
 
-    # 1. Intentar generación asíncrona con unimon:8b
+    # 1. Intentar generación asíncrona con el LLM activo (OpenAI / Ollama)
     system_prompt = (
         "Eres un generador de consultas de búsqueda documental para la base de conocimientos de TI "
         "de la Universidad Simón Bolívar (SIAAF, Portal Estudiantes, Teams, Kactus, Elecciones, etc.).\n"
@@ -356,30 +357,21 @@ async def async_generate_multi_query_variants(
     )
 
     try:
-        settings = get_settings()
-        ollama_url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                ollama_url,
-                json={
-                    "model": settings.llm_model,
-                    "system": system_prompt,
-                    "prompt": f"Rol: {user_role}\nConsulta informal: {cleaned_query}\n3 variantes formales de búsqueda:",
-                    "stream": False,
-                    "options": {"temperature": 0.1, "num_predict": 70}
-                },
-                timeout=4.0
-            )
-            if response.status_code == 200:
-                raw_text = response.json().get("response", "").strip()
-                lines = raw_text.splitlines()
-                for line in lines:
-                    cleaned_line = re.sub(r"^\s*(?:\d+[\.\)]|\-|\*)\s*", "", line).strip()
-                    if cleaned_line and len(cleaned_line) > 5 and cleaned_line not in variants:
-                        variants.append(cleaned_line)
-                    if len(variants) >= max_variants:
-                        break
+        llm_client = get_llm_client()
+        raw_text = await llm_client.generate_async(
+            prompt=f"Rol: {user_role}\nConsulta informal: {cleaned_query}\n3 variantes formales de búsqueda:",
+            system_prompt=system_prompt,
+            max_tokens=150,
+            timeout=5.0
+        )
+        if raw_text:
+            lines = raw_text.splitlines()
+            for line in lines:
+                cleaned_line = re.sub(r"^\s*(?:\d+[\.\)]|\-|\*)\s*", "", line).strip()
+                if cleaned_line and len(cleaned_line) > 5 and cleaned_line not in variants:
+                    variants.append(cleaned_line)
+                if len(variants) >= max_variants:
+                    break
     except Exception as exc:
         logger.debug(f"[MultiQuery] Fallback a diccionario semántico ({exc})")
 
@@ -455,25 +447,16 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
     )
 
     try:
-        settings = get_settings()
-        ollama_url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
-
-        response = httpx.post(
-            ollama_url,
-            json={
-                "model": settings.llm_model,
-                "system": system_prompt,
-                "prompt": f"Rol: {user_role}\nConsulta informal: {cleaned_query}\nConsulta técnica formal:",
-                "stream": False,
-                "options": {"temperature": 0.0, "num_predict": 20}
-            },
+        llm_client = get_llm_client()
+        expanded = llm_client.generate_sync(
+            prompt=f"Rol: {user_role}\nConsulta informal: {cleaned_query}\nConsulta técnica formal:",
+            system_prompt=system_prompt,
+            max_tokens=80,
             timeout=5.0
         )
-        if response.status_code == 200:
-            expanded = response.json().get("response", "").strip()
-            if expanded and len(expanded) > 4:
-                logger.info(f"[QueryExpansion] '{raw_query[:40]}...' -> '{expanded[:60]}...'")
-                return expanded
+        if expanded and len(expanded) > 4:
+            logger.info(f"[QueryExpansion] '{raw_query[:40]}...' -> '{expanded[:60]}...'")
+            return expanded
     except Exception as e:
         logger.warning(f"[QueryExpansion] Error en expansión LLM ({e}), usando consulta original.")
 
@@ -1464,9 +1447,10 @@ class RAGService:
         min_relevance_score: float = MIN_RELEVANCE_SCORE_THRESHOLD
     ):
         settings = get_settings()
+        self.llm_client = get_llm_client()
         self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
-        self.model = model or settings.llm_model
-        self.timeout = settings.ollama_timeout
+        self.model = model or self.llm_client.active_model
+        self.timeout = settings.openai_timeout if self.llm_client.provider == "openai" else settings.ollama_timeout
         self.chroma_db_dir = Path(chroma_db_dir or settings.chroma_db_dir)
         self.embedding_model_name = embedding_model or settings.embedding_model
         self.min_relevance_score = min_relevance_score
@@ -2060,74 +2044,60 @@ class RAGService:
             messages.extend(chat_history[-6:])
         messages.append({"role": "user", "content": user_prompt})
 
-        # 5. Llamada asíncrona a Ollama API
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "temperature": 0.0,
-                "repeat_penalty": 1.15,
-                "top_p": 0.9,
-                "num_predict": 768,
-                "num_ctx": 8192
-            }
-        }
-
-        url = f"{self.base_url}/api/chat"
-
+        # 5. Llamada asíncrona al LLM activo (OpenAI / Ollama con fallback)
         try:
-            async with httpx.AsyncClient() as client:
-                logger.info(f"Enviando consulta a Ollama ({url}) con modelo '{self.model}'...")
-                response = await client.post(url, json=payload, timeout=self.timeout)
+            logger.info(f"Enviando consulta a LLM ({self.llm_client.provider}: '{self.model}')...")
+            llm_res = await self.llm_client.chat_completion(
+                messages=messages,
+                max_tokens=900,
+                temperature=0.0
+            )
 
-                if response.status_code == 200:
-                    data = response.json()
-                    bot_message = data.get("message", {}).get("content", "").strip()
-                    prompt_tokens = data.get("prompt_eval_count", 0) or 0
-                    eval_tokens = data.get("eval_count", 0) or 0
-                    logger.info("Respuesta generada exitosamente por Ollama (tokens: %s prompt, %s eval).", prompt_tokens, eval_tokens)
+            bot_message = llm_res.get("content", "").strip()
+            prompt_tokens = llm_res.get("prompt_tokens", 0)
+            cached_tokens = llm_res.get("cached_tokens", 0)
+            eval_tokens = llm_res.get("eval_tokens", 0)
+            active_model = llm_res.get("model", self.model)
+            active_source = llm_res.get("source", f"llm_{active_model}")
+            logger.info("Respuesta generada exitosamente por %s (tokens: %s prompt, %s cached, %s eval).", active_source, prompt_tokens, cached_tokens, eval_tokens)
 
-                    # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
-                    bot_message = clean_llm_response(bot_message)
+            # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
+            bot_message = clean_llm_response(bot_message)
 
-                    # Se relajan las reglas de evasión y placeholder para permitir que el modelo interactúe de forma natural
-                    # cuando pide aclaraciones al usuario en vez de aplastar el diálogo con un mensaje de fallback duro.
-                    is_evasion = bool(re.search(r"(?i)\b(?:no\s+tengo\s+acceso\s+a\s+esa\s+informaci[oó]n|soy\s+solo\s+un\s+modelo\s+de\s+lenguaje|si\s+necesitas\s+ayuda|en\s+qu[eé]\s+m[aá]s\s+puedo|no\s+puedo\s+ayudar|no\s+hay\s+informaci[oó]n|el\s+contexto\s+no|no\s+proporciona)\b", bot_message))
-                    if not bot_message or len(bot_message.strip()) < 15 or is_evasion:
-                        logger.info("Respuesta de Ollama vacía o evasión del modelo genérico detectada. Invocando fallback institucional.")
-                        return self._generate_fallback_response(question, user_name, sources)
+            # Se relajan las reglas de evasión y placeholder para permitir que el modelo interactúe de forma natural
+            # cuando pide aclaraciones al usuario en vez de aplastar el diálogo con un mensaje de fallback duro.
+            is_evasion = bool(re.search(r"(?i)\b(?:no\s+tengo\s+acceso\s+a\s+esa\s+informaci[oó]n|soy\s+solo\s+un\s+modelo\s+de\s+lenguaje|si\s+necesitas\s+ayuda|en\s+qu[eé]\s+m[aá]s\s+puedo|no\s+puedo\s+ayudar|no\s+hay\s+informaci[oó]n|el\s+contexto\s+no|no\s+proporciona)\b", bot_message))
+            if not bot_message or len(bot_message.strip()) < 15 or is_evasion:
+                logger.info("Respuesta de LLM vacía o evasión del modelo genérico detectada. Invocando fallback institucional.")
+                return self._generate_fallback_response(question, user_name, sources)
 
-                    # Insertar canales de atención siempre y pie de confirmación (si no están ya presentes)
-                    contact_channels = (
-                        "\n\n---\n"
-                        "📌 **Canales Oficiales de Soporte TI:**\n"
-                        "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n"
-                        "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n"
-                    )
-                    
-                    if "solicitudcomputo@unisimon.edu.co" not in bot_message.lower() and "helpdesk@unisimon.edu.co" not in bot_message.lower():
-                        bot_message = bot_message.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
-                    else:
-                        bot_message = bot_message.rstrip() + "\n\n" + CLOSING_FEEDBACK_QUESTION
+            # Insertar canales de atención siempre y pie de confirmación (si no están ya presentes)
+            contact_channels = (
+                "\n\n---\n"
+                "📌 **Canales Oficiales de Soporte TI:**\n"
+                "📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n"
+                "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n"
+            )
+            
+            if "solicitudcomputo@unisimon.edu.co" not in bot_message.lower() and "helpdesk@unisimon.edu.co" not in bot_message.lower():
+                bot_message = bot_message.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
+            else:
+                bot_message = bot_message.rstrip() + "\n\n" + CLOSING_FEEDBACK_QUESTION
 
-                    return {
-                        "response": bot_message,
-                        "sources": sources,
-                        "source": f"ollama_{self.model}",
-                        "model": self.model,
-                        "retrieved_chunks": len(retrieved_docs),
-                        "has_context": True,
-                        "quick_replies": QUICK_REPLIES_DIAGNOSTICO,
-                        "prompt_tokens": prompt_tokens,
-                        "eval_tokens": eval_tokens
-                    }
-                else:
-                    logger.warning(f"Ollama respondió con código {response.status_code}: {response.text}")
-                    return self._generate_fallback_response(question, user_name, sources)
-
+            return {
+                "response": bot_message,
+                "sources": sources,
+                "source": active_source,
+                "model": active_model,
+                "retrieved_chunks": len(retrieved_docs),
+                "has_context": True,
+                "quick_replies": QUICK_REPLIES_DIAGNOSTICO,
+                "prompt_tokens": prompt_tokens,
+                "cached_tokens": cached_tokens,
+                "eval_tokens": eval_tokens
+            }
         except Exception as exc:
-            logger.warning(f"No se pudo conectar con el servidor Ollama ({exc}). Activando respuesta de contingencia.")
+            logger.warning(f"No se pudo conectar con el proveedor LLM ({exc}). Activando respuesta de contingencia.")
             return self._generate_fallback_response(question, user_name, sources)
 
     def _generate_fallback_response(

@@ -57,62 +57,82 @@ try {
     }
 
     # -------------------------------------------------------------------------
-    # 2. COMPROBACION DE SERVICIOS E INFRAESTRUCTURA LOCAL (OLLAMA & MODELO)
+    # 2. COMPROBACION DE SERVICIOS E INFRAESTRUCTURA DE IA (OPENAI / OLLAMA)
     # -------------------------------------------------------------------------
-    Write-Host "[2/5] Verificando servicio de LLM local (Ollama)..." -ForegroundColor Cyan
-    $ollamaApiUrl = "http://localhost:11434/api/tags"
-    $ollamaRunning = $false
-    $tagsResponse = $null
+    Write-Host "[2/5] Verificando proveedor de IA (LLM)..." -ForegroundColor Cyan
     
-    try {
-        $tagsResponse = Invoke-RestMethod -Uri $ollamaApiUrl -TimeoutSec 2 -ErrorAction Stop
-        $ollamaRunning = $true
-    } catch {
-        $ollamaRunning = $false
+    $provider = "openai"
+    $openaiKey = ""
+    $openaiModel = "gpt-5.6-luna"
+    if (Test-Path ".env") {
+        $envLines = Get-Content ".env"
+        foreach ($line in $envLines) {
+            if ($line -match '^\s*LLM_PROVIDER\s*=\s*(.+)') { $provider = $matches[1].Trim().ToLower() }
+            if ($line -match '^\s*OPENAI_API_KEY\s*=\s*(.+)') { $openaiKey = $matches[1].Trim() }
+            if ($line -match '^\s*OPENAI_MODEL\s*=\s*(.+)') { $openaiModel = $matches[1].Trim() }
+        }
     }
 
-    if (-not $ollamaRunning) {
-        Write-Host "      Ollama no esta en ejecucion. Intentando iniciar servicio en segundo plano..." -ForegroundColor Yellow
-        $ollamaCmd = Get-Command "ollama" -ErrorAction SilentlyContinue
-        if ($ollamaCmd) {
-            Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
-            $retryCount = 0
-            while ($retryCount -lt 8 -and -not $ollamaRunning) {
-                Start-Sleep -Seconds 1
-                $retryCount++
-                try {
-                    $tagsResponse = Invoke-RestMethod -Uri $ollamaApiUrl -TimeoutSec 2 -ErrorAction Stop
-                    $ollamaRunning = $true
-                } catch {
-                    $ollamaRunning = $false
+    if ($provider -eq "openai" -and $openaiKey -and ($openaiKey -notmatch "tu_openai")) {
+        Write-Host "      [OK] Proveedor en la nube: OpenAI ($openaiModel)" -ForegroundColor Green
+        Write-Host "           [ESTRICTO] Modelo local (Ollama) DESHABILITADO. Modo 100% Cloud activo." -ForegroundColor Yellow
+        Write-Host "           Toda inferencia y generacion se procesa exclusivamente con OpenAI." -ForegroundColor DarkGray
+    } else {
+        Write-Host "      Proveedor configurado: Ollama Local" -ForegroundColor Cyan
+        $ollamaApiUrl = "http://localhost:11434/api/tags"
+        $ollamaRunning = $false
+        $tagsResponse = $null
+        
+        try {
+            $tagsResponse = Invoke-RestMethod -Uri $ollamaApiUrl -TimeoutSec 2 -ErrorAction Stop
+            $ollamaRunning = $true
+        } catch {
+            $ollamaRunning = $false
+        }
+
+        if (-not $ollamaRunning) {
+            Write-Host "      Ollama no esta en ejecucion. Intentando iniciar servicio en segundo plano..." -ForegroundColor Yellow
+            $ollamaCmd = Get-Command "ollama" -ErrorAction SilentlyContinue
+            if ($ollamaCmd) {
+                Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
+                $retryCount = 0
+                while ($retryCount -lt 8 -and -not $ollamaRunning) {
+                    Start-Sleep -Seconds 1
+                    $retryCount++
+                    try {
+                        $tagsResponse = Invoke-RestMethod -Uri $ollamaApiUrl -TimeoutSec 2 -ErrorAction Stop
+                        $ollamaRunning = $true
+                    } catch {
+                        $ollamaRunning = $false
+                    }
                 }
             }
         }
-    }
 
-    if ($ollamaRunning) {
-        Write-Host "      [OK] Ollama activo y respondiendo en http://localhost:11434" -ForegroundColor Green
-        
-        $availableModels = @()
-        if ($tagsResponse -and $tagsResponse.models) {
-            $availableModels = $tagsResponse.models | ForEach-Object { $_.name }
-        }
-        
-        $hasUnimonModel = $availableModels | Where-Object { $_ -like "unimon:8b*" -or $_ -like "unimon:latest*" }
-        if ($hasUnimonModel) {
-            Write-Host "      [OK] Modelo institucional '$hasUnimonModel' listo en memoria." -ForegroundColor Green
-        } else {
-            Write-Host "      [ADVERTENCIA] Modelo 'unimon:8b' no detectado en Ollama." -ForegroundColor Yellow
-            if (Test-Path "Modelfile") {
-                Write-Host "      Creando modelo 'unimon:8b' a partir de Modelfile..." -ForegroundColor Cyan
-                & ollama create unimon:8b -f ./Modelfile
-            } else {
-                Write-Host "      Recuerda crearlo ejecutando: ollama create unimon:8b -f ./Modelfile" -ForegroundColor DarkGray
+        if ($ollamaRunning) {
+            Write-Host "      [OK] Ollama activo y respondiendo en http://localhost:11434" -ForegroundColor Green
+            
+            $availableModels = @()
+            if ($tagsResponse -and $tagsResponse.models) {
+                $availableModels = $tagsResponse.models | ForEach-Object { $_.name }
             }
+            
+            $hasUnimonModel = $availableModels | Where-Object { $_ -like "unimon:8b*" -or $_ -like "unimon:latest*" }
+            if ($hasUnimonModel) {
+                Write-Host "      [OK] Modelo institucional '$hasUnimonModel' listo en memoria." -ForegroundColor Green
+            } else {
+                Write-Host "      [ADVERTENCIA] Modelo 'unimon:8b' no detectado en Ollama." -ForegroundColor Yellow
+                if (Test-Path "Modelfile") {
+                    Write-Host "      Creando modelo 'unimon:8b' a partir de Modelfile..." -ForegroundColor Cyan
+                    & ollama create unimon:8b -f ./Modelfile
+                } else {
+                    Write-Host "      Recuerda crearlo ejecutando: ollama create unimon:8b -f ./Modelfile" -ForegroundColor DarkGray
+                }
+            }
+        } else {
+            Write-Host "      [AVISO] No se pudo conectar con Ollama en http://localhost:11434." -ForegroundColor Yellow
+            Write-Host "              Asegurate de iniciar Ollama antes de realizar consultas conversacionales." -ForegroundColor DarkGray
         }
-    } else {
-        Write-Host "      [AVISO] No se pudo conectar con Ollama en http://localhost:11434." -ForegroundColor Yellow
-        Write-Host "              Asegurate de iniciar Ollama antes de realizar consultas conversacionales." -ForegroundColor DarkGray
     }
 
     # -------------------------------------------------------------------------

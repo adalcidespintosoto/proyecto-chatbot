@@ -53,28 +53,13 @@ Consultas:
 Título descriptivo:"""
 
     try:
-        settings = get_settings()
-        ollama_url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
-
-        response = httpx.post(
-            ollama_url,
-            json={
-                "model": settings.llm_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.1,
-                    "num_predict": 25
-                }
-            },
-            timeout=4.0
-        )
-        if response.status_code == 200:
-            topic = response.json().get("response", "").strip().strip('"').strip("'")
-            if topic and len(topic) > 3:
-                return topic.split("\n")[0].strip()
+        from app.services.llm_client import get_llm_client
+        llm_client = get_llm_client()
+        topic = llm_client.generate_sync(prompt=prompt, max_tokens=100, timeout=5.0)
+        if topic and len(topic) > 3:
+            return topic.strip().strip('"').strip("'").split("\n")[0].strip()
     except Exception as e:
-        logger.warning(f"[Clustering] Error resumiendo tema con LLM: {e}")
+        logger.warning(f"[Clustering] Error resumiendo tema con LLMClient: {e}")
 
     return "Consultas Generales y Soporte TI"
 

@@ -166,6 +166,7 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
     source = resultado.get("source", "UniMon")
     sources = resultado.get("sources") or []
     prompt_tokens = resultado.get("prompt_tokens", 0) or 0
+    cached_tokens = resultado.get("cached_tokens", 0) or 0
     eval_tokens = resultado.get("eval_tokens", 0) or 0
 
     # Obtener rol del usuario registrado en la sesión
@@ -191,6 +192,7 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
             docs=sources,
             latency_ms=round(latency_ms, 2),
             prompt_tokens=prompt_tokens,
+            cached_tokens=cached_tokens,
             eval_tokens=eval_tokens,
             feedback=resultado.get("feedback", "NONE")
         )

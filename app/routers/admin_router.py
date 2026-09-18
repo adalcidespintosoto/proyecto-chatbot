@@ -717,20 +717,30 @@ async def get_system_status() -> Dict[str, Any]:
     """Retorna información de diagnóstico y salud de la infraestructura."""
     import httpx
     
-    # Chequeo Ollama
+    # Chequeo LLM activo (OpenAI / Ollama)
+    from app.services.llm_client import get_llm_client
+    llm_client = get_llm_client()
+    llm_health = await llm_client.check_health()
+    llm_ok = llm_health.get("active", False)
+
     ollama_ok = False
     models_available = []
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            r = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
-            if r.status_code == 200:
-                ollama_ok = True
-                models_available = [m.get("name") for m in r.json().get("models", [])]
-    except Exception:
-        ollama_ok = False
+    if llm_client.provider == "ollama":
+        ollama_ok = llm_ok
+        models_available = llm_health.get("models_in_server", [])
+    else:
+        # Chequeo secundario a Ollama local si el principal es OpenAI
+        try:
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                r = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
+                if r.status_code == 200:
+                    ollama_ok = True
+                    models_available = [m.get("name") for m in r.json().get("models", [])]
+        except Exception:
+            ollama_ok = False
 
     # Chequeo GPU
-    gpu_info = "CPU (Modo Fallback)"
+    gpu_info = "CPU / Cloud API (Modo Acelerado)" if llm_client.provider == "openai" else "CPU (Modo Fallback)"
     try:
         import torch
         if torch.cuda.is_available():
@@ -752,11 +762,17 @@ async def get_system_status() -> Dict[str, Any]:
         "app_version": settings.app_version,
         "environment": settings.environment,
         "gpu_active": gpu_info,
+        "llm": {
+            "provider": llm_client.provider,
+            "active_model": llm_client.active_model,
+            "active": llm_ok,
+            "endpoint": llm_health.get("endpoint", "")
+        },
         "ollama": {
-            "endpoint": settings.ollama_base_url,
-            "active": ollama_ok,
-            "model_configured": settings.llm_model,
-            "models_in_server": models_available
+            "endpoint": settings.openai_base_url if llm_client.provider == "openai" else settings.ollama_base_url,
+            "active": llm_ok if llm_client.provider == "openai" else ollama_ok,
+            "model_configured": settings.openai_model if llm_client.provider == "openai" else settings.llm_model,
+            "models_in_server": [settings.openai_model] if llm_client.provider == "openai" else models_available
         },
         "glpi": {
             "endpoint": settings.glpi_base_url,
