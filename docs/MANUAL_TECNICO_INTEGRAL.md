@@ -35,7 +35,7 @@ proyecto-chatbot/
 │   ├── routers/                         # Controladores REST API
 │   │   ├── chat.py                      # Endpoint POST /api/chat y flujo conversacional
 │   │   ├── analytics.py                 # Endpoint GET /api/analytics/kpis, clusters y exportación DPO
-│   │   └── analytics_router.py          # Alias de compatibilidad para el router de analítica
+
 │   ├── services/                        # Capa de lógica de negocio y servicios especializados
 │   │   ├── router_logic.py              # Máquina de estados conversacional, orquestador y slot-filling
 │   │   ├── router_service.py            # Clasificador semántico y léxico de intenciones

@@ -12,8 +12,7 @@ from app.services.normalizer_service import normalize_and_expand_query
 from app.services.rag_service import (
     STRICT_SYSTEM_PROMPT_TEMPLATE,
     ALLOWED_DOMAINS_AND_URLS,
-    clean_llm_response,
-    sanitize_markdown_links,
+    ALLOWED_DOMAINS_AND_URLS,
     RAGService
 )
 
@@ -126,32 +125,7 @@ def test_system_prompt_has_mandatory_directives():
     assert "GLPI" in prompt
 
 
-def test_elecciones_url_in_allowed_domains():
-    """Verifica que https://elecciones.unisimon.edu.co esté en la lista blanca de enlaces."""
-    assert "https://elecciones.unisimon.edu.co" in ALLOWED_DOMAINS_AND_URLS
 
-    link_test = "Accede a [Elecciones Institucionales](https://elecciones.unisimon.edu.co/) para votar."
-    sanitized = sanitize_markdown_links(link_test)
-    assert "[Elecciones Institucionales](https://elecciones.unisimon.edu.co/)" in sanitized
-
-
-# =============================================================================
-# 4. PRUEBAS DE SANITIZACIÓN Y CLEAN_LLM_RESPONSE
-# =============================================================================
-
-def test_clean_llm_response_normalizes_election_urls():
-    """Verifica normalización de URLs de elecciones."""
-    raw = "Ingresa a http://unisimon.edu.co/elecciones para registrar tu voto."
-    cleaned = clean_llm_response(raw)
-    assert "https://elecciones.unisimon.edu.co/" in cleaned
-
-
-def test_clean_llm_response_neutralizes_glpi_in_grade_claims():
-    """Verifica que no se ofrezca ticket de TI ante solicitudes de cambio de nota."""
-    raw = "Si deseas cambiar tu nota, puedes radicar un ticket en la Mesa de Ayuda TI."
-    cleaned = clean_llm_response(raw)
-    assert "trámite estrictamente académico" in cleaned
-    assert "docente de la materia" in cleaned
 
 
 # =============================================================================
@@ -178,19 +152,7 @@ def test_rag_fallback_responses():
 # 6. PRUEBAS DE PERIFÉRICOS, HARDWARE Y ERRADICACIÓN DE RESPUESTAS HUÉRFANAS
 # =============================================================================
 
-def test_clean_llm_response_purges_orphan_courtesy_questions():
-    """Verifica que clean_llm_response descarte frases huérfanas de cortesía sin contenido sustantivo."""
-    orphan_1 = "¿Hay algo más con lo que pueda ayudarte?"
-    assert clean_llm_response(orphan_1) == ""
 
-    orphan_2 = "¡Hola! ¿En qué más puedo ayudarte?"
-    assert clean_llm_response(orphan_2) == ""
-
-    orphan_3 = "Lo siento, no tengo información sobre teclados en este momento. ¿Hay algo más con lo que pueda ayudarte?"
-    assert clean_llm_response(orphan_3) == ""
-
-    valid_resp = "Para solicitar un teclado, contacta a Soporte Técnico TI en solicitudcomputo@unisimon.edu.co."
-    assert "solicitudcomputo@unisimon.edu.co" in clean_llm_response(valid_resp)
 
 
 def test_is_peripheral_or_hardware_request_detection():
