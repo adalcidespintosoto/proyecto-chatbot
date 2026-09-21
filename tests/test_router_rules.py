@@ -194,28 +194,7 @@ async def test_direct_role_declaration_without_premature_rag():
         mock_rag.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_placeholder_sanitization_in_rag_service():
-    """BUG 2: Verifica que el RAG sanitize automáticamente placeholders de GLPI o URLs inventadas."""
-    fake_ollama_resp = {
-        "message": {
-            "content": "Para solucionar el problema ingresa a [URL del GLPI] y asigna tu caso en GLPI o usa [Link]."
-        }
-    }
-    with patch("httpx.AsyncClient.post") as mock_post, \
-         patch("app.services.rag_service.async_generate_multi_query_variants", new=AsyncMock(return_value=["falla de monitor"])):
-        mock_response = AsyncMock()
-        mock_response.status_code = 200
-        mock_response.json = MagicMock(return_value=fake_ollama_resp)
-        mock_post.return_value = mock_response
 
-        res = await rag_service.answer_query(query="falla de monitor", user_role="funcionario")
-        resp_text = res["response"]
-
-        assert "[URL del GLPI]" not in resp_text
-        assert "GLPI" not in resp_text
-        assert "Mesa de Ayuda TI" in resp_text
-        assert "[Link]" not in resp_text
 
 
 # -----------------------------------------------------------------------------

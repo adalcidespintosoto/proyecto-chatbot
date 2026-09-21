@@ -121,8 +121,6 @@ async def test_analytics_api_endpoint():
 @pytest.mark.asyncio
 async def test_chat_pipeline_records_telemetry_automatically():
     """Verifica que enviar un mensaje por POST /api/chat guarde automáticamente la telemetría."""
-    from app.routers import chat
-    chat.RATE_LIMIT_BUCKET.clear()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         res = await client.post(
