@@ -25,7 +25,7 @@ from app.config import get_settings
 logger = logging.getLogger("unimon.clustering")
 
 DB_PATH = "data/analytics.db"
-EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-base"
+EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-large"
 
 _embedding_model: Optional[SentenceTransformer] = None
 
