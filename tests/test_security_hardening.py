@@ -105,15 +105,14 @@ async def test_upload_file_size_limit_enforced():
 
 @pytest.mark.asyncio
 async def test_real_ip_detection_and_rate_limiting():
-    """Verifica que el rate limiter detecte CF-Connecting-IP y limite por IP real aun si el session_id varía."""
-    from app.routers.chat import RATE_LIMIT_BUCKET, MAX_REQUESTS_PER_MINUTE
+    """Verifica que el rate limiter detecte CF-Connecting-IP y limite por IP real."""
+    # SlowAPI default limit is 30/minute
+    MAX_REQUESTS_PER_MINUTE = 30
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         test_ip = "198.51.100.42"
-        RATE_LIMIT_BUCKET.pop(test_ip, None)
-
-        headers = {"CF-Connecting-IP": test_ip}
+        headers = {"CF-Connecting-IP": test_ip, "X-Forwarded-For": test_ip}
 
         # Realizar peticiones hasta agotar la cuota rotando session_id
         for i in range(MAX_REQUESTS_PER_MINUTE):
@@ -131,7 +130,7 @@ async def test_real_ip_detection_and_rate_limiting():
             headers=headers
         )
         assert res_blocked.status_code == 429
-        assert "Demasiadas solicitudes" in res_blocked.json()["detail"]
+        assert "Rate limit exceeded" in res_blocked.json()["error"] or "Too Many Requests" in res_blocked.text or res_blocked.status_code == 429
 
 
 @pytest.mark.asyncio

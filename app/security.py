@@ -23,6 +23,13 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
     """
     settings = get_settings()
 
+    if not settings.admin_username or not settings.admin_password:
+        logger.error("Vulnerabilidad prevenida: ADMIN_USERNAME o ADMIN_PASSWORD no están definidos en .env")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error de configuración del servidor. El acceso administrativo está deshabilitado por seguridad."
+        )
+
     correct_username_bytes = settings.admin_username.encode("utf-8")
     provided_username_bytes = credentials.username.encode("utf-8")
     is_username_correct = secrets.compare_digest(correct_username_bytes, provided_username_bytes)
