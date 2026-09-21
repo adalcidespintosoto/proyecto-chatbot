@@ -24,7 +24,7 @@ logger = logging.getLogger("unimon.golden_cache")
 
 CHROMA_PATH = "data/chroma_db"
 COLLECTION_NAME = "golden_resolved_qa"
-EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-base"
+EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-large"
 
 _embedding_model = None
 _golden_collection = None

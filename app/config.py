@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     # Configuración de ChromaDB y Embeddings
     chroma_db_dir: str = "./chroma_db"
     docs_dir: str = "./data/docs"
-    embedding_model: str = "intfloat/multilingual-e5-base"
+    embedding_model: str = "intfloat/multilingual-e5-large"
 
     # Límites de Seguridad
     max_upload_size_mb: int = 15
