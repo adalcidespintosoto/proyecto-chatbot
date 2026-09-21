@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Credenciales de Administración (/admin y APIs protegidas)
     admin_username: str = "admin"
-    admin_password: str = "UniMonAdmin2026*"
+    admin_password: str = ""  # NO HARDCODEAR CONTRASEÑAS EN PRODUCCIÓN
 
     # Configuración de GLPI REST API (deben definirse en .env)
     glpi_base_url: str = "https://pruebas.us5.glpi-network.cloud/api.php/v1"
