@@ -362,7 +362,7 @@ async def async_generate_multi_query_variants(
             prompt=f"Rol: {user_role}\nConsulta informal: {cleaned_query}\n3 variantes formales de búsqueda:",
             system_prompt=system_prompt,
             max_tokens=150,
-            timeout=5.0
+            timeout=10.0
         )
         if raw_text:
             lines = raw_text.splitlines()
@@ -1222,6 +1222,7 @@ class RAGService:
         min_relevance_score: float = MIN_RELEVANCE_SCORE_THRESHOLD
     ):
         settings = get_settings()
+        self.settings = settings
         self.llm_client = get_llm_client()
         self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
         self.model = model or self.llm_client.active_model
@@ -1579,8 +1580,9 @@ class RAGService:
                     primary_source = primary_doc.metadata.get("source")
                     source_filename = Path(primary_source).name if primary_source else "Procedimiento Unisimon"
 
-                    # Intentar inyectar el documento institucional completo para contexto integral y cero pérdida de pasos
-                    full_doc_text = get_full_document_text(primary_source) if primary_source else None
+                    # Control de contexto: Modo Documento Completo vs Modo Chunks (Opción A: Ahorro de Tokens)
+                    inject_full = getattr(self.settings, "rag_inject_full_doc", False)
+                    full_doc_text = get_full_document_text(primary_source) if (inject_full and primary_source) else None
                     if full_doc_text:
                         logger.info(f"[RAG] Inyectando documento institucional completo: '{source_filename}' ({len(full_doc_text)} caracteres)")
                         retrieved_docs.append(primary_doc)
@@ -1607,27 +1609,13 @@ class RAGService:
                                     context_parts.append(f"[{sec_filename}]\n{cleaned_sec}")
                                     break
                     else:
-                        # Fallback a fragmentos si el archivo fuente original no está disponible en data/docs
+                        # Modo Chunks (Ahorro de tokens): Solo fragmentos más relevantes ordenados lógicamente
+                        max_chunks = getattr(self.settings, "rag_max_chunks", 4)
                         primary_chunks = []
                         for doc, _ in valid_docs_with_scores:
                             if doc.metadata.get("source") == primary_source:
                                 if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
                                     primary_chunks.append(doc)
-
-                        if len(primary_chunks) == 1 and self.vector_store is not None and primary_source:
-                            try:
-                                search_q = format_e5_query(rerank_query)
-                                extra_docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
-                                    search_q,
-                                    k=4,
-                                    filter={"source": primary_source}
-                                )
-                                for edoc, escore in extra_docs_with_scores:
-                                    if escore is not None and escore >= self.min_relevance_score:
-                                        if not any(edoc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                                            primary_chunks.append(edoc)
-                            except Exception as exc:
-                                logger.debug(f"No se pudieron cargar fragmentos complementarios para {primary_source}: {exc}")
 
                         def chunk_logical_rank(chunk_doc):
                             c_lower = chunk_doc.page_content.lower()
@@ -1644,8 +1632,9 @@ class RAGService:
                             return 6
 
                         primary_chunks_sorted = sorted(primary_chunks, key=chunk_logical_rank)
+                        max_primary = min(max_chunks, 3)
 
-                        for doc in primary_chunks_sorted:
+                        for doc in primary_chunks_sorted[:max_primary]:
                             retrieved_docs.append(doc)
                             source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                             source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
@@ -1657,7 +1646,7 @@ class RAGService:
                             context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
 
                         for doc, _ in reranked[1:]:
-                            if len(context_parts) >= 4:
+                            if len(context_parts) >= max_chunks:
                                 break
                             if doc.metadata.get("source") != primary_source:
                                 if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
@@ -1670,6 +1659,11 @@ class RAGService:
                                         sources.append(source_filename)
                                     cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
                                     context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+
+                        logger.info(
+                            f"[RAG] Modo Chunks (Ahorro de tokens activo): Inyectando {len(context_parts)} fragmentos "
+                            f"relevantes de '{source_filename}' (Total chars: {sum(len(p) for p in context_parts)})."
+                        )
             else:
                 logger.info("[RAG] El reordenador descartó todos los fragmentos recuperados por falta de relevancia semántica.")
 
@@ -1854,6 +1848,9 @@ class RAGService:
                 "📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n"
             )
             
+            # Limpiar posibles encabezados incompletos o redundantes de canales generados por el LLM
+            bot_message = re.sub(r"(?im)\n*#{1,4}\s*Canales\s+Oficiales[^\n]*\s*(?:Debido[^\n]*)?$", "", bot_message).strip()
+
             if "solicitudcomputo@unisimon.edu.co" not in bot_message.lower() and "helpdesk@unisimon.edu.co" not in bot_message.lower():
                 bot_message = bot_message.rstrip() + contact_channels + CLOSING_FEEDBACK_QUESTION
             else:
