@@ -64,54 +64,68 @@ class LLMClient:
         messages: List[Dict[str, Any]],
         max_tokens: int = 768
     ) -> Dict[str, Any]:
-        """Llamada asíncrona a la API de Google Gemini (mediante su endpoint compatible con OpenAI)."""
-        headers = {
-            "Authorization": f"Bearer {self.settings.gemini_api_key}",
-            "Content-Type": "application/json"
-        }
-
-        url = f"{self.settings.gemini_base_url.rstrip('/')}/chat/completions"
+        """
+        Llamada asíncrona a la API de Google Gemini utilizando su API nativa generateContent
+        para máxima velocidad y estabilidad (evitando cuellos de botella del proxy OpenAI).
+        """
         model_name = self.settings.gemini_model
+        key = self.settings.gemini_api_key
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
+
+        contents = []
+        system_instruction = None
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                system_instruction = {"parts": [{"text": content}]}
+            elif role == "assistant":
+                contents.append({"role": "model", "parts": [{"text": content}]})
+            else:
+                contents.append({"role": "user", "parts": [{"text": content}]})
 
         payload: Dict[str, Any] = {
-            "model": model_name,
-            "messages": messages,
-            "max_completion_tokens": max(max_tokens, 600)
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": max(max_tokens, 1500)
+            }
         }
+        if system_instruction:
+            payload["systemInstruction"] = system_instruction
 
-        timeout = self.settings.gemini_timeout or 35.0
+        timeout = self.settings.gemini_timeout or 45.0
 
-        print(f"\n[GEMINI CLOUD] >>> Enviando consulta al modelo: '{model_name}' en {url}...", flush=True)
+        print(f"\n[GEMINI CLOUD] >>> Enviando consulta al modelo: '{model_name}' (API Nativa)...", flush=True)
 
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(url, json=payload, headers=headers)
+            response = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
             if response.status_code == 200:
                 data = response.json()
-                choice = data.get("choices", [{}])[0]
-                content = choice.get("message", {}).get("content", "").strip()
-                usage = data.get("usage", {})
-                prompt_tokens = usage.get("prompt_tokens", 0)
-                completion_tokens = usage.get("completion_tokens", 0)
-                cached_tokens = usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)
-                regular_input = max(0, prompt_tokens - cached_tokens)
+                candidates = data.get("candidates", [{}])
+                if not candidates:
+                    raise RuntimeError("Gemini no devolvió candidatos de respuesta.")
+                parts = candidates[0].get("content", {}).get("parts", [{}])
+                content = parts[0].get("text", "").strip() if parts else ""
+                usage = data.get("usageMetadata", {})
+                prompt_tokens = usage.get("promptTokenCount", 0)
+                completion_tokens = usage.get("candidatesTokenCount", 0)
 
                 print(
                     f"[GEMINI CLOUD] <<< Respuesta exitosa de '{model_name}'!\n"
-                    f"               - Entrada regular ($0.075/1M):  {regular_input} tokens\n"
-                    f"               - Entrada en CACHÉ ($0.018/1M): {cached_tokens} tokens\n"
-                    f"               - Salida generada ($0.30/1M):   {completion_tokens} tokens\n",
+                    f"               - Entrada:  {prompt_tokens} tokens\n"
+                    f"               - Salida:   {completion_tokens} tokens\n",
                     flush=True
                 )
 
                 logger.info(
-                    "[LLMClient] Gemini '%s' respondió exitosamente (tokens: in=%s, cached=%s, out=%s).",
-                    model_name, regular_input, cached_tokens, completion_tokens
+                    "[LLMClient] Gemini '%s' respondió exitosamente (tokens: in=%s, out=%s).",
+                    model_name, prompt_tokens, completion_tokens
                 )
 
                 return {
                     "content": content,
                     "prompt_tokens": prompt_tokens,
-                    "cached_tokens": cached_tokens,
+                    "cached_tokens": 0,
                     "eval_tokens": completion_tokens,
                     "model": model_name,
                     "provider": "gemini",
@@ -248,20 +262,26 @@ class LLMClient:
 
         if self.provider == "gemini" and self.settings.gemini_api_key:
             try:
-                headers = {
-                    "Authorization": f"Bearer {self.settings.gemini_api_key}",
-                    "Content-Type": "application/json"
-                }
-                url = f"{self.settings.gemini_base_url.rstrip('/')}/chat/completions"
+                model_name = self.settings.gemini_model
+                key = self.settings.gemini_api_key
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
+                contents = [{"role": "user", "parts": [{"text": prompt}]}]
                 payload: Dict[str, Any] = {
-                    "model": self.settings.gemini_model,
-                    "messages": messages,
-                    "max_completion_tokens": max(max_tokens, 450)
+                    "contents": contents,
+                    "generationConfig": {
+                        "maxOutputTokens": max(max_tokens, 250)
+                    }
                 }
-                async with httpx.AsyncClient(timeout=timeout or self.settings.gemini_timeout) as client:
-                    resp = await client.post(url, json=payload, headers=headers)
+                if system_prompt:
+                    payload["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
+                async with httpx.AsyncClient(timeout=timeout or self.settings.gemini_timeout or 20.0) as client:
+                    resp = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
                     if resp.status_code == 200:
-                        return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        data = resp.json()
+                        candidates = data.get("candidates", [{}])
+                        parts = candidates[0].get("content", {}).get("parts", [{}])
+                        return parts[0].get("text", "").strip() if parts else ""
                     logger.error("[LLMClient] Error HTTP %s de Gemini en generate_async: %s", resp.status_code, resp.text)
                     raise RuntimeError(f"Gemini error {resp.status_code}: {resp.text}")
             except Exception as e:
