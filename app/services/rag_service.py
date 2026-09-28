@@ -1272,32 +1272,9 @@ class RAGService:
 
     def _build_role_filter(self, user_role: Optional[str]) -> Optional[Dict[str, Any]]:
         """
-        Construye la condición de filtrado en ChromaDB según el rol del usuario:
-        - Otros / Visitante / Sin Rol: Acceso irrestricto a toda la base documental (sin filtro de audiencia, retorna None).
-        - Administrativo / Funcionario / Admin TI: Accede a documentos de general, administrativo, funcionario, profesor y admin_ti.
-        - Profesor / Docente: Accede a documentos de general, profesor, docente y estudiante.
-        - Estudiante: Accede a documentos y guías para estudiantes y general.
+        Construye la condición de filtrado en ChromaDB según el rol del usuario.
+        Desactivado: ahora retorna siempre None para aprovechar el contexto global con el nuevo motor más inteligente.
         """
-        if not user_role:
-            return None
-
-        role_lower = user_role.strip().lower()
-
-        if role_lower in ["otros", "otro", "visitante", "visitantes", "aspirante", "aspirantes", "egresado", "egresada", "externo", "externa", "general"]:
-            # Acceso total irrestricto sin filtros
-            return None
-        elif role_lower in ["administrativo", "administrativa", "funcionario", "funcionaria", "admin_ti"]:
-            return {
-                "audience": {"$in": ["general", "administrativo", "funcionario", "profesor", "admin_ti"]}
-            }
-        elif role_lower in ["profesor", "profesora", "docente"]:
-            return {
-                "audience": {"$in": ["general", "profesor", "docente"]}
-            }
-        elif role_lower in ["estudiante", "alumno", "alumna"]:
-            return {
-                "audience": {"$in": ["general", "estudiante"]}
-            }
         return None
 
     async def query_rag(
