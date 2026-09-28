@@ -49,10 +49,10 @@ class Settings(BaseSettings):
     ollama_timeout: float = 45.0
 
     # Configuración de Vision-LLM (Ingesta Multimodal)
-    vision_model: str = "llama3.2-vision:11b"
+    vision_model: str = "llava:13b"
     vision_timeout: float = 120.0
     vision_max_image_size: int = 1024
-    vision_min_image_kb: int = 15
+    vision_min_image_kb: int = 0  # 0 = Sin restricciones de tamaño (interpreta el 100% de imágenes)
 
     # Configuración de ChromaDB y Embeddings
     chroma_db_dir: str = "./chroma_db"

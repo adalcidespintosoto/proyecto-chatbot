@@ -20,11 +20,13 @@ import os
 import sys
 import io
 import time
+import json
 import base64
 import shutil
+import hashlib
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 
 if sys.platform == "win32":
     try:
@@ -75,13 +77,12 @@ stats = {
 
 # Prompt institucional para interpretación visual de imágenes
 VISION_PROMPT = (
-    "Analiza detalladamente esta imagen de documentación técnica de TI institucional. "
-    "- Si es una captura de pantalla de software (Kactus, Seven, GLPI, Windows, portales web, etc.): "
-    "describe la ventana activa, menús, botones seleccionados, campos completados y el procedimiento exacto que se muestra. "
-    "- Si es un diagrama de flujo o mapa de procesos: describe la secuencia lógica, decisiones, roles y pasos de inicio a fin. "
-    "- Si es una tabla: transcribe las columnas, filas y datos relevantes. "
-    "- Si contiene texto o mensajes de error: transcribe literalmente los textos clave. "
-    "Sé conciso, técnico y estructurado. Responde en español."
+    "Describe de manera objetiva, técnica y detallada los elementos visibles en esta imagen institucional de TI. "
+    "- Si es una captura de pantalla de software o interfaz web (Kactus, Seven, GLPI, Windows, Teams, etc.): "
+    "describe las ventanas, menús, botones, campos y opciones que se muestran. "
+    "- Si es un diagrama, flujo o mapa de procesos: describe la secuencia lógica y los pasos representados de inicio a fin. "
+    "- Si contiene tablas o texto legible: transcribe el texto y los datos de forma estructurada. "
+    "Responde en español de forma concisa y técnica."
 )
 
 
@@ -127,9 +128,54 @@ def normalize_image(image_bytes: bytes, max_size: int = 1024, quality: int = 85)
         return image_bytes
 
 
-def is_significant_image(image_bytes: bytes, min_kb: int = 15) -> bool:
-    """Determina si una imagen es lo suficientemente grande para ser relevante (no un icono)."""
+def is_significant_image(image_bytes: bytes, min_kb: int = 0) -> bool:
+    """
+    Verifica que la imagen tenga contenido binario para procesar.
+    Si min_kb <= 0, no descarta ninguna imagen y procesa el 100% de ellas sin restricciones.
+    """
+    if not image_bytes or len(image_bytes) == 0:
+        return False
+    if min_kb <= 0:
+        return True
     return len(image_bytes) >= min_kb * 1024
+
+
+# =============================================================================
+# CACHÉ PERSISTENTE DE VISIÓN (A PRUEBA DE CORTES DE ENERGÍA Y REINICIOS)
+# =============================================================================
+VISION_CACHE_FILE = PROJECT_ROOT / "data" / ".vision_cache.json"
+_vision_cache: Optional[Dict[str, str]] = None
+
+
+def load_vision_cache() -> Dict[str, str]:
+    """Carga en memoria la caché persistente de descripciones de imágenes."""
+    global _vision_cache
+    if _vision_cache is None:
+        if VISION_CACHE_FILE.exists():
+            try:
+                with open(VISION_CACHE_FILE, "r", encoding="utf-8") as f:
+                    _vision_cache = json.load(f)
+                logger.info(f"⚡ Caché de visión cargada ({len(_vision_cache)} imágenes analizadas previamente).")
+            except Exception as e:
+                logger.warning(f"No se pudo leer la caché de visión ({e}), iniciando nueva.")
+                _vision_cache = {}
+        else:
+            _vision_cache = {}
+    return _vision_cache
+
+
+def save_vision_cache_entry(img_hash: str, description: str):
+    """Guarda y persiste inmediatamente una interpretación de imagen en disco con escritura atómica."""
+    cache = load_vision_cache()
+    cache[img_hash] = description
+    try:
+        VISION_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temp_cache = VISION_CACHE_FILE.with_suffix(".tmp")
+        with open(temp_cache, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+        temp_cache.replace(VISION_CACHE_FILE)
+    except Exception as e:
+        logger.debug(f"No se pudo guardar la caché de visión en disco: {e}")
 
 
 # =============================================================================
@@ -140,15 +186,24 @@ def describe_image_with_vllm(
     image_bytes: bytes,
     filename: str = "image",
     ollama_url: str = "http://localhost:11434",
-    vision_model: str = "llama3.2-vision:11b",
+    vision_model: str = "llava:13b",
     timeout: float = 120.0,
     max_image_size: int = 1024
 ) -> Optional[str]:
     """
     Envía una imagen al Vision-LLM de Ollama y retorna la descripción textual generada.
     Normaliza la imagen antes del envío para optimizar el uso de VRAM.
+    Utiliza una caché persistente en disco (SHA-256) para jamás repetir trabajo tras reinicios.
     Retorna None si el modelo no está disponible o falla.
     """
+    # 1. Chequeo de caché persistente inmediata (0 segundos si ya se procesó antes)
+    img_hash = hashlib.sha256(image_bytes).hexdigest()
+    cache = load_vision_cache()
+    if img_hash in cache:
+        logger.debug(f"[Vision-LLM] Imagen '{filename}' recuperada de caché local ({img_hash[:8]}).")
+        stats["images_described"] += 1
+        return cache[img_hash]
+
     try:
         # Normalizar imagen
         normalized = normalize_image(image_bytes, max_size=max_image_size)
@@ -174,6 +229,8 @@ def describe_image_with_vllm(
             if description:
                 logger.debug(f"[Vision-LLM] Imagen '{filename}' descrita ({len(description)} chars)")
                 stats["images_described"] += 1
+                # Guardar en disco inmediatamente de forma atómica
+                save_vision_cache_entry(img_hash, description)
                 return description
             else:
                 logger.warning(f"[Vision-LLM] Respuesta vacía para imagen '{filename}'")
@@ -200,7 +257,7 @@ def check_vision_model_available(ollama_url: str, vision_model: str) -> Tuple[bo
     Intenta el modelo primario, y si falla, prueba fallbacks automáticos.
     Retorna (disponible: bool, modelo_funcional: str).
     """
-    FALLBACK_MODELS = [vision_model, "llava:7b", "llava:13b", "llava-llama3:8b"]
+    FALLBACK_MODELS = [vision_model, "llava:13b", "llama3.2-vision:11b", "llava:7b", "llava-llama3:8b"]
 
     # Crear una imagen de prueba mínima (1x1 pixel rojo)
     test_img = Image.new("RGB", (10, 10), color=(255, 0, 0))
@@ -486,9 +543,10 @@ def delete_document_chunks(vector_store: Chroma, doc_source: str) -> int:
 def generate_deterministic_chunk_ids(chunks: List[Document]) -> List[str]:
     """
     Genera IDs deterministas para cada chunk en formato:
-    f"{file_stem}_p{page_num}_c{chunk_idx}"
+    f"{file_stem}_{hash}_p{page_num}_c{chunk_idx}"
     """
     import re
+    import hashlib
     ids = []
     page_chunk_counts = {}
 
@@ -496,6 +554,7 @@ def generate_deterministic_chunk_ids(chunks: List[Document]) -> List[str]:
         source_name = chunk.metadata.get("source", "doc")
         file_stem = Path(source_name).stem
         clean_stem = re.sub(r"[^a-zA-Z0-9_\-]", "_", file_stem)
+        source_hash = hashlib.md5(source_name.encode('utf-8')).hexdigest()[:6]
 
         page_num = (
             chunk.metadata.get("page_number")
@@ -507,7 +566,7 @@ def generate_deterministic_chunk_ids(chunks: List[Document]) -> List[str]:
         chunk_idx = page_chunk_counts.get(key, 0)
         page_chunk_counts[key] = chunk_idx + 1
 
-        chunk_id = f"{clean_stem}_p{page_num}_c{chunk_idx}"
+        chunk_id = f"{clean_stem}_{source_hash}_p{page_num}_c{chunk_idx}"
         ids.append(chunk_id)
 
     return ids
@@ -834,13 +893,15 @@ def ingest_multimodal(
     chroma_path: Optional[str] = None,
     model_name: Optional[str] = None,
     file_path: Optional[str] = None,
-    incremental: bool = False,
+    incremental: bool = True,
     delete_doc: Optional[str] = None,
     wipe_db: bool = False,
     check_redundancy: bool = False,
     deduplicate: bool = False,
     similarity_threshold: float = 0.88,
-    audit_db: bool = False
+    audit_db: bool = False,
+    vision_model_override: Optional[str] = None,
+    min_image_kb_override: Optional[int] = None
 ) -> bool:
     """
     Pipeline de ingesta multimodal con soporte para:
@@ -856,10 +917,10 @@ def ingest_multimodal(
     chroma_dir = Path(chroma_path or settings.chroma_db_dir)
     embedding_model_name = model_name or settings.embedding_model
     ollama_url = settings.ollama_base_url
-    vision_model = settings.vision_model
+    vision_model = vision_model_override or settings.vision_model
     vision_timeout = settings.vision_timeout
     max_image_size = settings.vision_max_image_size
-    min_image_kb = settings.vision_min_image_kb
+    min_image_kb = min_image_kb_override if min_image_kb_override is not None else settings.vision_min_image_kb
 
     # Resetear contadores
     for key in stats:
@@ -882,7 +943,7 @@ def ingest_multimodal(
         if torch.cuda.is_available():
             device = "cuda"
             gpu_name = torch.cuda.get_device_name(0)
-            vram_gb = torch.cuda.get_device_properties(0).total_mem / (1024 ** 3)
+            vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
             logger.info(f"🖥️ GPU detectada: {gpu_name} ({vram_gb:.1f} GB VRAM) — Embeddings en CUDA")
         else:
             logger.info("GPU CUDA no disponible. Embeddings en CPU.")
@@ -909,14 +970,24 @@ def ingest_multimodal(
         return True
 
     # 2. CASO: Limpieza forzada de base vectorial previa si se solicita wipe
-    if wipe_db and chroma_dir.exists():
-        logger.info(f"Limpiando base vectorial completa previa en '{chroma_dir}'...")
-        try:
-            shutil.rmtree(chroma_dir)
-            logger.info("Directorio ChromaDB previo eliminado con éxito.")
-        except Exception as exc:
-            logger.warning(f"No se pudo eliminar directorio completo ({exc}), se procederá a sobrescribir.")
-        chroma_dir.mkdir(parents=True, exist_ok=True)
+    if wipe_db:
+        if chroma_dir.exists():
+            logger.info(f"Limpiando base vectorial completa previa en '{chroma_dir}'...")
+            try:
+                shutil.rmtree(chroma_dir)
+                logger.info("Directorio ChromaDB previo eliminado con éxito.")
+            except Exception as exc:
+                logger.warning(f"No se pudo eliminar directorio completo ({exc}), se procederá a sobrescribir.")
+            chroma_dir.mkdir(parents=True, exist_ok=True)
+
+        if VISION_CACHE_FILE.exists():
+            try:
+                VISION_CACHE_FILE.unlink()
+                global _vision_cache
+                _vision_cache = {}
+                logger.info("⚡ Caché de visión previa eliminada con éxito (--wipe).")
+            except Exception as exc:
+                logger.warning(f"No se pudo eliminar la caché de visión: {exc}")
 
     vector_store = Chroma(
         persist_directory=str(chroma_dir),
@@ -968,7 +1039,7 @@ def ingest_multimodal(
             if not all_files:
                 logger.info("✅ Todos los documentos ya se encuentran indexados en ChromaDB. No hay archivos nuevos por procesar.")
                 return True
-            logger.info(f"Archivos nuevos a indexar ({len(all_files)}): {[f.name for f in all_files]}")
+            logger.info(f"Archivos pendientes a indexar ({len(all_files)} de {len(pdf_files) + len(pptx_files)}): {[f.name for f in all_files[:5]]}{'...' if len(all_files) > 5 else ''}")
 
     # 4. Verificar disponibilidad del modelo de visión
     use_vision, active_vision_model = check_vision_model_available(ollama_url, vision_model)
@@ -983,152 +1054,157 @@ def ingest_multimodal(
             f"La ingesta continuará con extracción de texto plano únicamente (sin interpretación visual)."
         )
 
-    # 5. Procesar los archivos seleccionados
-    all_documents: List[Document] = []
-    start_time = time.time()
-
-    for filepath in tqdm(all_files, desc="📂 Procesando documentos", unit="archivo"):
-        try:
-            ext = filepath.suffix.lower()
-            if ext == ".pdf":
-                docs = process_pdf(
-                    filepath,
-                    ollama_url=ollama_url,
-                    vision_model=vision_model,
-                    vision_timeout=vision_timeout,
-                    max_image_size=max_image_size,
-                    min_image_kb=min_image_kb,
-                    use_vision=use_vision
-                )
-            elif ext == ".pptx":
-                docs = process_pptx(
-                    filepath,
-                    ollama_url=ollama_url,
-                    vision_model=vision_model,
-                    vision_timeout=vision_timeout,
-                    max_image_size=max_image_size,
-                    min_image_kb=min_image_kb,
-                    use_vision=use_vision
-                )
-            else:
-                logger.warning(f"Formato no soportado: {filepath.name}")
-                continue
-
-            all_documents.extend(docs)
-            stats["files_processed"] += 1
-        except Exception as exc:
-            logger.error(f"❌ Error procesando '{filepath.name}': {exc}")
-            stats["files_failed"] += 1
-
-    if not all_documents:
-        logger.error("No se generaron documentos para indexar. Revisa los archivos fuente.")
-        return False
-
-    logger.info(f"Total de documentos/páginas extraídas antes de chunking: {len(all_documents)}")
-
-    # 6. Fragmentar documentos (chunking con solapamiento)
+    # 5. Configurar fragmentador de texto
     chunk_size = 800
     chunk_overlap = 150
-    logger.info(f"Fragmentando documentos (chunk_size={chunk_size}, chunk_overlap={chunk_overlap})...")
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         separators=["\n\n", "\n", ". ", " ", ""]
     )
-    chunks = text_splitter.split_documents(all_documents)
-    stats["chunks_generated"] = len(chunks)
-    logger.info(f"Total de fragmentos generados: {stats['chunks_generated']}")
 
-    # 7. Si se solicitó auditoría previa de redundancia (Dry-Run / Pre-Flight Check)
-    if check_redundancy:
-        logger.info("🔍 Ejecutando auditoría de redundancia previa a la ingesta (Dry-Run)...")
-        for f in all_files:
-            file_chunks = [c for c in chunks if c.metadata.get("source") == f.name]
-            if not file_chunks:
-                continue
-            rep = calculate_chunk_redundancy(
-                chunks=file_chunks,
-                vector_store=vector_store,
-                embeddings=embeddings,
-                threshold=similarity_threshold,
-                exclude_source=f.name
-            )
-            print_redundancy_report(f.name, rep, threshold=similarity_threshold)
-        logger.info("✅ Auditoría de redundancia completada. No se modificó la base de datos ChromaDB.")
+    start_time = time.time()
+    total_to_process = len(all_files)
+    logger.info(f"🚀 Iniciando indexación con persistencia continua por archivo ({total_to_process} documento(s) pendientes)...")
+    logger.info("   [Blindaje anti-cortes]: Cada documento terminado se guardará inmediatamente en ChromaDB.")
+
+    try:
+        for idx, filepath in enumerate(tqdm(all_files, desc="📂 Indexando documentos", unit="archivo"), 1):
+            try:
+                ext = filepath.suffix.lower()
+                if ext == ".pdf":
+                    docs = process_pdf(
+                        filepath,
+                        ollama_url=ollama_url,
+                        vision_model=vision_model,
+                        vision_timeout=vision_timeout,
+                        max_image_size=max_image_size,
+                        min_image_kb=min_image_kb,
+                        use_vision=use_vision
+                    )
+                elif ext == ".pptx":
+                    docs = process_pptx(
+                        filepath,
+                        ollama_url=ollama_url,
+                        vision_model=vision_model,
+                        vision_timeout=vision_timeout,
+                        max_image_size=max_image_size,
+                        min_image_kb=min_image_kb,
+                        use_vision=use_vision
+                    )
+                else:
+                    logger.warning(f"Formato no soportado: {filepath.name}")
+                    continue
+
+                if not docs:
+                    logger.warning(f"⚠️ Sin contenido extraído para '{filepath.name}'")
+                    stats["files_failed"] += 1
+                    continue
+
+                # 6. Fragmentar el documento
+                doc_chunks = text_splitter.split_documents(docs)
+                if not doc_chunks:
+                    logger.warning(f"⚠️ No se generaron fragmentos para '{filepath.name}'")
+                    stats["files_failed"] += 1
+                    continue
+
+                # 7. Si se solicitó auditoría previa de redundancia (Dry-Run)
+                if check_redundancy:
+                    rep = calculate_chunk_redundancy(
+                        chunks=doc_chunks,
+                        vector_store=vector_store,
+                        embeddings=embeddings,
+                        threshold=similarity_threshold,
+                        exclude_source=filepath.name
+                    )
+                    print_redundancy_report(filepath.name, rep, threshold=similarity_threshold)
+                    stats["files_processed"] += 1
+                    continue
+
+                # 8. Deduplicación activa durante la ingesta (si se solicitó --deduplicate)
+                if deduplicate:
+                    rep = calculate_chunk_redundancy(
+                        chunks=doc_chunks,
+                        vector_store=vector_store,
+                        embeddings=embeddings,
+                        threshold=similarity_threshold,
+                        exclude_source=filepath.name
+                    )
+                    novel = [c for c_idx, c in enumerate(doc_chunks) if c_idx not in rep["redundant_indices"]]
+                    dedup_count = rep["redundant_count"]
+                    stats["chunks_deduplicated"] += dedup_count
+                    if dedup_count > 0:
+                        logger.info(
+                            f"   • '{filepath.name}': {len(novel)}/{len(doc_chunks)} chunks conservados "
+                            f"({dedup_count} redundantes descartados)."
+                        )
+                    doc_chunks = novel
+
+                if not doc_chunks:
+                    logger.info(f"   • '{filepath.name}': Todos los fragmentos eran redundantes con BD existente. Omitido.")
+                    stats["files_processed"] += 1
+                    continue
+
+                # 9. Limpiar chunks anteriores de este archivo específico (evita duplicados si se re-indexa)
+                delete_document_chunks(vector_store, filepath.name)
+
+                # 10. Indexar con upsert determinista e INMEDIATO en ChromaDB
+                texts = [c.page_content for c in doc_chunks]
+                metadatas = [c.metadata for c in doc_chunks]
+                ids = generate_deterministic_chunk_ids(doc_chunks)
+
+                embeddings_list = embeddings.embed_documents(texts)
+                vector_store._collection.upsert(
+                    ids=ids,
+                    documents=texts,
+                    metadatas=metadatas,
+                    embeddings=embeddings_list
+                )
+
+                stats["chunks_generated"] += len(doc_chunks)
+                stats["files_processed"] += 1
+                logger.info(f"💾 [{idx}/{total_to_process}] Guardado en ChromaDB: '{filepath.name}' ({len(doc_chunks)} chunks).")
+
+            except Exception as exc:
+                logger.error(f"❌ Error procesando '{filepath.name}': {exc}")
+                stats["files_failed"] += 1
+
+    except KeyboardInterrupt:
+        logger.warning("\n⏸️ INGESTA PAUSADA POR EL USUARIO (Ctrl+C).")
+        logger.info(f"✅ Los {stats['files_processed']} documento(s) procesados hasta este momento están guardados en ChromaDB.")
+        logger.info("ℹ️ Para continuar en cualquier momento, simplemente vuelve a ejecutar el comando.")
         return True
 
-    # 8. Deduplicación activa durante la ingesta (si se solicitó --deduplicate)
-    if deduplicate:
-        logger.info(f"🛡️ Modo Deduplicación Activa (Umbral >= {similarity_threshold:.0%}): Filtrando fragmentos redundantes...")
-        filtered_chunks = []
-        total_deduped = 0
-        for f in all_files:
-            file_chunks = [c for c in chunks if c.metadata.get("source") == f.name]
-            if not file_chunks:
-                continue
-            rep = calculate_chunk_redundancy(
-                chunks=file_chunks,
-                vector_store=vector_store,
-                embeddings=embeddings,
-                threshold=similarity_threshold,
-                exclude_source=f.name
-            )
-            novel = [c for idx, c in enumerate(file_chunks) if idx not in rep["redundant_indices"]]
-            deduped_count = rep["redundant_count"]
-            total_deduped += deduped_count
-            if deduped_count > 0:
-                logger.info(
-                    f"   • '{f.name}': {len(novel)}/{len(file_chunks)} fragmentos novedosos conservados "
-                    f"({deduped_count} redundantes descartados)."
-                )
-            filtered_chunks.extend(novel)
-
-        stats["chunks_deduplicated"] = total_deduped
-        chunks = filtered_chunks
-        stats["chunks_generated"] = len(chunks)
-
-        if not chunks:
-            logger.warning("⚠️ Todos los fragmentos procesados superaron el umbral de redundancia con documentos ya existentes.")
-            logger.warning("   No se indexó ningún fragmento para evitar saturación de la base vectorial.")
-            return True
-
-    # 9. Limpiar chunks anteriores de los archivos a procesar para evitar huérfanos
-    for f in all_files:
-        delete_document_chunks(vector_store, f.name)
-
-    # 10. Indexar con upsert determinista en ChromaDB
-    texts = [c.page_content for c in chunks]
-    metadatas = [c.metadata for c in chunks]
-    ids = generate_deterministic_chunk_ids(chunks)
-
-    logger.info(f"Generando embeddings e indexando {len(chunks)} fragmentos con upsert en ChromaDB...")
-    embeddings_list = embeddings.embed_documents(texts)
-    vector_store._collection.upsert(
-        ids=ids,
-        documents=texts,
-        metadatas=metadatas,
-        embeddings=embeddings_list
-    )
+    if check_redundancy:
+        logger.info("✅ Auditoría de redundancia completada (Dry-Run). No se modificó la base de datos ChromaDB.")
+        return True
 
     elapsed_time = time.time() - start_time
 
     # 11. Reporte final
+    total_in_db = 0
+    try:
+        total_in_db = vector_store._collection.count()
+    except Exception:
+        pass
+
     logger.info("=" * 70)
     logger.info(" [ÉXITO] INGESTA COMPLETADA")
     logger.info("=" * 70)
-    logger.info(f" • Archivos procesados:       {stats['files_processed']} ({stats['files_failed']} con error)")
-    logger.info(f" • Páginas PDF extraídas:      {stats['pages_extracted']}")
-    logger.info(f" • Diapositivas PPTX extraídas:{stats['slides_extracted']}")
-    logger.info(f" • Imágenes interpretadas:     {stats['images_described']} ({stats['images_skipped']} descartadas por tamaño)")
+    logger.info(f" • Archivos procesados en sesión: {stats['files_processed']} ({stats['files_failed']} con error)")
+    logger.info(f" • Páginas PDF extraídas:         {stats['pages_extracted']}")
+    logger.info(f" • Diapositivas PPTX extraídas:   {stats['slides_extracted']}")
+    logger.info(f" • Imágenes interpretadas:        {stats['images_described']} ({stats['images_skipped']} descartadas por tamaño)")
     dedup_info = f" ({stats['chunks_deduplicated']} descartados por redundancia)" if stats.get("chunks_deduplicated", 0) > 0 else ""
-    logger.info(f" • Fragmentos indexados:        {stats['chunks_generated']}{dedup_info}")
-    logger.info(f" • Tiempo total:               {elapsed_time:.1f} segundos ({elapsed_time / 60:.1f} min)")
-    logger.info(f" • Base vectorial en:          {chroma_dir.resolve()}")
-    logger.info(f" • Dispositivo de embeddings:  {device.upper()}")
+    logger.info(f" • Fragmentos nuevos indexados:   {stats['chunks_generated']}{dedup_info}")
+    logger.info(f" • Total acumulado en ChromaDB:   {total_in_db} fragmentos")
+    logger.info(f" • Tiempo total:                  {elapsed_time:.1f} segundos ({elapsed_time / 60:.1f} min)")
+    logger.info(f" • Base vectorial en:             {chroma_dir.resolve()}")
+    logger.info(f" • Dispositivo de embeddings:     {device.upper()}")
     if use_vision:
-        logger.info(f" • Vision-LLM utilizado:       {vision_model}")
+        logger.info(f" • Vision-LLM utilizado:          {vision_model}")
     else:
-        logger.info(f" • Vision-LLM:                 NO DISPONIBLE (solo texto plano)")
+        logger.info(f" • Vision-LLM:                    NO DISPONIBLE (solo texto plano)")
     logger.info("=" * 70)
 
     return True
@@ -1149,7 +1225,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--incremental", "-i",
         action="store_true",
-        help="Escanear data/docs/ e indexar únicamente documentos que no existan en ChromaDB"
+        default=True,
+        help="Modo reanudable/incremental: indexa únicamente documentos que no existan en ChromaDB (por defecto: True)"
+    )
+    parser.add_argument(
+        "--no-incremental",
+        action="store_false",
+        dest="incremental",
+        help="Desactivar modo incremental y reprocesar todos los documentos"
     )
     parser.add_argument(
         "--delete-doc", "-d",
@@ -1196,6 +1279,19 @@ if __name__ == "__main__":
         help="Ruta personalizada de persistencia de ChromaDB"
     )
 
+    parser.add_argument(
+        "--vision-model",
+        type=str,
+        default=None,
+        help="Modelo de Visión LLM en Ollama a utilizar (ej: llava:13b, llama3.2-vision:11b)"
+    )
+    parser.add_argument(
+        "--min-image-kb",
+        type=int,
+        default=0,
+        help="Tamaño mínimo en KB para procesar imágenes (por defecto: 0 = procesar el 100%% sin exclusión)"
+    )
+
     args = parser.parse_args()
 
     success = ingest_multimodal(
@@ -1208,7 +1304,9 @@ if __name__ == "__main__":
         check_redundancy=args.check_redundancy,
         deduplicate=args.deduplicate,
         similarity_threshold=args.similarity_threshold,
-        audit_db=args.audit_db
+        audit_db=args.audit_db,
+        vision_model_override=args.vision_model,
+        min_image_kb_override=args.min_image_kb
     )
     sys.exit(0 if success else 1)
 

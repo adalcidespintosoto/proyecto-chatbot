@@ -6,7 +6,7 @@ creación de tickets con tipología institucional y cierre garantizado de sesió
 
 import logging
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import httpx
 from app.config import get_settings
 
