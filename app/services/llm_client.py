@@ -37,24 +37,76 @@ class LLMClient:
         messages: List[Dict[str, Any]],
         max_tokens: int = 768,
         temperature: Optional[float] = None,
-        fallback_to_ollama: bool = False
+        fallback_to_ollama: bool = True
     ) -> Dict[str, Any]:
         """
         Ejecuta una consulta conversacional completa con el LLM activo.
         
-        En modo 'gemini' u 'openai', el fallback a Ollama está COMPLETAMENTE DESHABILITADO
-        para garantizar que el 100% de las inferencias provengan del proveedor cloud configurado.
+        En modo Cloud ('openai' o 'gemini'), si el proveedor en la nube presenta fallas
+        (error de API, timeout de red, cuota excedida o indisponibilidad), se conmuta
+        automáticamente a Ollama local (modelo unimon:8b) como contingencia de alta disponibilidad.
         """
         if self.provider == "gemini":
             if not self.settings.gemini_api_key:
-                raise RuntimeError("LLM_PROVIDER está configurado como 'gemini', pero no se encontró GEMINI_API_KEY en .env")
-            return await self._call_gemini_chat(messages, max_tokens=max_tokens)
+                logger.warning("[LLMClient] Sin GEMINI_API_KEY. Conmutando a contingencia local Ollama (%s)...", self.settings.llm_model)
+                res = await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
+                res["contingency"] = True
+                res["fallback_from"] = "gemini"
+                return res
+
+            try:
+                return await self._call_gemini_chat(messages, max_tokens=max_tokens)
+            except Exception as exc:
+                logger.warning(
+                    "[LLMClient] Falla en Gemini (%s): %s. Conmutando de inmediato a contingencia local Ollama ('%s')...",
+                    self.settings.gemini_model, exc, self.settings.llm_model
+                )
+                print(
+                    f"\n[CONTINGENCIA LLM] Google Gemini fallo: {exc}\n"
+                    f"[FALLBACK LOCAL] Conmutando de inmediato a Ollama Local ({self.settings.llm_model})...\n",
+                    flush=True
+                )
+                res = await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
+                res["contingency"] = True
+                res["fallback_from"] = "gemini"
+                return res
 
         if self.provider == "openai":
             if not self.settings.openai_api_key:
-                raise RuntimeError("LLM_PROVIDER está configurado como 'openai', pero no se encontró OPENAI_API_KEY en .env")
-            # Modo estricto: solo OpenAI en la nube
-            return await self._call_openai_chat(messages, max_tokens=max_tokens)
+                logger.warning("[LLMClient] Sin OPENAI_API_KEY. Conmutando a contingencia local Ollama (%s)...", self.settings.llm_model)
+                print(
+                    f"\n[CONTINGENCIA LLM] OPENAI_API_KEY no configurada.\n"
+                    f"[FALLBACK LOCAL] Conmutando a Ollama Local ({self.settings.llm_model})...\n",
+                    flush=True
+                )
+                res = await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
+                res["contingency"] = True
+                res["fallback_from"] = "openai"
+                return res
+
+            try:
+                return await self._call_openai_chat(messages, max_tokens=max_tokens)
+            except Exception as exc:
+                logger.warning(
+                    "[LLMClient] Falla en OpenAI ('%s'): %s. Activando de inmediato contingencia con Ollama Local ('%s')...",
+                    self.settings.openai_model, exc, self.settings.llm_model
+                )
+                print(
+                    f"\n[CONTINGENCIA LLM] OpenAI ({self.settings.openai_model}) fallo: {exc}\n"
+                    f"[FALLBACK LOCAL] Conmutando de inmediato a Ollama Local ({self.settings.llm_model})...\n",
+                    flush=True
+                )
+                try:
+                    res = await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
+                    res["contingency"] = True
+                    res["fallback_from"] = "openai"
+                    return res
+                except Exception as ollama_exc:
+                    logger.error(
+                        "[LLMClient] Falla crítica: Falló OpenAI (%s) y la contingencia Ollama también falló (%s)",
+                        exc, ollama_exc
+                    )
+                    raise RuntimeError(f"Falla total: OpenAI ({exc}) y contingencia Ollama ({ollama_exc})")
 
         # Modo Ollama local directo (únicamente si LLM_PROVIDER=ollama)
         return await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
@@ -158,7 +210,7 @@ class LLMClient:
         }
 
         # Para modelos GPT-5 / Luna optimizamos la latencia con esfuerzo de razonamiento bajo
-        if any(k in model_name for k in ["gpt-5", "o1", "o3", "luna"]):
+        if any(k in model_name for k in ["gpt-6", "gpt-5", "o1", "o3", "luna"]):
             payload["reasoning_effort"] = "low"
         else:
             payload["temperature"] = 0.0
@@ -179,11 +231,15 @@ class LLMClient:
                 cached_tokens = usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)
                 regular_input = max(0, prompt_tokens - cached_tokens)
 
+                is_g6 = "gpt-6" in model_name.lower()
+                r_in = "$0.10" if is_g6 else "$0.20"
+                r_c = "$0.01" if is_g6 else "$0.02"
+                r_out = "$0.50" if is_g6 else "$1.20"
                 print(
                     f"[OPENAI CLOUD] <<< Respuesta exitosa de '{model_name}'!\n"
-                    f"               - Entrada regular ($0.20/1M):  {regular_input} tokens\n"
-                    f"               - Entrada en CACHÉ ($0.02/1M): {cached_tokens} tokens\n"
-                    f"               - Salida generada ($1.20/1M):  {completion_tokens} tokens\n",
+                    f"               - Entrada regular ({r_in}/1M):  {regular_input} tokens\n"
+                    f"               - Entrada en CACHÉ ({r_c}/1M): {cached_tokens} tokens\n"
+                    f"               - Salida generada ({r_out}/1M):  {completion_tokens} tokens\n",
                     flush=True
                 )
 
@@ -228,6 +284,7 @@ class LLMClient:
             }
         }
 
+        print(f"\n[OLLAMA LOCAL] >>> Enviando consulta al modelo local: '{self.settings.llm_model}' en {url}...", flush=True)
         async with httpx.AsyncClient(timeout=self.settings.ollama_timeout) as client:
             response = await client.post(url, json=payload)
             if response.status_code == 200:
@@ -236,16 +293,26 @@ class LLMClient:
                 prompt_tokens = data.get("prompt_eval_count", 0) or 0
                 eval_tokens = data.get("eval_count", 0) or 0
 
+                print(
+                    f"[OLLAMA LOCAL] <<< Respuesta exitosa de '{self.settings.llm_model}'!\n"
+                    f"               - Entrada procesada: {prompt_tokens} tokens\n"
+                    f"               - Salida generada:   {eval_tokens} tokens (Costo Local: $0.00 USD)\n",
+                    flush=True
+                )
+
                 return {
                     "content": content,
                     "prompt_tokens": prompt_tokens,
+                    "cached_tokens": 0,
                     "eval_tokens": eval_tokens,
                     "model": self.settings.llm_model,
                     "provider": "ollama",
                     "source": f"ollama_{self.settings.llm_model}"
                 }
 
-            raise RuntimeError(f"Ollama error {response.status_code}: {response.text}")
+            error_text = response.text
+            print(f"[OLLAMA LOCAL] [ERROR] Código {response.status_code}: {error_text}\n", flush=True)
+            raise RuntimeError(f"Ollama error {response.status_code}: {error_text}")
 
     async def generate_async(
         self,
@@ -282,11 +349,9 @@ class LLMClient:
                         candidates = data.get("candidates", [{}])
                         parts = candidates[0].get("content", {}).get("parts", [{}])
                         return parts[0].get("text", "").strip() if parts else ""
-                    logger.error("[LLMClient] Error HTTP %s de Gemini en generate_async: %s", resp.status_code, resp.text)
-                    raise RuntimeError(f"Gemini error {resp.status_code}: {resp.text}")
+                    logger.warning("[LLMClient] Error HTTP %s de Gemini en generate_async: %s", resp.status_code, resp.text)
             except Exception as e:
-                logger.error("[LLMClient] Falló generate_async con Gemini: %s", e)
-                raise e
+                logger.warning("[LLMClient] Falló generate_async con Gemini (%s). Conmutando a contingencia Ollama...", e)
 
         if self.provider == "openai" and self.settings.openai_api_key:
             try:
@@ -300,19 +365,17 @@ class LLMClient:
                     "messages": messages,
                     "max_completion_tokens": max(max_tokens, 450)
                 }
-                if any(k in self.settings.openai_model for k in ["gpt-5", "o1", "o3", "luna"]):
+                if any(k in self.settings.openai_model for k in ["gpt-6", "gpt-5", "o1", "o3", "luna"]):
                     payload["reasoning_effort"] = "low"
                 async with httpx.AsyncClient(timeout=timeout or self.settings.openai_timeout) as client:
                     resp = await client.post(url, json=payload, headers=headers)
                     if resp.status_code == 200:
                         return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                    logger.error("[LLMClient] Error HTTP %s de OpenAI en generate_async: %s", resp.status_code, resp.text)
-                    raise RuntimeError(f"OpenAI error {resp.status_code}: {resp.text}")
+                    logger.warning("[LLMClient] Error HTTP %s de OpenAI en generate_async: %s", resp.status_code, resp.text)
             except Exception as e:
-                logger.error("[LLMClient] Falló generate_async con OpenAI: %s", e)
-                raise e
+                logger.warning("[LLMClient] Falló generate_async con OpenAI (%s). Conmutando a contingencia Ollama...", e)
 
-        # Fallback / Modo directo a Ollama generate (únicamente si LLM_PROVIDER=ollama)
+        # Fallback / Modo directo a Ollama generate (únicamente si LLM_PROVIDER=ollama o contingencia)
         try:
             ollama_url = f"{self.settings.ollama_base_url.rstrip('/')}/api/generate"
             async with httpx.AsyncClient(timeout=timeout or 5.0) as client:
@@ -361,11 +424,9 @@ class LLMClient:
                     resp = client.post(url, json=payload, headers=headers)
                     if resp.status_code == 200:
                         return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                    logger.error("[LLMClient] Error HTTP %s de Gemini en generate_sync: %s", resp.status_code, resp.text)
-                    raise RuntimeError(f"Gemini error {resp.status_code}: {resp.text}")
+                    logger.warning("[LLMClient] Error HTTP %s de Gemini en generate_sync: %s", resp.status_code, resp.text)
             except Exception as e:
-                logger.error("[LLMClient] Falló generate_sync con Gemini: %s", e)
-                raise e
+                logger.warning("[LLMClient] Falló generate_sync con Gemini (%s). Conmutando a contingencia Ollama...", e)
 
         if self.provider == "openai" and self.settings.openai_api_key:
             try:
@@ -379,17 +440,15 @@ class LLMClient:
                     "messages": messages,
                     "max_completion_tokens": max(max_tokens, 450)
                 }
-                if any(k in self.settings.openai_model for k in ["gpt-5", "o1", "o3", "luna"]):
+                if any(k in self.settings.openai_model for k in ["gpt-6", "gpt-5", "o1", "o3", "luna"]):
                     payload["reasoning_effort"] = "low"
                 with httpx.Client(timeout=timeout or self.settings.openai_timeout) as client:
                     resp = client.post(url, json=payload, headers=headers)
                     if resp.status_code == 200:
                         return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                    logger.error("[LLMClient] Error HTTP %s de OpenAI en generate_sync: %s", resp.status_code, resp.text)
-                    raise RuntimeError(f"OpenAI error {resp.status_code}: {resp.text}")
+                    logger.warning("[LLMClient] Error HTTP %s de OpenAI en generate_sync: %s", resp.status_code, resp.text)
             except Exception as e:
-                logger.error("[LLMClient] Falló generate_sync con OpenAI: %s", e)
-                raise e
+                logger.warning("[LLMClient] Falló generate_sync con OpenAI (%s). Conmutando a contingencia Ollama...", e)
 
         # Fallback / Modo directo a Ollama (únicamente si LLM_PROVIDER=ollama)
         try:

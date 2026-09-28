@@ -370,11 +370,16 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
                 provider_label = "Google Gemini"
                 active_model_name = _cfg.gemini_model
             elif _prov == "openai":
-                rate_in = 0.20
-                rate_cache = 0.02
-                rate_out = 1.20
-                provider_label = "OpenAI"
                 active_model_name = _cfg.openai_model
+                provider_label = "OpenAI"
+                if "gpt-6" in (active_model_name or "").lower():
+                    rate_in = 0.10
+                    rate_cache = 0.01
+                    rate_out = 0.50
+                else:
+                    rate_in = 0.20
+                    rate_cache = 0.02
+                    rate_out = 1.20
             else:
                 rate_in = 0.0
                 rate_cache = 0.0

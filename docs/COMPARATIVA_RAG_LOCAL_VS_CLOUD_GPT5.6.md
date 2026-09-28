@@ -245,7 +245,7 @@ Paso 4: Post-procesamiento y Entrega (Idéntica en ambas opciones)
 └── Entrega la respuesta amigable al estudiante con botones de diagnóstico.
 ```
 
----
+--- 
 
 ## 7. Seguridad de los Datos, Privacidad y Cumplimiento Legal
 
