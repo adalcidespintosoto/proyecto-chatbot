@@ -63,7 +63,7 @@ try {
     
     $provider = "gemini"
     $openaiKey = ""
-    $openaiModel = "gpt-5.6-luna"
+    $openaiModel = "gpt-6-luna"
     $geminiKey = ""
     $geminiModel = "gemini-flash-lite-latest"
     if (Test-Path ".env") {
