@@ -1914,67 +1914,15 @@ class RouterLogic:
                     "source": "UniMon_Guardrail"
                 }
 
-            # 2. Si el usuario NO tiene rol asignado en la sesión:
+            # 2. Asignación automática de rol por defecto (segmentación deshabilitada)
             if not session.user_role:
-                detected_role = cls.detect_user_role(texto) or normalize_role(texto)
-                has_question_keywords = any(w in texto.lower() for w in [
-                    "?", "¿", "dónde", "donde", "cómo", "como", "por qué", "porque", 
-                    "por dónde", "por donde", "subo", "puedo", "quiero", "necesito", 
-                    "ayuda", "autoevaluacion", "autoevaluación", "clave", "contraseña", 
-                    "portal", "fallas", "problema", "error", "calificaciones", "promedio"
-                ])
-                is_just_role_declaration = bool(detected_role and len(texto.split()) <= 4 and not has_question_keywords)
+                session.user_role = "general"
 
-                if is_just_role_declaration:
-                    # El usuario envió únicamente su rol (ej: "estudiante", "profesor", "soy docente", "administrativo")
-                    session.user_role = detected_role
-                    logger.info(f"[Session: {session_id}] Rol identificado en primer mensaje: '{session.user_role}'")
-                    session.estado = EstadoTicket.DIAGNOSTICO
-                    session.diagnosis_attempts = 1
-                    session.intentos_diagnostico = 1
-                    greeting_reply = (
-                        "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar. "
-                        "¿En qué procedimiento institucional o falla técnica te puedo colaborar hoy?"
-                    )
-                    cls.add_history(session_id, "user", texto)
-                    cls.add_history(session_id, "assistant", greeting_reply)
-                    return {
-                        "tipo": "DIAGNOSTICO",
-                        "state": "DIAGNOSTICO",
-                        "mensaje": greeting_reply,
-                        "response": greeting_reply,
-                        "reply": greeting_reply,
-                        "ticket_id": None,
-                        "source": "UniMon_Assistant",
-                        "quick_replies": []
-                    }
-                else:
-                    # El usuario formuló una pregunta o saludo sin haber seleccionado su rol previamente.
-                    # Retener la consulta y solicitar OBLIGATORIAMENTE la selección de rol.
-                    # Permitir retención de consultas técnicas monopalabra (ej: 'Teams', 'SIAAF', 'Contraseña')
-                    is_valid_topic = len(texto.strip()) >= 3 and not cls.is_greeting(texto) and not cls.is_cancellation(texto) and not is_out_of_domain_query(texto)
-                    session.pending_query = texto if is_valid_topic else None
-                    session.estado = EstadoTicket.PIDIENDO_ROL
-                    cls.add_history(session_id, "user", texto)
-                    cls.add_history(session_id, "assistant", MENSAJE_PIDIENDO_ROL)
-                    return {
-                        "tipo": "PIDIENDO_ROL",
-                        "state": "PIDIENDO_ROL",
-                        "mensaje": MENSAJE_PIDIENDO_ROL,
-                        "response": MENSAJE_PIDIENDO_ROL,
-                        "reply": MENSAJE_PIDIENDO_ROL,
-                        "ticket_id": None,
-                        "source": "UniMon_Assistant",
-                        "quick_replies": ROLE_QUICK_REPLIES
-                    }
-
-            # Si ya tiene rol en la sesión:
             # 3. Saludo simple
             if cls.is_greeting(texto):
                 greeting_reply = (
-                    "¡Hola! 👋 Soy **UniMon**, el Asistente Virtual Oficial de TI de la Universidad Simón Bolívar. "
-                    "¿En qué te puedo colaborar hoy? Puedes consultarme sobre procedimientos institucionales (backups, cuentas, antimalware, Seven/Kactus) "
-                    "o indicarme si presentas alguna falla con tus equipos o servicios para ayudarte."
+                    "¡Hola! 👋 Soy **UniMon**, tu Asistente Virtual Oficial de TI. "
+                    "Estoy aquí para ayudarte de forma inmediata. ¿En qué te puedo colaborar hoy? Puedes preguntarme lo que necesites o indicarme si presentas alguna falla con tus equipos."
                 )
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", greeting_reply)
