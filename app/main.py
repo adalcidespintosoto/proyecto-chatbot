@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import get_settings
-from app.routers import chat, analytics, admin_router
+from app.routers import chat, analytics, admin_router, whatsapp
 from app.services.router_logic import RouterLogic
 from app.services.telemetry_service import init_telemetry_db
 from app.services.rag_service import rag_service, get_embedding_model, get_reranker_model
@@ -126,6 +126,7 @@ async def add_security_headers(request, call_next):
 app.include_router(chat.router)
 app.include_router(analytics.router)
 app.include_router(admin_router.router)
+app.include_router(whatsapp.router)
 
 # Ruta estática para la interfaz gráfica del Chatbot
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")

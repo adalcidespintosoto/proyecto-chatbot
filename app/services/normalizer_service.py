@@ -49,8 +49,11 @@ SYNONYM_MAP = {
     # Elecciones Institucionales y Votaciones
     r"\b(votaci[oó]n|votaciones|[oó]rganos colegiados|votar|elecci[oó]n|elecciones|representante|representantes|candidato|candidatos|sufragio)\b": "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/",
     
+    # Ingreso y Registro de Calificaciones por Docentes (Portal Profesores / Autoservicio)
+    r"\b(montar\s+(?:las\s+)?notas|monto\s+(?:las\s+)?notas|subir\s+(?:las\s+)?notas\s+(?:de\s+|a\s+)?(?:mis\s+)?(?:estudiantes|alumnos)|subir\s+notas|cargar\s+(?:las\s+)?notas|ingresar\s+(?:las\s+)?notas|registrar\s+(?:las\s+)?notas|ingreso\s+de\s+calificaciones|registro\s+de\s+calificaciones|como\s+califico|calificar\s+(?:a\s+)?(?:mis\s+)?estudiantes)\b": "portal profesores instructivo para ingreso de calificaciones registro de calificaciones asignaturas guardar borrador finalizar",
+
     # Reclamos y Cambio de Notas (Límite de Dominio Académico)
-    r"\b(me\s+clavaron|me\s+clav[oó]|cambiar\s+nota|cambie\s+la\s+nota|subir\s+nota|suba\s+la\s+nota|corregir\s+nota|reclamo\s+calificaci[oó]n|reclamo\s+nota|reclamar\s+nota|nota\s+injusta|calificaci[oó]n\s+injusta|revisi[oó]n\s+de\s+nota)\b": "reclamo calificacion revision docente direccion de programa",
+    r"\b(me\s+clavaron|me\s+clav[oó]|cambiar\s+nota|cambie\s+la\s+nota|suba\s+la\s+nota|corregir\s+nota|reclamo\s+calificaci[oó]n|reclamo\s+nota|reclamar\s+nota|nota\s+injusta|calificaci[oó]n\s+injusta|revisi[oó]n\s+de\s+nota)\b": "reclamo calificacion revision docente direccion de programa",
     
     # Errores, Accesos y Fallas Comunes
     r"\b(datos incorrectos|clave incorrecta|clave mala|clave est[aá] mala|clave no sirve|no me deja entrar|no entra|clave invalida|datos invalidos|no me coge la clave|ando embalao)\b": "problemas de acceso restablecimiento de contraseña credenciales incorrectas",
