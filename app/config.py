@@ -59,10 +59,18 @@ class Settings(BaseSettings):
     docs_dir: str = "./data/docs"
     embedding_model: str = "intfloat/multilingual-e5-large"
     rag_inject_full_doc: bool = False  # False = Modo Chunks (Ahorro de tokens); True = Documento Completo
-    rag_max_chunks: int = 4
+    rag_max_chunks: int = 6
 
     # Límites de Seguridad
     max_upload_size_mb: int = 15
+
+    # Configuración de WhatsApp Cloud API (Meta Business)
+    whatsapp_enabled: bool = True
+    whatsapp_phone_number_id: str = ""
+    whatsapp_waba_id: str = ""
+    whatsapp_access_token: str = ""
+    whatsapp_verify_token: str = "UniMon_USB_Verify_Token_2026"
+    whatsapp_api_version: str = "v20.0"
 
     model_config = SettingsConfigDict(
         env_file=".env",

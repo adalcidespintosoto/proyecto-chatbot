@@ -150,14 +150,16 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             "teclado", "mouse", "mause", "raton", "ratón", "pantalla", "monitor", "cable", "equipo", "computador", "portatil", "portátil", "pc", "videobeam", "proyector", "microfono", "diadema", "recurso"
         ]))
         is_teacher_grading_query = bool(re.search(
-            r"\b(subir|subo|sube|subiendo|cargar|cargo|carga|cargando|registrar|registro|asentar|asentamiento|ingreso|digitar|digitaci[oó]n|calificar)\b.*(nota|notas|calificaci|calificaciones|parcial|parciales|inasistencia|inasistencias|planilla|planillas|definitiva|definitivas|maestr[ií]a|posgrado)",
+            r"\b(montar|monto|monta|montando|subir|subo|sube|subiendo|cargar|cargo|carga|cargando|registrar|registro|asentar|asentamiento|ingreso|ingresar|digitar|digitaci[oó]n|calificar)\b.*(nota|notas|calificaci|calificaciones|parcial|parciales|inasistencia|inasistencias|planilla|planillas|definitiva|definitivas|maestr[ií]a|posgrado)",
             q_lower
         )) or any(w in q_lower for w in [
+            "montar notas", "montar las notas", "monto notas", "monto las notas",
             "subo las notas", "subo notas", "subir notas", "cargar notas", "cargo notas", "calificar",
             "fallas de mis alumnos", "inasistencias", "reporte de fallas", "reporte de las fallas",
             "mis alumnos", "mis estudiantes", "ingreso de calificaciones", "planillas de calificaciones",
             "cerrar el sistema", "cierre de sistema", "subir calificaciones", "cargar calificaciones",
             "reporte de inasistencias", "inasistencias y consulta de listados", "autoevaluación docente",
+            "calificaciones de mis estudiantes", "notas de mis estudiantes", "notas de mis alumnos",
             "calificaciones de una maestría", "calificaciones de maestria", "calificaciones de posgrado",
             "calificaciones de posgrados", "casillas de primer", "primer y segundo parcial"
         ])
@@ -185,6 +187,28 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
                     final_score += 2.0
                 if "requisitos previos" in content_lower and "procedimiento paso a paso" not in content_lower:
                     final_score -= 1.0
+
+            # Bonificación / Penalización especializada para ingreso de calificaciones de profesores
+            if is_teacher_grading_query:
+                if "calificaciones.pdf" in source_lower:
+                    final_score += 4.0
+                    # Bonificación adicional para pasos clave del procedimiento
+                    if any(k in content_lower for k in ["registro de calificaciones", "guardar borrador", "finalizar", "campo numérico", "n.p.", "listado de asignaturas"]):
+                        final_score += 2.0
+                elif "calificaciones posgrados" in source_lower:
+                    if any(p in q_lower for p in ["posgrado", "posgrados", "maestria", "maestría"]):
+                        final_score += 4.5
+                    else:
+                        final_score += 1.5
+                elif "calificaciones.pptx" in source_lower:
+                    # Calificaciones.pptx es consulta de estudiantes, penalizar en consultas docentes
+                    final_score -= 2.5
+
+                # Penalizar severamente documentos que contienen la palabra "notas" o "estudiantes" por alcance contable o administrativo
+                if any(bad in source_lower for bad in ["notas crédito", "notas credito", "nota crédito", "nota credito"]):
+                    final_score -= 6.0
+                if any(bad in source_lower for bad in ["remisiones", "graduados", "matriculados", "inscritos", "caracterización", "preinscritos"]):
+                    final_score -= 4.0
 
             scored_docs.append((doc, original_score, final_score))
 
@@ -234,7 +258,26 @@ SEMANTIC_SYNONYM_DICTIONARY = [
         ]
     },
     {
-        "triggers": ["subir notas", "subir calificaciones", "asentar notas", "registrar calificaciones", "calificaciones posgrado", "calificaciones posgrados", "calificaciones maestria", "calificaciones maestría", "calificaciones de una maestria", "calificaciones de una maestría", "calificaciones de posgrado", "calificaciones de posgrados", "calificaciones profesor", "calificaciones docente"],
+        "triggers": [
+            "montar notas", "montar las notas", "monto notas", "monto las notas",
+            "subir notas", "subir las notas", "subo notas", "subo las notas",
+            "cargar notas", "cargar las notas", "cargo notas", "cargo las notas",
+            "ingresar notas", "ingreso de calificaciones", "registro de calificaciones",
+            "calificaciones de mis estudiantes", "notas de mis estudiantes", "notas de mis alumnos",
+            "calificar estudiantes", "calificar alumnos", "portal profesores calificaciones"
+        ],
+        "variants": [
+            "Portal Profesores instructivo para ingreso de calificaciones registro de calificaciones asignaturas",
+            "Procedimiento digitar notas guardar borrador y finalizar calificaciones portal profesores",
+            "Ingreso de calificaciones parciales primer segundo parcial examen final portal profesores"
+        ]
+    },
+    {
+        "triggers": [
+            "calificaciones posgrado", "calificaciones posgrados", "calificaciones maestria",
+            "calificaciones maestría", "calificaciones de una maestria", "calificaciones de una maestría",
+            "calificaciones de posgrado", "calificaciones de posgrados", "asentar notas posgrado", "notas posgrado"
+        ],
         "variants": [
             "Registro y Asentamiento de Calificaciones Definitivas para Cursos de Posgrados SIA",
             "Instructivo de registro de calificaciones de posgrados en el sistema académico SIA",
@@ -1085,6 +1128,19 @@ def get_full_document_text(source_identifier: str) -> Optional[str]:
         elif target_path.suffix.lower() in [".md", ".txt"]:
             with open(target_path, "r", encoding="utf-8", errors="replace") as f:
                 full_text = f.read()
+        elif target_path.suffix.lower() == ".pptx":
+            try:
+                import pptx
+                prs = pptx.Presentation(target_path)
+                slides_text = []
+                for s_idx, slide in enumerate(prs.slides, 1):
+                    stxt = " ".join([shape.text for shape in slide.shapes if shape.has_text_frame])
+                    if stxt.strip():
+                        slides_text.append(f"[Diapositiva {s_idx}]\n{stxt.strip()}")
+                full_text = "\n\n".join(slides_text)
+            except Exception as e:
+                logger.warning(f"Error procesando PPTX {target_path}: {e}")
+                return None
         else:
             return None
 
@@ -1270,11 +1326,49 @@ class RAGService:
         self._vector_store = None
         _ = self.vector_store
 
+    def _build_query_filter(self, question: str, user_role: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Construye filtros semánticos y de taxonomía en ChromaDB para evitar colisiones entre dominios:
+        - Consultas académicas/docentes: excluye categoría 'financiero' (evita colisiones con Notas Crédito o Pagos).
+        - Consultas financieras: restringe a 'financiero', 'portales', 'academico', 'general'.
+        - Consultas de hardware/redes: excluye manuales financieros y académicos irrelevantes.
+        """
+        q_low = question.lower()
+
+        # 1. Detección de ámbito académico / docente (notas, calificaciones, parciales, inasistencias, programas)
+        is_academic = any(w in q_low for w in [
+            "nota", "notas", "calificaci", "parcial", "parciales", "asignatura", "asignaturas",
+            "materia", "materias", "horario", "horarios", "docente", "profesor", "profesores",
+            "estudiante", "estudiantes", "alumno", "alumnos", "montar notas", "subir notas",
+            "supletorio", "inasistencia", "inasistencias", "promedio", "boletin"
+        ]) and not any(fin in q_low for fin in ["factura", "facturas", "volante", "liquidaci", "arancel", "cartera", "tesorer", "pago"])
+
+        if is_academic:
+            logger.info("[ChromaFilter] Consulta académica/docente detectada: Excluyendo categoría 'financiero' a nivel de base de datos.")
+            return {"category": {"$ne": "financiero"}}
+
+        # 2. Detección de ámbito estrictamente financiero / pagos / facturas
+        is_financial = any(w in q_low for w in [
+            "pago", "pagos", "pagar", "factura", "facturas", "volante", "recibo",
+            "liquidaci", "arancel", "tarifa", "cartera", "tesorer", "paymentez", "link de pago"
+        ])
+        if is_financial:
+            logger.info("[ChromaFilter] Consulta financiera detectada: Restringiendo a categorías pertinentes.")
+            return {"category": {"$in": ["financiero", "portales", "academico", "general"]}}
+
+        # 3. Detección de ámbito de hardware y conectividad
+        is_hardware = any(w in q_low for w in [
+            "wifi", "internet", "red", "cable", "hdmi", "vga", "teclado", "mouse", "pantalla",
+            "monitor", "proyector", "videobeam", "computador", "portatil", "portátil"
+        ]) and not any(app in q_low for app in ["teams", "moodle", "kactus", "seven", "correo"])
+        if is_hardware:
+            logger.info("[ChromaFilter] Consulta de hardware/redes: Excluyendo financiero y académico.")
+            return {"category": {"$nin": ["financiero", "academico"]}}
+
+        return None
+
+    # Alias para compatibilidad con código existente
     def _build_role_filter(self, user_role: Optional[str]) -> Optional[Dict[str, Any]]:
-        """
-        Construye la condición de filtrado en ChromaDB según el rol del usuario.
-        Desactivado: ahora retorna siempre None para aprovechar el contexto global con el nuevo motor más inteligente.
-        """
         return None
 
     async def query_rag(
@@ -1339,7 +1433,7 @@ class RAGService:
                 "quick_replies": []
             }
 
-        filter_condition = self._build_role_filter(user_role)
+        filter_condition = self._build_query_filter(question, user_role)
 
         # 1. Expansión Multi-Consulta asíncrona tolerante a jerga
         query_variants = await async_generate_multi_query_variants(question, user_role or "general", max_variants=3)
@@ -1475,12 +1569,35 @@ class RAGService:
                 except Exception as exc:
                     logger.debug(f"Error cargando doc elecciones: {exc}")
 
+        # Asegurar recuperación del instructivo de ingreso de calificaciones para docentes
+        is_teacher_grades = any(w in question.lower() for w in [
+            "montar notas", "montar las notas", "monto notas", "monto las notas", 
+            "subir notas", "subo notas", "cargar notas", "ingresar notas", "calificaciones de mis estudiantes",
+            "registro de calificaciones", "como calificar", "notas de mis estudiantes", "notas de mis alumnos"
+        ]) or bool(re.search(r"\b(montar|subir|cargar|ingresar|digitar|registrar)\b.*(nota|notas|calificaci)", question.lower()))
+
+        if is_teacher_grades and self.vector_store is not None:
+            has_calif_doc = any("calificaciones.pdf" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
+            if not has_calif_doc or len([d for d, _ in valid_docs_with_scores if "calificaciones.pdf" in (d.metadata.get("source") or "").lower()]) < 4:
+                try:
+                    q_calif_1 = format_e5_query("Calificaciones - Programas Académicos Para realizar el ingreso de calificaciones menú lateral Registro de Calificaciones asignaturas")
+                    q_calif_2 = format_e5_query("Calificaciones - Estudiantes Uno a uno ingrese en el campo numérico la calificación Guardar Borrador Finalizar N.P.")
+                    extra_1 = self.vector_store.similarity_search_with_relevance_scores(q_calif_1, k=5)
+                    extra_2 = self.vector_store.similarity_search_with_relevance_scores(q_calif_2, k=5)
+                    for cdoc, cscore in extra_1 + extra_2:
+                        if cdoc.metadata.get("source") == "Calificaciones.pdf" or (cscore is not None and cscore >= 0.75):
+                            valid_docs_with_scores.append((cdoc, cscore))
+                except Exception as exc:
+                    logger.debug(f"Error cargando doc calificaciones: {exc}")
+
         # 3. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
         if valid_docs_with_scores:
             if is_election_query:
                 rerank_query = "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
             elif is_ambiguous_student_pwd:
                 rerank_query = "restablecimiento de contraseña portal estudiantes y activación de usuario primer semestre"
+            elif is_teacher_grades:
+                rerank_query = "Portal Profesores instructivo ingreso de calificaciones registro de calificaciones asignaturas guardar borrador finalizar"
             elif is_peripheral_or_hardware_request(question):
                 rerank_query = normalize_and_expand_query(question)
             elif query_variants:
@@ -1488,7 +1605,7 @@ class RAGService:
             else:
                 rerank_query = normalize_and_expand_query(question)
 
-            top_k_val = 4 if (is_ambiguous_student_pwd or is_election_query) else 3
+            top_k_val = getattr(self.settings, "rag_max_chunks", 6)
             reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=top_k_val, original_query=question)
 
             if reranked or is_ambiguous_student_pwd or is_election_query:
@@ -1586,30 +1703,63 @@ class RAGService:
                                     context_parts.append(f"[{sec_filename}]\n{cleaned_sec}")
                                     break
                     else:
-                        # Modo Chunks (Ahorro de tokens): Solo fragmentos más relevantes ordenados lógicamente
-                        max_chunks = getattr(self.settings, "rag_max_chunks", 4)
+                        # Modo Chunks (Ahorro de tokens): Fragmentos más relevantes ordenados lógicamente
+                        max_chunks = getattr(self.settings, "rag_max_chunks", 6)
                         primary_chunks = []
+                        seen_contents = set()
+
+                        # 1. Priorizar fragmentos de la fuente principal que superaron el umbral de relevancia semántica
                         for doc, _ in valid_docs_with_scores:
                             if doc.metadata.get("source") == primary_source:
-                                if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
+                                c_strip = doc.page_content.strip()
+                                if c_strip not in seen_contents and "[Imagen: Lo siento" not in c_strip:
+                                    seen_contents.add(c_strip)
                                     primary_chunks.append(doc)
 
-                        def chunk_logical_rank(chunk_doc):
-                            c_lower = chunk_doc.page_content.lower()
-                            if any(k in c_lower for k in ["1. generalidades", "1. objetivo", "1. alcance"]):
-                                return 1
-                            if any(k in c_lower for k in ["2. requisitos", "requisitos previos", "restricciones", "roles autorizados"]):
-                                return 2
-                            if any(k in c_lower for k in ["3. procedimiento", "procedimiento paso a paso", "paso 1"]):
-                                return 3
-                            if any(k in c_lower for k in ["4. reglas", "4. políticas", "4. politicas"]):
-                                return 4
-                            if any(k in c_lower for k in ["5. canales", "canales de escalado", "canales de soporte"]):
-                                return 5
-                            return 6
+                        # 2. Si hay menos de 4 fragmentos relevantes, expandir con páginas adyacentes de ChromaDB
+                        if len(primary_chunks) < 4 and self.vector_store is not None:
+                            try:
+                                col = self.vector_store._collection
+                                db_chunks = col.get(where={"source": primary_source})
+                                if db_chunks and db_chunks.get("documents"):
+                                    from langchain_core.documents import Document
+                                    # Encontrar las páginas de los fragmentos relevantes
+                                    target_pages = {
+                                        int(d.metadata.get("page_number", d.metadata.get("page", 0)))
+                                        for d in primary_chunks if str(d.metadata.get("page_number", d.metadata.get("page", ""))).isdigit()
+                                    }
+                                    for doc_txt, doc_meta in zip(db_chunks["documents"], db_chunks["metadatas"]):
+                                        if "[Imagen: Lo siento" in doc_txt and len(doc_txt.strip()) < 120:
+                                            continue
+                                        p_num = doc_meta.get("page_number", doc_meta.get("page", None))
+                                        # Preferir páginas contiguas cercanas a las relevantes
+                                        if target_pages and p_num is not None:
+                                            try:
+                                                p_int = int(p_num)
+                                                if not any(abs(p_int - tp) <= 2 for tp in target_pages):
+                                                    continue
+                                            except (ValueError, TypeError):
+                                                pass
+                                        if doc_txt.strip() not in seen_contents:
+                                            seen_contents.add(doc_txt.strip())
+                                            primary_chunks.append(Document(page_content=doc_txt, metadata=doc_meta or {}))
+                                            if len(primary_chunks) >= max_chunks:
+                                                break
+                                logger.info(f"[ContextStitching] {len(primary_chunks)} fragmentos seleccionados de '{primary_source}'.")
+                            except Exception as stitch_err:
+                                logger.debug(f"[ContextStitching] Error expandiendo ventana contigua: {stitch_err}")
 
-                        primary_chunks_sorted = sorted(primary_chunks, key=chunk_logical_rank)
-                        max_primary = min(max_chunks, 3)
+                        # Función de ordenamiento por página real para mantener la secuencia del instructivo
+                        def get_doc_page_order(chunk_doc):
+                            meta = chunk_doc.metadata or {}
+                            p = meta.get("page_number", meta.get("page", meta.get("slide_number", 999)))
+                            try:
+                                return int(p)
+                            except (ValueError, TypeError):
+                                return 999
+
+                        primary_chunks_sorted = sorted(primary_chunks, key=get_doc_page_order)
+                        max_primary = min(max_chunks, 5)
 
                         for doc in primary_chunks_sorted[:max_primary]:
                             retrieved_docs.append(doc)
@@ -1625,6 +1775,10 @@ class RAGService:
                         for doc, _ in reranked[1:]:
                             if len(context_parts) >= max_chunks:
                                 break
+                            doc_src_lower = (doc.metadata.get("source") or "").lower()
+                            # Omitir fuentes irrelevantes o penalizadas (ej: notas crédito financieras en consultas de profesores)
+                            if any(bad in doc_src_lower for bad in ["notas crédito", "notas credito", "nota crédito"]):
+                                continue
                             if doc.metadata.get("source") != primary_source:
                                 if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
                                     retrieved_docs.append(doc)
@@ -1809,6 +1963,53 @@ class RAGService:
 
             # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
             bot_message = clean_llm_response(bot_message)
+
+            # Auto-Recuperación (Full Document Retry): Si el modelo indica que los fragmentos no especifican
+            # los pasos posteriores o carece de información suficiente, reintentar inyectando el documento completo
+            insufficient_patterns = [
+                r"la\s+informaci[oó]n\s+disponible\s+no\s+especifica",
+                r"no\s+especifica\s+los\s+pasos\s+posteriores",
+                r"no\s+se\s+especifica\s+en\s+la\s+documentaci[oó]n",
+                r"los\s+fragmentos\s+no\s+especifican",
+                r"el\s+contexto\s+no\s+proporciona",
+                r"no\s+contiene\s+informaci[oó]n\s+suficiente",
+                r"no\s+se\s+menciona\s+en\s+el\s+contexto",
+            ]
+            has_insufficient_doc = any(re.search(pat, bot_message, flags=re.IGNORECASE) for pat in insufficient_patterns)
+
+            if has_insufficient_doc and sources:
+                primary_source_name = sources[0]
+                full_doc_content = get_full_document_text(primary_source_name)
+                if full_doc_content and len(full_doc_content) > len(context_text):
+                    logger.info(
+                        f"[FullDocRetry] La respuesta con fragmentos indicó información incompleta ('{bot_message[:70]}...'). "
+                        f"Reintentando con documento institucional completo: '{primary_source_name}' ({len(full_doc_content)} chars)..."
+                    )
+                    retry_context = f"[DOCUMENTO INSTITUCIONAL COMPLETO: {primary_source_name}]\n{full_doc_content}"
+                    retry_sys_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=retry_context, query=question)
+                    retry_msgs = [{"role": "system", "content": retry_sys_prompt}]
+                    if chat_history:
+                        retry_msgs.extend(chat_history[-4:])
+                    retry_msgs.append({"role": "user", "content": user_prompt})
+
+                    try:
+                        retry_res = await self.llm_client.chat_completion(
+                            messages=retry_msgs,
+                            max_tokens=950,
+                            temperature=0.0
+                        )
+                        retry_bot_msg = clean_llm_response(retry_res.get("content", "").strip())
+                        retry_has_insufficient = any(re.search(pat, retry_bot_msg, flags=re.IGNORECASE) for pat in insufficient_patterns)
+
+                        if retry_bot_msg and len(retry_bot_msg) > 25 and not retry_has_insufficient:
+                            logger.info("[FullDocRetry] ¡El reintento con documento completo resolvió satisfactoriamente la consulta!")
+                            bot_message = retry_bot_msg
+                            prompt_tokens += retry_res.get("prompt_tokens", 0)
+                            eval_tokens += retry_res.get("eval_tokens", 0)
+                        else:
+                            logger.info("[FullDocRetry] El documento completo tampoco contiene el paso requerido. Se confirma limitación documental genuina.")
+                    except Exception as retry_err:
+                        logger.warning(f"[FullDocRetry] Error en reintento con documento completo: {retry_err}")
 
             # Se relajan las reglas de evasión y placeholder para permitir que el modelo interactúe de forma natural
             # cuando pide aclaraciones al usuario en vez de aplastar el diálogo con un mensaje de fallback duro.

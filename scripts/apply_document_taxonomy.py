@@ -72,6 +72,7 @@ TEACHER_PATTERNS = [
     r"autoevaluaci[oó]n", r"autoevaluacion",
     r"registro.*calificaciones", r"calificaciones.*posgrado",
     r"calificaciones.*profesor", r"inasistencias.*portal\s*profesor",
+    r"calificaciones\.pdf",
 ]
 
 # Funcionarios específicos (no admin_ti, pero sí usuario de sistemas internos)
@@ -80,6 +81,7 @@ FUNCIONARIO_PATTERNS = [
     r"administrativo", r"administrativos",
     r"kactus", r"seven", r"erp",
     r"p-gt-\d+",
+    r"gesti[oó]n\s*de\s*notas\s*cr[eé]dito",
 ]
 
 # ─────────────────────────────────────────────────────────────────────
@@ -95,9 +97,10 @@ CATEGORY_RULES = [
     (r"carnet|carn[eé]|app\s*unisimon", "carnet_app"),
     (r"portal|portales", "portales"),
     (r"contrase[ñn]a|password|clave|bloqueo|desbloque|correo\s*institucional|correo\s*electr[oó]nico|acceso|cuenta", "cuentas_accesos"),
-    (r"matr[ií]cula|matricula|inscripci[oó]n|inscripcion|reintegro|grado|cr[eé]dito|credito", "academico"),
+    # Financiero colocado antes de académico para evitar que "notas crédito" caiga en académico
+    (r"n[oó]mina|nomina|liquidaci[oó]n|presupuesto|bancos|contabilidad|financiero|nota\s*cr[eé]dito|notas\s*cr[eé]dito|factura|facturas|recibo|arancel|tarifa|tesorer[ií]a|cartera|pagos?|paymentez|link\s*de\s*pagos?", "financiero"),
+    (r"matr[ií]cula|matricula|inscripci[oó]n|inscripcion|reintegro|grado|cr[eé]ditos?\s*acad[eé]micos?|calificaci|notas?\b|parcial|asignatura|horario|supletorio|docente|profesor", "academico"),
     (r"computador|port[aá]til|monitor|pantalla|proyector|mouse|teclado|red|wifi|internet|hdmi|cable|impresora|esc[aá]ner", "hardware_redes"),
-    (r"n[oó]mina|nomina|liquidaci[oó]n|presupuesto|bancos|contabilidad|financiero", "financiero"),
     (r"virus|malware|antivirus|antimalware|amenaza", "seguridad"),
     (r"backup|copia\s*de\s*seguridad|respaldo|restauraci[oó]n", "backup_restauracion"),
 ]
