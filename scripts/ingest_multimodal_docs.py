@@ -93,17 +93,60 @@ VISION_PROMPT = (
 def get_metadata_from_path(file_path: Path) -> dict:
     """Mapea automáticamente los metadatos institucionales según la ubicación del archivo."""
     path_str = str(file_path).lower()
+    name_str = file_path.name.lower()
+    
+    # Inferencia de Category basada en nombre de archivo (prioritario para filtro RAG)
+    category = "general"
+    if any(w in name_str for w in ["pago", "factura", "cartera", "tesorer", "credito", "financier", "liquidaci", "volante", "arancel"]):
+        category = "financiero"
+    elif any(w in name_str for w in ["nota", "calificaci", "parcial", "grado", "malla", "docente", "evaluaci", "programa", "homologacion", "horario"]):
+        category = "academico"
+    elif any(w in name_str for w in ["portal", "kactus", "seven"]):
+        category = "portales"
+
     if "1_estudiantes" in path_str:
-        return {"audience": "estudiante", "doc_type": "autoservicio", "source": file_path.name}
+        return {"audience": "estudiante", "doc_type": "autoservicio", "category": category, "source": file_path.name}
     elif "2_profesores" in path_str:
-        return {"audience": "profesor", "doc_type": "autoservicio", "source": file_path.name}
+        return {"audience": "profesor", "doc_type": "autoservicio", "category": "academico", "source": file_path.name}
     elif "3_funcionarios_gestion" in path_str or "administrativo" in path_str:
-        return {"audience": "administrativo", "doc_type": "gestion_interna", "source": file_path.name}
+        return {"audience": "administrativo", "doc_type": "gestion_interna", "category": category, "source": file_path.name}
     elif "4_general_normativa" in path_str:
-        return {"audience": "general", "doc_type": "normativa", "source": file_path.name}
+        return {"audience": "general", "doc_type": "normativa", "category": category, "source": file_path.name}
     elif "5_admin_ti" in path_str:
-        return {"audience": "admin_ti", "doc_type": "gestion_interna", "source": file_path.name}
-    return {"audience": "general", "doc_type": "autoservicio", "source": file_path.name}
+        return {"audience": "admin_ti", "doc_type": "gestion_interna", "category": category, "source": file_path.name}
+    return {"audience": "general", "doc_type": "autoservicio", "category": category, "source": file_path.name}
+
+
+def strip_chunk_boilerplate(content: str) -> str:
+    """
+    Elimina encabezados, pies de página, códigos de formato ISO y frases ultra-repetitivas
+    (boilerplate) ANTES de indexar en ChromaDB para evitar el efecto 'Eco' (saturación vectorial).
+    """
+    if not content:
+        return ""
+    cleaned = re.sub(
+        r"(?im)^.*(?:universidad\s+sim[oó]n\s+bol[ií]var|sistema\s+de\s+gesti[oó]n\s+de\s+la\s+calidad).*$",
+        "",
+        content
+    )
+    cleaned = re.sub(
+        r"(?im)^\s*(?:c[oó]digo|versi[oó]n|procedimiento|instructivo|p[aá]gina)\s*:\s*[A-Z0-9.\-/\s]+$",
+        "",
+        cleaned
+    )
+    cleaned = re.sub(
+        r"(?i)\bp[aá]gina\s+\d+\s+de\s+\d+\b",
+        "",
+        cleaned
+    )
+    # Limpieza agresiva del boilerplate que inunda la base de datos con falsos positivos de login
+    cleaned = re.sub(
+        r"(?i)digite su usuario y contraseña para acceder al sistema y luego presione sobre el botón «acceder»\.?",
+        "",
+        cleaned
+    )
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 
 def normalize_image(image_bytes: bytes, max_size: int = 1024, quality: int = 85) -> bytes:
@@ -630,7 +673,8 @@ def calculate_chunk_redundancy(
         }
 
     texts = [c.page_content for c in chunks]
-    chunk_embeddings = embeddings.embed_documents(texts)
+    texts_for_embedding = [f"passage: {t}" for t in texts]
+    chunk_embeddings = embeddings.embed_documents(texts_for_embedding)
 
     redundant_indices = set()
     ambiguous_indices = set()
@@ -843,7 +887,8 @@ def audit_chroma_database_redundancy(
 
         for src, chunk_list in tqdm(docs_by_source.items(), desc="Auditoría de Colección", unit="doc"):
             sample_texts = [c["text"] for c in chunk_list]
-            sample_embeddings = embeddings.embed_documents(sample_texts)
+            sample_texts_for_embedding = [f"passage: {t}" for t in sample_texts]
+            sample_embeddings = embeddings.embed_documents(sample_texts_for_embedding)
             res = col.query(
                 query_embeddings=sample_embeddings,
                 n_results=min(5, count),
@@ -974,10 +1019,18 @@ def ingest_multimodal(
         if chroma_dir.exists():
             logger.info(f"Limpiando base vectorial completa previa en '{chroma_dir}'...")
             try:
+                backup_dir = chroma_dir.with_name(f"{chroma_dir.name}_backup")
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+                shutil.copytree(chroma_dir, backup_dir)
+                logger.info(f"🛡️ Copia de seguridad creada en '{backup_dir}'.")
+                
                 shutil.rmtree(chroma_dir)
-                logger.info("Directorio ChromaDB previo eliminado con éxito.")
+                logger.info("🗑️ Directorio ChromaDB activo eliminado con éxito para reindexación limpia.")
             except Exception as exc:
-                logger.warning(f"No se pudo eliminar directorio completo ({exc}), se procederá a sobrescribir.")
+                logger.error(f"❌ ERROR CRÍTICO: No se pudo respaldar el directorio ChromaDB activo ({exc}).")
+                logger.error("🛑 La reindexación se ha detenido por seguridad para proteger tu base actual.")
+                sys.exit(1)
             chroma_dir.mkdir(parents=True, exist_ok=True)
 
         if VISION_CACHE_FILE.exists():
@@ -1101,6 +1154,10 @@ def ingest_multimodal(
                     stats["files_failed"] += 1
                     continue
 
+                # 5.5 Limpiar el Boilerplate ANTES de fragmentar
+                for doc in docs:
+                    doc.page_content = strip_chunk_boilerplate(doc.page_content)
+
                 # 6. Fragmentar el documento
                 doc_chunks = text_splitter.split_documents(docs)
                 if not doc_chunks:
@@ -1153,7 +1210,10 @@ def ingest_multimodal(
                 metadatas = [c.metadata for c in doc_chunks]
                 ids = generate_deterministic_chunk_ids(doc_chunks)
 
-                embeddings_list = embeddings.embed_documents(texts)
+                # Agregar prefijo requerido por E5 para documentos, SOLO para el cálculo del embedding
+                texts_for_embedding = [f"passage: {t}" for t in texts]
+                embeddings_list = embeddings.embed_documents(texts_for_embedding)
+
                 vector_store._collection.upsert(
                     ids=ids,
                     documents=texts,
@@ -1170,10 +1230,10 @@ def ingest_multimodal(
                 stats["files_failed"] += 1
 
     except KeyboardInterrupt:
-        logger.warning("\n⏸️ INGESTA PAUSADA POR EL USUARIO (Ctrl+C).")
+        logger.warning("\n⏸️ INGESTA CANCELADA O PAUSADA POR EL USUARIO (Ctrl+C).")
         logger.info(f"✅ Los {stats['files_processed']} documento(s) procesados hasta este momento están guardados en ChromaDB.")
-        logger.info("ℹ️ Para continuar en cualquier momento, simplemente vuelve a ejecutar el comando.")
-        return True
+        logger.info(f"⚠️ Atención: Quedaron documentos pendientes. El proceso reportará estado incompleto.")
+        return False
 
     if check_redundancy:
         logger.info("✅ Auditoría de redundancia completada (Dry-Run). No se modificó la base de datos ChromaDB.")
@@ -1189,7 +1249,13 @@ def ingest_multimodal(
         pass
 
     logger.info("=" * 70)
-    logger.info(" [ÉXITO] INGESTA COMPLETADA")
+    if stats["files_failed"] > 0:
+        logger.warning(" [INCOMPLETA] INGESTA FINALIZADA CON ERRORES")
+        if wipe_db:
+            logger.warning(f" ⚠️ Se borró el índice inicial pero la reconstrucción falló parcialmente.")
+            logger.warning(f" 🛡️ Puedes restaurar la versión anterior copiando '{chroma_dir.name}_backup' a '{chroma_dir.name}'")
+    else:
+        logger.info(" [ÉXITO] INGESTA COMPLETADA")
     logger.info("=" * 70)
     logger.info(f" • Archivos procesados en sesión: {stats['files_processed']} ({stats['files_failed']} con error)")
     logger.info(f" • Páginas PDF extraídas:         {stats['pages_extracted']}")
@@ -1206,8 +1272,8 @@ def ingest_multimodal(
     else:
         logger.info(f" • Vision-LLM:                    NO DISPONIBLE (solo texto plano)")
     logger.info("=" * 70)
-
-    return True
+    
+    return stats["files_failed"] == 0
 
 
 if __name__ == "__main__":

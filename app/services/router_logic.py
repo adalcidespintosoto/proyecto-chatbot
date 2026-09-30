@@ -924,6 +924,12 @@ class RouterLogic:
             if detected_role:
                 session.user_role = detected_role
                 logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
+        else:
+            # Reevaluar el rol dinámicamente si el usuario cambia de contexto o se identifica de otra forma
+            dynamic_role = cls.detect_user_role(texto)
+            if dynamic_role and dynamic_role != session.user_role:
+                session.user_role = dynamic_role
+                logger.info(f"[Session: {session_id}] Rol actualizado dinámicamente por contexto a: '{session.user_role}'")
 
         logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Rol: {session.user_role} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje ({len(texto)} chars): '{texto}'")
 
