@@ -1107,25 +1107,17 @@ def save_and_index_procedure(
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
 
+    # Nota: El auto-indexado ha sido desactivado porque el script principal (ingest_multimodal_docs.py)
+    # se focaliza en PDF y PPTX y usa lógica estricta de jerarquización institucional.
+    # El archivo generado debe ser validado por un administrador antes de su conversión o ingesta manual.
     reindexed = False
-    try:
-        from scripts.ingest_multimodal_docs import ingest_multimodal, apply_taxonomy_to_chroma
-        success = ingest_multimodal(file_path=str(file_path), incremental=True)
-        try:
-            apply_taxonomy_to_chroma()
-        except Exception:
-            pass
-        reindexed = bool(success)
-    except Exception as e:
-        logger.warning("Error al auto re-indexar archivo %s en ChromaDB: %s", file_path, e)
-
     return {
         "status": "success",
         "file_name": file_name,
         "folder": folder_name,
         "file_path": str(file_path),
         "reindexed": reindexed,
-        "message": f"Procedimiento guardado en '{folder_name}/{file_name}' e indexado exitosamente en RAG."
+        "message": f"Procedimiento guardado en '{folder_name}/{file_name}'. Pendiente de revisión e indexación manual."
     }
 
 

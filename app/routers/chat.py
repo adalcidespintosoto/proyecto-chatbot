@@ -152,7 +152,7 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
             detail="El mensaje ingresado no contiene texto válido tras la sanitización."
         )
 
-    logger.info(f"Procesando mensaje para session_id '{session_id}' (longitud: {len(texto)} chars): '{texto}'")
+    logger.info(f"Procesando mensaje para session_id '{session_id}' (longitud: {len(texto)} chars)")
 
     # Medir tiempo de procesamiento (latencia)
     t0 = time.time()

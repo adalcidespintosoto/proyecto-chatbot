@@ -394,8 +394,10 @@ async def async_generate_multi_query_variants(
         "Reglas:\n"
         "- Responde ÚNICAMENTE 3 líneas numeradas (1, 2, 3).\n"
         "- Usa terminología formal universitaria (ej. SIAAF, Portal Estudiantes, Horario Académico, Asignaturas, Notas, Matrícula, Microsoft Teams, Restablecimiento de Contraseña, Elecciones Institucionales).\n"
+        "- La Variante 1 y 2 deben ser oraciones formales cortas.\n"
+        "- La Variante 3 DEBE ser una cadena de palabras clave densas, sin artículos, preposiciones ni verbos conectores (ej. 'restablecimiento contraseña portal estudiantes clave temporal').\n"
         "- Si la consulta menciona elecciones o votaciones, NUNCA la reemplaces por certificados ni portal estudiantes; dirígela a https://elecciones.unisimon.edu.co/.\n"
-        "- Si la consulta menciona una plataforma o aplicativo específico (ej. UpToDate, Kactus, Seven, SIAAF, Teams), mantén siempre el nombre de esa plataforma en las 3 variantes.\n"
+        "- Si la consulta menciona una plataforma o aplicativo específico, mantén siempre el nombre de esa plataforma en las 3 variantes.\n"
         "- Sin explicaciones, saludos ni comentarios."
     )
 
@@ -1332,8 +1334,22 @@ class RAGService:
         - Consultas académicas/docentes: excluye categoría 'financiero' (evita colisiones con Notas Crédito o Pagos).
         - Consultas financieras: restringe a 'financiero', 'portales', 'academico', 'general'.
         - Consultas de hardware/redes: excluye manuales financieros y académicos irrelevantes.
+        Además, incorpora el rol del usuario para filtrar por 'audience'.
         """
         q_low = question.lower()
+        
+        # 0. Filtro por Rol (Audience)
+        role_filter = None
+        if user_role:
+            mapped_role = user_role.lower().strip()
+            if "docente" in mapped_role or "profesor" in mapped_role: mapped_role = "profesor"
+            elif "estudiante" in mapped_role or "alumno" in mapped_role: mapped_role = "estudiante"
+            elif "admin" in mapped_role or "funcionario" in mapped_role: mapped_role = "administrativo"
+            
+            if mapped_role in ["estudiante", "profesor", "administrativo"]:
+                role_filter = {"audience": {"$in": [mapped_role, "general"]}}
+
+        category_filter = None
 
         # 1. Detección de ámbito académico / docente (notas, calificaciones, parciales, inasistencias, programas)
         is_academic = any(w in q_low for w in [
@@ -1345,31 +1361,38 @@ class RAGService:
 
         if is_academic:
             logger.info("[ChromaFilter] Consulta académica/docente detectada: Excluyendo categoría 'financiero' a nivel de base de datos.")
-            return {"category": {"$ne": "financiero"}}
+            category_filter = {"category": {"$ne": "financiero"}}
+        else:
+            # 2. Detección de ámbito estrictamente financiero / pagos / facturas
+            is_financial = any(w in q_low for w in [
+                "pago", "pagos", "pagar", "factura", "facturas", "volante", "recibo",
+                "liquidaci", "arancel", "tarifa", "cartera", "tesorer", "paymentez", "link de pago"
+            ])
+            if is_financial:
+                logger.info("[ChromaFilter] Consulta financiera detectada: Restringiendo a categorías pertinentes.")
+                category_filter = {"category": {"$in": ["financiero", "portales", "academico", "general"]}}
+            else:
+                # 3. Detección de ámbito de hardware y conectividad
+                is_hardware = any(w in q_low for w in [
+                    "wifi", "internet", "red", "cable", "hdmi", "vga", "teclado", "mouse", "pantalla",
+                    "monitor", "proyector", "videobeam", "computador", "portatil", "portátil"
+                ]) and not any(app in q_low for app in ["teams", "moodle", "kactus", "seven", "correo"])
+                if is_hardware:
+                    logger.info("[ChromaFilter] Consulta de hardware/redes: Excluyendo financiero y académico.")
+                    category_filter = {"category": {"$nin": ["financiero", "academico"]}}
 
-        # 2. Detección de ámbito estrictamente financiero / pagos / facturas
-        is_financial = any(w in q_low for w in [
-            "pago", "pagos", "pagar", "factura", "facturas", "volante", "recibo",
-            "liquidaci", "arancel", "tarifa", "cartera", "tesorer", "paymentez", "link de pago"
-        ])
-        if is_financial:
-            logger.info("[ChromaFilter] Consulta financiera detectada: Restringiendo a categorías pertinentes.")
-            return {"category": {"$in": ["financiero", "portales", "academico", "general"]}}
-
-        # 3. Detección de ámbito de hardware y conectividad
-        is_hardware = any(w in q_low for w in [
-            "wifi", "internet", "red", "cable", "hdmi", "vga", "teclado", "mouse", "pantalla",
-            "monitor", "proyector", "videobeam", "computador", "portatil", "portátil"
-        ]) and not any(app in q_low for app in ["teams", "moodle", "kactus", "seven", "correo"])
-        if is_hardware:
-            logger.info("[ChromaFilter] Consulta de hardware/redes: Excluyendo financiero y académico.")
-            return {"category": {"$nin": ["financiero", "academico"]}}
-
+        if role_filter and category_filter:
+            return {"$and": [role_filter, category_filter]}
+        elif role_filter:
+            return role_filter
+        elif category_filter:
+            return category_filter
+            
         return None
 
     # Alias para compatibilidad con código existente
     def _build_role_filter(self, user_role: Optional[str]) -> Optional[Dict[str, Any]]:
-        return None
+        return self._build_query_filter(question="", user_role=user_role)
 
     async def query_rag(
         self,
@@ -1383,7 +1406,7 @@ class RAGService:
         Ejecuta el pipeline RAG completo:
         1. Expansión LLM de consulta (jerga -> terminología institucional).
         2. Normalización léxica estática (complementaria).
-        3. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=8, umbral >= 0.48) y filtro por rol.
+        3. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=8, umbral >= 0.38) y filtro por rol.
         4. Cross-Encoder Reranker: reordena Top-8 -> Top-3.
         5. Corte estricto / Fallback temático: Si ningún fragmento supera el umbral, evalúa fallback.
         6. Ensamblaje del System Prompt institucional + Golden Cache context + historial.
@@ -1450,21 +1473,20 @@ class RAGService:
                     if filter_condition:
                         docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
                             formatted_query,
-                            k=6,
+                            k=8,
                             filter=filter_condition
                         )
                     else:
                         docs_with_scores = self.vector_store.similarity_search_with_relevance_scores(
                             formatted_query,
-                            k=6
+                            k=8
                         )
 
                     for doc, score in docs_with_scores:
                         if score is not None and score >= self.min_relevance_score:
-                            source_path = doc.metadata.get("source", "")
-                            page_num = doc.metadata.get("page", doc.metadata.get("page_number", ""))
-                            # Clave única determinista por fragmento para deduplicación
-                            chunk_key = f"{source_path}_{page_num}_{doc.page_content.strip()[:100]}"
+                            # Clave única por CONTENIDO limpio para eliminar boilerplate cruzado
+                            c_clean = strip_chunk_boilerplate(doc.page_content)
+                            chunk_key = c_clean
 
                             if chunk_key not in candidate_docs_map or score > candidate_docs_map[chunk_key][1]:
                                 candidate_docs_map[chunk_key] = (doc, score)
@@ -1601,7 +1623,7 @@ class RAGService:
             elif is_peripheral_or_hardware_request(question):
                 rerank_query = normalize_and_expand_query(question)
             elif query_variants:
-                rerank_query = query_variants[0]
+                rerank_query = f"{question} {query_variants[0]}"
             else:
                 rerank_query = normalize_and_expand_query(question)
 
@@ -1703,97 +1725,42 @@ class RAGService:
                                     context_parts.append(f"[{sec_filename}]\n{cleaned_sec}")
                                     break
                     else:
-                        # Modo Chunks (Ahorro de tokens): Fragmentos más relevantes ordenados lógicamente
+                        # Modo Chunks (Ahorro de tokens): Fragmentos más relevantes de las mejores fuentes
                         max_chunks = getattr(self.settings, "rag_max_chunks", 6)
-                        primary_chunks = []
                         seen_contents = set()
+                        selected_chunks = []
+                        
+                        # 1. Tomar los fragmentos top del reranker sin discriminar fuente hasta recolectar max_chunks únicos
+                        for doc, score in reranked:
+                            if len(selected_chunks) >= max_chunks:
+                                break
+                            c_strip = doc.page_content.strip()
+                            # Omitir fuentes irrelevantes o penalizadas
+                            doc_src_lower = (doc.metadata.get("source") or "").lower()
+                            if any(bad in doc_src_lower for bad in ["notas crédito", "notas credito", "nota crédito"]):
+                                continue
+                            if c_strip not in seen_contents and "[Imagen: Lo siento" not in c_strip:
+                                seen_contents.add(c_strip)
+                                selected_chunks.append(doc)
+                                
+                        # Se ha eliminado el ContextStitching para garantizar 100% de precisión 
+                        # con los fragmentos validados por el Reranker sin rellenar basura.
 
-                        # 1. Priorizar fragmentos de la fuente principal que superaron el umbral de relevancia semántica
-                        for doc, _ in valid_docs_with_scores:
-                            if doc.metadata.get("source") == primary_source:
-                                c_strip = doc.page_content.strip()
-                                if c_strip not in seen_contents and "[Imagen: Lo siento" not in c_strip:
-                                    seen_contents.add(c_strip)
-                                    primary_chunks.append(doc)
-
-                        # 2. Si hay menos de 4 fragmentos relevantes, expandir con páginas adyacentes de ChromaDB
-                        if len(primary_chunks) < 4 and self.vector_store is not None:
-                            try:
-                                col = self.vector_store._collection
-                                db_chunks = col.get(where={"source": primary_source})
-                                if db_chunks and db_chunks.get("documents"):
-                                    from langchain_core.documents import Document
-                                    # Encontrar las páginas de los fragmentos relevantes
-                                    target_pages = {
-                                        int(d.metadata.get("page_number", d.metadata.get("page", 0)))
-                                        for d in primary_chunks if str(d.metadata.get("page_number", d.metadata.get("page", ""))).isdigit()
-                                    }
-                                    for doc_txt, doc_meta in zip(db_chunks["documents"], db_chunks["metadatas"]):
-                                        if "[Imagen: Lo siento" in doc_txt and len(doc_txt.strip()) < 120:
-                                            continue
-                                        p_num = doc_meta.get("page_number", doc_meta.get("page", None))
-                                        # Preferir páginas contiguas cercanas a las relevantes
-                                        if target_pages and p_num is not None:
-                                            try:
-                                                p_int = int(p_num)
-                                                if not any(abs(p_int - tp) <= 2 for tp in target_pages):
-                                                    continue
-                                            except (ValueError, TypeError):
-                                                pass
-                                        if doc_txt.strip() not in seen_contents:
-                                            seen_contents.add(doc_txt.strip())
-                                            primary_chunks.append(Document(page_content=doc_txt, metadata=doc_meta or {}))
-                                            if len(primary_chunks) >= max_chunks:
-                                                break
-                                logger.info(f"[ContextStitching] {len(primary_chunks)} fragmentos seleccionados de '{primary_source}'.")
-                            except Exception as stitch_err:
-                                logger.debug(f"[ContextStitching] Error expandiendo ventana contigua: {stitch_err}")
-
-                        # Función de ordenamiento por página real para mantener la secuencia del instructivo
-                        def get_doc_page_order(chunk_doc):
-                            meta = chunk_doc.metadata or {}
-                            p = meta.get("page_number", meta.get("page", meta.get("slide_number", 999)))
-                            try:
-                                return int(p)
-                            except (ValueError, TypeError):
-                                return 999
-
-                        primary_chunks_sorted = sorted(primary_chunks, key=get_doc_page_order)
-                        max_primary = min(max_chunks, 5)
-
-                        for doc in primary_chunks_sorted[:max_primary]:
+                        # 3. Inyectar manteniendo estrictamente el orden de RELEVANCIA del Reranker
+                        for doc in selected_chunks:
                             retrieved_docs.append(doc)
                             source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                             source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                            page_num = doc.metadata.get("page", None)
-                            page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                            page_num = doc.metadata.get("page", doc.metadata.get("page_number", doc.metadata.get("slide_number", None)))
+                            page_info = f" (Pág. {int(page_num) + 1})" if page_num is not None else ""
                             if source_filename not in sources:
                                 sources.append(source_filename)
                             cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
                             context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
 
-                        for doc, _ in reranked[1:]:
-                            if len(context_parts) >= max_chunks:
-                                break
-                            doc_src_lower = (doc.metadata.get("source") or "").lower()
-                            # Omitir fuentes irrelevantes o penalizadas (ej: notas crédito financieras en consultas de profesores)
-                            if any(bad in doc_src_lower for bad in ["notas crédito", "notas credito", "nota crédito"]):
-                                continue
-                            if doc.metadata.get("source") != primary_source:
-                                if not any(doc.page_content.strip() == pc.page_content.strip() for pc in primary_chunks):
-                                    retrieved_docs.append(doc)
-                                    source_path = doc.metadata.get("source", "Procedimiento Unisimon")
-                                    source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                                    page_num = doc.metadata.get("page", None)
-                                    page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
-                                    if source_filename not in sources:
-                                        sources.append(source_filename)
-                                    cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
-                                    context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
-
                         logger.info(
                             f"[RAG] Modo Chunks (Ahorro de tokens activo): Inyectando {len(context_parts)} fragmentos "
-                            f"relevantes de '{source_filename}' (Total chars: {sum(len(p) for p in context_parts)})."
+                            f"relevantes de {len(sources)} fuente(s) (Total chars: {sum(len(p) for p in context_parts)})."
                         )
             else:
                 logger.info("[RAG] El reordenador descartó todos los fragmentos recuperados por falta de relevancia semántica.")
@@ -1883,25 +1850,23 @@ class RAGService:
                     "quick_replies": QUICK_REPLIES_DIAGNOSTICO
                 }
 
-            # Si contiene palabras clave temáticas conocidas, entregar respuesta guiada temática
-            q_lower = question.lower()
-            if any(k in q_lower for k in [
-                "portal", "correo", "teams", "carnet", "kactus", "seven", "backup",
-                "malware", "virus", "computador", "portatil", "pantalla", "clave", "contraseña",
-                "internet", "red", "wifi", "conexion", "conexión", "conectividad",
-                "licencia", "software", "programa", "aplicativo"
-            ]):
-                logger.info("Activando fallback temático institucional por coincidencia de categoría.")
-                return self._generate_fallback_response(question, user_name, sources)
-
-            logger.info(f"Cero fragmentos con score >= {self.min_relevance_score}. Retornando mensaje institucional estricto sin invocar LLM.")
+            logger.info(f"Cero fragmentos con score >= {self.min_relevance_score}. Activando abstención estricta para evitar alucinaciones.")
+            msg = (
+                "El contexto disponible no especifica la información necesaria para resolver tu consulta o no se encontró documentación "
+                "institucional en la base de datos al respecto.\n\n"
+                "Para obtener la respuesta oficial o radicar este inconveniente, por favor contacta a Soporte Técnico TI:\n"
+                "- **Barranquilla:** `solicitudcomputo@unisimon.edu.co` | (605) 3444333, ext. 8003/8004 | WhatsApp 3172683922\n"
+                "- **Cúcuta:** `helpdesk@unisimon.edu.co` | (607) 5827070, ext. 129\n\n"
+                "¿Deseas que genere un reporte automático con tu consulta?"
+            )
             return {
-                "response": MENSAJE_NO_DOCUMENTADO,
+                "response": msg,
                 "sources": [],
-                "source": "unimon_no_doc_fallback",
+                "source": "unimon_no_context_fallback",
                 "model": None,
                 "retrieved_chunks": 0,
-                "has_context": False
+                "has_context": False,
+                "quick_replies": QUICK_REPLIES_DIAGNOSTICO
             }
 
         context_text = "\n\n---\n\n".join(context_parts)
@@ -1977,46 +1942,10 @@ class RAGService:
             ]
             has_insufficient_doc = any(re.search(pat, bot_message, flags=re.IGNORECASE) for pat in insufficient_patterns)
 
-            if has_insufficient_doc and sources:
-                primary_source_name = sources[0]
-                full_doc_content = get_full_document_text(primary_source_name)
-                if full_doc_content and len(full_doc_content) > len(context_text):
-                    logger.info(
-                        f"[FullDocRetry] La respuesta con fragmentos indicó información incompleta ('{bot_message[:70]}...'). "
-                        f"Reintentando con documento institucional completo: '{primary_source_name}' ({len(full_doc_content)} chars)..."
-                    )
-                    retry_context = f"[DOCUMENTO INSTITUCIONAL COMPLETO: {primary_source_name}]\n{full_doc_content}"
-                    retry_sys_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=retry_context, query=question)
-                    retry_msgs = [{"role": "system", "content": retry_sys_prompt}]
-                    if chat_history:
-                        retry_msgs.extend(chat_history[-4:])
-                    retry_msgs.append({"role": "user", "content": user_prompt})
+            # Se ha eliminado el mecanismo FullDocRetry por ser destructivo para el contexto multi-documento del RAG.
 
-                    try:
-                        retry_res = await self.llm_client.chat_completion(
-                            messages=retry_msgs,
-                            max_tokens=950,
-                            temperature=0.0
-                        )
-                        retry_bot_msg = clean_llm_response(retry_res.get("content", "").strip())
-                        retry_has_insufficient = any(re.search(pat, retry_bot_msg, flags=re.IGNORECASE) for pat in insufficient_patterns)
-
-                        if retry_bot_msg and len(retry_bot_msg) > 25 and not retry_has_insufficient:
-                            logger.info("[FullDocRetry] ¡El reintento con documento completo resolvió satisfactoriamente la consulta!")
-                            bot_message = retry_bot_msg
-                            prompt_tokens += retry_res.get("prompt_tokens", 0)
-                            eval_tokens += retry_res.get("eval_tokens", 0)
-                        else:
-                            logger.info("[FullDocRetry] El documento completo tampoco contiene el paso requerido. Se confirma limitación documental genuina.")
-                    except Exception as retry_err:
-                        logger.warning(f"[FullDocRetry] Error en reintento con documento completo: {retry_err}")
-
-            # Se relajan las reglas de evasión y placeholder para permitir que el modelo interactúe de forma natural
-            # cuando pide aclaraciones al usuario en vez de aplastar el diálogo con un mensaje de fallback duro.
-            is_evasion = bool(re.search(r"(?i)\b(?:no\s+tengo\s+acceso\s+a\s+esa\s+informaci[oó]n|soy\s+solo\s+un\s+modelo\s+de\s+lenguaje|si\s+necesitas\s+ayuda|en\s+qu[eé]\s+m[aá]s\s+puedo|no\s+puedo\s+ayudar|no\s+hay\s+informaci[oó]n|el\s+contexto\s+no|no\s+proporciona)\b", bot_message))
-            if not bot_message or len(bot_message.strip()) < 15 or is_evasion:
-                logger.info("Respuesta de LLM vacía o evasión del modelo genérico detectada. Invocando fallback institucional.")
-                return self._generate_fallback_response(question, user_name, sources)
+            if not bot_message:
+                bot_message = "Lo siento, ha ocurrido un error al procesar tu solicitud con el motor de IA. Por favor, contacta a Soporte TI."
 
             # Insertar canales de atención siempre y pie de confirmación (si no están ya presentes)
             contact_channels = (

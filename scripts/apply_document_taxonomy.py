@@ -19,7 +19,9 @@ import chromadb
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
-CHROMA_PATH = "./chroma_db"
+from app.config import get_settings
+settings = get_settings()
+CHROMA_PATH = str(settings.chroma_db_dir)
 
 # ─────────────────────────────────────────────────────────────────────
 # PATRONES DE CLASIFICACIÓN POR NOMBRE DE ARCHIVO / FUENTE

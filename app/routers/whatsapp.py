@@ -50,6 +50,10 @@ async def verify_webhook(
     )
 
 
+import hmac
+import hashlib
+from fastapi import Header, HTTPException
+
 @router.post(
     "",
     status_code=status.HTTP_200_OK,
@@ -59,13 +63,30 @@ async def verify_webhook(
 async def receive_webhook(
     payload: Dict[str, Any],
     background_tasks: BackgroundTasks,
-    request: Request
+    request: Request,
+    x_hub_signature_256: Optional[str] = Header(None)
 ):
     """
     Recibe los mensajes de WhatsApp en tiempo real.
     Responde HTTP 200 inmediatamente a Meta en <100ms y delega el procesamiento RAG
     en una tarea de fondo (BackgroundTasks) para evitar reintentos por latencia de red.
     """
+    settings = get_settings()
+
+    # Validación de Firma de Meta (Seguridad)
+    if settings.whatsapp_app_secret and x_hub_signature_256:
+        raw_body = await request.body()
+        expected_signature = hmac.new(
+            settings.whatsapp_app_secret.encode('utf-8'),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+        
+        # El header viene en formato sha256=hash
+        if not hmac.compare_digest(f"sha256={expected_signature}", x_hub_signature_256):
+            logger.warning("Firma de Meta inválida. Se rechaza el payload por posible spoofing.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
+
     # Despachar procesamiento en segundo plano para respuesta ultra rápida a Meta
     background_tasks.add_task(whatsapp_service.process_incoming_webhook_payload, payload)
 
