@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     chroma_db_dir: str = "./chroma_db"
     docs_dir: str = "./data/docs"
     embedding_model: str = "intfloat/multilingual-e5-large"
-    rag_inject_full_doc: bool = False  # False = Modo Chunks (Ahorro de tokens); True = Documento Completo
+    rag_inject_full_doc: bool = False  # Inyectar fragmentos; evita que un top-1 erróneo arrastre un documento completo
     rag_max_chunks: int = 6
 
     # Límites de Seguridad

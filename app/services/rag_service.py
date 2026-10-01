@@ -2,12 +2,15 @@
 Servicio RAG Local con ChromaDB, Embeddings Multilingües, Normalizador Léxico, Multi-Query Generator y Ollama (unimon:8b).
 Provee respuestas estrictas de soporte técnico y gestión de TI para la Universidad Simón Bolívar
 (Sedes Barranquilla y Cúcuta, Colombia) basadas en documentos y procedimientos institucionales indexados.
-Aplica normalización léxica, expansión multi-consulta LLM de consultas, Cross-Encoder Reranker y corte calibrado a 0.38.
+Aplica normalización léxica, expansión multi-consulta, filtros de dominio y Cross-Encoder Reranker.
 """
 
 import os
 import logging
 import re
+import math
+import unicodedata
+from collections import Counter
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import httpx
@@ -18,6 +21,7 @@ os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from langchain_core.documents import Document
 from sentence_transformers import CrossEncoder
 
 from app.config import get_settings
@@ -26,13 +30,167 @@ from app.services.llm_client import get_llm_client
 
 logger = logging.getLogger("unimon.rag_service")
 
-# Umbral mínimo de similitud para considerar relevante un fragmento recuperado (calibrado a 0.38 para tolerancia a jerga/sinónimos)
+# Umbral de candidatos de Chroma; el resultado final también se valida por intención y fuente.
 MIN_RELEVANCE_SCORE_THRESHOLD = 0.38
+
+_LEXICAL_STOPWORDS = frozenset((
+    "para", "como", "cómo", "donde", "dónde", "cuando", "cuándo", "quien", "quién",
+    "que", "qué", "cual", "cuál", "con", "sin", "por", "del", "las", "los", "una",
+    "uno", "unos", "unas", "esta", "este", "esto", "ese", "esa", "eso", "hay", "tengo",
+    "tiene", "puedo", "puede", "debo", "deberia", "debería", "quiero", "necesito",
+    "me", "mi", "mis", "el", "la", "un", "y", "o", "a", "en", "es", "al", "se",
+    "del", "lo", "le", "les", "su", "sus", "no", "si", "sí", "ya", "fue", "ser",
+    "sobre", "desde", "hasta", "muy", "mas", "más", "menos", "usuario", "ayuda",
+))
+
+_LEXICAL_CORPUS_CACHE: dict[tuple[int, int], list[tuple[Document, list[str], int]]] = {}
+
+
+def _lexical_terms(text: str) -> list[str]:
+    """Extrae términos informativos para rescate léxico transversal a los temas."""
+    folded = "".join(ch for ch in unicodedata.normalize("NFD", (text or "").lower()) if unicodedata.category(ch) != "Mn")
+    return [
+        token for token in re.findall(r"[a-z0-9]{3,}", folded)
+        if token not in _LEXICAL_STOPWORDS and not token.isdigit()
+    ]
+
+
+def _metadata_matches_filter(metadata: dict, condition: Optional[dict]) -> bool:
+    if not condition:
+        return True
+    for key, expected in condition.items():
+        if key == "$and" and not all(_metadata_matches_filter(metadata, item) for item in expected):
+            return False
+        if key == "$or" and not any(_metadata_matches_filter(metadata, item) for item in expected):
+            return False
+        if key.startswith("$"):
+            continue
+        actual = metadata.get(key)
+        if isinstance(expected, dict):
+            if "$ne" in expected and actual == expected["$ne"]:
+                return False
+            if "$eq" in expected and actual != expected["$eq"]:
+                return False
+            if "$in" in expected and actual not in expected["$in"]:
+                return False
+            if "$nin" in expected and actual in expected["$nin"]:
+                return False
+        elif actual != expected:
+            return False
+    return True
+
+
+def _generic_lexical_candidates(collection: Any, queries: list[str], query_filter: Optional[dict]) -> list[tuple[Document, float]]:
+    """Recupera candidatos por términos exactos cuando la búsqueda vectorial omite evidencia.
+
+    La búsqueda léxica solo amplía el conjunto de candidatos; el reranker y los guardas
+    de dominio/plataforma siguen decidiendo qué fragmentos pasan al contexto.
+    """
+    try:
+        count = collection.count()
+        cache_key = (id(collection), count)
+        corpus = _LEXICAL_CORPUS_CACHE.get(cache_key)
+        if corpus is None:
+            raw = collection.get(include=["documents", "metadatas"])
+            corpus = []
+            for content, metadata in zip(raw.get("documents") or [], raw.get("metadatas") or []):
+                if content:
+                    doc = Document(page_content=content, metadata=metadata or {})
+                    tokens = _lexical_terms(strip_chunk_boilerplate(content))
+                    corpus.append((doc, tokens, len(tokens)))
+            _LEXICAL_CORPUS_CACHE.clear()
+            _LEXICAL_CORPUS_CACHE[cache_key] = corpus
+    except Exception as exc:
+        logger.warning("[LexicalFallback] No se pudo preparar índice léxico local: %s", exc)
+        return []
+    corpus = [item for item in corpus if _metadata_matches_filter(item[0].metadata, query_filter)]
+    if not corpus:
+        return []
+
+    doc_freq = Counter(token for _, tokens, _ in corpus for token in set(tokens))
+    avg_len = sum(length for _, _, length in corpus) / len(corpus) or 1
+    best_scores: dict[str, tuple[Document, float, int]] = {}
+    for query in queries:
+        q_terms = _lexical_terms(query)
+        if not q_terms:
+            continue
+        q_counts = Counter(q_terms)
+        for doc, tokens, length in corpus:
+            frequencies = Counter(tokens)
+            score = 0.0
+            matched = 0
+            for term, qtf in q_counts.items():
+                tf = frequencies.get(term, 0)
+                if not tf:
+                    continue
+                matched += 1
+                idf = math.log(1 + (len(corpus) - doc_freq[term] + 0.5) / (doc_freq[term] + 0.5))
+                score += idf * (tf * 2.2) / (tf + 1.2 * (0.25 + 0.75 * length / avg_len)) * min(qtf, 2)
+            if matched < 2 and not any(len(t) >= 10 and frequencies[t] for t in q_counts):
+                continue
+            if score <= 0:
+                continue
+            key = f"{doc.metadata.get('source', '')}\0{strip_chunk_boilerplate(doc.page_content)}"
+            previous = best_scores.get(key)
+            if previous is None or score > previous[1]:
+                best_scores[key] = (doc, score, matched)
+    ranked = sorted(best_scores.values(), key=lambda item: item[1], reverse=True)[:20]
+    # BM25 is used only for candidate ordering; map to a bounded score accepted by
+    # the existing reranker pipeline, without treating lexical score as confidence.
+    return [(doc, 0.50 + 0.40 * score / (score + 3.0)) for doc, score, _ in ranked]
+
+
+def is_suspicious_email_query(question: str) -> bool:
+    """Detecta reportes de phishing/correos sospechosos para no confundirlos con acceso a cuentas."""
+    q = strip_query_header_noise(question or "").lower()
+    mentions_email = any(term in q for term in ("correo", "email", "e-mail", "mensaje"))
+    mentions_link = any(term in q for term in ("enlace", "link", "url"))
+    mentions_threat = any(term in q for term in (
+        "quitan la cuenta", "quitan mi cuenta", "suspender la cuenta", "bloquear la cuenta",
+        "cancelar la cuenta", "desactivar la cuenta", "perder la cuenta", "roban la cuenta",
+    ))
+    suspicious_signal = any(term in q for term in (
+        "phishing", "sospechoso", "sospechosa", "rarísimo", "rarisimo", "raro",
+        "extraño", "extrano", "fraudulento", "falso", "falsa", "suplantación", "suplantacion",
+    ))
+    urgent_link = mentions_link and mentions_threat and any(term in q for term in ("urgente", "amenaza", "sospechoso", "rarísimo", "rarisimo", "raro"))
+    return mentions_email and ("phishing" in q or "suplantación" in q or "suplantacion" in q or urgent_link or suspicious_signal)
+
+
+def is_account_identifier_query(question: str) -> bool:
+    """Detecta consultas para identificar/activar la cuenta institucional, no fallas de red."""
+    q = strip_query_header_noise(question or "").lower()
+    if is_suspicious_email_query(q):
+        return False
+    asks_for_identity = any(term in q for term in (
+        "usuario", "correo", "email", "e-mail", "credencial", "cuenta institucional",
+        "correo institucional", "red institucional",
+    ))
+    asks_for_account_access = any(term in q for term in (
+        "entrar", "ingresar", "acceder", "iniciar sesión", "iniciar sesion",
+        "activar", "consultar", "consulto", "conocer", "saber", "averiguar",
+        "cual es mi usuario", "cuál es mi usuario", "que usuario uso", "qué usuario uso",
+        "soy nuevo", "estudiante nuevo", "primer semestre", "nuevo ingreso",
+    ))
+    asks_for_network_fault = any(term in q for term in (
+        "sin internet", "no tengo internet", "se cayó la red", "se cayo la red",
+        "no conecta", "no hay conexión", "no hay conexion",
+    ))
+    return asks_for_identity and asks_for_account_access and not asks_for_network_fault
+
+
+def _is_onboarding_query(question: str) -> bool:
+    q = strip_query_header_noise(question or "").lower()
+    is_new = any(term in q for term in (
+        "soy nuevo", "estudiante nuevo", "nuevo ingreso", "primer semestre",
+        "recién ingresado", "recien ingresado", "primíparo", "primiparo",
+    ))
+    return is_new and is_account_identifier_query(question)
 
 
 def format_e5_query(query: str) -> str:
     """
-    Asegura que toda consulta enviada al modelo de embeddings 'intfloat/multilingual-e5-base'
+    Asegura que toda consulta enviada al modelo de embeddings 'intfloat/multilingual-e5-large'
     y a ChromaDB incluya el prefijo formal 'query: ' para maximizar compatibilidad y precisión.
     """
     if not query:
@@ -97,17 +255,21 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
     """
     if not retrieved_docs:
         return []
-    if len(retrieved_docs) <= 1:
+    is_guarded_intent = (
+        is_account_identifier_query(original_query or query)
+        or is_suspicious_email_query(original_query or query)
+    )
+    if len(retrieved_docs) <= 1 and not is_guarded_intent:
         return retrieved_docs[:top_k]
 
     reranker = get_reranker()
-    if not reranker:
+    if not reranker and not is_guarded_intent:
         return retrieved_docs[:top_k]
 
     try:
         clean_q = strip_query_header_noise(query)
-        pairs = [[clean_q, doc.page_content.strip()] for doc, _ in retrieved_docs]
-        scores = reranker.predict(pairs)
+        pairs = [[clean_q, strip_chunk_boilerplate(doc.page_content)] for doc, _ in retrieved_docs]
+        scores = reranker.predict(pairs) if reranker else [0.0] * len(retrieved_docs)
 
         full_q = f"{clean_q} {original_query or ''}".strip()
         q_lower = full_q.lower()
@@ -172,6 +334,9 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             "sin internet", "sin red", "no hay internet", "se cayó la red", "se cayo el internet",
             "caida de red", "caída de red", "cable de red"
         ]) and not any(app in q_lower for app in ["teams", "kactus", "seven", "siaaf", "correo", "moodle", "office", "onedrive"])
+        is_account_query = is_account_identifier_query(full_q)
+        is_phishing_query = is_suspicious_email_query(full_q)
+        is_onboarding = _is_onboarding_query(full_q)
 
         # Asignar scores del cross-encoder y ordenar
         scored_docs = []
@@ -180,6 +345,44 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             final_score = float(rerank_score)
             content_lower = doc.page_content.lower()
             source_lower = doc.metadata.get("source", "").lower()
+
+            if is_phishing_query:
+                phishing_evidence = any(term in source_lower or term in content_lower for term in (
+                    "p-gt-07", "proteccion de codigo malicioso", "protección de código malicioso",
+                    "correo sospechoso", "oficial de seguridad de la informacion",
+                    "oficial de seguridad de la información",
+                ))
+                if not phishing_evidence:
+                    continue
+                final_score = max(final_score, 2.0)
+                if "p-gt-07" in source_lower or "codigo malicioso" in source_lower or "código malicioso" in source_lower:
+                    final_score += 5.0
+
+            if is_account_query:
+                # Requiere evidencia directa de cuentas/correo; evita que instrucciones de login
+                # genéricas de trámites financieros compitan con el procedimiento institucional.
+                account_evidence = any(term in source_lower or term in content_lower for term in (
+                    "activar usuario", "correo institucional", "credenciales microsoft",
+                    "usuario institucional", "primer semestre", "primer ingreso",
+                    "cuenta institucional", "correo y usuario",
+                ))
+                if not account_evidence:
+                    continue
+                # La evidencia de fuente/intención es una señal independiente; no permitir que
+                # un logit bajo del reranker multilingüe descarte el documento exacto.
+                final_score = max(final_score, 1.0)
+                if "financiero" in str(doc.metadata.get("category", "")).lower() or any(
+                    term in source_lower for term in ("credito empresarial", "crédito empresarial", "link de pagos")
+                ):
+                    final_score -= 6.0
+                if any(term in source_lower for term in ("activar usuario", "correo institucional")):
+                    final_score += 4.0
+                elif "credenciales microsoft" in source_lower:
+                    final_score += 2.5
+                if is_onboarding and any(term in source_lower for term in (
+                    "activar usuario", "primer semestre", "estudiantes nuevos",
+                )):
+                    final_score += 2.0
 
             # Bonificación procedimental: priorizar fragmentos con pasos e instructivos directos
             if is_procedural_query:
@@ -213,7 +416,7 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             scored_docs.append((doc, original_score, final_score))
 
         # Descartar fragmentos con score final inferior al umbral de corte (ruido o contradicciones semánticas)
-        MIN_RERANK_SCORE_CUTOFF = -2.0
+        MIN_RERANK_SCORE_CUTOFF = 0.0
         ranked = sorted(
             [item for item in scored_docs if item[2] >= MIN_RERANK_SCORE_CUTOFF],
             key=lambda x: x[2], reverse=True
@@ -1082,6 +1285,15 @@ def strip_chunk_boilerplate(content: str) -> str:
         "",
         cleaned
     )
+    cleaned = re.sub(
+        r"(?i)\b(?:digite|ingrese|introduzca|escriba)\s+su\s+usuario\s+y\s+contrase(?:ñ|n)a"
+        r"(?:\s+institucional)?(?:\s+para\s+(?:acceder|ingresar|entrar)\s+al\s+sistema)?"
+        r"\s*,?\s*(?:y\s+luego\s+)?(?:presione|pulse|haga\s+clic)\s+(?:sobre\s+)?(?:el\s+)?"
+        r"bot[oó]n\s*[«»'\"“”]?(?:acceder|entrar|iniciar(?:\s+sesi[oó]n)?)[«»'\"“”]?\.?",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(r"(?is)\[Imagen:\s*Lo siento\b.*?\]", "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
@@ -1337,6 +1549,23 @@ class RAGService:
         Además, incorpora el rol del usuario para filtrar por 'audience'.
         """
         q_low = question.lower()
+        if is_suspicious_email_query(question):
+            logger.info("[ChromaFilter] Reporte de correo sospechoso: excluyendo contenido financiero.")
+            return {"category": {"$ne": "financiero"}}
+        if is_account_identifier_query(question):
+            category_filter = {"category": {"$ne": "financiero"}}
+            role_for_filter = user_role or ("estudiante" if _is_onboarding_query(question) else None)
+            role_filter = None
+            if role_for_filter:
+                mapped_role = role_for_filter.lower().strip()
+                if "estudiante" in mapped_role or "alumno" in mapped_role:
+                    mapped_role = "estudiante"
+                if mapped_role == "estudiante":
+                    role_filter = {"audience": {"$in": ["estudiante", "general"]}}
+            logger.info("[ChromaFilter] Consulta de cuenta institucional: excluyendo categoría financiero.")
+            if role_filter:
+                return {"$and": [role_filter, category_filter]}
+            return category_filter
         
         # 0. Filtro por Rol (Audience)
         role_filter = None
@@ -1460,6 +1689,21 @@ class RAGService:
 
         # 1. Expansión Multi-Consulta asíncrona tolerante a jerga
         query_variants = await async_generate_multi_query_variants(question, user_role or "general", max_variants=3)
+        if is_suspicious_email_query(question):
+            phishing_query = (
+                "Correo sospechoso phishing. No abrir ni acceder al enlace. Informar de inmediato al "
+                "Oficial de Seguridad de la Información o en su defecto a la Dirección de TI para su inspección. "
+                "No reenviar correo spam. Procedimiento P-GT-07 Protección de Código Malicioso."
+            )
+            if phishing_query not in query_variants:
+                query_variants.insert(0, phishing_query)
+        if _is_onboarding_query(question):
+            onboarding_query = (
+                "Activar usuario y correo institucional para estudiantes nuevos de primer semestre. "
+                "Usuario, clave temporal, recibo de matrícula."
+            )
+            if onboarding_query not in query_variants:
+                query_variants.insert(0, onboarding_query)
 
         # 2. Búsqueda por similitud con puntuación de relevancia en ChromaDB combinando variantes
         candidate_docs_map: Dict[str, tuple] = {}
@@ -1490,6 +1734,16 @@ class RAGService:
 
                             if chunk_key not in candidate_docs_map or score > candidate_docs_map[chunk_key][1]:
                                 candidate_docs_map[chunk_key] = (doc, score)
+
+                # Recuperación híbrida transversal: amplía candidatos con coincidencias
+                # léxicas de todos los temas, no solo con una frase/dominio predefinido.
+                lexical_docs = _generic_lexical_candidates(
+                    self.vector_store._collection, [question, *query_variants], filter_condition
+                )
+                for doc, score in lexical_docs:
+                    chunk_key = strip_chunk_boilerplate(doc.page_content)
+                    if chunk_key not in candidate_docs_map:
+                        candidate_docs_map[chunk_key] = (doc, score)
 
                 valid_docs_with_scores = sorted(candidate_docs_map.values(), key=lambda x: x[1], reverse=True)
                 for idx, (doc, score) in enumerate(valid_docs_with_scores[:8], 1):
@@ -1728,6 +1982,7 @@ class RAGService:
                         # Modo Chunks (Ahorro de tokens): Fragmentos más relevantes de las mejores fuentes
                         max_chunks = getattr(self.settings, "rag_max_chunks", 6)
                         seen_contents = set()
+                        per_source_counts = {}
                         selected_chunks = []
                         
                         # 1. Tomar los fragmentos top del reranker sin discriminar fuente hasta recolectar max_chunks únicos
@@ -1735,13 +1990,23 @@ class RAGService:
                             if len(selected_chunks) >= max_chunks:
                                 break
                             c_strip = doc.page_content.strip()
+                            source_key = (doc.metadata.get("source") or "").lower()
+                            if per_source_counts.get(source_key, 0) >= 2:
+                                continue
                             # Omitir fuentes irrelevantes o penalizadas
                             doc_src_lower = (doc.metadata.get("source") or "").lower()
                             if any(bad in doc_src_lower for bad in ["notas crédito", "notas credito", "nota crédito"]):
                                 continue
-                            if c_strip not in seen_contents and "[Imagen: Lo siento" not in c_strip:
-                                seen_contents.add(c_strip)
+                            cleaned_for_context = strip_chunk_boilerplate(c_strip)
+                            if (
+                                cleaned_for_context
+                                and cleaned_for_context not in seen_contents
+                                and "[Imagen: Lo siento" not in c_strip
+                                and "[imagen: lo siento" not in c_strip.lower()
+                            ):
+                                seen_contents.add(cleaned_for_context)
                                 selected_chunks.append(doc)
+                                per_source_counts[source_key] = per_source_counts.get(source_key, 0) + 1
                                 
                         # Se ha eliminado el ContextStitching para garantizar 100% de precisión 
                         # con los fragmentos validados por el Reranker sin rellenar basura.
