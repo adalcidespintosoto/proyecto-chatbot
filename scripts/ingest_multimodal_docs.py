@@ -23,6 +23,7 @@ import time
 import json
 import base64
 import shutil
+import re
 import hashlib
 import logging
 from pathlib import Path
@@ -139,12 +140,16 @@ def strip_chunk_boilerplate(content: str) -> str:
         "",
         cleaned
     )
-    # Limpieza agresiva del boilerplate que inunda la base de datos con falsos positivos de login
+    # Elimina instrucciones genéricas repetidas de acceso que sesgan los embeddings hacia cualquier portal.
     cleaned = re.sub(
-        r"(?i)digite su usuario y contraseña para acceder al sistema y luego presione sobre el botón «acceder»\.?",
+        r"(?i)\b(?:digite|ingrese|introduzca|escriba)\s+su\s+usuario\s+y\s+contrase(?:ñ|n)a"
+        r"(?:\s+institucional)?(?:\s+para\s+(?:acceder|ingresar|entrar)\s+al\s+sistema)?"
+        r"\s*,?\s*(?:y\s+luego\s+)?(?:presione|pulse|haga\s+clic)\s+(?:sobre\s+)?(?:el\s+)?"
+        r"bot[oó]n\s*[«»'\"“”]?(?:acceder|entrar|iniciar(?:\s+sesi[oó]n)?)[«»'\"“”]?\.?",
         "",
         cleaned
     )
+    cleaned = re.sub(r"(?is)\[Imagen:\s*Lo siento\b.*?\]", "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
