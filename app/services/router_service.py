@@ -138,6 +138,7 @@ def normalize_role(user_input: str) -> Optional[str]:
 
 INFORMATIVE_PROCEDURAL_PATTERNS = [
     r"\b(?:c[oó]mo|d[oó]nde|por\s+d[oó]nde|cu[aá]l|qui[eé]n|qu[eé]\s+requisitos|qu[eé]\s+documentos)\b",
+    r"\bqu[eé]\s+(?:puedo|debo|hago|se\s+hace)\b",
     r"\b(?:me\s+pueden\s+prestar|puedo\s+pedir|se\s+puede\s+prestar|pueden\s+asignar|me\s+prestan)\b",
     r"\b(?:pr[eé]stamo|prestar|prestamo|solicitar\s+un\s+(?:equipo|computador|port[aá]til|pc|laptop)|pedir\s+(?:equipo|computador|port[aá]til|pc))\b",
     r"\b(?:reemplazo|dotaci[oó]n|asignaci[oó]n|tr[aá]mite|instructivo|procedimiento|pol[ií]tica|requisitos\s+para)\b",

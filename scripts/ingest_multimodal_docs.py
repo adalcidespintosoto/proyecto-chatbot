@@ -78,12 +78,14 @@ stats = {
 
 # Prompt institucional para interpretación visual de imágenes
 VISION_PROMPT = (
-    "Describe de manera objetiva, técnica y detallada los elementos visibles en esta imagen institucional de TI. "
+    "Describe solo la información visible que ayude a entender un procedimiento técnico institucional. "
     "- Si es una captura de pantalla de software o interfaz web (Kactus, Seven, GLPI, Windows, Teams, etc.): "
-    "describe las ventanas, menús, botones, campos y opciones que se muestran. "
+    "transcribe los nombres legibles de ventanas, menús, botones, campos y opciones; no inventes pasos que no aparezcan. "
     "- Si es un diagrama, flujo o mapa de procesos: describe la secuencia lógica y los pasos representados de inicio a fin. "
     "- Si contiene tablas o texto legible: transcribe el texto y los datos de forma estructurada. "
-    "Responde en español de forma concisa y técnica."
+    "No infieras universidad, país, ciudad, identidad de personas ni significado de logotipos o fotografías. "
+    "Si es un logotipo, fotografía decorativa, banner promocional o imagen sin información técnica útil, "
+    "responde exactamente [IMAGEN_NO_RELEVANTE]. Responde en español de forma concisa y técnica."
 )
 
 
@@ -125,10 +127,12 @@ def strip_chunk_boilerplate(content: str) -> str:
     """
     if not content:
         return ""
+    # Quitar únicamente encabezados que sean solo el nombre institucional. No
+    # borrar líneas completas que también incluyan instrucciones del documento.
     cleaned = re.sub(
-        r"(?im)^.*(?:universidad\s+sim[oó]n\s+bol[ií]var|sistema\s+de\s+gesti[oó]n\s+de\s+la\s+calidad).*$",
+        r"(?im)^\s*(?:universidad\s+sim[oó]n\s+bol[ií]var|sistema\s+de\s+gesti[oó]n\s+de\s+la\s+calidad)\s*$",
         "",
-        content
+        content,
     )
     cleaned = re.sub(
         r"(?im)^\s*(?:c[oó]digo|versi[oó]n|procedimiento|instructivo|p[aá]gina)\s*:\s*[A-Z0-9.\-/\s]+$",
@@ -137,15 +141,6 @@ def strip_chunk_boilerplate(content: str) -> str:
     )
     cleaned = re.sub(
         r"(?i)\bp[aá]gina\s+\d+\s+de\s+\d+\b",
-        "",
-        cleaned
-    )
-    # Elimina instrucciones genéricas repetidas de acceso que sesgan los embeddings hacia cualquier portal.
-    cleaned = re.sub(
-        r"(?i)\b(?:digite|ingrese|introduzca|escriba)\s+su\s+usuario\s+y\s+contrase(?:ñ|n)a"
-        r"(?:\s+institucional)?(?:\s+para\s+(?:acceder|ingresar|entrar)\s+al\s+sistema)?"
-        r"\s*,?\s*(?:y\s+luego\s+)?(?:presione|pulse|haga\s+clic)\s+(?:sobre\s+)?(?:el\s+)?"
-        r"bot[oó]n\s*[«»'\"“”]?(?:acceder|entrar|iniciar(?:\s+sesi[oó]n)?)[«»'\"“”]?\.?",
         "",
         cleaned
     )
@@ -186,6 +181,19 @@ def is_significant_image(image_bytes: bytes, min_kb: int = 0) -> bool:
     if min_kb <= 0:
         return True
     return len(image_bytes) >= min_kb * 1024
+
+
+def is_useful_image_description(description: Optional[str]) -> bool:
+    """Rechaza negativas del modelo visual y descripciones no informativas."""
+    text = (description or "").strip()
+    if not text or text.casefold() == "[imagen_no_relevante]":
+        return False
+    if re.search(
+        r"(?i)\b(lo siento|lamento|no puedo ayudar|no puedo describir|i am sorry|i'm sorry|i cannot help)\b",
+        text,
+    ):
+        return False
+    return True
 
 
 # =============================================================================
@@ -249,8 +257,12 @@ def describe_image_with_vllm(
     cache = load_vision_cache()
     if img_hash in cache:
         logger.debug(f"[Vision-LLM] Imagen '{filename}' recuperada de caché local ({img_hash[:8]}).")
+        description = cache[img_hash]
+        if not is_useful_image_description(description):
+            stats["images_skipped"] += 1
+            return None
         stats["images_described"] += 1
-        return cache[img_hash]
+        return description
 
     try:
         # Normalizar imagen
@@ -275,6 +287,10 @@ def describe_image_with_vllm(
             data = response.json()
             description = data.get("response", "").strip()
             if description:
+                if not is_useful_image_description(description):
+                    logger.info("[Vision-LLM] Se omite una descripción no útil para '%s'.", filename)
+                    stats["images_skipped"] += 1
+                    return None
                 logger.debug(f"[Vision-LLM] Imagen '{filename}' descrita ({len(description)} chars)")
                 stats["images_described"] += 1
                 # Guardar en disco inmediatamente de forma atómica

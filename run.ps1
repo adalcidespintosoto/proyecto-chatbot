@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$Tunnel,
+    [switch]$CaptureLogs,
     [int]$Port = 8000,
     [string]$HostIP = "0.0.0.0"
 )
@@ -19,6 +20,8 @@ param(
     Activa un tunel Cloudflare para generar una URL publica temporal hacia el asistente.
 .PARAMETER Port
     Puerto HTTP de escucha del servidor (por defecto 8000).
+.PARAMETER CaptureLogs
+    Guarda una copia local de los logs de la aplicación en scratch/unimon-runtime.log.
 .PARAMETER HostIP
     Direccion IP de escucha (por defecto 0.0.0.0).
 .EXAMPLE
@@ -30,6 +33,7 @@ param(
 #>
 
 $tunnelProcess = $null
+$previousUnimonLogFile = $env:UNIMON_LOG_FILE
 
 try {
     Write-Host "==========================================================================" -ForegroundColor Cyan
@@ -214,12 +218,22 @@ try {
     Write-Host "==========================================================================" -ForegroundColor Cyan
     Write-Host " Presiona [Ctrl + C] para detener el servidor limpiamente.`n" -ForegroundColor DarkGray
 
-    # Iniciar Uvicorn
+    # Iniciar Uvicorn. La captura es optativa porque los logs incluyen preguntas de usuario.
+    if ($CaptureLogs) {
+        $logPath = Join-Path $PSScriptRoot "scratch\unimon-runtime.log"
+        $env:UNIMON_LOG_FILE = $logPath
+        Write-Host " Captura local de logs:   $logPath" -ForegroundColor Yellow
+    }
     & $venvUvicorn app.main:app --host $HostIP --port $Port --reload
 
 } catch {
     Write-Host "`n[ERROR CRITICO] Ocurrio un fallo durante la ejecucion: $_" -ForegroundColor Red
 } finally {
+    if ($null -eq $previousUnimonLogFile) {
+        Remove-Item Env:\UNIMON_LOG_FILE -ErrorAction SilentlyContinue
+    } else {
+        $env:UNIMON_LOG_FILE = $previousUnimonLogFile
+    }
     # Limpieza ordenada al presionar Ctrl + C
     if ($tunnelProcess -and -not $tunnelProcess.HasExited) {
         Write-Host "`n[INFO] Cerrando proceso de Cloudflare Tunnel (PID: $($tunnelProcess.Id))..." -ForegroundColor Yellow

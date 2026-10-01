@@ -1,5 +1,5 @@
 """
-Servicio RAG Local con ChromaDB, Embeddings Multilingües, Normalizador Léxico, Multi-Query Generator y Ollama (unimon:8b).
+Servicio RAG de UniMon con ChromaDB, Embeddings Multilingües, Normalizador Léxico, Multi-Query Generator y LLM configurable.
 Provee respuestas estrictas de soporte técnico y gestión de TI para la Universidad Simón Bolívar
 (Sedes Barranquilla y Cúcuta, Colombia) basadas en documentos y procedimientos institucionales indexados.
 Aplica normalización léxica, expansión multi-consulta, filtros de dominio y Cross-Encoder Reranker.
@@ -32,6 +32,68 @@ logger = logging.getLogger("unimon.rag_service")
 
 # Umbral de candidatos de Chroma; el resultado final también se valida por intención y fuente.
 MIN_RELEVANCE_SCORE_THRESHOLD = 0.38
+
+_CONTEXT_ABSTENTION_PATTERNS = (
+    r"el\s+contexto\s+disponible\s+no\s+especifica",
+    r"el\s+contexto\s+disponible\s+no\s+incluye\s+(?:un\s+)?procedimiento",
+    r"no\s+incluye\s+(?:un\s+)?procedimiento\s+de\s+autoservicio",
+    r"la\s+informaci[oó]n\s+disponible\s+no\s+especifica",
+    r"no\s+especifica\s+los\s+pasos\s+posteriores",
+    r"no\s+se\s+especifica\s+en\s+la\s+documentaci[oó]n",
+    r"los\s+fragmentos\s+no\s+especifican",
+    r"el\s+contexto\s+no\s+proporciona",
+    r"no\s+contiene\s+informaci[oó]n\s+suficiente",
+    r"no\s+se\s+menciona\s+en\s+el\s+contexto",
+    r"no\s+se\s+encontr[oó]\s+documentaci[oó]n",
+    r"no\s+hay\s+documentaci[oó]n\s+(?:disponible|al\s+respecto)",
+)
+
+
+def _is_context_abstention(text: str) -> bool:
+    return any(re.search(pattern, text or "", flags=re.IGNORECASE) for pattern in _CONTEXT_ABSTENTION_PATTERNS)
+
+
+def _fold_accents(text: str) -> str:
+    """Normaliza acentos para que las reglas entiendan variaciones habituales en español."""
+    return "".join(
+        char for char in unicodedata.normalize("NFD", (text or "").casefold())
+        if unicodedata.category(char) != "Mn"
+    )
+
+
+def _is_election_query(text: str) -> bool:
+    """Reconoce conjugaciones y formas naturales de preguntas sobre votaciones."""
+    q = strip_query_header_noise(text or "").casefold()
+    election_action = re.search(
+        r"\b(?:elecci[oó]n(?:es)?|vot(?:o|as|a|amos|an|ar|aci[oó]n|aciones)|sufrag(?:io|ar)|candidat[oa]s?)\b",
+        q,
+    )
+    representative_context = (
+        re.search(r"\brepresentantes?\b", q)
+        and re.search(r"\b(?:estudiantil(?:es)?|estudiante(?:s)?|egresado(?:s)?|funcionario(?:s)?|[oó]rganos? colegiados?)\b", q)
+    )
+    return bool(election_action or representative_context)
+
+
+def _is_election_management_query(text: str) -> bool:
+    """Distingue la administración de elecciones de la votación del usuario."""
+    if not _is_election_query(text):
+        return False
+    q = strip_query_header_noise(text or "").casefold()
+    return bool(re.search(
+        r"\b(?:crear|crea|modificar|modifica|editar|edita|eliminar|elimina|borrar|configurar|configura|"
+        r"administrar|administra|gestionar|gestiona|activar|activa|desactivar|desactiva|cerrar|cierra)\b",
+        q,
+    ))
+
+
+def _is_election_voting_query(text: str) -> bool:
+    """Detecta preguntas sobre emitir un voto y no sobre configurar el aplicativo."""
+    q = strip_query_header_noise(text or "").casefold()
+    asks_to_vote = bool(re.search(
+        r"\b(?:vot(?:o|as|a|amos|an|ar|aci[oó]n|aciones)|sufrag(?:io|ar))\b", q
+    ))
+    return asks_to_vote and not _is_election_management_query(text)
 
 _LEXICAL_STOPWORDS = frozenset((
     "para", "como", "cómo", "donde", "dónde", "cuando", "cuándo", "quien", "quién",
@@ -106,6 +168,7 @@ def _generic_lexical_candidates(collection: Any, queries: list[str], query_filte
     corpus = [item for item in corpus if _metadata_matches_filter(item[0].metadata, query_filter)]
     if not corpus:
         return []
+    logger.info("[RAGTrace] BM25 corpus=%d filtro=%s variantes=%d", len(corpus), bool(query_filter), len(queries))
 
     doc_freq = Counter(token for _, tokens, _ in corpus for token in set(tokens))
     avg_len = sum(length for _, _, length in corpus) / len(corpus) or 1
@@ -135,6 +198,7 @@ def _generic_lexical_candidates(collection: Any, queries: list[str], query_filte
             if previous is None or score > previous[1]:
                 best_scores[key] = (doc, score, matched)
     ranked = sorted(best_scores.values(), key=lambda item: item[1], reverse=True)[:20]
+    logger.info("[RAGTrace] BM25 candidates=%d", len(ranked))
     # BM25 is used only for candidate ordering; map to a bounded score accepted by
     # the existing reranker pipeline, without treating lexical score as confidence.
     return [(doc, 0.50 + 0.40 * score / (score + 3.0)) for doc, score, _ in ranked]
@@ -159,7 +223,7 @@ def is_suspicious_email_query(question: str) -> bool:
 
 def is_account_identifier_query(question: str) -> bool:
     """Detecta consultas para identificar/activar la cuenta institucional, no fallas de red."""
-    q = strip_query_header_noise(question or "").lower()
+    q = _fold_accents(strip_query_header_noise(question or ""))
     if is_suspicious_email_query(q):
         return False
     asks_for_identity = any(term in q for term in (
@@ -171,12 +235,88 @@ def is_account_identifier_query(question: str) -> bool:
         "activar", "consultar", "consulto", "conocer", "saber", "averiguar",
         "cual es mi usuario", "cuál es mi usuario", "que usuario uso", "qué usuario uso",
         "soy nuevo", "estudiante nuevo", "primer semestre", "nuevo ingreso",
-    ))
+    )) or _is_forgotten_identity_query(question)
     asks_for_network_fault = any(term in q for term in (
         "sin internet", "no tengo internet", "se cayó la red", "se cayo la red",
         "no conecta", "no hay conexión", "no hay conexion",
     ))
     return asks_for_identity and asks_for_account_access and not asks_for_network_fault
+
+
+def _is_forgotten_identity_query(question: str) -> bool:
+    """Reconoce pérdida/olvido de usuario o dirección aunque esté escrito sin tilde."""
+    q = _fold_accents(strip_query_header_noise(question or ""))
+    has_identity = bool(re.search(r"\b(?:correo|email|e\s+mail|usuario|cuenta)\b", q))
+    has_forgotten_signal = bool(re.search(
+        r"\b(?:olvide|olvido|olvidado|olvidada|perdi|perdido|perdida|extravi[eé]|extraviado|extraviada)\b|"
+        r"\bno\s+(?:me\s+)?(?:acuerdo|recuerdo)\b|\bno\s+se\s+(?:cual|que)\b",
+        q,
+    ))
+    return has_identity and has_forgotten_signal and not is_suspicious_email_query(q)
+
+
+def _is_forgotten_email_query(question: str) -> bool:
+    """Subtipo de identificación: olvidó la dirección, no la contraseña del correo."""
+    q = _fold_accents(strip_query_header_noise(question or ""))
+    has_email = bool(re.search(r"\b(?:correo|email|e\s+mail)\b", q))
+    asks_password = bool(re.search(r"\b(?:clave|contrasena|password)\b", q))
+    return _is_forgotten_identity_query(question) and has_email and not asks_password
+
+
+def _is_ambiguous_student_password_query(question: str, user_role: Optional[str]) -> bool:
+    """Activa el flujo de contraseñas solo ante señales de clave/acceso, no por olvidar un usuario."""
+    q = _fold_accents(strip_query_header_noise(question or ""))
+    if _is_forgotten_email_query(question):
+        return False
+    has_password_topic = bool(re.search(r"\b(?:clave|contrasena|password)\b", q))
+    has_password_action = any(term in q for term in (
+        "desbloquear", "restablecer", "recuperar", "cambiar clave", "cambiar contrasena",
+    ))
+    login_failure = any(term in q for term in (
+        "no me deja entrar", "no puedo entrar", "no puedo ingresar", "no me deja ingresar",
+        "clave mala", "clave incorrecta", "datos incorrectos",
+    ))
+    is_password_query = has_password_topic or (has_password_action and not _is_forgotten_identity_query(question)) or login_failure
+    role = (user_role or "").casefold()
+    is_student_user = not role or any(term in role for term in ("estudiante", "alumno", "general"))
+    is_upper_sem = bool(re.search(
+        r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|semestres?\s+(?:avanzados?|superiores?)|"
+        r"(?:[2-9]|10)\s*(?:do|er|ro|to|mo|vo|no|°)?\s*semestre|"
+        r"(?:segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo)\s+semestre|"
+        r"(?:2do|3er|4to|5to|6to|7mo|8vo|9no|10mo)\s*semestre|"
+        r"ya\s+tengo\s+(?:cuenta|correo)|no\s+soy\s+nuevo|no\s+soy\s+de\s+primer)\b",
+        q,
+    ))
+    is_first_sem = bool(re.search(
+        r"\b(primer\s+semestre|1er\s+semestre|1\s*°?\s*semestre|nuevo\s+ingreso|estudiante\s+nuevo|"
+        r"soy\s+nuevo|recien\s+ingresado|primiparo)\b",
+        q,
+    ))
+    return is_password_query and is_student_user and not is_upper_sem and not is_first_sem
+
+
+def _is_forgotten_email_evidence(doc: Document) -> bool:
+    """Deja solo evidencia de identidad/correo estudiantil y su acceso, fuera de ruido de pagos."""
+    source = _fold_accents(str(doc.metadata.get("source", "")))
+    text_only = re.sub(r"(?is)\[Imagen\s*:\s*.*?(?:\]|$)", "", doc.page_content or "")
+    content = _fold_accents(strip_chunk_boilerplate(text_only))
+    category = _fold_accents(str(doc.metadata.get("category", "")))
+    if category == "financiero" or any(term in source for term in ("paymentez", "link de pagos", "pagos en linea", "credito empresarial")):
+        return False
+    mentions_institutional_email = any(term in content or term in source for term in (
+        "correo institucional", "correo estudiantil", "usuario institucional", "activar usuario",
+    ))
+    if not mentions_institutional_email:
+        return False
+    identity_workflow_source = any(term in source for term in (
+        "gie", "aspirante", "activar usuario", "correo institucional", "portales estudiantes",
+    ))
+    identity_workflow_text = any(term in content for term in (
+        "se le indicara", "le indicara su usuario", "recordara su correo", "notificarle su nuevo correo",
+        "nuevo correo estudiantil", "digite su correo institucional",
+        "restablecido la contrasena de su portal de estudiantes",
+    ))
+    return identity_workflow_source and identity_workflow_text
 
 
 def _is_onboarding_query(question: str) -> bool:
@@ -259,17 +399,21 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
         is_account_identifier_query(original_query or query)
         or is_suspicious_email_query(original_query or query)
     )
-    if len(retrieved_docs) <= 1 and not is_guarded_intent:
-        return retrieved_docs[:top_k]
-
     reranker = get_reranker()
-    if not reranker and not is_guarded_intent:
-        return retrieved_docs[:top_k]
 
     try:
         clean_q = strip_query_header_noise(query)
         pairs = [[clean_q, strip_chunk_boilerplate(doc.page_content)] for doc, _ in retrieved_docs]
-        scores = reranker.predict(pairs) if reranker else [0.0] * len(retrieved_docs)
+        if reranker:
+            try:
+                scores = reranker.predict(pairs)
+            except Exception as score_exc:
+                logger.warning("[Reranker] Error al predecir scores; aplicando heurísticas y scores neutrales: %s", score_exc)
+                scores = [0.0] * len(retrieved_docs)
+        else:
+            # Aun sin Cross-Encoder, aplicar filtros de dominio/intención y
+            # ordenar por señales heurísticas y similitud de Chroma.
+            scores = [0.0] * len(retrieved_docs)
 
         full_q = f"{clean_q} {original_query or ''}".strip()
         q_lower = full_q.lower()
@@ -335,6 +479,7 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             "caida de red", "caída de red", "cable de red"
         ]) and not any(app in q_lower for app in ["teams", "kactus", "seven", "siaaf", "correo", "moodle", "office", "onedrive"])
         is_account_query = is_account_identifier_query(full_q)
+        is_forgotten_email = _is_forgotten_email_query(full_q)
         is_phishing_query = is_suspicious_email_query(full_q)
         is_onboarding = _is_onboarding_query(full_q)
 
@@ -345,6 +490,31 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             final_score = float(rerank_score)
             content_lower = doc.page_content.lower()
             source_lower = doc.metadata.get("source", "").lower()
+            category_lower = str(doc.metadata.get("category", "")).lower()
+
+            # No mezclar procedimientos exclusivos de un laboratorio (por ejemplo,
+            # P-GT-09 del Laboratorio de Diagnóstico Molecular) en preguntas sobre
+            # oficinas o equipos generales. La señal de consulta de campus ya se
+            # calculaba, pero estaba sin uso.
+            if is_general_campus_query and "laboratorio" in source_lower:
+                continue
+
+            if is_peripheral_or_hardware_query or is_hardware_dotation_query:
+                hardware_evidence = any(term in source_lower or term in content_lower for term in (
+                    "p-gt-01", "mantenimiento", "equipo de computo", "equipo de cómputo",
+                    "computador", "portatil", "portátil", "teclado", "mouse", "periferico",
+                    "periférico", "dotacion", "dotación", "equipo de redes",
+                ))
+                financial_noise = (
+                    category_lower == "financiero"
+                    or any(term in source_lower for term in (
+                        "credito", "crédito", "cartera", "condonacion", "condonación", "notas credito",
+                    ))
+                )
+                if financial_noise and not hardware_evidence:
+                    continue
+                if hardware_evidence:
+                    final_score += 2.0
 
             if is_phishing_query:
                 phishing_evidence = any(term in source_lower or term in content_lower for term in (
@@ -361,11 +531,14 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
             if is_account_query:
                 # Requiere evidencia directa de cuentas/correo; evita que instrucciones de login
                 # genéricas de trámites financieros compitan con el procedimiento institucional.
-                account_evidence = any(term in source_lower or term in content_lower for term in (
-                    "activar usuario", "correo institucional", "credenciales microsoft",
-                    "usuario institucional", "primer semestre", "primer ingreso",
-                    "cuenta institucional", "correo y usuario",
-                ))
+                if is_forgotten_email:
+                    account_evidence = _is_forgotten_email_evidence(doc)
+                else:
+                    account_evidence = any(term in source_lower or term in content_lower for term in (
+                        "activar usuario", "correo institucional", "credenciales microsoft",
+                        "usuario institucional", "primer semestre", "primer ingreso",
+                        "cuenta institucional", "correo y usuario",
+                    ))
                 if not account_evidence:
                     continue
                 # La evidencia de fuente/intención es una señal independiente; no permitir que
@@ -379,6 +552,16 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
                     final_score += 4.0
                 elif "credenciales microsoft" in source_lower:
                     final_score += 2.5
+                if is_forgotten_email:
+                    content_folded = _fold_accents(content_lower)
+                    if "gie" in source_lower and any(term in content_folded for term in (
+                        "recordara su correo", "notificarle su nuevo correo", "se le indicara su usuario",
+                    )):
+                        final_score += 6.0
+                    elif "activar usuario" in source_lower:
+                        final_score += 2.0
+                    elif "portales estudiantes" in source_lower:
+                        final_score += 0.5
                 if is_onboarding and any(term in source_lower for term in (
                     "activar usuario", "primer semestre", "estudiantes nuevos",
                 )):
@@ -415,26 +598,38 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
 
             scored_docs.append((doc, original_score, final_score))
 
-        # Descartar fragmentos con score final inferior al umbral de corte (ruido o contradicciones semánticas)
-        MIN_RERANK_SCORE_CUTOFF = 0.0
+        # Los scores del Cross-Encoder son logits, no probabilidades calibradas. En
+        # particular, el modelo MS MARCO puede asignar logits negativos a evidencia
+        # útil en español. El corte absoluto 0.0 descartaba todo el contexto aunque
+        # Chroma/BM25 ya hubiera validado los candidatos. Se usa para ordenar, no
+        # como segundo umbral de relevancia.
         ranked = sorted(
-            [item for item in scored_docs if item[2] >= MIN_RERANK_SCORE_CUTOFF],
-            key=lambda x: x[2], reverse=True
+            (item for item in scored_docs if math.isfinite(item[2])),
+            key=lambda x: (
+                x[2],
+                x[1] if isinstance(x[1], (int, float)) and math.isfinite(x[1]) else 0.0,
+            ),
+            reverse=True,
         )
 
         if not ranked:
-            logger.info(f"[Reranker] Ningún fragmento superó el umbral de corte ({MIN_RERANK_SCORE_CUTOFF}). Retornando lista vacía.")
+            logger.info("[Reranker] El Cross-Encoder no produjo scores finitos; no hay candidatos válidos para el contexto.")
             return []
 
         result = [(doc, orig_score) for doc, orig_score, _ in ranked[:top_k]]
 
         logger.info(
-            f"[Reranker] Reordenados {len(retrieved_docs)} fragmentos -> Top-{top_k} (corte >= {MIN_RERANK_SCORE_CUTOFF}). "
-            f"Mejor score reranker: {ranked[0][2]:.4f}"
+            f"[Reranker] Reordenados {len(retrieved_docs)} fragmentos -> Top-{top_k} "
+            f"(modelo={'CrossEncoder' if reranker else 'heurísticas + Chroma'}; score usado solo para ordenar). "
+            f"Mejor score de ranking: {ranked[0][2]:.4f}"
         )
         return result
     except Exception as e:
         logger.warning(f"[Reranker] Error reordenando fragmentos: {e}")
+        if is_guarded_intent:
+            # En intenciones de seguridad/cuentas no se debe inyectar contexto
+            # sin filtrar ante un error del pipeline de ranking.
+            return []
         return retrieved_docs[:top_k]
 
 
@@ -533,7 +728,7 @@ SEMANTIC_SYNONYM_DICTIONARY = [
         ]
     },
     {
-        "triggers": ["votar", "votacion", "votación", "sufragio"],
+        "triggers": ["votar", "voto", "eleccion", "elección", "elecciones", "votacion", "votación", "sufragio", "representante", "candidato"],
         "variants": [
             "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/",
             "Procedimiento de votación electrónica elecciones institucionales https://elecciones.unisimon.edu.co/"
@@ -573,7 +768,7 @@ async def async_generate_multi_query_variants(
 ) -> List[str]:
     """
     Genera 3 variantes de búsqueda formal/institucional a partir de una frase informal/ambigua.
-    Utiliza Ollama ('unimon:8b') de forma asíncrona y rápida, con fallback instantáneo a diccionario semántico.
+    Utiliza el proveedor LLM activo de forma asíncrona y complementa fallos con el diccionario semántico.
     Preserva estrictamente entidades críticas como elecciones institucionales y reclamos académicos.
     """
     cleaned_query = strip_query_header_noise(raw_query)
@@ -581,9 +776,7 @@ async def async_generate_multi_query_variants(
     variants: List[str] = []
 
     # Detección de entidades obligatorias: elecciones y reclamo de calificaciones
-    is_election_query = any(w in q_low for w in [
-        "votar", "votacion", "votación", "sufragio"
-    ])
+    is_election_query = _is_election_query(cleaned_query)
     is_grade_complaint = bool(re.search(
         r"(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)",
         q_low
@@ -661,13 +854,22 @@ async def async_generate_multi_query_variants(
         if posgrado_instructivo not in variants:
             variants.insert(1, posgrado_instructivo)
 
-    logger.info(f"[MultiQuery] '{raw_query[:40]}' -> {len(variants)} variantes generadas: {variants}")
-    return variants[:max_variants + 1]
+    # Reserva siempre una búsqueda para la consulta original normalizada. Si el
+    # generador devuelve tres variantes, antes el límite max_variants + 1 podía
+    # dejar fuera la pregunta del usuario y buscar solo con expansiones que
+    # cambiaron la entidad o la intención.
+    expansions = [v for v in variants if v and v != cleaned_query][:max_variants]
+    final_variants = list(expansions)
+    if cleaned_query and cleaned_query not in final_variants:
+        final_variants.append(cleaned_query)
+
+    logger.info(f"[MultiQuery] '{raw_query[:40]}' -> {len(final_variants)} variantes (consulta base incluida): {final_variants}")
+    return final_variants
 
 
 def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -> str:
     """
-    Traduce jerga informal estudiantil a términos técnicos institucionales mediante Ollama (síncrono).
+    Traduce jerga informal estudiantil a términos técnicos institucionales mediante el proveedor LLM activo (síncrono).
     Depura previamente ruido de remitentes y encabezados.
     
     Args:
@@ -680,7 +882,7 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
     cleaned_query = strip_query_header_noise(raw_query)
     q_low = cleaned_query.lower()
 
-    if any(w in q_low for w in ["votar", "votacion", "votación", "sufragio"]):
+    if _is_election_query(cleaned_query):
         return "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
     is_grade_complaint = bool(re.search(r"(cambi(ar|e|é)|sub(ir|a)|clav(aron|o|ó)|corregi(r|t)|reclam(ar|o|ó)|injusta).*(nota|calificaci[oó]n|parcial|definitiva)", q_low))
     if is_grade_complaint and not any(w in q_low for w in ["formato", "tamaño", "tamano", "peso", "pdf", "archivo", "archivos", "adjuntar", "papeles", "diploma", "cargar", "documento", "documentos"]):
@@ -728,6 +930,8 @@ DIRECTRICES DE RESPUESTA:
 1. Interpreta la intención del usuario aunque use lenguaje informal, abreviaturas o sinónimos cotidianos (ej. 'profes', 'materias', 'horarios', 'portal').
 2. GROUNDING ESTRICTO:
    - Responde exclusivamente con la información provista en el contexto. Está estrictamente prohibido inventar botones, enlaces, menús o formularios si no aparecen en los fragmentos.
+   - Compara por significado, no por coincidencia literal: la pregunta puede usar sinónimos o lenguaje informal. Lee todos los fragmentos antes de concluir que falta documentación; responde los hechos y pasos que sí estén respaldados, y aclara únicamente lo que el contexto no cubra.
+   - Si solo hay un procedimiento relacionado o aplicable a un perfil/caso concreto, explica primero esa parte de forma condicional, indica qué resuelve y qué no resuelve, y escala únicamente el dato o paso que no esté documentado. No presentes como equivalente un procedimiento de acceso a correo y uno para recuperar la dirección del correo.
    - Si el rol del usuario es 'Administrativo' o 'Profesor', NUNCA lo envíes al 'Portal Estudiantes'. Respeta estrictamente el rol institucional del usuario.
    - NUNCA le digas al usuario que busque, lea o consulte un documento o archivo PDF (ej. "Busca el procedimiento P-GT-02.pdf"). Tu deber es extraer los pasos de la documentación y explicárselos directamente en el chat.
    - EXTRACCIÓN OBLIGATORIA: Si el contexto contiene un procedimiento o instructivo para resolver la duda del usuario (ej. restablecer contraseña, reportar virus, entrar a teams), DEBES extraer los pasos exactos y redactar la respuesta con ellos. ESTÁ ESTRICTAMENTE PROHIBIDO dar respuestas evasivas, cortas o coloquiales como "Si necesitas ayuda, dime". Tu función es dar la solución técnica detallada.
@@ -755,7 +959,7 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
    
    - B. TRÁMITES Y PROCEDIMIENTOS (Cómo votar, cómo registrar notas, exámenes supletorios, restablecer claves):
      * Si el trámite tiene restricciones normativas o aprobaciones de jefatura explícitas en el contexto, inclúyelas al inicio bajo: **⚠️ Requisitos y Restricciones Previas:**
-     * REGLA DE NO-PARADOJA: Para recuperación de contraseñas/correo, NUNCA exijas tener la contraseña activa ni la sesión iniciada. Los requisitos son documento de identidad y acceso al correo personal o celular registrado.
+      * REGLA DE NO-PARADOJA: Para restablecer una contraseña, NUNCA exijas la contraseña anterior ni una sesión ya iniciada. Menciona requisitos solo si aparecen en los fragmentos. Recuperar una contraseña no equivale a identificar una dirección de correo olvidada; no afirmes que un enlace de restablecimiento revela esa dirección salvo que el contexto lo indique.
      * Luego detalla el procedimiento cronológico (**Paso 1**, **Paso 2**, etc.) con botones y enlaces en negrita.
      * Si en el contexto NO hay requisitos especiales, ve directamente al paso a paso sin inventar nada.
      * PROHIBICIÓN ESTRICTA DE REQUISITOS FALSOS: NUNCA generes el encabezado '**⚠️ Requisitos y Restricciones Previas:**' si el texto del contexto no contiene requisitos previos normativos explícitos. PROHIBIDO reutilizar requisitos de equipos de cómputo en trámites de SIAAF, cursos de énfasis, portales, calificaciones o votaciones.
@@ -767,11 +971,16 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
         * ESTÁ ESTRICTAMENTE PROHIBIDO decirle al usuario que envíe un correo o solicitud a soporte como primera opción cuando existe un instructivo que le permite realizarlo por autoservicio.
         * Los canales de soporte (solicitudcomputo@unisimon.edu.co / WhatsApp 3172683922 / helpdesk@unisimon.edu.co) se indican ÚNICAMENTE al final del mensaje como alternativa de escalado en caso de fallas o problemas técnicos persistentes.
 
-   B. CASOS DE INCIDENCIA TÉCNICA, INFRAESTRUCTURA O FALLA GENERAL (Sin autoservicio posible):
+    B. CASOS DE INCIDENCIA TÉCNICA, INFRAESTRUCTURA O FALLA GENERAL (Sin autoservicio posible):
       - Si la consulta reporta una falla de infraestructura o servicio (ej. corte o caída de internet/wifi, daño físico en cables, periféricos, equipos o servidores caídos) o el contexto NO describe una opción de autoservicio para solucionar la falla:
         * ESTÁ ESTRICTAMENTE PROHIBIDO inventar pasos o botones en portales (ej. NUNCA inventar un botón de 'Reportar internet' en el Portal Estudiantes).
         * Brinda recomendaciones breves y prácticas de verificación de descarte (ej. revisar cables de red, verificar si ocurre a otros compañeros de la oficina/área).
-        * Informa con claridad que la novedad requiere la intervención del equipo de Soporte Técnico TI y suministra los canales oficiales de contacto y radicación correspondientes a su sede.
+         * Informa con claridad que la novedad requiere la intervención del equipo de Soporte Técnico TI y suministra los canales oficiales de contacto y radicación correspondientes a su sede.
+
+    C. IDENTIFICACIÓN DE CUENTA O CORREO OLVIDADO:
+       - Busca en los fragmentos dónde se muestra, recuerda o notifica el usuario/correo. Si ese paso está documentado solo para inscripción o matrícula, preséntalo como válido únicamente para ese caso.
+       - No conviertas instrucciones para iniciar sesión o restablecer una contraseña en un procedimiento para averiguar una dirección olvidada.
+       - Si los fragmentos solo cubren cómo acceder al buzón una vez conocida la dirección, dilo claramente; ofrece cualquier paso de identificación que sí esté documentado y deriva a Soporte TI solo para el escenario que no esté cubierto.
 
 3. JERARQUÍA ESTRICTA DE RESPUESTA:
    - Para instructivos y trámites de autoservicio:
@@ -788,7 +997,8 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA:
    - PROHIBIDO hablar de ti mismo, justificarte o disculparte por fallas o respuestas previas.
 
 5. FIDELIDAD AL CONTEXTO, GROUNDING Y ABSTENCIÓN:
-   - Limítate estrictamente a los hechos extraídos del contexto provisto.
+    - Limítate estrictamente a los hechos extraídos del contexto provisto.
+    - No respondas con una abstención general si el contexto contiene evidencia relacionada: entrega la parte útil respaldada, especifica el límite exacto y deriva solo lo que falte. No digas que no hay documentación por una diferencia de palabras entre la pregunta y el fragmento.
    - Usa ÚNICAMENTE las URLs especificadas en el contexto formateadas como [Nombre](URL). NUNCA inventes placeholders.
    - PROHIBICIÓN ABSOLUTA DE ADAPTAR INSTRUCTIVOS A OTRAS PLATAFORMAS (ABSTENCIÓN ESTRICTA):
      * Si la consulta menciona una plataforma, software, base de datos o aplicativo específico (ej. UpToDate, Scopus, Moodle, Canvas, etc.) y dicha plataforma NO APARECE en el [CONTEXTO INSTITUCIONAL DOCUMENTADO], ESTÁ TERMINANTEMENTE PROHIBIDO inventar pasos o reutilizar instructivos de otros sistemas (como Portal Estudiantes o SIAAF). Responde indicando con honestidad que no dispongas de un instructivo institucional para dicha plataforma y proporciona los canales de Soporte TI.
@@ -825,6 +1035,7 @@ Consulta institucional a responder: {query}"""
 
 PROMPT_INJECTION_PATTERNS = [
     # 1. Intentos de sobrescritura u olvido de prompt / instrucciones / directrices / rol
+    r"\b(ignora|ignorar|ignore|disregard)\s+(?:todas?\s+)?(?:las\s+|tus\s+|all\s+|previous\s+|prior\s+)?(?:instrucciones|instructions|reglas|rules|directrices|directives)\b",
     r"\b(olvida|olvides|olvidar|olvidaos|ignora|ignores|ignorar)\s+(?:de\s+)?(todo|lo\s+anterior|lo\s+dicho|lo\s+que|(?:el|tu)\s+prom?pt|(?:las|tus)\s+(?:instrucciones|reglas|directrices)|tu\s+rol|tu\s+funci[oó]n|tu\s+sistema)\b",
     r"\b(haz|hacer)\s+caso\s+omiso\s+(a\s+todo|al\s+prom?pt|a\s+las\s+instrucciones|a\s+las\s+reglas|a\s+lo\s+anterior|a\s+las\s+directrices)\b",
     r"\b(deshazte|elimina|borra)\s+(de\s+las\s+reglas|del\s+prom?pt|de\s+las\s+instrucciones|de\s+tus\s+directrices)\b",
@@ -1270,10 +1481,13 @@ def strip_chunk_boilerplate(content: str) -> str:
     """
     if not content:
         return ""
+    # Quitar únicamente encabezados que sean solo el nombre institucional. La
+    # regla anterior borraba líneas enteras que mencionaban a la Universidad,
+    # incluso cuando contenían pasos o instrucciones útiles.
     cleaned = re.sub(
-        r"(?im)^.*(?:universidad\s+sim[oó]n\s+bol[ií]var|sistema\s+de\s+gesti[oó]n\s+de\s+la\s+calidad).*$",
+        r"(?im)^\s*(?:universidad\s+sim[oó]n\s+bol[ií]var|sistema\s+de\s+gesti[oó]n\s+de\s+la\s+calidad)\s*$",
         "",
-        content
+        content,
     )
     cleaned = re.sub(
         r"(?im)^\s*(?:c[oó]digo|versi[oó]n|procedimiento|instructivo|p[aá]gina)\s*:\s*[A-Z0-9.\-/\s]+$",
@@ -1285,85 +1499,221 @@ def strip_chunk_boilerplate(content: str) -> str:
         "",
         cleaned
     )
-    cleaned = re.sub(
-        r"(?i)\b(?:digite|ingrese|introduzca|escriba)\s+su\s+usuario\s+y\s+contrase(?:ñ|n)a"
-        r"(?:\s+institucional)?(?:\s+para\s+(?:acceder|ingresar|entrar)\s+al\s+sistema)?"
-        r"\s*,?\s*(?:y\s+luego\s+)?(?:presione|pulse|haga\s+clic)\s+(?:sobre\s+)?(?:el\s+)?"
-        r"bot[oó]n\s*[«»'\"“”]?(?:acceder|entrar|iniciar(?:\s+sesi[oó]n)?)[«»'\"“”]?\.?",
-        "",
-        cleaned,
-    )
     cleaned = re.sub(r"(?is)\[Imagen:\s*Lo siento\b.*?\]", "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
 
-DOCS_DIRECTORY = Path(__file__).resolve().parent.parent.parent / "data" / "docs"
-_FULL_DOC_CACHE: Dict[str, str] = {}
+def _select_context_chunks(reranked: list, max_chunks: int) -> list[tuple[Document, str]]:
+    """Retiene los mejores fragmentos con contenido útil, sin cortar por documento.
 
-
-def get_full_document_text(source_identifier: str) -> Optional[str]:
+    Una consulta puede necesitar varios fragmentos consecutivos de un único
+    procedimiento. La antigua cuota de dos por fuente eliminaba pasos aunque el
+    Cross-Encoder los hubiera ubicado en el top-k.
     """
-    Recupera el texto completo de un documento institucional (.pdf, .md, .txt)
-    almacenado en data/docs, utilizando caché en memoria para alto rendimiento.
-    Garantiza contexto institucional integral para el LLM sin pérdida de pasos ni requisitos.
-    """
-    if not source_identifier:
-        return None
+    if max_chunks <= 0:
+        return []
 
-    normalized_name = Path(source_identifier).name.strip()
-    if normalized_name in _FULL_DOC_CACHE:
-        return _FULL_DOC_CACHE[normalized_name]
+    selected: list[tuple[Document, str]] = []
+    seen_contents: set[str] = set()
+    for doc, _score in reranked:
+        cleaned = strip_chunk_boilerplate(doc.page_content)
+        content_key = re.sub(r"\s+", " ", cleaned).casefold()
+        if not content_key or content_key in seen_contents:
+            continue
+        seen_contents.add(content_key)
+        selected.append((doc, cleaned))
+        if len(selected) >= max_chunks:
+            break
+    return selected
 
-    # 1. Buscar si la ruta directa existe
-    target_path = Path(source_identifier)
-    if not target_path.is_file():
-        target_path = None
-        # 2. Buscar recursivamente en DOCS_DIRECTORY
-        if DOCS_DIRECTORY.is_dir():
-            for file_path in DOCS_DIRECTORY.rglob("*"):
-                if file_path.is_file() and file_path.name.lower() == normalized_name.lower():
-                    target_path = file_path
-                    break
 
-    if not target_path or not target_path.is_file():
-        return None
+def _select_forgotten_email_context_chunks(
+    reranked: list,
+    max_chunks: Optional[int] = None,
+) -> list[tuple[Document, str]]:
+    """Conserva toda la evidencia pertinente de identidad sin limitar su cantidad."""
+    if max_chunks is not None and max_chunks <= 0:
+        return []
+    selected: list[tuple[Document, str]] = []
+    seen_contents: set[str] = set()
+    for doc, _score in reranked:
+        if not _is_forgotten_email_evidence(doc):
+            continue
+        # Las descripciones generadas para imágenes de documentos antiguos pueden
+        # ser erróneas; esta consulta ya tiene evidencia textual de identificación.
+        text_only = re.sub(r"(?is)\[Imagen\s*:\s*.*?(?:\]|$)", "", doc.page_content or "")
+        cleaned = strip_chunk_boilerplate(text_only)
+        content_key = re.sub(r"\s+", " ", cleaned).casefold()
+        if not content_key or content_key in seen_contents:
+            continue
+        seen_contents.add(content_key)
+        selected.append((doc, cleaned))
+        if max_chunks is not None and len(selected) >= max_chunks:
+            break
+    return selected
 
-    try:
-        if target_path.suffix.lower() == ".pdf":
-            from pypdf import PdfReader
-            reader = PdfReader(target_path)
-            pages_text = []
-            for p in reader.pages:
-                txt = p.extract_text() or ""
-                if txt.strip():
-                    pages_text.append(txt.strip())
-            full_text = "\n\n".join(pages_text)
-        elif target_path.suffix.lower() in [".md", ".txt"]:
-            with open(target_path, "r", encoding="utf-8", errors="replace") as f:
-                full_text = f.read()
-        elif target_path.suffix.lower() == ".pptx":
-            try:
-                import pptx
-                prs = pptx.Presentation(target_path)
-                slides_text = []
-                for s_idx, slide in enumerate(prs.slides, 1):
-                    stxt = " ".join([shape.text for shape in slide.shapes if shape.has_text_frame])
-                    if stxt.strip():
-                        slides_text.append(f"[Diapositiva {s_idx}]\n{stxt.strip()}")
-                full_text = "\n\n".join(slides_text)
-            except Exception as e:
-                logger.warning(f"Error procesando PPTX {target_path}: {e}")
-                return None
+
+def _select_election_context_chunks(
+    reranked: list,
+    question: str,
+    user_role: Optional[str],
+    max_chunks: int = 3,
+) -> list[tuple[Document, str]]:
+    """Selecciona evidencia electoral rerankeada y compatible con el electorado."""
+    q = (question or "").casefold()
+    voter_flow_query = _is_election_voting_query(question)
+    if re.search(r"\b(?:egresad[oa]s?)\b", q):
+        constituency = "egresados"
+    elif re.search(r"\b(?:estudiantil(?:es)?|estudiantes?|alumn[oa]s?)\b", q):
+        constituency = "estudiantes"
+    elif re.search(r"\b(?:funcionari[oa]s?|administrativ[oa]s?|colaborador[oa]s?)\b", q):
+        constituency = "funcionarios"
+    elif re.search(r"\b(?:docentes?|profesor[oa]s?)\b", q):
+        constituency = "docentes"
+    else:
+        role = (user_role or "").casefold()
+        if any(term in role for term in ("estudiante", "alumno")):
+            constituency = "estudiantes"
+        elif any(term in role for term in ("profesor", "docente")):
+            constituency = "docentes"
+        elif any(term in role for term in ("administrativo", "funcionario", "colaborador")):
+            constituency = "funcionarios"
         else:
-            return None
+            constituency = None
 
-        full_text_cleaned = strip_chunk_boilerplate(full_text)
-        _FULL_DOC_CACHE[normalized_name] = full_text_cleaned
-        return full_text_cleaned
-    except Exception as exc:
-        logger.warning(f"Error cargando texto completo de {target_path}: {exc}")
-        return None
+    election_candidates = [
+        (doc, score)
+        for doc, score in reranked
+        if re.search(r"elecci[oó]n", str(doc.metadata.get("source", "")), re.IGNORECASE)
+        or "elecciones.unisimon.edu.co" in doc.page_content.casefold()
+    ]
+    module_markers = ("estudiantes", "egresados", "funcionarios", "docentes")
+    compatible = []
+    for doc, score in election_candidates:
+        source = str(doc.metadata.get("source", "")).casefold()
+        source_module = next((marker for marker in module_markers if marker in source), None)
+        if source_module and constituency and source_module != constituency:
+            continue
+        if voter_flow_query:
+            content = strip_chunk_boilerplate(doc.page_content).casefold()
+            # Los PPTX por módulo repiten pantallas administrativas como "Crear
+            # elección" y "Eliminar candidato". Para preguntas de votantes solo
+            # aceptar evidencia de participación/selección/confirmación del voto.
+            voter_action_evidence = bool(re.search(
+                r"elecciones.{0,160}(?:participar|seg[uú]n\s+su\s+rol)|"
+                r"bot[oó]n.{0,40}votar|"
+                r"(?:foto|nombre).{0,100}candidat[oa].{0,100}votar|"
+                r"voto.{0,60}(?:enviado|registrado|confirmado)",
+                content,
+                flags=re.IGNORECASE | re.DOTALL,
+            ))
+            if not voter_action_evidence:
+                continue
+        compatible.append((doc, score))
+
+    return _select_context_chunks(compatible, max_chunks)
+
+
+def _format_page_info(metadata: dict) -> str:
+    """Formatea página/diapositiva respetando si el metadato ya es 1-based."""
+    page_number = metadata.get("page_number")
+    if isinstance(page_number, int):
+        return f" (Pág. {page_number})"
+    slide_number = metadata.get("slide_number")
+    if isinstance(slide_number, int):
+        return f" (Diapositiva {slide_number})"
+    page_index = metadata.get("page")
+    if isinstance(page_index, int):
+        return f" (Pág. {page_index + 1})"
+    return ""
+
+
+def _expand_chunks_with_neighbors(
+    anchor_chunks: list[tuple[Document, str]],
+    collection: Any,
+    *,
+    neighbors_each_side: int = 1,
+    strip_visual_captions: bool = False,
+    metadata_filter: Optional[dict] = None,
+) -> list[tuple[Document, str]]:
+    """Añade vecinos secuenciales del mismo documento y página/diapositiva.
+
+    La ingesta crea IDs deterministas con el sufijo ``_p{pagina}_c{indice}``.
+    Solo se expande si podemos verificar ese orden y localizar el chunk ancla;
+    ante metadatos/IDs antiguos o una consulta fallida, se conserva el ancla sin
+    adivinar qué fragmentos son adyacentes.
+    """
+    if not anchor_chunks:
+        return []
+
+    def clean_chunk(text: str) -> str:
+        if strip_visual_captions:
+            text = re.sub(r"(?is)\[Imagen\s*:\s*.*?(?:\]|$)", "", text or "")
+        return strip_chunk_boilerplate(text)
+
+    expanded: list[tuple[Document, str]] = []
+    seen_contents: set[str] = set()
+    page_cache: dict[tuple[str, str, int], list[tuple[int, str, dict]]] = {}
+
+    def append_once(doc: Document, text: str) -> None:
+        cleaned = clean_chunk(text)
+        key = re.sub(r"\s+", " ", cleaned).casefold()
+        if cleaned and key not in seen_contents:
+            seen_contents.add(key)
+            expanded.append((doc, cleaned))
+
+    for anchor_doc, anchor_text in anchor_chunks:
+        metadata = anchor_doc.metadata or {}
+        source = str(metadata.get("source") or "").strip()
+        page_field = "page_number" if metadata.get("page_number") is not None else "slide_number"
+        page_value = metadata.get(page_field)
+        if not source or not isinstance(page_value, int) or neighbors_each_side <= 0:
+            append_once(anchor_doc, anchor_text)
+            continue
+
+        cache_key = (source, page_field, page_value)
+        if cache_key not in page_cache:
+            try:
+                # Query only the anchor's page/slide to keep expansion bounded
+                # even when a source contains thousands of chunks.
+                rows = collection.get(
+                    where={"$and": [{"source": source}, {page_field: page_value}]},
+                    include=["documents", "metadatas"],
+                )
+                ids = rows.get("ids") or []
+                texts = rows.get("documents") or []
+                metadatas = rows.get("metadatas") or []
+                page_rows = []
+                for chunk_id, text, chunk_metadata in zip(ids, texts, metadatas):
+                    match = re.search(r"_p\d+_c(\d+)$", str(chunk_id))
+                    if match and text and _metadata_matches_filter(chunk_metadata or {}, metadata_filter):
+                        page_rows.append((int(match.group(1)), text, chunk_metadata or {}))
+                page_cache[cache_key] = sorted(page_rows, key=lambda item: item[0])
+            except Exception as exc:
+                logger.debug("[RAG] No se pudieron recuperar vecinos del chunk: %s", exc)
+                page_cache[cache_key] = []
+
+        rows_for_page = page_cache[cache_key]
+        anchor_key = re.sub(r"\s+", " ", anchor_doc.page_content or "").strip().casefold()
+        anchor_position = next(
+            (
+                index for index, (_chunk_index, text, _metadata) in enumerate(rows_for_page)
+                if re.sub(r"\s+", " ", text).strip().casefold() == anchor_key
+            ),
+            None,
+        )
+        if anchor_position is None:
+            append_once(anchor_doc, anchor_text)
+            continue
+
+        start = max(0, anchor_position - neighbors_each_side)
+        end = min(len(rows_for_page), anchor_position + neighbors_each_side + 1)
+        for _chunk_index, text, chunk_metadata in rows_for_page[start:end]:
+            neighbor_doc = Document(page_content=text, metadata=chunk_metadata)
+            append_once(neighbor_doc, text)
+
+    return expanded
 
 
 # Lista de plataformas, herramientas o bases de datos no documentadas en el catálogo institucional
@@ -1478,9 +1828,9 @@ def extract_queried_platform_or_system(query: str) -> Optional[str]:
 
 class RAGService:
     """
-    Servicio RAG local para recuperación de contexto con ChromaDB y generación con Ollama.
-    Aplica normalización léxica y expansión de consultas para asertividad >= 90%,
-    umbral de relevancia >= 0.48 y corte estricto contra alucinaciones.
+    Servicio RAG de UniMon: recuperación híbrida en ChromaDB y generación con el
+    proveedor LLM configurado. Combina expansión de consultas, E5, filtros de
+    metadatos, recuperación léxica, reranking y grounding documental.
     """
 
     def __init__(
@@ -1526,7 +1876,18 @@ class RAGService:
                     persist_directory=str(self.chroma_db_dir),
                     embedding_function=self.embeddings
                 )
-                logger.info(f"ChromaDB cargado exitosamente desde {self.chroma_db_dir.resolve()}")
+                chunk_count = self._vector_store._collection.count()
+                if chunk_count == 0:
+                    logger.error(
+                        "[RAG] ChromaDB abrió una colección VACÍA en %s. Verifica CHROMA_DB_DIR; "
+                        "no se iniciará una reingesta automática ni se tocarán otras bases.",
+                        self.chroma_db_dir.resolve(),
+                    )
+                else:
+                    logger.info(
+                        "ChromaDB cargado desde %s (%d fragmentos)",
+                        self.chroma_db_dir.resolve(), chunk_count,
+                    )
             except Exception as exc:
                 logger.warning(f"No se pudo inicializar ChromaDB en {self.chroma_db_dir}: {exc}")
                 self._vector_store = None
@@ -1576,7 +1937,15 @@ class RAGService:
             elif "admin" in mapped_role or "funcionario" in mapped_role: mapped_role = "administrativo"
             
             if mapped_role in ["estudiante", "profesor", "administrativo"]:
-                role_filter = {"audience": {"$in": [mapped_role, "general"]}}
+                # Los índices existentes etiquetan procedimientos de personal como
+                # "funcionario". Profesores y administrativos también necesitan
+                # esos procedimientos institucionales de TI.
+                audiences = {
+                    "estudiante": ["estudiante", "general"],
+                    "profesor": ["profesor", "funcionario", "general"],
+                    "administrativo": ["administrativo", "funcionario", "general"],
+                }
+                role_filter = {"audience": {"$in": audiences[mapped_role]}}
 
         category_filter = None
 
@@ -1633,13 +2002,14 @@ class RAGService:
     ) -> Dict[str, Any]:
         """
         Ejecuta el pipeline RAG completo:
-        1. Expansión LLM de consulta (jerga -> terminología institucional).
-        2. Normalización léxica estática (complementaria).
-        3. Búsqueda por similitud con puntuación de relevancia en ChromaDB (k=8, umbral >= 0.38) y filtro por rol.
-        4. Cross-Encoder Reranker: reordena Top-8 -> Top-3.
-        5. Corte estricto / Fallback temático: Si ningún fragmento supera el umbral, evalúa fallback.
-        6. Ensamblaje del System Prompt institucional + Golden Cache context + historial.
-        7. Invocación asíncrona a Ollama (unimon:8b).
+        1. Expande la consulta y conserva la pregunta original entre sus variantes.
+        2. Busca candidatos con E5/Chroma y amplía por coincidencia léxica BM25,
+           aplicando filtros de rol y categoría.
+        3. Reordena candidatos con Cross-Encoder (o heurísticas si no está disponible)
+           y arma el contexto con fragmentos limpios y deduplicados.
+        4. Si no queda contexto, usa las respuestas temáticas acotadas o se abstiene.
+        5. Envía contexto documental, historial y una referencia Golden Cache marcada
+           solo como guía de formato al proveedor LLM configurado.
         """
         retrieved_docs = []
         sources: List[str] = []
@@ -1707,11 +2077,30 @@ class RAGService:
 
         # 2. Búsqueda por similitud con puntuación de relevancia en ChromaDB combinando variantes
         candidate_docs_map: Dict[str, tuple] = {}
+        valid_docs_with_scores: list[tuple[Document, float]] = []
+
+        def append_supplemental_candidate(doc: Document, score: Optional[float], allow_low_score: bool = False) -> None:
+            """Añade resultados auxiliares aplicando los mismos filtros y deduplicación."""
+            if score is None or (score < self.min_relevance_score and not allow_low_score):
+                return
+            if not _metadata_matches_filter(doc.metadata, filter_condition):
+                return
+            cleaned = strip_chunk_boilerplate(doc.page_content)
+            if not cleaned:
+                return
+            for index, (existing_doc, existing_score) in enumerate(valid_docs_with_scores):
+                if strip_chunk_boilerplate(existing_doc.page_content) == cleaned:
+                    if score > existing_score:
+                        valid_docs_with_scores[index] = (doc, score)
+                    return
+            valid_docs_with_scores.append((doc, score))
         if self.vector_store is not None:
             try:
                 filter_desc = f" con filtro {filter_condition}" if filter_condition else " sin filtro"
                 logger.info(f"Buscando fragmentos en ChromaDB ({len(query_variants)} variantes, umbral >= {self.min_relevance_score}{filter_desc})")
 
+                dense_raw_hits = 0
+                dense_accepted_hits = 0
                 for q_var in query_variants:
                     formatted_query = format_e5_query(q_var)
                     if filter_condition:
@@ -1726,8 +2115,10 @@ class RAGService:
                             k=8
                         )
 
+                    dense_raw_hits += len(docs_with_scores)
                     for doc, score in docs_with_scores:
                         if score is not None and score >= self.min_relevance_score:
+                            dense_accepted_hits += 1
                             # Clave única por CONTENIDO limpio para eliminar boilerplate cruzado
                             c_clean = strip_chunk_boilerplate(doc.page_content)
                             chunk_key = c_clean
@@ -1745,17 +2136,59 @@ class RAGService:
                     if chunk_key not in candidate_docs_map:
                         candidate_docs_map[chunk_key] = (doc, score)
 
+                logger.info(
+                    "[RAGTrace] collection=%d dense_raw=%d dense_above_threshold=%d bm25=%d fused_unique=%d",
+                    self.vector_store._collection.count(), dense_raw_hits, dense_accepted_hits,
+                    len(lexical_docs), len(candidate_docs_map),
+                )
+
                 valid_docs_with_scores = sorted(candidate_docs_map.values(), key=lambda x: x[1], reverse=True)
                 for idx, (doc, score) in enumerate(valid_docs_with_scores[:8], 1):
                     score_val = f"{score:.4f}" if score is not None else "N/A"
                     source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                     source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                    page_num = doc.metadata.get("page", doc.metadata.get("page_number", None))
-                    page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
+                    page_info = _format_page_info(doc.metadata)
                     logger.info(f"  [Chunk #{idx} VÁLIDO] Score: {score_val} | Fuente: {source_filename}{page_info} | Texto: '{doc.page_content.strip()[:90]}...'")
 
             except Exception as exc:
-                logger.warning(f"Error al realizar búsqueda de similitud en ChromaDB: {exc}")
+                # No perder los hits de las variantes que ya funcionaron solo
+                # porque una consulta expandida posterior haya fallado.
+                valid_docs_with_scores = sorted(candidate_docs_map.values(), key=lambda item: item[1], reverse=True)
+                logger.warning(
+                    "Error al realizar búsqueda de similitud en ChromaDB: %s. Se conservan %d candidatos parciales.",
+                    exc, len(valid_docs_with_scores),
+                )
+
+        # La frase "olvidé mi correo" requiere localizar el dato de identidad,
+        # no mezclarlo con recuperación de claves ni con cualquier trámite que
+        # mencione un correo. Estas consultas documentales rescatan los pasos de
+        # inscripción/matrícula donde se informa el usuario institucional.
+        is_forgotten_email = _is_forgotten_email_query(question)
+        if is_forgotten_email and self.vector_store is not None:
+            identity_lookup_queries = (
+                "proceso de aspirantes inscripción matrícula donde se indica el usuario y correo institucional asignado",
+                "oficialización de matrícula anterior sistema recuerda correo institucional nuevo correo estudiantil notificación",
+            )
+            for identity_query in identity_lookup_queries:
+                try:
+                    if filter_condition:
+                        identity_docs = self.vector_store.similarity_search_with_relevance_scores(
+                            format_e5_query(identity_query), k=6, filter=filter_condition
+                        )
+                    else:
+                        identity_docs = self.vector_store.similarity_search_with_relevance_scores(
+                            format_e5_query(identity_query), k=6
+                        )
+                    for identity_doc, identity_score in identity_docs:
+                        append_supplemental_candidate(identity_doc, identity_score)
+                except Exception as exc:
+                    logger.debug("Error recuperando evidencia para identificar correo institucional: %s", exc)
+
+            logger.info(
+                "[RAGTrace] Consulta de correo olvidado: filtro=%s, candidatos de identidad=%d",
+                bool(filter_condition),
+                sum(1 for doc, _ in valid_docs_with_scores if _is_forgotten_email_evidence(doc)),
+            )
 
         # Verificación estricta de entidad o plataforma consultada (Entity & Platform Grounding)
         target_platform = extract_queried_platform_or_system(question)
@@ -1774,27 +2207,9 @@ class RAGService:
                 )
                 valid_docs_with_scores = []
 
-        # Detección de consulta ambigua de credenciales de estudiantes (sin aclarar semestre o antigüedad)
-        clean_q_low = strip_query_header_noise(question).lower()
-        is_pwd_query = any(w in clean_q_low for w in [
-            "clave", "contraseña", "contrasena", "olvidé", "olvide", "desbloquear", "restablecer",
-            "recuperar", "no me deja entrar", "no puedo entrar", "no puedo ingresar", "no me deja ingresar",
-            "clave mala", "clave incorrecta", "datos incorrectos", "ando embalao"
-        ])
-        is_student_user = not user_role or user_role.lower() in ["estudiante", "alumno", "alumna", "general"]
-        is_upper_sem = bool(re.search(
-            r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|semestres?\s+(?:avanzados?|superiores?)|"
-            r"(?:[2-9]|10)\s*(?:do|er|ro|to|mo|vo|no|°)?\s*semestre|"
-            r"(?:segundo|tercer|tercero|cuarto|quinto|sexto|s[eé]ptimo|septimo|octavo|noveno|d[eé]cimo|decimo)\s+semestre|"
-            r"\b(?:2do|3er|4to|5to|6to|7mo|8vo|9no|10mo)\s*semestre\b|"
-            r"ya\s+tengo\s+(?:cuenta|correo)|no\s+soy\s+nuevo|no\s+soy\s+de\s+primer)\b",
-            clean_q_low
-        ))
-        is_first_sem = bool(re.search(
-            r"\b(primer\s+semestre|1er\s+semestre|1\s*°?\s*semestre|nuevo\s+ingreso|estudiante\s+nuevo|soy\s+nuevo|reci[eé]n\s+ingresado|primipar[oa])\b",
-            clean_q_low
-        ))
-        is_ambiguous_student_pwd = is_pwd_query and is_student_user and not is_upper_sem and not is_first_sem
+        # La recuperación de una dirección/usuario no debe abrir el flujo de
+        # recuperación de contraseña ni inyectar sus pasos por defecto.
+        is_ambiguous_student_pwd = _is_ambiguous_student_password_query(question, user_role)
 
         if is_ambiguous_student_pwd and self.vector_store is not None:
             has_first_doc = any("primer semestre" in (doc.metadata.get("source") or "").lower() or "activar usuario" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
@@ -1808,8 +2223,7 @@ class RAGService:
                     else:
                         extra_first = self.vector_store.similarity_search_with_relevance_scores(q_first, k=2)
                     for fdoc, fscore in extra_first:
-                        if fscore is not None and fscore >= self.min_relevance_score:
-                            valid_docs_with_scores.append((fdoc, fscore))
+                        append_supplemental_candidate(fdoc, fscore)
                 except Exception as exc:
                     logger.debug(f"Error cargando doc primer semestre: {exc}")
 
@@ -1821,17 +2235,32 @@ class RAGService:
                     else:
                         extra_reset = self.vector_store.similarity_search_with_relevance_scores(q_reset, k=2)
                     for rdoc, rscore in extra_reset:
-                        if rscore is not None and rscore >= self.min_relevance_score:
-                            valid_docs_with_scores.append((rdoc, rscore))
+                        append_supplemental_candidate(rdoc, rscore)
                 except Exception as exc:
                     logger.debug(f"Error cargando doc restablecimiento: {exc}")
 
         # Asegurar recuperación de documento de elecciones si la consulta es sobre votaciones
-        is_election_query = any(w in question.lower() for w in [
-            "votar", "votacion", "votación", "sufragio"
-        ])
+        is_election_query = _is_election_query(question)
         if is_election_query and self.vector_store is not None:
             has_elec_doc = any("elecciones" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
+            if _is_election_voting_query(question):
+                # La búsqueda genérica "elecciones/votar" suele recuperar también
+                # pantallas administrativas (crear/eliminar candidatos). Recuperar
+                # aparte la guía de votación del elector con sus acciones explícitas.
+                q_vote = format_e5_query(
+                    "cómo votar seleccione botón votar elección candidato confirmar sufragio"
+                )
+                try:
+                    if filter_condition:
+                        vote_docs = self.vector_store.similarity_search_with_relevance_scores(
+                            q_vote, k=8, filter=filter_condition
+                        )
+                    else:
+                        vote_docs = self.vector_store.similarity_search_with_relevance_scores(q_vote, k=8)
+                    for vdoc, vscore in vote_docs:
+                        append_supplemental_candidate(vdoc, vscore)
+                except Exception as exc:
+                    logger.debug("Error cargando la guía de votación del elector: %s", exc)
             if not has_elec_doc:
                 try:
                     q_elec = format_e5_query("aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/")
@@ -1840,8 +2269,7 @@ class RAGService:
                     else:
                         extra_elec = self.vector_store.similarity_search_with_relevance_scores(q_elec, k=3)
                     for edoc, escore in extra_elec:
-                        if escore is not None and escore >= self.min_relevance_score:
-                            valid_docs_with_scores.append((edoc, escore))
+                        append_supplemental_candidate(edoc, escore)
                 except Exception as exc:
                     logger.debug(f"Error cargando doc elecciones: {exc}")
 
@@ -1861,15 +2289,24 @@ class RAGService:
                     extra_1 = self.vector_store.similarity_search_with_relevance_scores(q_calif_1, k=5)
                     extra_2 = self.vector_store.similarity_search_with_relevance_scores(q_calif_2, k=5)
                     for cdoc, cscore in extra_1 + extra_2:
-                        if cdoc.metadata.get("source") == "Calificaciones.pdf" or (cscore is not None and cscore >= 0.75):
-                            valid_docs_with_scores.append((cdoc, cscore))
+                        exact_source = cdoc.metadata.get("source") == "Calificaciones.pdf"
+                        if exact_source or (cscore is not None and cscore >= 0.75):
+                            append_supplemental_candidate(cdoc, cscore, allow_low_score=exact_source)
                 except Exception as exc:
                     logger.debug(f"Error cargando doc calificaciones: {exc}")
 
         # 3. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
         if valid_docs_with_scores:
             if is_election_query:
-                rerank_query = "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
+                if _is_election_voting_query(question):
+                    rerank_query = "cómo votar seleccione botón votar candidato confirmar sufragio"
+                else:
+                    rerank_query = "aplicativo de elecciones institucionales votaciones votar https://elecciones.unisimon.edu.co/"
+            elif is_forgotten_email:
+                rerank_query = (
+                    "dónde se informa o recuerda el usuario y correo institucional del estudiante "
+                    "al finalizar inscripción o matrícula; acceso al correo una vez conocida la dirección"
+                )
             elif is_ambiguous_student_pwd:
                 rerank_query = "restablecimiento de contraseña portal estudiantes y activación de usuario primer semestre"
             elif is_teacher_grades:
@@ -1877,156 +2314,90 @@ class RAGService:
             elif is_peripheral_or_hardware_request(question):
                 rerank_query = normalize_and_expand_query(question)
             elif query_variants:
-                rerank_query = f"{question} {query_variants[0]}"
+                # Las variantes amplían la búsqueda de candidatos; no se concatenan
+                # para rerankear, porque sus términos añadidos pueden cambiar la intención.
+                rerank_query = question
             else:
                 rerank_query = normalize_and_expand_query(question)
 
-            top_k_val = getattr(self.settings, "rag_max_chunks", 6)
+            # Evaluamos el conjunto recuperado, pero solo conservamos los 15
+            # mejores para la selección de anclas/contexto final.
+            top_k_val = min(15, len(valid_docs_with_scores))
             reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=top_k_val, original_query=question)
 
             if reranked or is_ambiguous_student_pwd or is_election_query:
-                if is_ambiguous_student_pwd:
-                    # Ensamblado balanceado para consultas ambiguas de credenciales de estudiantes:
-                    # Garantizar inclusión de fragmentos de primer semestre y de restablecimiento regular
-                    first_sem_chunks = [
-                        doc for doc, _ in valid_docs_with_scores
-                        if any(k in (doc.metadata.get("source") or "").lower() for k in ["primer semestre", "activar usuario"])
-                    ]
-                    reset_chunks = [
-                        doc for doc, _ in valid_docs_with_scores
-                        if any(k in (doc.metadata.get("source") or "").lower() for k in ["restablecimiento", "contraseña unificada"])
-                    ]
-
-                    selected_docs = []
-                    for d in first_sem_chunks:
-                        if len([x for x in selected_docs if any(k in (x.metadata.get("source") or "").lower() for k in ["primer semestre", "activar usuario"])]) < 2:
-                            selected_docs.append(d)
-                    for d in reset_chunks:
-                        if len([x for x in selected_docs if any(k in (x.metadata.get("source") or "").lower() for k in ["restablecimiento", "contraseña unificada"])]) < 2:
-                            selected_docs.append(d)
-
-                    for doc, _ in (reranked or []):
-                        if len(selected_docs) >= 4:
-                            break
-                        if not any(doc.page_content.strip() == sd.page_content.strip() for sd in selected_docs):
-                            selected_docs.append(doc)
-
-                    for doc in selected_docs:
+                if is_forgotten_email:
+                    evidence_chunks = _select_forgotten_email_context_chunks(reranked, max_chunks=3)
+                    contextual_chunks = _expand_chunks_with_neighbors(
+                        evidence_chunks,
+                        self.vector_store._collection,
+                        strip_visual_captions=True,
+                        metadata_filter=filter_condition,
+                    )
+                    for doc, cleaned_chunk in contextual_chunks:
                         source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                         source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
                         retrieved_docs.append(doc)
                         if source_filename not in sources:
                             sources.append(source_filename)
-                        page_num = doc.metadata.get("page", None)
-                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
-                        cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                        page_info = _format_page_info(doc.metadata)
+                        context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                    logger.info(
+                        "[RAG] Correo olvidado: %d chunks de contexto de %d fuente(s) (%d caracteres).",
+                        len(contextual_chunks), len(sources), sum(len(part) for part in context_parts),
+                    )
+                elif is_ambiguous_student_pwd:
+                    anchor_chunks = _select_context_chunks(reranked, max_chunks=3)
+                    contextual_chunks = _expand_chunks_with_neighbors(
+                        anchor_chunks,
+                        self.vector_store._collection,
+                        metadata_filter=filter_condition,
+                    )
+                    for doc, cleaned_chunk in contextual_chunks:
+                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                        retrieved_docs.append(doc)
+                        if source_filename not in sources:
+                            sources.append(source_filename)
+                        page_info = _format_page_info(doc.metadata)
                         context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
                 elif is_election_query:
-                    # Priorizar fragmentos del aplicativo oficial de elecciones institucionales
-                    elec_chunks = [
-                        doc for doc, _ in valid_docs_with_scores
-                        if "elecciones" in (doc.metadata.get("source") or "").lower() or "elecciones.unisimon.edu.co" in doc.page_content.lower()
-                    ]
-                    selected_docs = elec_chunks[:3]
-                    for doc, _ in (reranked or []):
-                        if len(selected_docs) >= 3:
-                            break
-                        if not any(doc.page_content.strip() == sd.page_content.strip() for sd in selected_docs):
-                            selected_docs.append(doc)
+                    # Usa solo evidencia electoral y evita mezclar módulos de
+                    # electores distintos (p. ej., egresados para un estudiante).
+                    # Si no hay evidencia electoral rerankeada, no rellenar con
+                    # documentos académicos que solo comparten vocabulario.
+                    election_chunks = _select_election_context_chunks(
+                        reranked or [], question, user_role, max_chunks=3
+                    )
 
-                    for doc in selected_docs:
+                    for doc, cleaned_chunk in election_chunks:
                         source_path = doc.metadata.get("source", "Procedimiento Unisimon")
                         source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
                         retrieved_docs.append(doc)
                         if source_filename not in sources:
                             sources.append(source_filename)
-                        page_num = doc.metadata.get("page", None)
-                        page_info = f" (Pág. {page_num + 1})" if isinstance(page_num, int) else ""
-                        cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
+                        page_info = _format_page_info(doc.metadata)
                         context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
                 else:
-                    # Identificar el documento principal con mayor relevancia semántica
-                    primary_doc, _ = reranked[0]
-                    primary_source = primary_doc.metadata.get("source")
-                    source_filename = Path(primary_source).name if primary_source else "Procedimiento Unisimon"
-
-                    # Control de contexto: Modo Documento Completo vs Modo Chunks (Opción A: Ahorro de Tokens)
-                    inject_full = getattr(self.settings, "rag_inject_full_doc", False)
-                    full_doc_text = get_full_document_text(primary_source) if (inject_full and primary_source) else None
-                    if full_doc_text:
-                        logger.info(f"[RAG] Inyectando documento institucional completo: '{source_filename}' ({len(full_doc_text)} caracteres)")
-                        retrieved_docs.append(primary_doc)
+                    anchor_chunks = _select_context_chunks(reranked, max_chunks=3)
+                    contextual_chunks = _expand_chunks_with_neighbors(
+                        anchor_chunks,
+                        self.vector_store._collection,
+                        metadata_filter=filter_condition,
+                    )
+                    for doc, cleaned_chunk in contextual_chunks:
+                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                        retrieved_docs.append(doc)
                         if source_filename not in sources:
                             sources.append(source_filename)
-                        context_parts.append(f"[DOCUMENTO INSTITUCIONAL COMPLETO: {source_filename}]\n{full_doc_text}")
-
-                        # Si hay un segundo documento relevante de otra fuente y cabe en el presupuesto (<= 25000 chars)
-                        for secondary_doc, _ in reranked[1:]:
-                            sec_source = secondary_doc.metadata.get("source")
-                            sec_filename = Path(sec_source).name if sec_source else ""
-                            if sec_source and sec_source != primary_source and sec_filename not in sources:
-                                sec_full_text = get_full_document_text(sec_source)
-                                if sec_full_text and (len(full_doc_text) + len(sec_full_text)) <= 25000:
-                                    logger.info(f"[RAG] Inyectando documento institucional secundario completo: '{sec_filename}'")
-                                    retrieved_docs.append(secondary_doc)
-                                    sources.append(sec_filename)
-                                    context_parts.append(f"[DOCUMENTO INSTITUCIONAL COMPLETO: {sec_filename}]\n{sec_full_text}")
-                                    break
-                                else:
-                                    cleaned_sec = strip_chunk_boilerplate(secondary_doc.page_content)
-                                    retrieved_docs.append(secondary_doc)
-                                    sources.append(sec_filename)
-                                    context_parts.append(f"[{sec_filename}]\n{cleaned_sec}")
-                                    break
-                    else:
-                        # Modo Chunks (Ahorro de tokens): Fragmentos más relevantes de las mejores fuentes
-                        max_chunks = getattr(self.settings, "rag_max_chunks", 6)
-                        seen_contents = set()
-                        per_source_counts = {}
-                        selected_chunks = []
-                        
-                        # 1. Tomar los fragmentos top del reranker sin discriminar fuente hasta recolectar max_chunks únicos
-                        for doc, score in reranked:
-                            if len(selected_chunks) >= max_chunks:
-                                break
-                            c_strip = doc.page_content.strip()
-                            source_key = (doc.metadata.get("source") or "").lower()
-                            if per_source_counts.get(source_key, 0) >= 2:
-                                continue
-                            # Omitir fuentes irrelevantes o penalizadas
-                            doc_src_lower = (doc.metadata.get("source") or "").lower()
-                            if any(bad in doc_src_lower for bad in ["notas crédito", "notas credito", "nota crédito"]):
-                                continue
-                            cleaned_for_context = strip_chunk_boilerplate(c_strip)
-                            if (
-                                cleaned_for_context
-                                and cleaned_for_context not in seen_contents
-                                and "[Imagen: Lo siento" not in c_strip
-                                and "[imagen: lo siento" not in c_strip.lower()
-                            ):
-                                seen_contents.add(cleaned_for_context)
-                                selected_chunks.append(doc)
-                                per_source_counts[source_key] = per_source_counts.get(source_key, 0) + 1
-                                
-                        # Se ha eliminado el ContextStitching para garantizar 100% de precisión 
-                        # con los fragmentos validados por el Reranker sin rellenar basura.
-
-                        # 3. Inyectar manteniendo estrictamente el orden de RELEVANCIA del Reranker
-                        for doc in selected_chunks:
-                            retrieved_docs.append(doc)
-                            source_path = doc.metadata.get("source", "Procedimiento Unisimon")
-                            source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
-                            page_num = doc.metadata.get("page", doc.metadata.get("page_number", doc.metadata.get("slide_number", None)))
-                            page_info = f" (Pág. {int(page_num) + 1})" if page_num is not None else ""
-                            if source_filename not in sources:
-                                sources.append(source_filename)
-                            cleaned_chunk = strip_chunk_boilerplate(doc.page_content)
-                            context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
-
-                        logger.info(
-                            f"[RAG] Modo Chunks (Ahorro de tokens activo): Inyectando {len(context_parts)} fragmentos "
-                            f"relevantes de {len(sources)} fuente(s) (Total chars: {sum(len(p) for p in context_parts)})."
-                        )
+                        page_info = _format_page_info(doc.metadata)
+                        context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                    logger.info(
+                        "[RAG] Contexto por chunks: %d anclas, %d chunks con vecinos, %d fuente(s), %d caracteres.",
+                        len(anchor_chunks), len(contextual_chunks), len(sources),
+                        sum(len(part) for part in context_parts),
+                    )
             else:
                 logger.info("[RAG] El reordenador descartó todos los fragmentos recuperados por falta de relevancia semántica.")
 
@@ -2160,11 +2531,18 @@ class RAGService:
             )
 
         # 5. Ensamblar System Prompt estricto + Golden Cache few-shot + historial y User Prompt
-        full_context = context_text
+        # Mantener el Golden Cache fuera del contexto documental: una respuesta
+        # histórica no es fuente oficial y no debe hacer parecer documentados sus
+        # hechos. Solo se ofrece como referencia de formato/tono.
+        system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=context_text, query=question)
         if golden_context:
-            full_context = f"{full_context}\n\n---\n[CASO DE REFERENCIA VALIDADO]:\n{golden_context.strip()}"
-
-        system_prompt = STRICT_SYSTEM_PROMPT_TEMPLATE.format(context=full_context, query=question)
+            system_prompt += (
+                "\n\n[REFERENCIA DE FORMATO; NO ES FUENTE DOCUMENTAL]\n"
+                "Usa el siguiente ejemplo únicamente para el tono y la organización. "
+                "No copies hechos, requisitos, pasos, contactos ni enlaces a menos que "
+                "también aparezcan en el contexto institucional documentado.\n"
+                f"{golden_context.strip()}"
+            )
         user_greeting = f"El usuario se llama {user_name}. " if user_name else ""
         role_ctx = f"[Rol del usuario: {user_role}] " if user_role else ""
         user_prompt = f"{user_greeting}{role_ctx}Consulta del usuario: {question}"
@@ -2194,20 +2572,47 @@ class RAGService:
             # Sanitizar saludos redundantes, placeholders, GLPI y enlaces duplicados
             bot_message = clean_llm_response(bot_message)
 
-            # Auto-Recuperación (Full Document Retry): Si el modelo indica que los fragmentos no especifican
-            # los pasos posteriores o carece de información suficiente, reintentar inyectando el documento completo
-            insufficient_patterns = [
-                r"la\s+informaci[oó]n\s+disponible\s+no\s+especifica",
-                r"no\s+especifica\s+los\s+pasos\s+posteriores",
-                r"no\s+se\s+especifica\s+en\s+la\s+documentaci[oó]n",
-                r"los\s+fragmentos\s+no\s+especifican",
-                r"el\s+contexto\s+no\s+proporciona",
-                r"no\s+contiene\s+informaci[oó]n\s+suficiente",
-                r"no\s+se\s+menciona\s+en\s+el\s+contexto",
-            ]
-            has_insufficient_doc = any(re.search(pat, bot_message, flags=re.IGNORECASE) for pat in insufficient_patterns)
-
-            # Se ha eliminado el mecanismo FullDocRetry por ser destructivo para el contexto multi-documento del RAG.
+            # Si el modelo se abstiene a pesar de tener fragmentos seleccionados,
+            # vuelve a leer esos mismos fragmentos una vez y pide una respuesta
+            # semántica y parcial. No se inyecta el documento completo ni se
+            # incorpora evidencia nueva o no verificada.
+            if retrieved_docs and _is_context_abstention(bot_message):
+                logger.warning(
+                    "[RAG] El LLM se abstuvo con %d fragmentos en contexto; reintentando una vez con grounding explícito.",
+                    len(retrieved_docs),
+                )
+                retry_messages = messages + [
+                    {"role": "assistant", "content": bot_message},
+                    {
+                        "role": "user",
+                        "content": (
+                            "Revisa de nuevo los fragmentos institucionales ya incluidos en el mensaje de sistema. "
+                            "La pregunta puede describir el mismo concepto con otras palabras. Responde con los "
+                            "hechos y pasos que sí estén sustentados; si falta algún detalle, limita la aclaración "
+                            "a ese detalle concreto. No digas que no hay documentación si los fragmentos contienen "
+                            "información relacionada. No inventes datos."
+                        ),
+                    },
+                ]
+                try:
+                    retry_res = await self.llm_client.chat_completion(
+                        messages=retry_messages,
+                        max_tokens=900,
+                        temperature=0.0,
+                    )
+                    retry_message = clean_llm_response((retry_res.get("content") or "").strip())
+                    prompt_tokens += retry_res.get("prompt_tokens", 0) or 0
+                    cached_tokens += retry_res.get("cached_tokens", 0) or 0
+                    eval_tokens += retry_res.get("eval_tokens", 0) or 0
+                    if retry_message and not _is_context_abstention(retry_message):
+                        bot_message = retry_message
+                        active_model = retry_res.get("model", active_model)
+                        active_source = retry_res.get("source", active_source)
+                        logger.info("[RAG] Reintento de generación produjo respuesta con grounding.")
+                    else:
+                        logger.warning("[RAG] El reintento mantuvo la abstención; conservando la respuesta original.")
+                except Exception as retry_exc:
+                    logger.warning("[RAG] Falló el reintento de grounding; se conserva la respuesta original: %s", retry_exc)
 
             if not bot_message:
                 bot_message = "Lo siento, ha ocurrido un error al procesar tu solicitud con el motor de IA. Por favor, contacta a Soporte TI."
@@ -2271,7 +2676,7 @@ class RAGService:
                 "quick_replies": []
             }
 
-        if any(w in msg_lower for w in ["votar", "votacion", "votación", "sufragio"]):
+        if _is_election_query(user_message):
             contenido = (
                 f"{saludo} Para el proceso de **Elecciones Institucionales y Votaciones** en la Universidad Simón Bolívar:\n\n"
                 "• El sufragio **no** se realiza en el Portal Estudiantes habitual ni en SIAAF.\n"

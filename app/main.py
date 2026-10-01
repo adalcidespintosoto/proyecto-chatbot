@@ -5,6 +5,7 @@ Configura middlewares de CORS, eventos de ciclo de vida (lifespan), endpoints de
 
 import asyncio
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,10 +20,19 @@ from app.services.telemetry_service import init_telemetry_db
 from app.services.rag_service import rag_service, get_embedding_model, get_reranker_model
 from app.services.golden_cache_service import init_golden_cache
 
-# Configuración básica de logging estructurado
+# Configuración básica de logging estructurado. La captura a archivo es optativa
+# (UNIMON_LOG_FILE) y se mantiene junto al proyecto para facilitar auditorías locales.
+log_handlers = [logging.StreamHandler()]
+log_file = os.getenv("UNIMON_LOG_FILE", "").strip()
+if log_file:
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=log_handlers,
 )
 logger = logging.getLogger("unimon.main")
 
@@ -38,20 +48,30 @@ async def lifespan(app: FastAPI):
     logger.info("=============================================================")
     logger.info(f"Iniciando {settings.app_name} v{settings.app_version}")
     logger.info(f"Entorno: {settings.environment} | GLPI URL: {settings.glpi_base_url}")
-    logger.info(f"Ollama URL: {settings.ollama_base_url} | Modelo: {settings.llm_model}")
+    provider = settings.llm_provider.strip().lower()
+    provider_models = {
+        "openai": settings.openai_model,
+        "gemini": settings.gemini_model,
+        "ollama": settings.llm_model,
+    }
+    logger.info("Proveedor LLM: %s | Modelo: %s", provider, provider_models.get(provider, "no configurado"))
     logger.info("=============================================================")
 
     # Inicializar Base de Datos de Telemetría
     init_telemetry_db()
 
-    # Pre-calentamiento (Warmup) de modelos de embeddings, reranker y golden cache para respuesta inmediata (<2s)
+    # Precalienta los componentes locales de recuperación y la Golden Cache.
     try:
         logger.info("Pre-cargando modelos RAG y Golden Cache en RAM (Warmup)...")
         get_embedding_model()
         _ = rag_service.vector_store
         get_reranker_model()
         init_golden_cache()
-        logger.info("Modelos RAG y Golden Cache listos en memoria (Modo 100% offline).")
+        logger.info(
+            "Embeddings, Cross-Encoder y Golden Cache locales listos; generación LLM configurada en %s (%s).",
+            provider,
+            provider_models.get(provider, "no configurado"),
+        )
     except Exception as e:
         logger.warning(f"Aviso durante el pre-calentamiento de modelos: {e}")
 
@@ -92,7 +112,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"])
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Backend oficial del Asistente Virtual de Soporte Técnico para la Universidad Simón Bolívar (USB). Provee conexión con GLPI REST API y módulo RAG con Ollama.",
+    description="Backend oficial del Asistente Virtual de Soporte Técnico para la Universidad Simón Bolívar (USB). Provee conexión con GLPI REST API y módulo RAG con proveedor LLM configurable.",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -166,12 +186,19 @@ async def health_check():
     """
     Endpoint de chequeo de salud y configuración activa.
     """
+    provider = settings.llm_provider.strip().lower()
+    provider_models = {
+        "openai": settings.openai_model,
+        "gemini": settings.gemini_model,
+        "ollama": settings.llm_model,
+    }
     return {
         "status": "healthy",
         "app": settings.app_name,
         "version": settings.app_version,
         "environment": settings.environment,
         "glpi_endpoint_configured": bool(settings.glpi_base_url and settings.glpi_app_token),
+        "llm_provider": provider,
+        "llm_model": provider_models.get(provider, "no configurado"),
         "ollama_endpoint": settings.ollama_base_url,
-        "llm_model": settings.llm_model
     }

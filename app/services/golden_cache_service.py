@@ -19,10 +19,11 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 from sentence_transformers import SentenceTransformer
+from app.config import get_settings
 
 logger = logging.getLogger("unimon.golden_cache")
 
-CHROMA_PATH = "data/chroma_db"
+CHROMA_PATH = get_settings().golden_cache_db_dir
 COLLECTION_NAME = "golden_resolved_qa"
 EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-large"
 
@@ -105,7 +106,12 @@ def get_golden_collection():
             name=COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"}
         )
-        logger.info(f"[GoldenCache] Colección '{COLLECTION_NAME}' inicializada ({_golden_collection.count()} casos).")
+        logger.info(
+            "[GoldenCache] Colección '%s' inicializada desde %s (%d casos).",
+            COLLECTION_NAME,
+            os.path.abspath(CHROMA_PATH),
+            _golden_collection.count(),
+        )
     return _golden_collection
 
 

@@ -56,10 +56,9 @@ class Settings(BaseSettings):
 
     # Configuración de ChromaDB y Embeddings
     chroma_db_dir: str = "./chroma_db"
+    golden_cache_db_dir: str = "./data/chroma_db"
     docs_dir: str = "./data/docs"
     embedding_model: str = "intfloat/multilingual-e5-large"
-    rag_inject_full_doc: bool = True  # Inyectar fragmentos; evita que un top-1 erróneo arrastre un documento completo
-    rag_max_chunks: int = 6
 
     # Límites de Seguridad
     max_upload_size_mb: int = 15
