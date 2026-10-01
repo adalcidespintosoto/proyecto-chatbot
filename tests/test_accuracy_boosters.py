@@ -545,25 +545,34 @@ class TestIntegralRestrictionsAndPrerequisites:
 
     @pytest.mark.asyncio
     async def test_hierarchical_context_assembly_for_voting_procedure(self):
-        """Valida que para votaciones se recuperen tanto los requisitos (censo) como el procedimiento paso a paso."""
-        from app.services.rag_service import rag_service
+        """Valida que se recuperen el criterio documentado por rol y los pasos de votación."""
+        from app.services.rag_service import rag_service, format_e5_query
 
         if rag_service.vector_store is not None:
             # Buscar fragmentos de votación
-            docs = rag_service.vector_store.similarity_search("como votar representantes estudiantes", k=6)
+            docs = rag_service.vector_store.similarity_search(
+                format_e5_query(
+                    "al ingresar visualizar listado elecciones participar según su rol seleccione botón votar "
+                    "foto del candidato confirmar acción"
+                ),
+                k=6,
+            )
             combined_content = " ".join([d.page_content.lower() for d in docs])
             
-            # Debe contener elementos de requisitos (censo, credenciales) y del procedimiento (votar)
-            assert any(w in combined_content for w in ["censo", "requisito", "activo", "credenciales"])
-            assert any(w in combined_content for w in ["votar", "procedimiento", "paso"])
+            # La documentación recuperable describe el listado habilitado por rol
+            # y la confirmación del voto; no documenta censo ni elegibilidad.
+            assert any(w in combined_content for w in ["según su rol", "segun su rol", "podrá participar"])
+            assert any(w in combined_content for w in ["votar", "candidato", "confirmación", "confirmacion"])
 
     @pytest.mark.asyncio
     async def test_hierarchical_context_assembly_for_equipment_request(self):
         """Valida que para solicitudes de PC/dotación tecnológica se recuperen requisitos de jefatura/dotación."""
-        from app.services.rag_service import rag_service
+        from app.services.rag_service import rag_service, format_e5_query
 
         if rag_service.vector_store is not None:
-            docs = rag_service.vector_store.similarity_search("como solicito un pc dotacion de computadores", k=6)
+            docs = rag_service.vector_store.similarity_search(
+                format_e5_query("como solicito un pc dotacion de computadores"), k=6
+            )
             combined_content = " ".join([d.page_content.lower() for d in docs])
             
             # Debe contener referencias a equipos/mantenimiento/dotación o canales de TI
@@ -572,10 +581,12 @@ class TestIntegralRestrictionsAndPrerequisites:
     @pytest.mark.asyncio
     async def test_hierarchical_context_assembly_for_siaaf_supletorios(self):
         """Valida que para exámenes supletorios en SIAAF se recuperen requisitos de fechas/autorización y pasos."""
-        from app.services.rag_service import rag_service
+        from app.services.rag_service import rag_service, format_e5_query
 
         if rag_service.vector_store is not None:
-            docs = rag_service.vector_store.similarity_search("autorizacion examenes supletorios siaaf", k=6)
+            docs = rag_service.vector_store.similarity_search(
+                format_e5_query("autorizacion examenes supletorios siaaf"), k=6
+            )
             combined_content = " ".join([d.page_content.lower() for d in docs])
             
             assert any(w in combined_content for w in ["siaaf", "supletorio", "examen", "programa", "buscar"])

@@ -81,12 +81,14 @@ def test_build_role_filter_unrestricted_otros():
     admin_filter = rag_service._build_role_filter("administrativo")
     assert admin_filter is not None
     assert "administrativo" in admin_filter["audience"]["$in"]
+    assert "funcionario" in admin_filter["audience"]["$in"]
     assert "general" in admin_filter["audience"]["$in"]
 
     # Rol 'profesor'
     prof_filter = rag_service._build_role_filter("profesor")
     assert prof_filter is not None
     assert "profesor" in prof_filter["audience"]["$in"]
+    assert "funcionario" in prof_filter["audience"]["$in"]
     assert "general" in prof_filter["audience"]["$in"]
 
     # Rol 'estudiante'

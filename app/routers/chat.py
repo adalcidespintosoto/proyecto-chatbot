@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Request, UploadFi
 from pydantic import BaseModel, Field
 
 from app.security import require_admin_auth
-from app.services.router_logic import router_logic, RouterLogic, EstadoTicket, IntentType
+from app.services.router_logic import router_logic, RouterLogic, EstadoTicket, IntentType, is_prompt_injection_query
 from app.services.glpi_service import glpi_client, GLPIService, GLPIException, is_valid_email
 from app.services.rag_service import rag_service, RAGService
 
@@ -110,15 +110,19 @@ def get_client_ip(request: Optional[Request]) -> str:
 
 
 
-def sanitize_input_text(text: str) -> str:
+def sanitize_input_text(text: str, neutralize_injections: bool = True) -> str:
     """Sanitiza el texto eliminando etiquetas HTML, neutralizando inyecciones de prompt y limitando a 600 caracteres."""
     # 1. Limitar longitud máxima a 600 caracteres
     clean = text[:600].strip()
     # 2. Eliminar etiquetas HTML / script
     clean = re.sub(r'<[^>]*>', '', clean).strip()
-    # 3. Neutralizar intentos de inyección de prompt
-    for pat in INJECTION_PATTERNS:
-        clean = re.sub(pat, "[consulta filtrada]", clean)
+    # 3. Neutralizar intentos de inyección de prompt en consultas normales.
+    # Si el guardrail ya identificó una inyección, preservamos sus palabras clave
+    # tras quitar HTML para que router_logic pueda rechazarla; de otro modo el
+    # reemplazo aquí la ocultaba antes de que RAG la detectara.
+    if neutralize_injections:
+        for pat in INJECTION_PATTERNS:
+            clean = re.sub(pat, "[consulta filtrada]", clean)
     return clean.strip()
 
 
@@ -145,7 +149,10 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
 
 
     # Sanitizar y validar longitud del mensaje (máx 600 chars)
-    texto = sanitize_input_text(raw_texto)
+    # Evaluar la señal de inyección antes de neutralizarla. Si se reemplaza primero,
+    # "ignora todas las instrucciones" desaparece y llega al RAG como consulta normal.
+    prompt_injection = is_prompt_injection_query(raw_texto)
+    texto = sanitize_input_text(raw_texto, neutralize_injections=not prompt_injection)
     if not texto:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

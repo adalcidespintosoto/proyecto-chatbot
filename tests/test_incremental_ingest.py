@@ -19,6 +19,8 @@ from scripts.ingest_multimodal_docs import (
     generate_deterministic_chunk_ids,
     delete_document_chunks,
     get_existing_sources,
+    is_useful_image_description,
+    strip_chunk_boilerplate as strip_ingest_chunk_boilerplate,
     ingest_multimodal
 )
 
@@ -37,6 +39,25 @@ def test_deterministic_chunk_ids():
     assert ids[1] == "P-GT-01_Mantenimiento_p1_c1"
     assert ids[2] == "P-GT-01_Mantenimiento_p2_c0"
     assert ids[3] == "Manual_Docentes_p1_c0"
+
+
+def test_vision_refusals_and_decorative_images_are_not_indexed_as_content():
+    assert not is_useful_image_description("Lo siento, pero no puedo ayudar con la descripción de imágenes.")
+    assert not is_useful_image_description("[IMAGEN_NO_RELEVANTE]")
+    assert is_useful_image_description("La captura muestra el botón Guardar y el campo de usuario.")
+
+
+def test_ingestion_cleaner_preserves_document_instructions():
+    text = (
+        "UNIVERSIDAD SIMÓN BOLÍVAR\n"
+        "Para ingresar al portal de la Universidad Simón Bolívar, sigue el procedimiento.\n"
+        "Digite su usuario y contraseña institucional para acceder al sistema, y luego presione el botón Acceder."
+    )
+
+    cleaned = strip_ingest_chunk_boilerplate(text)
+
+    assert "Para ingresar al portal de la Universidad Simón Bolívar" in cleaned
+    assert "Digite su usuario y contraseña institucional" in cleaned
 
 
 def test_delete_and_upsert_chunks(tmp_path):
