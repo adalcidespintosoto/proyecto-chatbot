@@ -42,5 +42,11 @@
     "role": "estudiante",
     "query": "Olvidé mi usuario o contraseña del Portal Estudiantes, ¿cómo la restablezco?",
     "expected_sources": ["Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf"]
+  },
+  {
+    "id": "new_pregrado_enrollment_report_steps",
+    "role": "estudiante",
+    "query": "¿Cómo genero el consolidado de inscripciones y matrículas de Estudiantes Nuevos de Pregrado?",
+    "expected_sources": ["1. Estudiantes Nuevos Pregrado.pptx"]
   }
 ]

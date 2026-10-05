@@ -1565,12 +1565,41 @@ def _is_step_by_step_query(question: str) -> bool:
     q = (question or "").casefold()
     return bool(re.search(
         r"\b(?:paso\s+a\s+paso|pasos|procedimiento|instructivo|gu[ií]a|"
-        r"c[oó]mo\s+(?:hacer|realizar|completar|llevar\s+a\s+cabo|"
+        r"c[oó]mo\s+(?:hacer|realizar|completar|gener\w*|obten\w*|consult\w*|"
+        r"sacar|descarg\w*|llevar\s+a\s+cabo|"
         r"ingres\w*|activ\w*|restablec\w*|recuper\w*|registr\w*|solicit\w*|"
         r"radic\w*|inscrib\w*|configur\w*|acced\w*|vot\w*|guard\w*|finaliz\w*)|"
         r"desde\s+.+\s+hasta|primero.{0,80}(?:luego|despu[eé]s|finalmente))\b",
         q,
     ))
+
+
+def _is_new_pregrado_report_query(question: str) -> bool:
+    """Detecta consultas sobre el informe operativo de estudiantes nuevos."""
+    q = _fold_accents(question or "")
+    return (
+        any(term in q for term in ("estudiantes nuevos", "estudiante nuevo", "nuevo pregrado"))
+        and any(term in q for term in ("consolidado", "inscripciones", "matriculas"))
+        and any(term in q for term in ("gener", "como", "paso", "reporte", "informe"))
+    )
+
+
+def _select_new_pregrado_report_anchors(
+    candidates: list[tuple[Document, float]],
+) -> list[tuple[Document, str]]:
+    """Prioriza las diapositivas del informe pedido y su entrada al módulo."""
+    anchors: list[tuple[Document, float]] = []
+    for doc, score in candidates:
+        metadata = doc.metadata or {}
+        source = Path(str(metadata.get("source") or "")).name.casefold()
+        text = _fold_accents(strip_chunk_boilerplate(doc.page_content or ""))
+        if "1. estudiantes nuevos pregrado" not in source:
+            continue
+        if "seleccionar el informe" in text or "ingrese desde su navegador" in text or "opcion portales" in text:
+            anchors.append((doc, score))
+    # La expansión contigua de cada ancla aporta la diapositiva de filtros y
+    # genera PDF junto a la selección del informe, en orden verificable.
+    return anchors[:2]
 
 
 def _is_safe_first_line_self_help_query(question: str) -> bool:
@@ -1605,7 +1634,7 @@ def _fit_context_budget(
 ) -> list[tuple[Document, str]]:
     """Conserva los primeros chunks completos dentro del presupuesto estimado."""
     if budget is None:
-        budget = 2400 if _is_step_by_step_query(question) else 900
+        budget = 2400
     fitted = []
     used = 0
     for doc, text in chunks:
@@ -2432,13 +2461,12 @@ class RAGService:
 
         # 3. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
         procedural_query = _is_step_by_step_query(question)
+        new_pregrado_report_query = _is_new_pregrado_report_query(question)
         onboarding_context_query = _is_onboarding_query(question)
-        # Las consultas de primer ingreso suelen distribuir la identificación
-        # de credenciales y la activación en páginas consecutivas. Aunque se
-        # formulen como una pregunta directa, necesitan más de los 4 chunks de
-        # una consulta simple para no perder el fragmento exacto del recibo.
-        context_budget_tokens = 2400 if procedural_query else 1500 if onboarding_context_query else 900
-        max_anchor_chunks = 6 if procedural_query else 3
+        # Todas las consultas comparten el mismo presupuesto amplio. El detector
+        # procedural queda solo para ordenar y expandir páginas contiguas.
+        context_budget_tokens = 2400
+        max_anchor_chunks = 6
         if valid_docs_with_scores:
             if is_election_query:
                 if _is_election_voting_query(question):
@@ -2522,6 +2550,21 @@ class RAGService:
                             sources.append(source_filename)
                         page_info = _format_page_info(doc.metadata)
                         context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
+                elif new_pregrado_report_query:
+                    report_anchors = _select_new_pregrado_report_anchors(valid_docs_with_scores)
+                    contextual_chunks = _expand_chunks_with_neighbors(
+                        report_anchors,
+                        self.vector_store._collection,
+                        metadata_filter=filter_condition,
+                        preserve_document_order=True,
+                    )
+                    for doc, cleaned_chunk in contextual_chunks:
+                        source_path = doc.metadata.get("source", "Procedimiento Unisimon")
+                        source_filename = Path(source_path).name if source_path else "Procedimiento Unisimon"
+                        retrieved_docs.append(doc)
+                        if source_filename not in sources:
+                            sources.append(source_filename)
+                        context_parts.append(f"[{source_filename}{_format_page_info(doc.metadata)}]\n{cleaned_chunk}")
                 elif onboarding_context_query:
                     anchor_chunks = _select_onboarding_context_chunks(
                         reranked or [], valid_docs_with_scores, max_chunks=max_anchor_chunks
@@ -2588,7 +2631,7 @@ class RAGService:
                 list(zip(retrieved_docs, [part.split("\n", 1)[-1] for part in context_parts])),
                 question,
                 budget=context_budget_tokens,
-                max_chunks=12 if procedural_query else 8 if onboarding_context_query else 4,
+                max_chunks=12,
             )
             retrieved_docs = [doc for doc, _text in budgeted_chunks]
             context_parts = []
@@ -2604,7 +2647,7 @@ class RAGService:
                 sum(_estimated_context_tokens(part) for part in context_parts),
                 context_budget_tokens,
                 len(context_parts),
-                "procedimiento" if procedural_query else "consulta simple",
+                "ampliado",
             )
             emit_retrieval_trace("final_context", [
                 (doc, None, text) for doc, text in budgeted_chunks
@@ -2748,6 +2791,14 @@ class RAGService:
                 "Integra la evidencia complementaria de GIE con esta condición: al finalizar el proceso de matrícula se indica el usuario institucional y se genera el recibo para descargar. "
                 "No sustituyas la respuesta concreta por instrucciones genéricas del Portal, no digas que falta ese dato cuando aparece en los fragmentos, y no afirmes una clave temporal que los fragmentos recuperados no indiquen. "
                 "Después de resolver la pregunta principal, agrega solo el siguiente paso de acceso si la pregunta también lo solicita."
+            )
+        if new_pregrado_report_query:
+            system_policy_instructions.append(
+                "Para generar el informe de Estudiantes Nuevos Pregrado, explica en orden las acciones documentadas: "
+                "seleccionar el módulo Rectoría, abrir el informe «Estudiantes Nuevos Pregrado», aplicar los filtros "
+                "Año, Periodo y Fecha, y presionar «Generar» para obtener el PDF. El título del informe y el título "
+                "del instructivo identifican el consolidado solicitado; no agregues una duda sobre si es el informe "
+                "correcto. No inventes valores para los filtros ni requisitos adicionales."
             )
 
         # 5. Ensamblar System Prompt estricto + Golden Cache few-shot + historial y User Prompt
