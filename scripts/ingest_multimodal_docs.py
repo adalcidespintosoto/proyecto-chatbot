@@ -636,6 +636,21 @@ def generate_deterministic_chunk_ids(chunks: List[Document]) -> List[str]:
     return ids
 
 
+def _distance_to_similarity(distance: float, metric: str) -> float:
+    """Convierte distancias Chroma a similitud para embeddings normalizados."""
+    metric = (metric or "l2").casefold()
+    if metric in {"l2", "euclidean"}:
+        # Chroma reporta L2 al cuadrado. Para vectores unitarios,
+        # ||a-b||² = 2 - 2*cos(a,b).
+        similarity = 1.0 - float(distance) / 2.0
+    elif metric in {"cosine", "ip", "inner_product"}:
+        # cosine distance = 1-cos; normalized inner product = cosine.
+        similarity = 1.0 - float(distance) if metric == "cosine" else 1.0 - float(distance)
+    else:
+        raise ValueError(f"Métrica de distancia Chroma no soportada: {metric}")
+    return max(-1.0, min(1.0, similarity))
+
+
 # =============================================================================
 # DETECCIÓN DE REDUNDANCIA Y CONTROL DE ADMISIÓN (PRE-FLIGHT CHECK)
 # =============================================================================
@@ -674,6 +689,9 @@ def calculate_chunk_redundancy(
     try:
         col = vector_store._collection
         col_count = col.count()
+        configuration = getattr(col, "configuration", None) or {}
+        collection_metadata = getattr(col, "metadata", None) or {}
+        metric = (configuration.get("hnsw") or {}).get("space") or collection_metadata.get("hnsw:space", "l2")
     except Exception:
         col = None
         col_count = 0
@@ -745,7 +763,7 @@ def calculate_chunk_redundancy(
                     best_matched_doc = str(docs[k]).strip()
                 break
 
-            similarity = max(0.0, 1.0 - best_dist) if best_dist < 900.0 else 0.0
+            similarity = _distance_to_similarity(best_dist, metric) if best_dist < 900.0 else 0.0
             matched_src = best_meta.get("source", "desconocido") if best_meta else None
 
             is_redundant = (similarity >= threshold) and (matched_src is not None)
@@ -781,6 +799,8 @@ def calculate_chunk_redundancy(
             status_str = "redundant" if is_redundant else ("ambiguous" if is_ambiguous else "novel")
             chunk_results.append({
                 "chunk": chunk,
+                "distance": best_dist if best_dist < 900.0 else None,
+                "distance_metric": metric,
                 "similarity": similarity,
                 "matched_source": matched_src,
                 "matched_chunk_snippet": best_matched_doc.strip(),

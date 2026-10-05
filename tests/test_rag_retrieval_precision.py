@@ -23,6 +23,8 @@ from app.services.rag_service import (
     _is_ambiguous_student_password_query,
     _select_forgotten_email_context_chunks,
     _expand_chunks_with_neighbors,
+    _fit_context_budget,
+    _is_step_by_step_query,
 )
 
 
@@ -423,6 +425,24 @@ def test_forgotten_password_stays_in_password_flow_and_not_email_identity_flow()
     assert _is_ambiguous_student_password_query(question, None)
 
 
+def test_mixed_forgotten_user_or_password_query_keeps_recovery_manual():
+    question = "Olvidé mi usuario o contraseña del Portal Estudiantes, ¿cómo la restablezco?"
+    reset_manual = make_doc(
+        "Restablecimiento de contraseña.pdf",
+        "Para recuperar o restablecer la contraseña del Portal de Estudiantes, digite su documento y siga el enlace.",
+    )
+    unrelated = make_doc("Manual de Microsoft Teams.pdf", "Inicie sesión en Teams con su cuenta institucional.")
+
+    ranked = rerank_chunks(
+        question,
+        [(unrelated, 0.9), (reset_manual, 0.8)],
+        top_k=2,
+        original_query=question,
+    )
+
+    assert [doc.metadata["source"] for doc, _score in ranked] == ["Restablecimiento de contraseña.pdf"]
+
+
 def test_forgotten_email_context_keeps_identification_steps_and_drops_payment_noise():
     gie = make_doc(
         "GIE - ASPIRANTES NOV.2021.pptx",
@@ -476,11 +496,11 @@ def test_context_expansion_adds_only_adjacent_chunks_from_same_page():
 
     class FakeCollection:
         def get(self, **kwargs):
-            assert kwargs["where"] == {"$and": [{"source": "Manual TI.pdf"}, {"page_number": 4}]}
+            page = kwargs["where"]["$and"][1]["page_number"]
             return {
-                "ids": [chunk_id for chunk_id, _, _ in page_chunks[:3]],
-                "documents": [text for _, text, _ in page_chunks[:3]],
-                "metadatas": [metadata for _, _, metadata in page_chunks[:3]],
+                "ids": [chunk_id for chunk_id, _, metadata in page_chunks if metadata["page_number"] == page],
+                "documents": [text for _, text, metadata in page_chunks if metadata["page_number"] == page],
+                "metadatas": [metadata for _, _, metadata in page_chunks if metadata["page_number"] == page],
             }
 
     anchor = make_doc("Manual TI.pdf", "Chunk relevante")
@@ -488,7 +508,48 @@ def test_context_expansion_adds_only_adjacent_chunks_from_same_page():
     expanded = _expand_chunks_with_neighbors([(anchor, "Chunk relevante")], FakeCollection())
 
     assert [text for _, text in expanded] == ["Paso anterior", "Chunk relevante", "Paso siguiente"]
-    assert all("otra página" not in text for _, text in expanded)
+    assert [text for _, text in expanded] == ["Paso anterior", "Chunk relevante", "Paso siguiente"]
+
+
+def test_context_expansion_crosses_page_boundary_in_verified_document_order():
+    rows = {
+        1: [("Manual_ab12cd_p1_c0", "Primer paso", {"source": "Manual.pdf", "page_number": 1})],
+        2: [("Manual_ab12cd_p2_c0", "Paso intermedio", {"source": "Manual.pdf", "page_number": 2})],
+        3: [("Manual_ab12cd_p3_c0", "Paso final", {"source": "Manual.pdf", "page_number": 3})],
+    }
+
+    class FakeCollection:
+        def get(self, **kwargs):
+            page = kwargs["where"]["$and"][1]["page_number"]
+            page_rows = rows.get(page, [])
+            return {
+                "ids": [row[0] for row in page_rows],
+                "documents": [row[1] for row in page_rows],
+                "metadatas": [row[2] for row in page_rows],
+            }
+
+    anchor = make_doc("Manual.pdf", "Paso intermedio")
+    anchor.metadata["page_number"] = 2
+    expanded = _expand_chunks_with_neighbors([(anchor, "Paso intermedio")], FakeCollection())
+    assert [(doc.metadata["page_number"], text) for doc, text in expanded] == [
+        (1, "Primer paso"), (2, "Paso intermedio"), (3, "Paso final")
+    ]
+
+
+def test_procedural_context_budget_is_larger_and_keeps_chunks_whole():
+    question = "¿Cuál es el paso a paso para realizar el trámite?"
+    simple_question = "¿Cuál es el horario?"
+    assert _is_step_by_step_query(question)
+    assert not _is_step_by_step_query(simple_question)
+    chunks = [
+        (make_doc("Manual.pdf", f"Texto del paso {index}. " * 45), f"Texto del paso {index}. " * 45)
+        for index in range(8)
+    ]
+    procedural = _fit_context_budget(chunks, question)
+    simple = _fit_context_budget(chunks, simple_question)
+    assert 3 < len(procedural) <= 8
+    assert len(simple) < len(procedural)
+    assert all(text.endswith(" ") or text.endswith(".") for _, text in procedural + simple)
 
 
 def test_context_expansion_keeps_anchor_when_chunk_order_cannot_be_verified():

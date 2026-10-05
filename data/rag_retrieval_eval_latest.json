@@ -1,0 +1,954 @@
+{
+  "collection_count": 7307,
+  "collection_name": "langchain",
+  "cases": [
+    {
+      "id": "teacher_grades_step_by_step",
+      "role": "profesor",
+      "query": "¿Cuál es el paso a paso para ingresar, guardar borrador y finalizar notas de estudiantes en Portal Profesores?",
+      "expected_sources": [
+        "Calificaciones.pdf"
+      ],
+      "candidates": [
+        {
+          "source": "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+          "page": 15,
+          "score": 0.8524150190201893,
+          "text": "En la parte superior del diagrama, se encuentra una etiqueta con el texto \"Início\" (Inicio), que es el punto de partida del proceso. A partir de ahí, hay una serie de pasos representados por etiquetas con números y flechas que indican la secuencia en la que se deben realizar las acciones.\n\nLos pasos representados incluyen:\n\n1. \"Verificar\" (Verificar)\n2. \"Aceitar\" (Aceitar)\n3. \"Rechazar\" (Rechazar)\n4. \"Confirmar\" (Confirmar)\n5. \"Finalizar\" (Finalizar)\n\nCada paso tiene una etiqueta con un número y una flecha que lo conecta con el paso anterior o con el siguiente paso en la secuencia.\n\nEn la parte inferior del diagrama, hay una etiqueta con el texto \"Finalizar\" (Finalizar), que es el punto de llegada del proceso."
+        },
+        {
+          "source": "Bancos y cuentas_v1_20211007.pdf",
+          "page": 5,
+          "score": 0.8372968424662113,
+          "text": "\"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y"
+        },
+        {
+          "source": "SITE 2.0.pptx",
+          "page": 42,
+          "score": 0.836740262000624,
+          "text": "Como segundo paso debemos seleccionar el o los eventos a los cuales le aplicaremos dicha configuración de logística. Siendo este segundo paso practico con el fin de agilizar el proceso creación de logística ya que varios eventos pueden tener la misma configuración.\n\n[Imagen: La imagen muestra una interfaz web de un sistema de gestión de eventos, posiblemente una herramienta de gestión de logística o de eventos. En la parte superior de la pantalla, se encuentra el menú principal con opciones como \"Inicio\", \"Eventos\", \"Lista de eventos\", \"Tipo\", \"Evento\", \"Salón\", \"Fecha\", \"Hora\", \"Confirmar\" y \"Guardar\"."
+        },
+        {
+          "source": "Bancos y cuentas_v1_20211007.pdf",
+          "page": 5,
+          "score": 0.8360856640401584,
+          "text": "de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Prof]"
+        },
+        {
+          "source": "Bancos y cuentas_v1_20211007.pdf",
+          "page": 5,
+          "score": 0.8346672273203052,
+          "text": ". En la parte superior de la página, se encuentra el logo de la universidad y el menú principal con opciones como \"Inicio\", \"Acerca de la USB\", \"Estudios\", \"Investigación\", \"Extensión\", \"Comunidad\", \"Convocatorias\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\","
+        },
+        {
+          "source": "Manual de Usuario - Portal CovidApp.pdf",
+          "page": 22,
+          "score": 0.8338298758321055,
+          "text": "Bloqueos – Bloqueo individual de usuario \nPara realizar el registro de un estudiante o funcionario bloqueado, el usuario debe ingresar en la\nsiguiente opción\n.\nLuego de ingresar se abrirá un pequeño formulario donde el usuario deberá ingresar el tipo y\nnumero de documento a bloquear.\nPaso siguiente a lo anterior mencionado, debe\nrealizar\nla\nbúsqueda\ndel\nestudiante\no\nfuncionario a bloquear.\nComo resultado obtendremos la información\nbásica de dicho usuario.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Autoevaluacion por Grupos - Funcionarios.pdf",
+          "page": 3,
+          "score": 0.8336413999570782,
+          "text": "\"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"]"
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 8,
+          "score": 0.8729696514692564,
+          "text": "Calificaciones - Estudiantes  \nGuardar Borrador: si desea mantener un registro temporal de las calificaciones sin finalizar el \nproceso presione el botón «Guardar Borrador».  \nFinalizar: para enviar las notas contenidas en el borrador, presione el botón «Finalizar».\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Reporte - Asignaturas por Grupos.pptx",
+          "page": 3,
+          "score": 0.8045022225038546,
+          "text": "Dirigirse a la sección «Profesores y Administrativos», digite su usuario y contraseña para acceder al sistema y luego presione sobre el botón “Ingresar”"
+        },
+        {
+          "source": "Reportes créditos general.pptx",
+          "page": 3,
+          "score": 0.8008295039777669,
+          "text": "Dirigirse a la sección «Profesores y Administrativos», digite su usuario y contraseña para acceder al sistema y luego presione sobre el botón “Ingresar”\n\nAcceso"
+        },
+        {
+          "source": "Gestión de Ayudas Educativas.pdf",
+          "page": 7,
+          "score": 0.8005405451843761,
+          "text": "Para\niniciar,\ningrese\ndocumento\no\ncódigo, al cual se asociará la ayuda\neducativa, al presionar la tecla “Enter”,\nel\nsistema\nbuscará\nel\nnombre\ndel\nestudiante. Luego diligencie todos los\ndemás\ncampos\ny\npara\nfinalizar,\nseleccione el botón «Guardar».\nPara\nsu\ncomodidad\nlos\ncampos\npermiten\ningresar\ntexto\npara\nautocompletar la búsqueda.\nEl sistema le mostrará un mensaje con\nel\nnúmero\nde\nla\nayuda\neducativa\ngenerada.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 4,
+          "score": 0.9067787680633465,
+          "text": "Calificaciones - Programas Académicos \nPara realizar el ingreso de calificaciones deberá seleccionar en el menú lateral la opción «Registro \nde Calificaciones»,  posteriormente seleccione el Programa Académico al cual pertenece la \nasignatura en la que desea registrar las calificaciones.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones Posgrados-S3-DITI-PC07.pdf",
+          "page": 4,
+          "score": 0.8835167949419864,
+          "text": "Registro de calificaciones\nSeleccione en el menú lateral la opción “Registro de Calificaciones” y luego escoja el programa académico al que\ncorresponda el curso en el que desea ingresar las calificaciones.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 5,
+          "score": 0.8593482536458692,
+          "text": "Calificaciones - Asignaturas \nSeleccione de entre el listado de asignaturas que corresponda al período académico para el que va \na ingresar las calificaciones, el botón «Calificaciones»  (o «Diferido» según sea el caso) que se \nencuentra debajo del parcial a ingresar (Primero, segundo o examen final) de la asignatura y el \ngrupo deseado. Para el caso de asignaturas de posgrados, módulos o vacacionales, sólo aparecerá \nla opción «Definitiva».\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones Posgrados.pdf",
+          "page": 4,
+          "score": 0.8550290867573213,
+          "text": "Registro de calificaciones\nEscoja el programa académico al que corresponda el curso en el que desea ingresar las calificaciones.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pptx",
+          "page": 4,
+          "score": 0.8524778853333962,
+          "text": "Ingreso a Programas\n\nPara iniciar el proceso, seleccione el icono de «Registro y Control Académico»."
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 7,
+          "score": 0.8758215811940189,
+          "text": "Calificaciones - Estudiantes  \nUno a uno ingrese en el campo numérico la calificación correspondiente, si desea registrar «N.P» \nseleccione con un clic la casilla que se encuentra justo al lado del campo numérico, esto inhabilitará \nel campo numérico indicándole al sistema que no se debe digitar calificación para ese estudiante.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Calificaciones.pdf",
+          "page": 8,
+          "score": 0.8729696514692564,
+          "text": "Calificaciones - Estudiantes  \nGuardar Borrador: si desea mantener un registro temporal de las calificaciones sin finalizar el \nproceso presione el botón «Guardar Borrador».  \nFinalizar: para enviar las notas contenidas en el borrador, presione el botón «Finalizar».\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 5,
+          "score": 0.8593482536458692,
+          "text": "Calificaciones - Asignaturas \nSeleccione de entre el listado de asignaturas que corresponda al período académico para el que va \na ingresar las calificaciones, el botón «Calificaciones»  (o «Diferido» según sea el caso) que se \nencuentra debajo del parcial a ingresar (Primero, segundo o examen final) de la asignatura y el \ngrupo deseado. Para el caso de asignaturas de posgrados, módulos o vacacionales, sólo aparecerá \nla opción «Definitiva».\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 4,
+          "score": 0.9067787680633465,
+          "text": "Calificaciones - Programas Académicos \nPara realizar el ingreso de calificaciones deberá seleccionar en el menú lateral la opción «Registro \nde Calificaciones»,  posteriormente seleccione el Programa Académico al cual pertenece la \nasignatura en la que desea registrar las calificaciones.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 7,
+          "score": 0.8758215811940189,
+          "text": "Calificaciones - Estudiantes  \nUno a uno ingrese en el campo numérico la calificación correspondiente, si desea registrar «N.P» \nseleccione con un clic la casilla que se encuentra justo al lado del campo numérico, esto inhabilitará \nel campo numérico indicándole al sistema que no se debe digitar calificación para ese estudiante.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones Posgrados.pdf",
+          "page": 4,
+          "score": 0.8550290867573213,
+          "text": "Registro de calificaciones\nEscoja el programa académico al que corresponda el curso en el que desea ingresar las calificaciones.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Calificaciones Posgrados-S3-DITI-PC07.pdf",
+          "page": 4,
+          "score": 0.8835167949419864,
+          "text": "Registro de calificaciones\nSeleccione en el menú lateral la opción “Registro de Calificaciones” y luego escoja el programa académico al que\ncorresponda el curso en el que desea ingresar las calificaciones.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Bancos y cuentas_v1_20211007.pdf",
+          "page": 5,
+          "score": 0.8346672273203052,
+          "text": ". En la parte superior de la página, se encuentra el logo de la universidad y el menú principal con opciones como \"Inicio\", \"Acerca de la USB\", \"Estudios\", \"Investigación\", \"Extensión\", \"Comunidad\", \"Convocatorias\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\","
+        },
+        {
+          "source": "Bancos y cuentas_v1_20211007.pdf",
+          "page": 5,
+          "score": 0.8372968424662113,
+          "text": "\"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y"
+        },
+        {
+          "source": "Gestión de Ayudas Educativas.pdf",
+          "page": 7,
+          "score": 0.8005405451843761,
+          "text": "Para\niniciar,\ningrese\ndocumento\no\ncódigo, al cual se asociará la ayuda\neducativa, al presionar la tecla “Enter”,\nel\nsistema\nbuscará\nel\nnombre\ndel\nestudiante. Luego diligencie todos los\ndemás\ncampos\ny\npara\nfinalizar,\nseleccione el botón «Guardar».\nPara\nsu\ncomodidad\nlos\ncampos\npermiten\ningresar\ntexto\npara\nautocompletar la búsqueda.\nEl sistema le mostrará un mensaje con\nel\nnúmero\nde\nla\nayuda\neducativa\ngenerada.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Bancos y cuentas_v1_20211007.pdf",
+          "page": 5,
+          "score": 0.8360856640401584,
+          "text": "de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Prof]"
+        },
+        {
+          "source": "Autoevaluacion por Grupos - Funcionarios.pdf",
+          "page": 3,
+          "score": 0.8336413999570782,
+          "text": "\"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"]"
+        },
+        {
+          "source": "Manual de Usuario - Portal CovidApp.pdf",
+          "page": 22,
+          "score": 0.8338298758321055,
+          "text": "Bloqueos – Bloqueo individual de usuario \nPara realizar el registro de un estudiante o funcionario bloqueado, el usuario debe ingresar en la\nsiguiente opción\n.\nLuego de ingresar se abrirá un pequeño formulario donde el usuario deberá ingresar el tipo y\nnumero de documento a bloquear.\nPaso siguiente a lo anterior mencionado, debe\nrealizar\nla\nbúsqueda\ndel\nestudiante\no\nfuncionario a bloquear.\nComo resultado obtendremos la información\nbásica de dicho usuario.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pptx",
+          "page": 4,
+          "score": 0.8524778853333962,
+          "text": "Ingreso a Programas\n\nPara iniciar el proceso, seleccione el icono de «Registro y Control Académico»."
+        },
+        {
+          "source": "Reportes créditos general.pptx",
+          "page": 3,
+          "score": 0.8008295039777669,
+          "text": "Dirigirse a la sección «Profesores y Administrativos», digite su usuario y contraseña para acceder al sistema y luego presione sobre el botón “Ingresar”\n\nAcceso"
+        },
+        {
+          "source": "Reporte - Asignaturas por Grupos.pptx",
+          "page": 3,
+          "score": 0.8045022225038546,
+          "text": "Dirigirse a la sección «Profesores y Administrativos», digite su usuario y contraseña para acceder al sistema y luego presione sobre el botón “Ingresar”"
+        }
+      ],
+      "final_chunks": [
+        {
+          "source": "Calificaciones.pdf",
+          "page": 3,
+          "score": null,
+          "text": "Calificaciones \nPara ingresar al módulo, se deberá seleccionar el ícono «Calificaciones»"
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 4,
+          "score": null,
+          "text": "Calificaciones - Programas Académicos \nPara realizar el ingreso de calificaciones deberá seleccionar en el menú lateral la opción «Registro \nde Calificaciones»,  posteriormente seleccione el Programa Académico al cual pertenece la \nasignatura en la que desea registrar las calificaciones."
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 5,
+          "score": null,
+          "text": "Calificaciones - Asignaturas \nSeleccione de entre el listado de asignaturas que corresponda al período académico para el que va \na ingresar las calificaciones, el botón «Calificaciones»  (o «Diferido» según sea el caso) que se \nencuentra debajo del parcial a ingresar (Primero, segundo o examen final) de la asignatura y el \ngrupo deseado. Para el caso de asignaturas de posgrados, módulos o vacacionales, sólo aparecerá \nla opción «Definitiva»."
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 6,
+          "score": null,
+          "text": "Calificaciones - Asignaturas \nNota: los botones «Calificaciones» y «Diferido» sólo se visualizan para cada parcial, si las fechas de \ningreso de notas para éste se encuentran activas."
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 7,
+          "score": null,
+          "text": "Calificaciones - Estudiantes  \nUno a uno ingrese en el campo numérico la calificación correspondiente, si desea registrar «N.P» \nseleccione con un clic la casilla que se encuentra justo al lado del campo numérico, esto inhabilitará \nel campo numérico indicándole al sistema que no se debe digitar calificación para ese estudiante."
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 8,
+          "score": null,
+          "text": "Calificaciones - Estudiantes  \nGuardar Borrador: si desea mantener un registro temporal de las calificaciones sin finalizar el \nproceso presione el botón «Guardar Borrador».  \nFinalizar: para enviar las notas contenidas en el borrador, presione el botón «Finalizar»."
+        },
+        {
+          "source": "Calificaciones.pdf",
+          "page": 9,
+          "score": null,
+          "text": "Calificaciones - Estudiantes  \nUna vez finalizado el proceso de ingreso de calificaciones, el sistema lo redireccionará a la \npantalla de asignaturas, si desea descargar el listado de las notas enviadas deberá dirigirse a la \nopción Listados del menú lateral del módulo de calificaciones. Si ingresa nuevamente a la \npantalla de calificaciones de una asignatura en la que ya envió las calificaciones, el sistema le \narrojará el siguiente mensaje:"
+        },
+        {
+          "source": "Calificaciones Posgrados.pdf",
+          "page": 3,
+          "score": null,
+          "text": "Módulo - Calificaciones\nUna vez que haya ingresado al Portal, seleccione la opción “Calificaciones”"
+        },
+        {
+          "source": "Calificaciones Posgrados.pdf",
+          "page": 4,
+          "score": null,
+          "text": "Registro de calificaciones\nEscoja el programa académico al que corresponda el curso en el que desea ingresar las calificaciones."
+        },
+        {
+          "source": "Calificaciones Posgrados.pdf",
+          "page": 5,
+          "score": null,
+          "text": "Registro de calificaciones\nEscoja el curso en el que desea ingresar las calificaciones teniendo en cuenta el período académico que se encuentra\nen la parte superior del mismo. Para iniciar el registro de las calificaciones, seleccione el icono en la celda de la\ncolumna “Definitiva”.\n\n[Imagen: La imagen muestra una interfaz web de un sistema de gestión de tecnología de la información (TI). En la parte superior, hay un menú desplegable con opciones como \"Inicio\", \"Mis datos\", \"Ayuda\", \"Cerrar sesión\", y \"Acerca de\"."
+        },
+        {
+          "source": "Calificaciones Posgrados-S3-DITI-PC07.pdf",
+          "page": 4,
+          "score": null,
+          "text": "Registro de calificaciones\nSeleccione en el menú lateral la opción “Registro de Calificaciones” y luego escoja el programa académico al que\ncorresponda el curso en el que desea ingresar las calificaciones."
+        }
+      ],
+      "expected_source_hit_candidates": true,
+      "expected_source_hit_reranked": true,
+      "expected_source_hit_final_chunks": true,
+      "estimated_final_context_tokens": 1002
+    },
+    {
+      "id": "new_student_activation",
+      "role": "estudiante",
+      "query": "Soy estudiante nuevo, ¿cómo activo mi usuario y correo institucional?",
+      "expected_sources": [
+        "Activar Usuario y Correo institucional.pdf"
+      ],
+      "candidates": [
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 2,
+          "score": 0.8690024002290624,
+          "text": "ACTIVAR USUARIO Y CORREO INSTITUCIONAL\nPRIMER SEMESTRE\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+          "page": 13,
+          "score": 0.8480161277703774,
+          "text": "3. A continuación, hay una lista de \"Estudiantes\" con campos como \"Número de matrícula\", \"Nombre\", \"Apellido\", \"Carrera\", \"Semestre\", \"Año\", \"Matrícula\", \"Clave\", y \"Contraseña\".\n\n4. En la parte inferior, hay una sección con un botón \"Iniciar sesión\" y otro que dice \"Registrarse\"."
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 17,
+          "score": 0.8419869973667161,
+          "text": "Finalizado el proceso se le indicará su usuario y correo institucional y podrá descargar el recibo de matrícula generado. Para primer ingreso en los programas de pregrado, se visualizará también el horario de clases.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos de interfaces de usuario o contenido de texto en imágenes.]"
+        },
+        {
+          "source": "Demo tipos de admisión.pptx",
+          "page": 22,
+          "score": 0.8372324075576385,
+          "text": "Información y Recibo de Matrícula"
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 11,
+          "score": 0.8361008471595648,
+          "text": "Asignaturas y Estados Académicos\n\nPara aceptar la proyección académica, deberá verificar las asignaturas proyectadas y presionar el botón «Aceptar»\n\nPara imprimir el recibo de matrícula, presionar el icono «Recibo matrícula»\n\n[Imagen: La imagen muestra una página web institucional de TI, posiblemente de una universidad o escuela. En la página, se pueden observar varias secciones y elementos:"
+        },
+        {
+          "source": "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+          "page": 13,
+          "score": 0.83425898233637,
+          "text": "Listado de Tutoría \nLuego de guardar una tutoría, se actualizará el listado de las tutorías realizadas \nAtención a Estudiantes\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: La imagen muestra una interfaz web de una institución educativa, posiblemente una universidad o escuela. En la pantalla se pueden observar varias secciones y elementos:\n\n1. En la parte superior, hay un menú principal con opciones como \"Inicio\", \"Acerca de nosotros\", \"Estudios\", \"Investigación\", \"Extensión\", \"Comunidad\", \"Vida universitaria\", \"Contacto\", y \"Ayuda\".\n\n2. En la sección central, hay un formulario con campos para \"Nombre\", \"Apellido\", \"Correo electrónico\", \"Teléfono\", \"Carrera\", \"Semestre\", \"Año\", \"Matrícula\", \"Clave\", y \"Contraseña\"."
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 8,
+          "score": 0.8318953559592677,
+          "text": "Cuando haya restablecido la contraseña de su Portal de Estudiantes, esa\nmisma contraseña le servirá para su Aula Extendida y Correo Estudiantil.\nRecuerde que para acceder a su correo institucional, siempre debe hacerlo a\ntravés de la página web de la Universidad, en la sección Servicios y luego\nCorreo Estudiantes, de lo contrario la cuenta no será reconocida.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "1. Estudiantes Nuevos Pregrado.pptx",
+          "page": 8,
+          "score": 0.8290751733481461,
+          "text": "Reporte Generado\n\n[Imagen: La imagen muestra un documento institucional, posiblemente un informe o un registro académico, con una estructura organizada en secciones y tablas. En la parte superior, hay un logotipo y un título que indica que es un documento relacionado con la educación.\n\nLa sección principal del documento está dividida en varias secciones, cada una con un título claro. En la sección \"ESTUDIANTES NOVOS PRIMER SEMESTRE\", se presentan datos estadísticos sobre la cantidad de estudiantes matriculados en el primer semestre, incluyendo información sobre la edad, género, nivel educativo, y otras estadísticas relevantes."
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 5,
+          "score": 0.8237307887802889,
+          "text": "El usuario y contraseña, se\nencuentran\nal\nfinal\ndel\nrecibo\nde\nmatrícula.\nEn\ncaso\nde\npresentar\ninconvenientes\ncon\nla\ncontraseña, escríbanos a\ntrabajodesdecasa@unisim\nonbolivar.edu.co con sus\ndatos personales.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen que no puedo ver.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la transcripción de textos en imágenes.]"
+        },
+        {
+          "source": "retorno al campus 2021.pdf",
+          "page": 3,
+          "score": 0.8197056301753018,
+          "text": "¿Es obligatorio el regreso\na la presencialidad?\nNo es obligatorio. Durante el proceso de matrícula, los \nestudiantes han escogido si desean sus cursos teórico-prácticos \nen presencialidad o remotos y, de acuerdo con esa escogencia, \nrealizarán su semestre 2021-1. Sin embargo, si desean \nmodiﬁcar esa decisión en el transcurso del semestre, podrán \ninformarlo a su profesor y director de programa para ajustar la \nmodalidad ya que, en 2021-1, la asistencia presencial es \nvoluntaria."
+        },
+        {
+          "source": "Como_acceder_MS_Teams_Estudiantes.pdf",
+          "page": 2,
+          "score": 0.8188283285445954,
+          "text": "¿Cómo acceder a Microsoft Teams?\nInicie sesión en su correo institucional de Microsoft accediendo desde el sitio web de\nUnisimon, en la Sección: Servicios --> Correo Estudiantes\n1"
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 16,
+          "score": 0.81874518230363,
+          "text": "Complete la información solicitada en el formulario dependiendo del semestre y tipo de \nmatrícula a realizar\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Activación de matrículas.pdf",
+          "page": 1,
+          "score": 0.8184808148683718,
+          "text": "ACTIVACIÓN DE \nMATRÍCULAS\nINSTRUCTIVO\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 2,
+          "score": 0.8183314979979582,
+          "text": "RESTABLECIMIENTO DE CONTRASEÑA\n(Contraseña unificada para el portal de estudiantes, aula extendida y correo \ninstitucional)\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 22,
+          "score": 0.8182947197529102,
+          "text": "Para modificar el grupo de una matrícula presione el icono «     » correspondiente al registro a actualizar.\nNota: el grupo solo se puede modificar cuando la matrícula sea de 1er. semestre."
+        },
+        {
+          "source": "Reporte - No matriculados (1).pdf",
+          "page": 8,
+          "score": 0.8182947197529102,
+          "text": "Seleccione los filtros correspondientes para la generación del reporte (Año de matricula, periodo de \nmatricula, semestre y estado académico). Posteriormente presione el botón “Buscar”\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Matricula de Cursos Intersemestrales.pptx",
+          "page": 8,
+          "score": 0.8140717487519502,
+          "text": "Seleccione los filtros de búsqueda de: año, periodo, programa y curso para realizar la oficialización de las matrículas\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes que contengan texto o elementos que puedan ser interpretados como texto. Esto se debe a que mi capacidad para leer texto está limitada y no puedo proporcionar información detallada sobre el contenido de una imagen. Sin embargo, puedo proporcionar información general sobre cómo describir elementos en una imagen institucional de TI, como menús, botones, campos y opciones, si es una captura de pantalla de software o interfaz web.]"
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 16,
+          "score": 0.8129434486405569,
+          "text": "Luego de culminar la encuesta poblacional, confirme la oficialización de su matrícula.\n\nEn caso de que ya posea una inscripción o matrícula anterior, el sistema le recordará su correo institucional. De lo contrario además de notificarle su nuevo correo estudiantil, le pedirá que establezca una contraseña, para continuar, seleccione el botón «Confirmar»\n\n[Imagen: La imagen muestra una pantalla de un sistema de gestión de tecnología de la información (TI) que parece ser una interfaz web. En la parte superior de la pantalla, hay un menú desplegable con la opción \"Oficializar matrícula\" seleccionada. A continuación, se presenta un formulario con campos de texto y botones."
+        },
+        {
+          "source": "Certificados Electrónicos.pptx",
+          "page": 1,
+          "score": 0.8125782962483908,
+          "text": "PORTAL DE ESTUDIANTES\n\nINSTRUCTIVO PARA GENERAR LA SOLICITUD Y DESCARGA DE CERTIFICADOS ELECTRÓNICOS"
+        },
+        {
+          "source": "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+          "page": 4,
+          "score": 0.8121313078465086,
+          "text": "Ingreso  \nPara iniciar el proceso, seleccione el icono de «Atención a Estudiantes».\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en una imagen.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Activación de matrículas.pdf",
+          "page": 7,
+          "score": 0.8116954583047431,
+          "text": "Seleccione uno o más registros, luego seleccione el botón “Activar”. Automáticamente aparecerá una nueva ventana\ndónde deberá seleccionar la fecha que se asignará a la(s) matrícula(s) seleccionada(s). Podrá escoger entre asignar la\nmisma fecha de activación o asignar una fecha especifica.\nPara finalizar, seleccione el botón “Guardar”.\nActivar matrícula(s)\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: La imagen muestra una interfaz de usuario de un sistema de gestión de activos tecnológicos (TI). En la parte superior de la pantalla, hay un menú principal con opciones como \"Inventario\", \"Mantenimiento\", \"Proyectos\", \"Reportes\", \"Administrador\", \"Usuarios\", \"Configuración\", \"Ayuda\" y \"Cerrar\"."
+        },
+        {
+          "source": "1. Estudiantes Nuevos Pregrado.pptx",
+          "page": 1,
+          "score": 0.8112926984427605,
+          "text": "SIAAF WEB\n\nINSTRUCTIVO PARA GENERAR EL INFORME DE INSCRIPCIONES Y MATRICULAS – ESTUDIANTES NUEVOS PREGRADO"
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 7,
+          "score": 0.8106119139576908,
+          "text": "Ingrese su código de estudiante o número de identificación y presione el botón “Enviar”\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: La imagen muestra una pantalla de un sistema de gestión de identidades y accesos (IAM) en un entorno de negocios. En la parte superior de la pantalla, se encuentra el menú principal con opciones como \"Inicio\", \"Configuración\", \"Usuarios\", \"Grupos\", \"Roles\", \"Políticas\", \"Auditoría\", \"Seguridad\", \"Informes\", \"Ayuda\" y \"Cerrar sesión\".\n\nEn el centro de la pantalla, hay un formulario de búsqueda con un campo de búsqueda y un botón \"Buscar\". A continuación, se muestra un campo de texto con el mensaje \"Recordar usuario: Contraeña\" y un campo de texto donde se puede ingresar una contraseña."
+        },
+        {
+          "source": "Reporte - Asignaturas por Grupos.pptx",
+          "page": 3,
+          "score": 0.8104115056930216,
+          "text": "Dirigirse a la sección «Profesores y Administrativos», digite su usuario y contraseña para acceder al sistema y luego presione sobre el botón “Ingresar”"
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 14,
+          "score": 0.8093599207492506,
+          "text": "Ingrese desde su navegador al sitio web de la Universidad: http://www.unisimon.edu.co/ y \nseleccionar en menú principal la opción «Servicios»\nACCESO AL CORREO ESTUDIANTE MICROSOFT\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 2,
+          "score": 0.8690024002290624,
+          "text": "ACTIVAR USUARIO Y CORREO INSTITUCIONAL\nPRIMER SEMESTRE\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 8,
+          "score": 0.8318953559592677,
+          "text": "Cuando haya restablecido la contraseña de su Portal de Estudiantes, esa\nmisma contraseña le servirá para su Aula Extendida y Correo Estudiantil.\nRecuerde que para acceder a su correo institucional, siempre debe hacerlo a\ntravés de la página web de la Universidad, en la sección Servicios y luego\nCorreo Estudiantes, de lo contrario la cuenta no será reconocida.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 5,
+          "score": 0.8237307887802889,
+          "text": "El usuario y contraseña, se\nencuentran\nal\nfinal\ndel\nrecibo\nde\nmatrícula.\nEn\ncaso\nde\npresentar\ninconvenientes\ncon\nla\ncontraseña, escríbanos a\ntrabajodesdecasa@unisim\nonbolivar.edu.co con sus\ndatos personales.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen que no puedo ver.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la transcripción de textos en imágenes.]"
+        },
+        {
+          "source": "1. Estudiantes Nuevos Pregrado.pptx",
+          "page": 8,
+          "score": 0.8290751733481461,
+          "text": "Reporte Generado\n\n[Imagen: La imagen muestra un documento institucional, posiblemente un informe o un registro académico, con una estructura organizada en secciones y tablas. En la parte superior, hay un logotipo y un título que indica que es un documento relacionado con la educación.\n\nLa sección principal del documento está dividida en varias secciones, cada una con un título claro. En la sección \"ESTUDIANTES NOVOS PRIMER SEMESTRE\", se presentan datos estadísticos sobre la cantidad de estudiantes matriculados en el primer semestre, incluyendo información sobre la edad, género, nivel educativo, y otras estadísticas relevantes."
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 16,
+          "score": 0.8129434486405569,
+          "text": "Luego de culminar la encuesta poblacional, confirme la oficialización de su matrícula.\n\nEn caso de que ya posea una inscripción o matrícula anterior, el sistema le recordará su correo institucional. De lo contrario además de notificarle su nuevo correo estudiantil, le pedirá que establezca una contraseña, para continuar, seleccione el botón «Confirmar»\n\n[Imagen: La imagen muestra una pantalla de un sistema de gestión de tecnología de la información (TI) que parece ser una interfaz web. En la parte superior de la pantalla, hay un menú desplegable con la opción \"Oficializar matrícula\" seleccionada. A continuación, se presenta un formulario con campos de texto y botones."
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 17,
+          "score": 0.8419869973667161,
+          "text": "Finalizado el proceso se le indicará su usuario y correo institucional y podrá descargar el recibo de matrícula generado. Para primer ingreso en los programas de pregrado, se visualizará también el horario de clases.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos de interfaces de usuario o contenido de texto en imágenes.]"
+        },
+        {
+          "source": "Como_acceder_MS_Teams_Estudiantes.pdf",
+          "page": 2,
+          "score": 0.8188283285445954,
+          "text": "¿Cómo acceder a Microsoft Teams?\nInicie sesión en su correo institucional de Microsoft accediendo desde el sitio web de\nUnisimon, en la Sección: Servicios --> Correo Estudiantes\n1"
+        }
+      ],
+      "final_chunks": [
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 1,
+          "score": null,
+          "text": "En la parte inferior de la imagen, se encuentra un texto que menciona que la universidad ha sido reconocida por la Asociación Colombiana de Educación Superior (ASCES) con el premio \"Reconocimiento a la Calidad\" en el año 2021.\n\nEn general, la imagen es una publicación institucional que celebra la calidad de la educación ofrecida por la Universidad de San Simón Bolívar y su reconocimiento por parte de la Asociación Colombiana de Educación Superior (ASCES).]"
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 2,
+          "score": null,
+          "text": "ACTIVAR USUARIO Y CORREO INSTITUCIONAL\nPRIMER SEMESTRE"
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 3,
+          "score": null,
+          "text": "Ingrese\na\nhttps://www.unisimon.edu.co/portales\nseleccione\n“Portal\nEstudiantes”."
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 4,
+          "score": null,
+          "text": "Seleccione  Barranquilla."
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 5,
+          "score": null,
+          "text": "El usuario y contraseña, se\nencuentran\nal\nfinal\ndel\nrecibo\nde\nmatrícula.\nEn\ncaso\nde\npresentar\ninconvenientes\ncon\nla\ncontraseña, escríbanos a\ntrabajodesdecasa@unisim\nonbolivar.edu.co con sus\ndatos personales."
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 6,
+          "score": null,
+          "text": "Al acceder, el sistema solicitará cambiar la contraseña a una de seguridad. \nSeleccione “Cambiar”."
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 7,
+          "score": null,
+          "text": "La nueva contraseña deberá estar formada por:\nMínimo 8 caracteres, máximo 15.\nMayúsculas, minúsculas  y al menos 1 número.\nNo podrá contener ningún dato personal (nombres, apellidos, identificación, \nnúmeros de teléfono o fecha de nacimiento)."
+        },
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 8,
+          "score": null,
+          "text": "Cuando haya restablecido la contraseña de su Portal de Estudiantes, esa\nmisma contraseña le servirá para su Aula Extendida y Correo Estudiantil.\nRecuerde que para acceder a su correo institucional, siempre debe hacerlo a\ntravés de la página web de la Universidad, en la sección Servicios y luego\nCorreo Estudiantes, de lo contrario la cuenta no será reconocida."
+        },
+        {
+          "source": "1. Estudiantes Nuevos Pregrado.pptx",
+          "page": 7,
+          "score": null,
+          "text": "Para crear el reporte deberá aplicar los filtros solicitados de: Año, Periodo y Fecha. Posteriormente presionar el botón «Generar», este creará el reporte en un documento PDF para su visualización."
+        },
+        {
+          "source": "1. Estudiantes Nuevos Pregrado.pptx",
+          "page": 8,
+          "score": null,
+          "text": "Reporte Generado\n\n[Imagen: La imagen muestra un documento institucional, posiblemente un informe o un registro académico, con una estructura organizada en secciones y tablas. En la parte superior, hay un logotipo y un título que indica que es un documento relacionado con la educación.\n\nLa sección principal del documento está dividida en varias secciones, cada una con un título claro. En la sección \"ESTUDIANTES NOVOS PRIMER SEMESTRE\", se presentan datos estadísticos sobre la cantidad de estudiantes matriculados en el primer semestre, incluyendo información sobre la edad, género, nivel educativo, y otras estadísticas relevantes."
+        },
+        {
+          "source": "1. Estudiantes Nuevos Pregrado.pptx",
+          "page": 8,
+          "score": null,
+          "text": "La sección \"COMPARATIVO GENERAL\" muestra una tabla comparativa de datos, que podría incluir información sobre la cantidad de estudiantes en diferentes categorías, como el género, la edad, el nivel educativo, y otros indicadores.\n\nLa sección \"COMPARATIVO POR PROGRAMA\" presenta una tabla que compara la cantidad de estudiantes en diferentes programas educativos, lo que podría incluir información sobre la cantidad de estudiantes en cada programa, así como estadísticas adicionales relevantes.\n\nEn la parte inferior del documento, hay una sección que parece ser una lista de programas educativos con una tabla que muestra la cantidad de estudiantes en cada programa, así como estadísticas adicionales relevantes."
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 15,
+          "score": null,
+          "text": "A lo largo del formulario se encuentran preguntas de los siguientes tipos:"
+        }
+      ],
+      "expected_source_hit_candidates": true,
+      "expected_source_hit_reranked": true,
+      "expected_source_hit_final_chunks": true,
+      "estimated_final_context_tokens": 1052
+    },
+    {
+      "id": "student_election_voting",
+      "role": "estudiante",
+      "query": "¿Cómo participo y voto en las elecciones institucionales?",
+      "expected_sources": [
+        "Aplicativo Elecciones -  Cómo votar.pptx"
+      ],
+      "candidates": [
+        {
+          "source": "Aplicativo Elecciones -  Cómo votar.pptx",
+          "page": 2,
+          "score": 0.8412669500700439,
+          "text": "¿Cómo votar?"
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page": 36,
+          "score": 0.8092675293573492,
+          "text": "Reportes Desde Módulo\n \nInformes Institucionales\n \nReportes Desde Módulo \nInformes Institucionales\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Anulación y Modificación de Programa Pre-inscripciones.pptx",
+          "page": 8,
+          "score": 0.8052500030006613,
+          "text": "Estudiantes - Elecciones\n\nEn este submódulo podrá crear, modificar o eliminar elecciones dirigidas a la comunidad estudiantil."
+        },
+        {
+          "source": "Estadísticas institucionales.pdf",
+          "page": 1,
+          "score": 0.802618447067762,
+          "text": "Instructivo\nEstadísticas Institucionales\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page": 37,
+          "score": 0.7968052731092782,
+          "text": "Seleccione la opción «Informes Institucionales» en el menú principal. \nReportes\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Módulo Egresados.pptx",
+          "page": 3,
+          "score": 0.7955333128400404,
+          "text": "Egresados - Elecciones\n\nEn este submódulo podrá crear, modificar o eliminar elecciones dirigidas a la comunidad de egresados. Adicionalmente podrá realizar búsquedas rápidas usando el filtro que se encuentra en la esquina superior derecha de la tabla de registros.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en una imagen.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Módulo Estudiantes.pptx",
+          "page": 3,
+          "score": 0.7955333128400404,
+          "text": "Estudiantes - Elecciones\n\nEn este submódulo podrá crear, modificar o eliminar elecciones dirigidas a la comunidad estudiantil. Adicionalmente podrá realizar búsquedas rápidas usando el filtro que se encuentra en la esquina superior derecha de la tabla de registros."
+        },
+        {
+          "source": "Anulación y Modificación de Programa Pre-inscripciones.pptx",
+          "page": 1,
+          "score": 0.7949687627180679,
+          "text": "APLICATIVO ELECCIONES \n\nINSTRUCTIVO\n\n\n(arial 60 en negrita alineado a la izquierda)\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Caracterización de estudiantes.pptx",
+          "page": 5,
+          "score": 0.793981640849877,
+          "text": "Módulo\n\nLuego de ingresar al sistema deberá seleccionar el módulo «Estadísticas Institucionales»\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]"
+        },
+        {
+          "source": "Estadísticas institucionales.pdf",
+          "page": 7,
+          "score": 0.793981640849877,
+          "text": "Módulo\nLuego de ingresar al sistema deberá seleccionar el módulo «Informes Institucionales»\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes que contengan texto o elementos que puedan ser interpretados como texto. Esto se debe a que mi capacidad para leer texto está limitada y no puedo proporcionar información detallada sobre el contenido de una imagen.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 4,
+          "score": 0.7929887571618912,
+          "text": "Votación\n\nAl ingresar podrá visualizar un listado con todas las elecciones en las que podrá participar según su rol dentro de la institución. Para iniciar, seleccione el botón “Votar” de la elección en la que desea participar.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 3,
+          "score": 0.791813745172256,
+          "text": "Acceder\n\nSe debe ingresar al enlace https://elecciones.unisimon.edu.co/, digite su nombre de usuario y contraseña institucional y luego clic en “Iniciar sesión”."
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 2,
+          "score": 0.7724917332066792,
+          "text": "Instructivo para acceder a los Servicios Institucionales"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 1,
+          "score": 0.7654458970271432,
+          "text": "ELECCIONES – Órganos colegiados\n\nINSTRUCTIVO\n\n\n(arial 60 en negrita alineado a la izquierda)\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 5,
+          "score": 0.7556590405547012,
+          "text": "Para ingresar, digite su número de identificación y la fecha de expedición del documento de identificación. Luego seleccione el botón «Continuar»"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Cómo votar.pptx",
+          "page": 4,
+          "score": 0.835130316243297,
+          "text": "Votación\n\nHaga clic sobre la foto del candidato por el que desea votar, el sistema le solicitará confirmación de la acción.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 5,
+          "score": 0.8336467577124258,
+          "text": "Votación\n\nHaga clic sobre el nombre o la foto del candidato por el que desea votar, el sistema le solicitará confirmación de la acción.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Módulo Egresados.pptx",
+          "page": 10,
+          "score": 0.8312413422374999,
+          "text": "Eliminar Candidato\nPara eliminar un candidato, seleccione el botón “Eliminar”, el sistema le pedirá confirmación de la acción."
+        },
+        {
+          "source": "Aplicativo Elecciones -  Módulo Egresados.pptx",
+          "page": 6,
+          "score": 0.8193135101544016,
+          "text": "Eliminar Elección\nPara eliminar una elección, seleccione el botón “Eliminar”, el sistema le pedirá confirmación de la acción.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page": 7,
+          "score": 0.8177790487672412,
+          "text": "Inscripción - Diplomado\n\nPara finalizar presione el botón Guardar"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Módulo Egresados.pptx",
+          "page": 8,
+          "score": 0.8165203542098876,
+          "text": "Agregar Candidatos\nPara crear un candidato, seleccione el botón “Agregar Candidato” y luego diligencie los campos de la ventana emergente que aparecerá. Por último seleccione el botón “Guardar”."
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Aplicativo Elecciones -  Módulo Egresados.pptx",
+          "page": 10,
+          "score": 0.8312413422374999,
+          "text": "Eliminar Candidato\nPara eliminar un candidato, seleccione el botón “Eliminar”, el sistema le pedirá confirmación de la acción."
+        },
+        {
+          "source": "Aplicativo Elecciones -  Módulo Egresados.pptx",
+          "page": 8,
+          "score": 0.8165203542098876,
+          "text": "Agregar Candidatos\nPara crear un candidato, seleccione el botón “Agregar Candidato” y luego diligencie los campos de la ventana emergente que aparecerá. Por último seleccione el botón “Guardar”."
+        },
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 4,
+          "score": 0.7929887571618912,
+          "text": "Votación\n\nAl ingresar podrá visualizar un listado con todas las elecciones en las que podrá participar según su rol dentro de la institución. Para iniciar, seleccione el botón “Votar” de la elección en la que desea participar.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Cómo votar.pptx",
+          "page": 4,
+          "score": 0.835130316243297,
+          "text": "Votación\n\nHaga clic sobre la foto del candidato por el que desea votar, el sistema le solicitará confirmación de la acción.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 5,
+          "score": 0.8336467577124258,
+          "text": "Votación\n\nHaga clic sobre el nombre o la foto del candidato por el que desea votar, el sistema le solicitará confirmación de la acción.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Módulo Egresados.pptx",
+          "page": 6,
+          "score": 0.8193135101544016,
+          "text": "Eliminar Elección\nPara eliminar una elección, seleccione el botón “Eliminar”, el sistema le pedirá confirmación de la acción.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 5,
+          "score": 0.7556590405547012,
+          "text": "Para ingresar, digite su número de identificación y la fecha de expedición del documento de identificación. Luego seleccione el botón «Continuar»"
+        },
+        {
+          "source": "Aplicativo Elecciones -  Cómo votar.pptx",
+          "page": 2,
+          "score": 0.8412669500700439,
+          "text": "¿Cómo votar?"
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page": 37,
+          "score": 0.7968052731092782,
+          "text": "Seleccione la opción «Informes Institucionales» en el menú principal. \nReportes\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en imágenes.]"
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page": 7,
+          "score": 0.8177790487672412,
+          "text": "Inscripción - Diplomado\n\nPara finalizar presione el botón Guardar"
+        },
+        {
+          "source": "Caracterización de estudiantes.pptx",
+          "page": 5,
+          "score": 0.793981640849877,
+          "text": "Módulo\n\nLuego de ingresar al sistema deberá seleccionar el módulo «Estadísticas Institucionales»\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una imagen.]"
+        },
+        {
+          "source": "Estadísticas institucionales.pdf",
+          "page": 7,
+          "score": 0.793981640849877,
+          "text": "Módulo\nLuego de ingresar al sistema deberá seleccionar el módulo «Informes Institucionales»\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes que contengan texto o elementos que puedan ser interpretados como texto. Esto se debe a que mi capacidad para leer texto está limitada y no puedo proporcionar información detallada sobre el contenido de una imagen.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Estadísticas institucionales.pdf",
+          "page": 1,
+          "score": 0.802618447067762,
+          "text": "Instructivo\nEstadísticas Institucionales\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Anulación y Modificación de Programa Pre-inscripciones.pptx",
+          "page": 1,
+          "score": 0.7949687627180679,
+          "text": "APLICATIVO ELECCIONES \n\nINSTRUCTIVO\n\n\n(arial 60 en negrita alineado a la izquierda)\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 2,
+          "score": 0.7724917332066792,
+          "text": "Instructivo para acceder a los Servicios Institucionales"
+        }
+      ],
+      "final_chunks": [
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 4,
+          "score": null,
+          "text": "Votación\n\nAl ingresar podrá visualizar un listado con todas las elecciones en las que podrá participar según su rol dentro de la institución. Para iniciar, seleccione el botón “Votar” de la elección en la que desea participar."
+        },
+        {
+          "source": "Aplicativo Elecciones -  Cómo votar.pptx",
+          "page": 4,
+          "score": null,
+          "text": "Votación\n\nHaga clic sobre la foto del candidato por el que desea votar, el sistema le solicitará confirmación de la acción."
+        },
+        {
+          "source": "Aplicativo Elecciones -  Órganos colegiados.pptx",
+          "page": 5,
+          "score": null,
+          "text": "Votación\n\nHaga clic sobre el nombre o la foto del candidato por el que desea votar, el sistema le solicitará confirmación de la acción."
+        }
+      ],
+      "expected_source_hit_candidates": true,
+      "expected_source_hit_reranked": true,
+      "expected_source_hit_final_chunks": true,
+      "estimated_final_context_tokens": 162
+    },
+    {
+      "id": "student_password_reset",
+      "role": "estudiante",
+      "query": "Olvidé mi usuario o contraseña del Portal Estudiantes, ¿cómo la restablezco?",
+      "expected_sources": [
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf"
+      ],
+      "candidates": [
+        {
+          "source": "Activar Usuario y Correo institucional.pdf",
+          "page": 8,
+          "score": 0.8575442631624816,
+          "text": "Cuando haya restablecido la contraseña de su Portal de Estudiantes, esa\nmisma contraseña le servirá para su Aula Extendida y Correo Estudiantil.\nRecuerde que para acceder a su correo institucional, siempre debe hacerlo a\ntravés de la página web de la Universidad, en la sección Servicios y luego\nCorreo Estudiantes, de lo contrario la cuenta no será reconocida.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 3,
+          "score": 0.835967226214178,
+          "text": "Portal de Estudiantes"
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 28,
+          "score": 0.8353129398965449,
+          "text": "Ddiríjase a la sección “Olvidé mi Usuario / Contraseña”\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una página web o captura de pantalla.]"
+        },
+        {
+          "source": "Matrícula Antiguos Posgrados.pdf",
+          "page": 3,
+          "score": 0.8344610137522319,
+          "text": "Seleccione “Portal Estudiantes”.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Volantes.pdf",
+          "page": 2,
+          "score": 0.8329134341584725,
+          "text": "Ingrese su usuario y contraseña, y presione el botón “Acceder”.\nIngrese\na\nla\npágina\nweb\nde\nla\nUniversidad,\nseleccione\n“Portales”\n(https://www.unisimon.edu.co/portales), luego seleccione “Estudiantes”.\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de contenido de una página web.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Manual de Usuario - Portal CovidApp.pdf",
+          "page": 4,
+          "score": 0.8301782722775096,
+          "text": "Para iniciar sesión al sistema, si eres estudiante podrás iniciar sesión con tus\ncredenciales del “Portal Estudiantes”\no si eres docente/funcionario administrativo podrás iniciar sesión con tu credenciales\ndel “Portal Gestión Académico - Administrativo”\nInicio de Sesión\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 29,
+          "score": 0.8298220260404713,
+          "text": "Ingrese su código de estudiante o número de identificación y presione el botón “Enviar”\n\n[Imagen: La imagen muestra una pantalla de un sistema de gestión de identidades y accesos (IAM) o un sistema de gestión de usuarios. En la parte superior de la pantalla, se encuentra un encabezado que dice \"Recordar usuario con contraseña\". A continuación, hay un campo de texto con la instrucción \"Código de estudio\" y un botón \"Enviar\".\n\nA continuación, se encuentra un campo de texto con la instrucción \"Código de usuario\" y otro botón \"Enviar\".\n\nEn la parte inferior de la pantalla, hay un campo de texto con la instrucción \"Código de usuario\" y un botón \"Enviar\".\n\nEl texto en la imagen es el siguiente:\n\n\"Recordar usuario con contraseña\nCódigo de estudio\nCódigo de usuario\""
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 7,
+          "score": 0.8293872918347935,
+          "text": "Ingrese su código de estudiante o número de identificación y presione el botón “Enviar”\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: La imagen muestra una pantalla de un sistema de gestión de identidades y accesos (IAM) en un entorno de negocios. En la parte superior de la pantalla, se encuentra el menú principal con opciones como \"Inicio\", \"Configuración\", \"Usuarios\", \"Grupos\", \"Roles\", \"Políticas\", \"Auditoría\", \"Seguridad\", \"Informes\", \"Ayuda\" y \"Cerrar sesión\".\n\nEn el centro de la pantalla, hay un formulario de búsqueda con un campo de búsqueda y un botón \"Buscar\". A continuación, se muestra un campo de texto con el mensaje \"Recordar usuario: Contraeña\" y un campo de texto donde se puede ingresar una contraseña."
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 3,
+          "score": 0.8256267076662727,
+          "text": "Desde\nla\npágina\nweb\nde\nla\nUniversidad,\nen\nla\nsección\n“Portales”\n(http://www.unisimon.edu.co/portales/estudiantes), ingrese su usuario y contraseña, y presione\nel botón “Acceder”\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en una imagen que no puedo ver. Si puedes proporcionar una imagen o describir los elementos que necesitas que describa, estaré encantado de ayudarte.]"
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 2,
+          "score": 0.8228969627323135,
+          "text": "RESTABLECIMIENTO DE CONTRASEÑA\n(Contraseña unificada para el portal de estudiantes, aula extendida y correo \ninstitucional)\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Matrícula Antiguos Posgrados.pdf",
+          "page": 5,
+          "score": 0.8073874747079247,
+          "text": "\"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\","
+        },
+        {
+          "source": "Matrícula Antiguos Posgrados.pdf",
+          "page": 5,
+          "score": 0.8061690339935497,
+          "text": "de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"]"
+        },
+        {
+          "source": "Matrícula Antiguos Posgrados.pdf",
+          "page": 5,
+          "score": 0.8060015482333305,
+          "text": ". En la parte superior, hay un menú de navegación con opciones como \"Inicio\", \"Acerca de nosotros\", \"Servicios\", \"Contacto\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\", \"Portal de investigadores\", \"Portal de empleados\", \"Portal de estudiantes\", \"Portal de profesores\","
+        },
+        {
+          "source": "Autorización estudiantes en proceso de créditos.pdf",
+          "page": 4,
+          "score": 0.8034907575508894,
+          "text": "\"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"]"
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 2,
+          "score": 0.8228969627323135,
+          "text": "RESTABLECIMIENTO DE CONTRASEÑA\n(Contraseña unificada para el portal de estudiantes, aula extendida y correo \ninstitucional)\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de elementos en imágenes.]\n\n[Imagen: Lo siento, no puedo ayudar con la descripción de imágenes.]"
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 7,
+          "score": 0.8293872918347935,
+          "text": "Ingrese su código de estudiante o número de identificación y presione el botón “Enviar”\n\n[Imagen: Lo siento, pero no puedo ayudar con la descripción de imágenes.]\n\n[Imagen: La imagen muestra una pantalla de un sistema de gestión de identidades y accesos (IAM) en un entorno de negocios. En la parte superior de la pantalla, se encuentra el menú principal con opciones como \"Inicio\", \"Configuración\", \"Usuarios\", \"Grupos\", \"Roles\", \"Políticas\", \"Auditoría\", \"Seguridad\", \"Informes\", \"Ayuda\" y \"Cerrar sesión\".\n\nEn el centro de la pantalla, hay un formulario de búsqueda con un campo de búsqueda y un botón \"Buscar\". A continuación, se muestra un campo de texto con el mensaje \"Recordar usuario: Contraeña\" y un campo de texto donde se puede ingresar una contraseña."
+        }
+      ],
+      "final_chunks": [
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 1,
+          "score": null,
+          "text": "En la parte inferior de la imagen, se encuentra un texto que menciona que la universidad ha sido reconocida por la Asociación Colombiana de Educación Superior (ASCES) con el premio \"Reconocimiento a la Calidad\" en el año 2021.\n\nEn general, la imagen es una publicación institucional que celebra la calidad de la educación ofrecida por la Universidad de San Simón Bolívar y su reconocimiento por parte de la Asociación Colombiana de Educación Superior (ASCES).]"
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 2,
+          "score": null,
+          "text": "RESTABLECIMIENTO DE CONTRASEÑA\n(Contraseña unificada para el portal de estudiantes, aula extendida y correo \ninstitucional)"
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 3,
+          "score": null,
+          "text": "Acceso al portal estudiantes\nIngrese desde su navegador al sitio web de la Universidad: http://www.unisimon.edu.co/ y \nseleccionar en menú principal la opción «Portales»"
+        },
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 6,
+          "score": null,
+          "text": "Ddiríjase a la sección “Olvidé mi Usuario / Contraseña”"
+        }
+      ],
+      "expected_source_hit_candidates": true,
+      "expected_source_hit_reranked": true,
+      "expected_source_hit_final_chunks": true,
+      "estimated_final_context_tokens": 271
+    }
+  ]
+}

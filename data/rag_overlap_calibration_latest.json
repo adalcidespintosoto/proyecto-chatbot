@@ -1,0 +1,25 @@
+{
+  "collection": "langchain",
+  "collection_count": 7307,
+  "metric": "l2",
+  "seed": 20261005,
+  "requested_sample_size": 250,
+  "nearest_other_source_among_top_k": 12,
+  "thresholds": {
+    "redundant": 0.88,
+    "ambiguous": 0.65
+  },
+  "previous_formula": {
+    "sample_size": 244,
+    "redundant_pct": 52.0,
+    "ambiguous_pct": 48.0,
+    "novel_pct": 0.0
+  },
+  "corrected_formula": {
+    "sample_size": 244,
+    "redundant_pct": 95.9,
+    "ambiguous_pct": 4.1,
+    "novel_pct": 0.0
+  },
+  "mutates_collection": false
+}

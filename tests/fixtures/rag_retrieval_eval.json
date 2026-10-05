@@ -1,0 +1,26 @@
+[
+  {
+    "id": "teacher_grades_step_by_step",
+    "role": "profesor",
+    "query": "¿Cuál es el paso a paso para ingresar, guardar borrador y finalizar notas de estudiantes en Portal Profesores?",
+    "expected_sources": ["Calificaciones.pdf"]
+  },
+  {
+    "id": "new_student_activation",
+    "role": "estudiante",
+    "query": "Soy estudiante nuevo, ¿cómo activo mi usuario y correo institucional?",
+    "expected_sources": ["Activar Usuario y Correo institucional.pdf"]
+  },
+  {
+    "id": "student_election_voting",
+    "role": "estudiante",
+    "query": "¿Cómo participo y voto en las elecciones institucionales?",
+    "expected_sources": ["Aplicativo Elecciones -  Cómo votar.pptx"]
+  },
+  {
+    "id": "student_password_reset",
+    "role": "estudiante",
+    "query": "Olvidé mi usuario o contraseña del Portal Estudiantes, ¿cómo la restablezco?",
+    "expected_sources": ["Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf"]
+  }
+]

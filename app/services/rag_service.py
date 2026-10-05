@@ -12,7 +12,7 @@ import math
 import unicodedata
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable
 import httpx
 
 # Forzar modo offline estricto para evitar peticiones a Hugging Face Hub en runtime
@@ -533,6 +533,15 @@ def rerank_chunks(query: str, retrieved_docs: list, top_k: int = 3, original_que
                 # genéricas de trámites financieros compitan con el procedimiento institucional.
                 if is_forgotten_email:
                     account_evidence = _is_forgotten_email_evidence(doc)
+                elif is_password_recovery_query:
+                    # Las consultas mixtas "olvidé usuario o contraseña" son un
+                    # flujo de acceso; no deben descartar el manual de recuperación
+                    # por no describir cómo se asigna el correo institucional.
+                    account_evidence = any(term in source_lower or term in content_lower for term in (
+                        "restablecimiento", "recuperación de contraseña", "recuperacion de contrasena",
+                        "recuperar contraseña", "recuperar contrasena", "restablecer contraseña",
+                        "restablecer contrasena", "olvidé mi contraseña", "olvide mi contrasena",
+                    ))
                 else:
                     account_evidence = any(term in source_lower or term in content_lower for term in (
                         "activar usuario", "correo institucional", "credenciales microsoft",
@@ -1528,6 +1537,49 @@ def _select_context_chunks(reranked: list, max_chunks: int) -> list[tuple[Docume
     return selected
 
 
+def _is_step_by_step_query(question: str) -> bool:
+    """Detecta solicitudes que necesitan una secuencia de varios pasos."""
+    q = (question or "").casefold()
+    return bool(re.search(
+        r"\b(?:paso\s+a\s+paso|pasos|procedimiento|instructivo|gu[ií]a|"
+        r"c[oó]mo\s+(?:hacer|realizar|completar|llevar\s+a\s+cabo|"
+        r"ingres\w*|activ\w*|restablec\w*|recuper\w*|registr\w*|solicit\w*|"
+        r"radic\w*|inscrib\w*|configur\w*|acced\w*|vot\w*|guard\w*|finaliz\w*)|"
+        r"desde\s+.+\s+hasta|primero.{0,80}(?:luego|despu[eé]s|finalmente))\b",
+        q,
+    ))
+
+
+def _estimated_context_tokens(text: str) -> int:
+    """Estimación conservadora sin agregar dependencias de tokenizer."""
+    return (len(text or "") + 2) // 3
+
+
+def _fit_context_budget(
+    chunks: list[tuple[Document, str]],
+    question: str,
+    *,
+    budget: Optional[int] = None,
+    max_chunks: Optional[int] = None,
+) -> list[tuple[Document, str]]:
+    """Conserva los primeros chunks completos dentro del presupuesto estimado."""
+    if budget is None:
+        budget = 2400 if _is_step_by_step_query(question) else 900
+    fitted = []
+    used = 0
+    for doc, text in chunks:
+        if max_chunks is not None and len(fitted) >= max_chunks:
+            break
+        source = Path(str((doc.metadata or {}).get("source") or "Procedimiento Unisimon")).name
+        labeled = f"[{source}{_format_page_info(doc.metadata or {})}]\n{text}"
+        cost = _estimated_context_tokens(labeled)
+        if used + cost > budget:
+            continue
+        fitted.append((doc, text))
+        used += cost
+    return fitted
+
+
 def _select_forgotten_email_context_chunks(
     reranked: list,
     max_chunks: Optional[int] = None,
@@ -1636,8 +1688,9 @@ def _expand_chunks_with_neighbors(
     neighbors_each_side: int = 1,
     strip_visual_captions: bool = False,
     metadata_filter: Optional[dict] = None,
+    preserve_document_order: bool = True,
 ) -> list[tuple[Document, str]]:
-    """Añade vecinos secuenciales del mismo documento y página/diapositiva.
+    """Añade vecinos secuenciales del mismo documento, incluso entre páginas.
 
     La ingesta crea IDs deterministas con el sufijo ``_p{pagina}_c{indice}``.
     Solo se expande si podemos verificar ese orden y localizar el chunk ancla;
@@ -1654,13 +1707,38 @@ def _expand_chunks_with_neighbors(
 
     expanded: list[tuple[Document, str]] = []
     seen_contents: set[str] = set()
-    page_cache: dict[tuple[str, str, int], list[tuple[int, str, dict]]] = {}
+    source_order: dict[str, int] = {}
+    page_cache: dict[tuple[str, str, int], list[tuple[int, int, str, dict]]] = {}
+
+    def load_page(source: str, page_field: str, page_value: int) -> list[tuple[int, int, str, dict]]:
+        cache_key = (source, page_field, page_value)
+        if cache_key not in page_cache:
+            try:
+                rows = collection.get(
+                    where={"$and": [{"source": source}, {page_field: page_value}]},
+                    include=["documents", "metadatas"],
+                )
+                parsed = []
+                for chunk_id, text, chunk_metadata in zip(
+                    rows.get("ids") or [], rows.get("documents") or [], rows.get("metadatas") or []
+                ):
+                    match = re.search(r"_p(\d+)_c(\d+)$", str(chunk_id))
+                    if (match and text and int(match.group(1)) == page_value
+                            and _metadata_matches_filter(chunk_metadata or {}, metadata_filter)):
+                        parsed.append((int(match.group(1)), int(match.group(2)), text, chunk_metadata or {}))
+                page_cache[cache_key] = sorted(parsed, key=lambda item: item[1])
+            except Exception as exc:
+                logger.debug("[RAG] No se pudieron recuperar vecinos del chunk: %s", exc)
+                page_cache[cache_key] = []
+        return page_cache[cache_key]
 
     def append_once(doc: Document, text: str) -> None:
         cleaned = clean_chunk(text)
         key = re.sub(r"\s+", " ", cleaned).casefold()
         if cleaned and key not in seen_contents:
             seen_contents.add(key)
+            source = str((doc.metadata or {}).get("source") or "")
+            source_order.setdefault(source, len(source_order))
             expanded.append((doc, cleaned))
 
     for anchor_doc, anchor_text in anchor_chunks:
@@ -1672,33 +1750,16 @@ def _expand_chunks_with_neighbors(
             append_once(anchor_doc, anchor_text)
             continue
 
-        cache_key = (source, page_field, page_value)
-        if cache_key not in page_cache:
-            try:
-                # Query only the anchor's page/slide to keep expansion bounded
-                # even when a source contains thousands of chunks.
-                rows = collection.get(
-                    where={"$and": [{"source": source}, {page_field: page_value}]},
-                    include=["documents", "metadatas"],
-                )
-                ids = rows.get("ids") or []
-                texts = rows.get("documents") or []
-                metadatas = rows.get("metadatas") or []
-                page_rows = []
-                for chunk_id, text, chunk_metadata in zip(ids, texts, metadatas):
-                    match = re.search(r"_p\d+_c(\d+)$", str(chunk_id))
-                    if match and text and _metadata_matches_filter(chunk_metadata or {}, metadata_filter):
-                        page_rows.append((int(match.group(1)), text, chunk_metadata or {}))
-                page_cache[cache_key] = sorted(page_rows, key=lambda item: item[0])
-            except Exception as exc:
-                logger.debug("[RAG] No se pudieron recuperar vecinos del chunk: %s", exc)
-                page_cache[cache_key] = []
-
-        rows_for_page = page_cache[cache_key]
+        # Solo consulta la página ancla y las adyacentes. Cada ID valida página
+        # y posición del chunk; los metadatos solos no establecen el orden.
+        page_rows = []
+        for adjacent_page in range(max(1, page_value - 1), page_value + 2):
+            page_rows.extend(load_page(source, page_field, adjacent_page))
+        page_rows.sort(key=lambda item: (item[0], item[1]))
         anchor_key = re.sub(r"\s+", " ", anchor_doc.page_content or "").strip().casefold()
         anchor_position = next(
             (
-                index for index, (_chunk_index, text, _metadata) in enumerate(rows_for_page)
+                index for index, (_page, _chunk_index, text, _metadata) in enumerate(page_rows)
                 if re.sub(r"\s+", " ", text).strip().casefold() == anchor_key
             ),
             None,
@@ -1708,12 +1769,25 @@ def _expand_chunks_with_neighbors(
             continue
 
         start = max(0, anchor_position - neighbors_each_side)
-        end = min(len(rows_for_page), anchor_position + neighbors_each_side + 1)
-        for _chunk_index, text, chunk_metadata in rows_for_page[start:end]:
-            neighbor_doc = Document(page_content=text, metadata=chunk_metadata)
+        end = min(len(page_rows), anchor_position + neighbors_each_side + 1)
+        for _page_number, _chunk_index, text, chunk_metadata in page_rows[start:end]:
+            ordered_metadata = dict(chunk_metadata)
+            ordered_metadata["_rag_sequence"] = (_page_number, _chunk_index)
+            neighbor_doc = Document(page_content=text, metadata=ordered_metadata)
             append_once(neighbor_doc, text)
 
-    return expanded
+    if not preserve_document_order:
+        return expanded
+    return [
+        item for _index, item in sorted(
+            enumerate(expanded),
+            key=lambda indexed: (
+                source_order.get(str((indexed[1][0].metadata or {}).get("source") or ""), 0),
+                (indexed[1][0].metadata or {}).get("_rag_sequence", (float("inf"), float("inf"))),
+                indexed[0],
+            ),
+        )
+    ]
 
 
 # Lista de plataformas, herramientas o bases de datos no documentadas en el catálogo institucional
@@ -1998,7 +2072,8 @@ class RAGService:
         user_name: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
         user_role: Optional[str] = None,
-        golden_context: Optional[str] = None
+        golden_context: Optional[str] = None,
+        trace_callback: Optional[Callable[[dict], None]] = None,
     ) -> Dict[str, Any]:
         """
         Ejecuta el pipeline RAG completo:
@@ -2295,7 +2370,29 @@ class RAGService:
                 except Exception as exc:
                     logger.debug(f"Error cargando doc calificaciones: {exc}")
 
+        def emit_retrieval_trace(stage: str, rows: list) -> None:
+            if trace_callback is None:
+                return
+            trace_callback({
+                "stage": stage,
+                "chunks": [
+                    {
+                        "source": str((doc.metadata or {}).get("source", "")),
+                        "page": (doc.metadata or {}).get("page_number", (doc.metadata or {}).get("slide_number", (doc.metadata or {}).get("page"))),
+                        "score": score,
+                        "text": (text if text is not None else doc.page_content)[:1200],
+                    }
+                    for doc, score, *optional_text in rows
+                    for text in [optional_text[0] if optional_text else None]
+                ],
+            })
+
+        emit_retrieval_trace("candidates", [(doc, score) for doc, score in valid_docs_with_scores])
+
         # 3. Cross-Encoder Reranker y Ensamblado de Contexto Jerárquico por Documento
+        procedural_query = _is_step_by_step_query(question)
+        context_budget_tokens = 2400 if procedural_query else 900
+        max_anchor_chunks = 6 if procedural_query else 3
         if valid_docs_with_scores:
             if is_election_query:
                 if _is_election_voting_query(question):
@@ -2324,15 +2421,17 @@ class RAGService:
             # mejores para la selección de anclas/contexto final.
             top_k_val = min(15, len(valid_docs_with_scores))
             reranked = rerank_chunks(rerank_query, valid_docs_with_scores, top_k=top_k_val, original_query=question)
+            emit_retrieval_trace("reranked", reranked)
 
             if reranked or is_ambiguous_student_pwd or is_election_query:
                 if is_forgotten_email:
-                    evidence_chunks = _select_forgotten_email_context_chunks(reranked, max_chunks=3)
+                    evidence_chunks = _select_forgotten_email_context_chunks(reranked, max_chunks=max_anchor_chunks)
                     contextual_chunks = _expand_chunks_with_neighbors(
                         evidence_chunks,
                         self.vector_store._collection,
                         strip_visual_captions=True,
                         metadata_filter=filter_condition,
+                        preserve_document_order=procedural_query,
                     )
                     for doc, cleaned_chunk in contextual_chunks:
                         source_path = doc.metadata.get("source", "Procedimiento Unisimon")
@@ -2347,11 +2446,12 @@ class RAGService:
                         len(contextual_chunks), len(sources), sum(len(part) for part in context_parts),
                     )
                 elif is_ambiguous_student_pwd:
-                    anchor_chunks = _select_context_chunks(reranked, max_chunks=3)
+                    anchor_chunks = _select_context_chunks(reranked, max_chunks=max_anchor_chunks)
                     contextual_chunks = _expand_chunks_with_neighbors(
                         anchor_chunks,
                         self.vector_store._collection,
                         metadata_filter=filter_condition,
+                        preserve_document_order=procedural_query,
                     )
                     for doc, cleaned_chunk in contextual_chunks:
                         source_path = doc.metadata.get("source", "Procedimiento Unisimon")
@@ -2367,7 +2467,7 @@ class RAGService:
                     # Si no hay evidencia electoral rerankeada, no rellenar con
                     # documentos académicos que solo comparten vocabulario.
                     election_chunks = _select_election_context_chunks(
-                        reranked or [], question, user_role, max_chunks=3
+                        reranked or [], question, user_role, max_chunks=max_anchor_chunks
                     )
 
                     for doc, cleaned_chunk in election_chunks:
@@ -2379,11 +2479,12 @@ class RAGService:
                         page_info = _format_page_info(doc.metadata)
                         context_parts.append(f"[{source_filename}{page_info}]\n{cleaned_chunk}")
                 else:
-                    anchor_chunks = _select_context_chunks(reranked, max_chunks=3)
+                    anchor_chunks = _select_context_chunks(reranked, max_chunks=max_anchor_chunks)
                     contextual_chunks = _expand_chunks_with_neighbors(
                         anchor_chunks,
                         self.vector_store._collection,
                         metadata_filter=filter_condition,
+                        preserve_document_order=procedural_query,
                     )
                     for doc, cleaned_chunk in contextual_chunks:
                         source_path = doc.metadata.get("source", "Procedimiento Unisimon")
@@ -2401,6 +2502,35 @@ class RAGService:
             else:
                 logger.info("[RAG] El reordenador descartó todos los fragmentos recuperados por falta de relevancia semántica.")
 
+
+        # Aplica el límite sobre el contexto expandido. Cada bloque conserva su
+        # fuente y página; si un ancla queda fuera, los siguientes sí pueden caber.
+        if context_parts:
+            budgeted_chunks = _fit_context_budget(
+                list(zip(retrieved_docs, [part.split("\n", 1)[-1] for part in context_parts])),
+                question,
+                budget=context_budget_tokens,
+                max_chunks=12 if procedural_query else 4,
+            )
+            retrieved_docs = [doc for doc, _text in budgeted_chunks]
+            context_parts = []
+            sources = []
+            for doc, cleaned_chunk in budgeted_chunks:
+                source_path = (doc.metadata or {}).get("source", "Procedimiento Unisimon")
+                source_filename = Path(str(source_path)).name
+                if source_filename not in sources:
+                    sources.append(source_filename)
+                context_parts.append(f"[{source_filename}{_format_page_info(doc.metadata or {})}]\n{cleaned_chunk}")
+            logger.info(
+                "[RAG] Presupuesto de contexto: %d/%d tokens estimados, %d chunks finales (%s).",
+                sum(_estimated_context_tokens(part) for part in context_parts),
+                context_budget_tokens,
+                len(context_parts),
+                "procedimiento" if procedural_query else "consulta simple",
+            )
+            emit_retrieval_trace("final_context", [
+                (doc, None, text) for doc, text in budgeted_chunks
+            ])
 
         # 3. Si ningún fragmento superó el umbral, evaluar fallback temático o mensaje estándar
         if not context_parts:

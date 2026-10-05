@@ -17,12 +17,22 @@ from langchain_huggingface import HuggingFaceEmbeddings
 
 from scripts.ingest_multimodal_docs import (
     generate_deterministic_chunk_ids,
+    _distance_to_similarity,
     delete_document_chunks,
     get_existing_sources,
     is_useful_image_description,
     strip_chunk_boilerplate as strip_ingest_chunk_boilerplate,
     ingest_multimodal
 )
+
+
+@pytest.mark.parametrize("distance, expected", [(0.0, 1.0), (0.24, 0.88), (1.0, 0.5), (2.0, 0.0)])
+def test_squared_l2_distance_is_converted_to_cosine_for_normalized_vectors(distance, expected):
+    assert _distance_to_similarity(distance, "l2") == pytest.approx(expected)
+
+
+def test_cosine_distance_conversion_keeps_existing_cosine_interpretation():
+    assert _distance_to_similarity(0.12, "cosine") == pytest.approx(0.88)
 
 
 def test_deterministic_chunk_ids():
@@ -35,10 +45,10 @@ def test_deterministic_chunk_ids():
     chunks = [doc1_p1_c0, doc1_p1_c1, doc1_p2_c0, doc2_s1_c0]
     ids = generate_deterministic_chunk_ids(chunks)
 
-    assert ids[0] == "P-GT-01_Mantenimiento_p1_c0"
-    assert ids[1] == "P-GT-01_Mantenimiento_p1_c1"
-    assert ids[2] == "P-GT-01_Mantenimiento_p2_c0"
-    assert ids[3] == "Manual_Docentes_p1_c0"
+    assert ids[0] == "P-GT-01_Mantenimiento_943c80_p1_c0"
+    assert ids[1] == "P-GT-01_Mantenimiento_943c80_p1_c1"
+    assert ids[2] == "P-GT-01_Mantenimiento_943c80_p2_c0"
+    assert ids[3] == "Manual_Docentes_c74246_p1_c0"
 
 
 def test_vision_refusals_and_decorative_images_are_not_indexed_as_content():
