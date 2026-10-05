@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -25,6 +25,7 @@ from app.services.rag_service import (
     _expand_chunks_with_neighbors,
     _fit_context_budget,
     _is_step_by_step_query,
+    _is_safe_first_line_self_help_query,
 )
 
 
@@ -400,9 +401,29 @@ async def test_llm_retries_once_when_it_abstains_despite_context_and_golden_is_n
     assert llm.await_count == 2
     system_prompt = llm.await_args_list[0].kwargs["messages"][0]["content"]
     assert "[REFERENCIA DE FORMATO; NO ES FUENTE DOCUMENTAL]" in system_prompt
-    assert "abre el enlace" not in system_prompt.split("[CONTEXTO INSTITUCIONAL DOCUMENTADO]:", 1)[1].split(
+    assert "abre el enlace" not in system_prompt.split("[CONTEXTO INSTITUCIONAL RECUPERADO]", 1)[1].split(
         "[REFERENCIA DE FORMATO; NO ES FUENTE DOCUMENTAL]", 1
     )[0]
+
+
+@pytest.mark.asyncio
+async def test_safe_common_it_failure_still_attempts_first_line_help_without_chunks():
+    question = "No puedo conectarme al Wi-Fi de la universidad"
+    llm = AsyncMock(return_value={
+        "content": "Entiendo que esto te deja sin conexión. Revisa si otros dispositivos pueden conectarse y confirma que el Wi-Fi esté activado.",
+        "model": "mock",
+    })
+    with patch("app.services.rag_service.RAGService.vector_store", new_callable=PropertyMock, return_value=None):
+        with patch("app.services.rag_service.async_generate_multi_query_variants", new=AsyncMock(return_value=[question])):
+            with patch.object(rag_service.llm_client, "chat_completion", new=llm):
+                result = await rag_service.query_rag(question, user_role="estudiante")
+
+    assert result["has_context"] is False
+    assert result["retrieved_chunks"] == 0
+    assert llm.await_count == 1
+    system_prompt = llm.await_args.kwargs["messages"][0]["content"]
+    assert "conocimiento general de soporte TI" in system_prompt
+    assert "No puedo conectarme al Wi-Fi" not in system_prompt
 
 
 @pytest.mark.parametrize("question", [
@@ -431,16 +452,23 @@ def test_mixed_forgotten_user_or_password_query_keeps_recovery_manual():
         "Restablecimiento de contraseña.pdf",
         "Para recuperar o restablecer la contraseña del Portal de Estudiantes, digite su documento y siga el enlace.",
     )
+    activation_manual = make_doc(
+        "Activar Usuario y Correo institucional.pdf",
+        "Estudiantes nuevos de primer semestre consultan su usuario en el recibo de matrícula y activan la cuenta institucional.",
+    )
     unrelated = make_doc("Manual de Microsoft Teams.pdf", "Inicie sesión en Teams con su cuenta institucional.")
 
     ranked = rerank_chunks(
         question,
-        [(unrelated, 0.9), (reset_manual, 0.8)],
-        top_k=2,
+        [(unrelated, 0.9), (reset_manual, 0.8), (activation_manual, 0.7)],
+        top_k=3,
         original_query=question,
     )
 
-    assert [doc.metadata["source"] for doc, _score in ranked] == ["Restablecimiento de contraseña.pdf"]
+    ranked_sources = [doc.metadata["source"] for doc, _score in ranked]
+    assert "Restablecimiento de contraseña.pdf" in ranked_sources
+    assert "Activar Usuario y Correo institucional.pdf" in ranked_sources
+    assert "Manual de Microsoft Teams.pdf" not in ranked_sources
 
 
 def test_forgotten_email_context_keeps_identification_steps_and_drops_payment_noise():
@@ -550,6 +578,19 @@ def test_procedural_context_budget_is_larger_and_keeps_chunks_whole():
     assert 3 < len(procedural) <= 8
     assert len(simple) < len(procedural)
     assert all(text.endswith(" ") or text.endswith(".") for _, text in procedural + simple)
+
+
+@pytest.mark.parametrize("question", [
+    "No puedo conectarme al Wi-Fi de la universidad",
+    "Teams no abre y muestra un error",
+    "Olvidé la clave del portal y no puedo ingresar",
+])
+def test_common_it_failures_can_try_safe_first_line_help_without_chunks(question):
+    assert _is_safe_first_line_self_help_query(question)
+
+
+def test_non_it_question_does_not_enter_generic_first_line_help():
+    assert not _is_safe_first_line_self_help_query("¿Cuál es el calendario académico?")
 
 
 def test_context_expansion_keeps_anchor_when_chunk_order_cannot_be_verified():

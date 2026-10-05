@@ -12,6 +12,26 @@
     "expected_sources": ["Activar Usuario y Correo institucional.pdf"]
   },
   {
+    "id": "primiparo_credentials_in_tuition_receipt",
+    "role": null,
+    "require_all_expected_sources": true,
+    "query": "Soy primíparo y acabé de pagar la matrícula, ¿en qué parte me entregan el usuario y la clave para entrar al sistema?",
+    "expected_sources": [
+      "Activar Usuario y Correo institucional.pdf",
+      "GIE - ASPIRANTES NOV.2021.pptx"
+    ]
+  },
+  {
+    "id": "first_semester_access_data_location",
+    "role": null,
+    "require_all_expected_sources": true,
+    "query": "Estoy en primer semestre, ¿qué parte del recibo de matrícula tiene mis datos de acceso?",
+    "expected_sources": [
+      "Activar Usuario y Correo institucional.pdf",
+      "GIE - ASPIRANTES NOV.2021.pptx"
+    ]
+  },
+  {
     "id": "student_election_voting",
     "role": "estudiante",
     "query": "¿Cómo participo y voto en las elecciones institucionales?",

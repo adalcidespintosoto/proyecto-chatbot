@@ -120,8 +120,8 @@ def test_system_prompt_has_mandatory_directives():
     assert "RESPUESTAS TRANSPARENTES" in prompt
     assert "https://elecciones.unisimon.edu.co/" in prompt
     assert "VOTAR" in prompt
-    assert "DOCENTE" in prompt
-    assert "DIRECCIÓN DE PROGRAMA" in prompt
+    assert "docente" in prompt.casefold()
+    assert "dirección de programa" in prompt.casefold()
     assert "GLPI" in prompt
 
 

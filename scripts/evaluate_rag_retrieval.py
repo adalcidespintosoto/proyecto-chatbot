@@ -21,13 +21,14 @@ from app.services.rag_service import RAGService
 
 async def evaluate_case(service: RAGService, case: dict) -> dict:
     trace = []
+    llm_mock = AsyncMock(return_value={"content": "Evaluación de recuperación sin generación.", "model": "eval"})
     with patch(
         "app.services.rag_service.async_generate_multi_query_variants",
         new=AsyncMock(return_value=[case["query"]]),
     ), patch.object(
         service.llm_client,
         "chat_completion",
-        new=AsyncMock(return_value={"content": "Evaluación de recuperación sin generación.", "model": "eval"}),
+        new=llm_mock,
     ):
         await service.query_rag(
             question=case["query"],
@@ -42,10 +43,17 @@ async def evaluate_case(service: RAGService, case: dict) -> dict:
         "candidates": stages.get("candidates", []),
         "reranked": stages.get("reranked", []),
         "final_chunks": stages.get("final_context", []),
+        "llm_messages": (
+            llm_mock.await_args.kwargs.get("messages", []) if llm_mock.await_args else []
+        ),
     }
+    require_all_sources = case.get("require_all_expected_sources", False)
     for key in ("candidates", "reranked", "final_chunks"):
         observed = {Path(chunk["source"]).name.casefold() for chunk in result[key]}
-        result[f"expected_source_hit_{key}"] = bool(expected & observed)
+        result[f"expected_source_hit_{key}"] = (
+            expected.issubset(observed) if require_all_sources else bool(expected & observed)
+        )
+        result[f"missing_expected_sources_{key}"] = sorted(expected - observed)
     result["estimated_final_context_tokens"] = sum(
         (len(chunk["text"]) + 2) // 3 for chunk in result["final_chunks"]
     )

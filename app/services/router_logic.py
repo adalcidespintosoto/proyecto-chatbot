@@ -1070,8 +1070,6 @@ class RouterLogic:
         if estado_actual in [EstadoTicket.IDLE, EstadoTicket.DIAGNOSTICO, EstadoTicket.PIDIENDO_ROL]:
             if is_out_of_domain_query(texto):
                 cls.reset_session(session_id)
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", MENSAJE_FUERA_DE_DOMINIO)
                 return {
                     "tipo": "FUERA_DE_DOMINIO",
                     "state": "FUERA_DE_DOMINIO",
@@ -1911,13 +1909,31 @@ class RouterLogic:
             # 1. Guardrail rápido de Fuera de Dominio (Out-of-Domain)
             if is_out_of_domain_query(texto):
                 cls.reset_session(session_id)
-                cls.add_history(session_id, "user", texto)
-                cls.add_history(session_id, "assistant", MENSAJE_FUERA_DE_DOMINIO)
                 return {
                     "tipo": "FUERA_DE_DOMINIO",
                     "mensaje": MENSAJE_FUERA_DE_DOMINIO,
                     "ticket_id": None,
                     "source": "UniMon_Guardrail"
+                }
+
+            declared_role = normalize_role(texto)
+            if declared_role and len(texto.split()) <= 2:
+                session.user_role = declared_role
+                cls.clear_history(session_id)
+                role_response = (
+                    f"Gracias por aclarar que eres {declared_role}. Estoy aquí para ayudarte con problemas técnicos "
+                    "y servicios TI de la Universidad. ¿Qué falla o qué trámite de soporte necesitas resolver?"
+                )
+                cls.add_history(session_id, "user", texto)
+                cls.add_history(session_id, "assistant", role_response)
+                return {
+                    "tipo": "DIAGNOSTICO",
+                    "state": "DIAGNOSTICO",
+                    "mensaje": role_response,
+                    "response": role_response,
+                    "ticket_id": None,
+                    "source": "UniMon_Role_Clarification",
+                    "quick_replies": [],
                 }
 
             # 2. Asignación automática de rol por defecto (segmentación deshabilitada)

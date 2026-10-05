@@ -485,14 +485,17 @@ class TestIntegralRestrictionsAndPrerequisites:
     """Valida la inclusión obligatoria de restricciones y prerrequisitos en múltiples escenarios."""
 
     def test_system_prompt_contains_mandatory_two_layer_structure_directives(self):
-        """Valida que el prompt del sistema contenga las directivas de adaptación de respuesta."""
+        """Valida que el prompt priorice tono humano, autoayuda y límites seguros."""
         from app.services.rag_service import STRICT_SYSTEM_PROMPT_TEMPLATE
 
         assert "DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA" in STRICT_SYSTEM_PROMPT_TEMPLATE
         assert "CONSULTAS DIRECTAS" in STRICT_SYSTEM_PROMPT_TEMPLATE
         assert "TRÁMITES Y PROCEDIMIENTOS" in STRICT_SYSTEM_PROMPT_TEMPLATE
         assert "**⚠️ Requisitos y Restricciones Previas:**" in STRICT_SYSTEM_PROMPT_TEMPLATE
-        assert "PROHIBICIÓN ABSOLUTA DE META-LENGUAJE" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "TONO Y ACOMPAÑAMIENTO" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "AUTOSERVICIO PRIMERO" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "No le pidas contraseñas, códigos de verificación" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "No repitas la consulta" in STRICT_SYSTEM_PROMPT_TEMPLATE
 
     def test_clean_llm_response_removes_internal_prompt_leaks(self):
         """Valida que clean_llm_response elimine transcripciones de directivas internas del prompt."""
@@ -698,7 +701,7 @@ class TestIntegralRestrictionsAndPrerequisites:
         assert res2.get("tipo") == "DIAGNOSTICO"
         # No debe intentar buscar "código estudiantil" ni ejecutar RAG sobre el código anterior
         assert "código estudiantil" not in res2.get("mensaje", "").lower()
-        assert "en qué" in res2.get("mensaje", "").lower() or "te puedo colaborar" in res2.get("mensaje", "").lower()
+        assert "qué falla" in res2.get("mensaje", "").lower() or "te puedo colaborar" in res2.get("mensaje", "").lower()
 
     @pytest.mark.asyncio
 
