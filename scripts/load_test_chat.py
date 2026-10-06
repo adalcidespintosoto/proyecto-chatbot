@@ -11,6 +11,7 @@ import asyncio
 import json
 import statistics
 import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -69,7 +70,64 @@ CASES = [
     ("acceso_moodle_grupos", "Aula Extendida", "¿Cómo encuentro los grupos de mis asignaturas en Moodle?", "Estudiantes_Matricular grupos en teams ymoodle.pdf"),
     ("uso_correo_y_aula", "Aula Extendida", "¿La contraseña del portal también sirve para correo estudiantil y Aula Extendida?", "Activar Usuario y Correo institucional.pdf"),
     ("acceso_portales_sedes", "Portales", "¿Qué opción de sede debo elegir al ingresar al Portal Estudiantes de Barranquilla?", "Activar Usuario y Correo institucional.pdf"),
+    ("instalar_office_portal", "Microsoft 365", "¿Cómo instalo las aplicaciones de Office usando mi cuenta institucional?", "Descarga e instalación Ms 365.pdf"),
+    ("agregar_integrante_teams", "Microsoft 365", "¿Cómo agrego a una persona a un equipo o grupo de Microsoft Teams?", "Agregar_miembros_Grupos_MS_Teams.pdf"),
+    ("ajustar_asistentes_reunion", "Microsoft 365", "¿Cómo cambio o administro los participantes de una reunión de Teams?", "Ajustes participantes reuniones Ms Teams.pdf"),
+    ("reunion_teams_ipad", "Microsoft 365", "¿Cómo programo una reunión de Teams desde un iPad?", "Crear reuniones en teams - iPads aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf"),
+    ("administrar_grupos_teams", "Microsoft 365", "¿Dónde consulto los grupos de Teams asociados a mis cursos?", "Grupos_en_Teams.pdf"),
+    ("depurar_curso_aula", "Aula Extendida", "¿Qué debo revisar si un curso duplicado sigue apareciendo en Teams o Aula Extendida?", "Depuración de cursos (Teams y Aula Extendida).pdf"),
+    ("grabar_videollamada", "Microsoft 365", "¿Cómo se graba una videollamada de Teams?", "Grabar videollamadas en Teams.pdf"),
+    ("credenciales_servicios_microsoft", "Microsoft 365", "¿Qué cuenta debo usar para entrar a las herramientas Microsoft institucionales?", "Credenciales microsoft.pdf"),
+    ("acceso_teams_desde_portal", "Microsoft 365", "¿Cuál es el acceso indicado para abrir Microsoft Teams como estudiante?", "Como_acceder_MS_Teams_Estudiantes.pdf"),
+    ("pac_profesores", "Docentes", "¿Cómo diligencio el PAC como profesor?", "Diligenciamiento de PAC (Profesores).pdf"),
+    ("habilitar_pac_director", "Docentes", "¿Quién puede habilitar permisos de PAC para un director de programa?", "Habilitar permisos PAC (Director de programa).pdf"),
+    ("configurar_evaluacion_profesoral", "Docentes", "¿Dónde se configura la evaluación profesoral para funcionarios?", "Configuracion de Evaluacion Profesoral - Funcionarios.pptx"),
+    ("configurar_evaluaciones", "Docentes", "¿Cómo se configuran las evaluaciones de un curso?", "Configuracion de Evaluaciones.pptx"),
+    ("ausentes_causas", "Gestión académica", "¿Cómo registro las causas de deserción o ausencia de estudiantes?", "Ingreso de Causas de Desertores y Ausentes.pdf"),
+    ("parametrizar_ausencias", "Gestión académica", "¿Qué instructivo explica la parametrización de desertores y ausentes?", "instructivo parametrizacion desertores y ausentes.pptx"),
+    ("inscripcion_curso_enfasis", "Matrícula", "¿Qué autorización necesito para inscribirme en un curso de énfasis?", "Autorizacion de Inscripcion Curso de Enfasis.pptx"),
+    ("autorizacion_intersemestral", "Matrícula", "¿Cómo se autorizan cursos intersemestrales?", "Autorizaciones cursos intersemestrales.pptx"),
+    ("inscripcion_grado", "Grados", "¿Cómo presento la solicitud de inscripción para grado?", "Solicitud de inscripción para grado.pdf"),
+    ("tramite_graduacion", "Grados", "¿Qué pasos se realizan en el sistema para graduar a un estudiante?", "Graduar.pptx"),
+    ("aprobacion_requisitos_grado", "Grados", "¿Cómo se revisa o aprueba el cumplimiento de requisitos para grado?", "Instructivo Aprobación de Requisitos.pdf"),
+    ("homologar_asignaturas", "Admisiones", "¿Qué debo hacer para solicitar la homologación de asignaturas?", "Homologaciones.pdf"),
+    ("anular_preinscripcion", "Admisiones", "¿Cómo se anula o modifica un programa en una preinscripción?", "Anulación y Modificación de Programa Pre-inscripciones.pptx"),
+    ("demo_tipos_admision", "Admisiones", "¿Qué tipos de admisión contempla el proceso para aspirantes?", "Demo tipos de admisión.pptx"),
+    ("aprobar_requisitos_aspirante", "Admisiones", "¿Cómo verifico y apruebo los requisitos de un aspirante?", "Aprobación de Requisitos.pptx"),
+    ("consultar_hoja_vida", "Admisiones", "¿Dónde puedo consultar la hoja de vida de matrícula de un estudiante?", "Consulta de Hoja de Vida - Matrículas.pdf"),
+    ("excepciones_bloqueos", "Cuentas", "¿Cómo consulto si un estudiante tiene excepciones, bloqueos o sanciones?", "Consulta de Excepciones, bloqueos y sanciones.pdf"),
+    ("gestion_bloqueos", "Cuentas", "¿Qué pasos muestra el instructivo para gestionar bloqueos de usuarios?", "Instructivo Bloqueos.pdf"),
+    ("bloqueo_excepciones_sanciones", "Cuentas", "¿En qué módulo se revisan bloqueos y sanciones asociados a estudiantes?", "Bloqueos, Sanciones y Excepciones.pptx"),
+    ("creditos_autorizacion", "Créditos", "¿Cómo se tramita una autorización para estudiantes en proceso de crédito?", "Autorización estudiantes en proceso de créditos_v2.pdf"),
+    ("solicitud_credito", "Créditos", "¿Cómo se aprueba una solicitud de crédito estudiantil?", "Aprobacion Solicitudes de credito.pptx"),
+    ("verificar_pago", "Pagos", "¿Cómo verifico en el sistema si un pago ya fue aplicado?", "Instructivo Verificación pagos V2.pdf"),
+    ("detalle_factura", "Pagos", "¿Dónde consulto los anexos o el detalle de una factura?", "Detalle factura (Anexos).pptx"),
+    ("cuentas_bancarias", "Pagos", "¿Qué información institucional está disponible sobre bancos y cuentas para pagos?", "Bancos y cuentas_v1_20211007.pdf"),
+    ("reporte_notas_credito", "Financiero", "¿Cómo se gestiona un reporte de notas crédito?", "Gestión de Notas Crédito.pdf"),
+    ("liquidacion_servicios_academicos", "Financiero", "¿Dónde se configura la liquidación de servicios académicos?", "Liquidacion de servicios academicos - Configuración.pptx"),
+    ("descuentos_programa", "Financiero", "¿Cómo consulto los descuentos asociados a un programa académico?", "Descuentos por Programa.pptx"),
+    ("valor_matricula", "Financiero", "¿Cómo genero el reporte de valor de matrícula en SIAAF?", "7. Valor matrícula.pptx"),
+    ("matricula_nuevos_reporte", "Admisiones", "¿Qué filtros pide el reporte de estudiantes nuevos de pregrado antes de generarlo?", "1. Estudiantes Nuevos Pregrado.pptx"),
+    ("reporte_inscripciones_consolidado", "Admisiones", "¿Cómo genero el consolidado de inscripciones y matrículas de estudiantes nuevos?", "1. Estudiantes Nuevos Pregrado.pptx"),
+    ("reporte_estudiantes_antiguos", "Admisiones", "¿Qué informe se usa para generar el reporte de estudiantes antiguos de pregrado?", "2. Estudiantes Antiguos Pregrado.pptx"),
+    ("reporte_matricula_completa", "Admisiones", "¿Cómo se genera el reporte de matrícula completa y media matrícula?", "3. Matricula Completa-Media matricula.pptx"),
+    ("reporte_reintegro", "Admisiones", "¿Cuál es el instructivo de SIAAF para generar el reporte de reintegros?", "6. Reintegro.pptx"),
+    ("reporte_transferencias", "Admisiones", "¿Qué documento explica el reporte de transferencias externas?", "4. Transferencia Externa.pptx"),
+    ("reporte_ser_pilo", "Admisiones", "¿Cómo se consulta el informe de estudiantes Ser Pilo Paga?", "5. Ser Pilo Paga.pptx"),
+    ("informe_inscripciones", "Admisiones", "¿Qué opciones ofrece el módulo de gestión de inscripciones?", "Gestión de inscripciones.pdf"),
+    ("atencion_modulo_estudiantes", "Atención estudiantil", "¿Cómo se atiende una solicitud en el módulo de atención a estudiantes?", "Instructivo Módulo Atención Estudiantes (Completo).pdf"),
+    ("tutorias_estudiantes", "Atención estudiantil", "¿Cómo se registra o gestiona una tutoría para un estudiante?", "Instructivo Atencion a Estudiantes (Tutorías).pdf"),
+    ("practicas_estudiantes", "Prácticas", "¿Qué procedimiento deben seguir los estudiantes para gestionar sus prácticas?", "Gestión Prácticas - Estudiantes.pdf"),
+    ("autoevaluacion_funcionarios", "Funcionarios", "¿Cómo se administra la autoevaluación por grupos de funcionarios?", "Autoevaluacion por Grupos - Funcionarios.pdf"),
+    ("solicitud_supletorio", "Académico", "¿Qué pasos indica el documento para autorizar un examen supletorio?", "Autorización de Supletorios.pdf"),
 ]
+
+
+def normalize_source_name(value: str) -> str:
+    """Compara nombres de fuente ignorando acentos y espacios duplicados."""
+    decomposed = unicodedata.normalize("NFKD", str(value or ""))
+    without_accents = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return " ".join(without_accents.casefold().split())
 
 
 def percentile(values: list[float], percent: float) -> float | None:
@@ -89,7 +147,7 @@ async def run_case(
     run_id: str,
 ) -> dict:
     case_id, category, question, expected_source = case
-    session_id = f"load50-{run_id}-{index:02d}"
+    session_id = f"load100-{run_id}-{index:03d}"
     await gate.wait()
     started = time.perf_counter()
     try:
@@ -105,7 +163,8 @@ async def run_case(
             payload = {"raw": response.text}
         message = payload.get("mensaje") or payload.get("response") or payload.get("reply") or ""
         sources = payload.get("sources") or []
-        source_match = any(expected_source.casefold() in str(source).casefold() for source in sources)
+        expected_key = normalize_source_name(expected_source)
+        source_match = any(expected_key in normalize_source_name(source) for source in sources)
         return {
             "user": index + 1,
             "case_id": case_id,
@@ -147,8 +206,9 @@ async def run_case(
 
 def write_report(report: dict, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     md_path = output.with_suffix(".md")
+    report["markdown_report"] = str(md_path)
+    output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     summary = report["summary"]
     rows = [
         f"# Prueba de carga de UniMon — {report['timestamp']}",
@@ -161,7 +221,7 @@ def write_report(report: dict, output: Path) -> None:
         f"- Latencia p50/p95/máxima: **{summary['p50_ms']} / {summary['p95_ms']} / {summary['max_ms']} ms**",
         f"- Throughput: **{summary['requests_per_second']} solicitudes/s**",
         "",
-        "Las 50 preguntas comenzaron juntas en sesiones independientes. Cada una usó un X-Forwarded-For distinto; esto simula claves de rate limit de clientes distintos, pero no representa latencia de 50 redes físicas. La API completa sí se ejecutó con el proveedor LLM configurado.",
+        f"Las {summary['users']} preguntas comenzaron juntas en sesiones independientes. Cada una usó un X-Forwarded-For distinto; esto simula claves de rate limit de clientes distintos, pero no representa latencia de {summary['users']} redes físicas. La API completa sí se ejecutó con el proveedor LLM configurado.",
         "",
         "## Resultado por usuario",
         "",
@@ -183,16 +243,19 @@ def write_report(report: dict, output: Path) -> None:
 async def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8001")
-    parser.add_argument("--output", type=Path, default=ROOT / "reports" / "load_test_50_users_20261005.json")
-    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--output", type=Path, default=ROOT / "reports" / "load_test_100_users_20261005.json")
+    parser.add_argument("--timeout", type=float, default=180.0)
     args = parser.parse_args()
 
-    if len(CASES) != 50:
-        raise RuntimeError(f"La prueba debe tener 50 casos; encontró {len(CASES)}")
+    if len(CASES) != 100:
+        raise RuntimeError(f"La prueba debe tener 100 casos; encontró {len(CASES)}")
+    normalized_questions = [" ".join(case[2].casefold().split()) for case in CASES]
+    if len(set(normalized_questions)) != len(CASES):
+        raise RuntimeError("La batería contiene preguntas duplicadas")
 
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     gate = asyncio.Event()
-    limits = httpx.Limits(max_connections=60, max_keepalive_connections=50)
+    limits = httpx.Limits(max_connections=120, max_keepalive_connections=100)
     timeout = httpx.Timeout(args.timeout, connect=10.0)
     async with httpx.AsyncClient(limits=limits, timeout=timeout, trust_env=False) as client:
         tasks = [
@@ -212,7 +275,7 @@ async def main() -> int:
         "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
         "base_url": args.base_url,
         "provider": "Configuración del backend; consultar /health para el nombre sin credenciales",
-        "load_shape": "50 concurrent POST /api/chat; barrier synchronized; distinct X-Forwarded-For; isolated session_id per user",
+        "load_shape": f"{len(results)} concurrent POST /api/chat; barrier synchronized; distinct X-Forwarded-For; isolated session_id per user",
         "summary": {
             "users": len(results),
             "successes": successes,

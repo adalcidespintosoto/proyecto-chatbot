@@ -52,6 +52,36 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
+def _query_intent_family(text: str) -> Optional[str]:
+    """Agrupa acciones explícitas para evitar usar consultas de otro trámite como expansión."""
+    q = normalize_text(text)
+    families = (
+        ("recuperar_acceso", r"\b(?:recuper\w*|restablec\w*|olvid[eé]|desbloque\w*)\b"),
+        ("ingresar", r"\b(?:ingres\w*|entr\w*|acced\w*|iniciar sesi[oó]n)\b"),
+        ("consultar", r"\b(?:consult\w*|verific\w*|revis\w*|mir\w*|busc\w*|encuentr\w*)\b"),
+        ("generar_reporte", r"\b(?:gener\w*|sac\w*|export\w*)\b.*\b(?:informe|reporte|consolidado)\b|\b(?:informe|reporte|consolidado)\b.*\b(?:gener\w*|sac\w*|export\w*)\b"),
+        ("matricular_inscribir", r"\b(?:matricul\w*|inscrib\w*)\b"),
+        ("descargar", r"\b(?:descarg\w*|baj\w*)\b"),
+        ("solicitar", r"\b(?:solicit\w*|pedir|radic\w*)\b"),
+        ("aprobar", r"\b(?:aprob\w*|autoriz\w*|rechaz\w*)\b"),
+        ("configurar", r"\b(?:configur\w*|parametriz\w*)\b"),
+        ("crear", r"\b(?:cre\w*|program\w*)\b"),
+        ("agregar_quitar", r"\b(?:agreg\w*|a[nñ]ad\w*|quit\w*|elimin\w*)\b"),
+        ("votar", r"\b(?:vot\w*|sufrag\w*)\b"),
+        ("pagar", r"\b(?:pag\w*|cancel\w*)\b"),
+        ("evaluar", r"\b(?:evalu\w*|calific\w*)\b"),
+    )
+    return next((family for family, pattern in families if re.search(pattern, q)), None)
+
+
+def _compatible_query_intents(current: str, matched: str) -> bool:
+    current_intent = _query_intent_family(current)
+    matched_intent = _query_intent_family(matched)
+    if current_intent is None or matched_intent is None:
+        return current_intent is None and matched_intent is None
+    return current_intent == matched_intent
+
+
 def is_anomalous_golden_pair(user_query: str, response: str) -> Tuple[bool, str]:
     """
     Evalúa si un par query/response almacenado en Golden Cache es anómalo,
@@ -291,15 +321,9 @@ def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[
         model = get_embedding_model()
         embedding = model.encode([f"query: {user_query}"])[0].tolist()
 
-        # Filtrar por rol si se especifica uno distinto a "general"
-        where_filter = None
-        if role and role.strip().lower() != "general":
-            where_filter = {"role": {"$in": [role.strip().lower(), "general"]}}
-
         results = collection.query(
             query_embeddings=[embedding],
             n_results=1,
-            where=where_filter,
             include=["documents", "metadatas", "distances"]
         )
 
@@ -310,6 +334,12 @@ def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[
             if similarity >= threshold:
                 matched_query = results["metadatas"][0][0].get("user_query", "")
                 matched_response = results["documents"][0][0]
+                if not _compatible_query_intents(user_query, matched_query):
+                    logger.info(
+                        "[GoldenCache] Coincidencia semántica descartada: intención distinta (%s vs %s).",
+                        _query_intent_family(user_query), _query_intent_family(matched_query),
+                    )
+                    return None
                 matched_lower = matched_response.lower()
 
                 # Descartar si la respuesta contiene patrones inválidos

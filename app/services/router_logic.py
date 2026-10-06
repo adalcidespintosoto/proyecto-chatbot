@@ -420,6 +420,18 @@ class RouterLogic:
         """
         msg_lower = text.lower().strip()
 
+        # Priorizar la identidad declarada por la persona sobre los roles
+        # mencionados como objeto del trámite (p. ej. "funcionario ... estudiante").
+        declared_roles = [
+            (r"\b(?:soy|trabajo como|me desempeño como)\s+(?:un\s+|una\s+)?(?:funcionario|funcionaria|administrativo|administrativa|colaborador|colaboradora|empleado|empleada|trabajador|trabajadora)\b", "administrativo"),
+            (r"\b(?:trabajo en|estoy en)\s+(?:el\s+)?(?:área de\s+)?(?:admisiones|cartera|tesorería|registro|finanzas|talento humano)\b", "administrativo"),
+            (r"\b(?:soy|trabajo como|me desempeño como)\s+(?:un\s+|una\s+)?(?:profesor|profesora|docente|catedr[aá]tico|catedr[aá]tica)\b", "profesor"),
+            (r"\b(?:soy|estudio como)\s+(?:un\s+|una\s+)?(?:estudiante|alumno|alumna)\b", "estudiante"),
+        ]
+        for pattern, declared_role in declared_roles:
+            if re.search(pattern, msg_lower):
+                return declared_role
+
         # 1. Patrones contextuales prioritarios de profesor / docente
         if any(re.search(pat, msg_lower) for pat in [
             r"\bmis\s+(alumnos|alumnas|estudiantes)\b",
@@ -1438,17 +1450,16 @@ class RouterLogic:
                     }
 
                 # Consultar RAG con el rol confirmado y filtrar chunks
-                # Golden Cache: buscar coincidencia previa (filtrada por rol)
+                # Golden Cache aporta otra formulación para recuperar evidencia;
+                # sus respuestas guardadas no se reusan como fuente factual.
                 golden_context = ""
-                golden_hit = search_golden_case(query_to_run, role=session.user_role)
+                golden_hit = search_golden_case(query_to_run)
                 if golden_hit:
-                    prev_q, prev_ans, sim = golden_hit
+                    prev_q, _prev_ans, sim = golden_hit
                     golden_context = (
-                        f"Ejemplo institucional de referencia:\n"
-                        f"- Consulta similar: {prev_q}\n"
-                        f"- Solución validada:\n{prev_ans}\n"
+                        f"Consulta similar validada para ampliar la búsqueda documental:\n{prev_q}\n"
                     )
-                    logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en PIDIENDO_ROL.")
+                    logger.info(f"[GoldenCache] Usando consulta similar solo como expansión RAG (sim={sim:.2f}) en PIDIENDO_ROL.")
 
                 history = cls.get_history(session_id)
                 rag_res = await rag_service.answer_query(
@@ -1817,17 +1828,15 @@ class RouterLogic:
             history = cls.get_history(session_id)
             query_ctx = texto
 
-            # Golden Cache: buscar coincidencia previa antes del RAG completo (filtrada por rol)
+            # Golden Cache aporta una formulación adicional para buscar evidencia.
             golden_context = ""
-            golden_hit = search_golden_case(query_ctx, role=session.user_role)
+            golden_hit = search_golden_case(query_ctx)
             if golden_hit:
-                prev_q, prev_ans, sim = golden_hit
+                prev_q, _prev_ans, sim = golden_hit
                 golden_context = (
-                    f"Ejemplo institucional de referencia:\n"
-                    f"- Consulta similar: {prev_q}\n"
-                    f"- Solución validada:\n{prev_ans}\n"
+                    f"Consulta similar validada para ampliar la búsqueda documental:\n{prev_q}\n"
                 )
-                logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en diagnóstico.")
+                logger.info(f"[GoldenCache] Usando consulta similar solo como expansión RAG (sim={sim:.2f}) en diagnóstico.")
 
 
             rag_res = await rag_service.answer_query(
@@ -2008,17 +2017,15 @@ class RouterLogic:
                 }
 
             # 7. Consultar RAG con historial conversacional y rol de usuario
-            # Golden Cache: buscar coincidencia previa (filtrada por rol)
+            # Golden Cache aporta una formulación adicional para buscar evidencia.
             golden_context = ""
-            golden_hit = search_golden_case(texto, role=session.user_role)
+            golden_hit = search_golden_case(texto)
             if golden_hit:
-                prev_q, prev_ans, sim = golden_hit
+                prev_q, _prev_ans, sim = golden_hit
                 golden_context = (
-                    f"Ejemplo institucional de referencia:\n"
-                    f"- Consulta similar: {prev_q}\n"
-                    f"- Solución validada:\n{prev_ans}\n"
+                    f"Consulta similar validada para ampliar la búsqueda documental:\n{prev_q}\n"
                 )
-                logger.info(f"[GoldenCache] Inyectando few-shot golden (sim={sim:.2f}) en IDLE.")
+                logger.info(f"[GoldenCache] Usando consulta similar solo como expansión RAG (sim={sim:.2f}) en IDLE.")
 
             history = cls.get_history(session_id)
             rag_res = await rag_service.answer_query(

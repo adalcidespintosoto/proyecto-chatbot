@@ -49,6 +49,20 @@ def test_new_student_account_query_filters_financial_sources():
     }
 
 
+def test_colloquial_enrede_does_not_trigger_hardware_network_filter():
+    question = "Hola, estoy haciendo este trámite y me enredé un poco: ¿Cómo hago la inscripción a cursos intersemestrales?"
+
+    assert rag_service._build_query_filter(question, "general") is None
+
+
+def test_explicit_network_question_still_gets_hardware_network_filter():
+    question = "No puedo conectarme a la red wifi institucional desde mi portátil."
+
+    assert rag_service._build_query_filter(question, "general") == {
+        "category": {"$nin": ["financiero", "academico"]}
+    }
+
+
 def test_account_reranker_prefers_activation_and_drops_unrelated_login_docs():
     question = "Soy nuevo, ¿cómo obtengo mi usuario para el correo institucional?"
     activation = make_doc(

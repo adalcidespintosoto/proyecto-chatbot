@@ -1,5 +1,7 @@
 # Resumen de Integración: Migración a OpenAI (GPT-5.6 Luna) en UniMon
 
+> **Registro histórico, no configuración vigente.** Este documento conserva la migración y datos observados en su fecha. El código actual admite OpenAI, Gemini y Ollama, y puede usar Ollama como fallback; modelos, proveedor activo, precios y estado deben verificarse en el `.env` privado, `app/config.py`, `app/services/llm_client.py` y `/health`. Para operar hoy, usa `docs/MANUAL_TECNICO_INTEGRAL.md` y `docs/REPLICAR_Y_OPERAR_UNIMON.md`.
+
 Este documento recopila el contexto, decisiones técnicas, archivos modificados, pruebas realizadas y el estado final del sistema tras la integración de la API comercial en la nube (**OpenAI GPT-5.6 Luna**) en sustitución del modelo local de Ollama.
 
 ---

@@ -7,6 +7,7 @@ mensajes interactivos con botones de respuesta rápida y envío mediante Meta Gr
 import logging
 import re
 import time
+import unicodedata
 from typing import Dict, Any, Optional, List, Tuple
 import httpx
 
@@ -15,6 +16,27 @@ from app.services.router_logic import router_logic
 from app.services.telemetry_service import log_interaction, update_session_status
 
 logger = logging.getLogger("unimon.whatsapp_service")
+
+
+def is_new_session_command(text: str) -> bool:
+    """Reconoce comandos explícitos para reiniciar el contexto de WhatsApp."""
+    normalized = unicodedata.normalize("NFKD", text or "")
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    normalized = re.sub(r"[^a-z0-9\s/]", " ", normalized.casefold())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized in {
+        "new chat", "new_chat", "nuevo chat", "nueva conversacion", "nueva sesion",
+        "empezar de nuevo", "empezar otra vez", "reiniciar chat",
+        "reiniciar conversacion", "reiniciar sesion", "/nuevo",
+    }
+
+
+def split_whatsapp_follow_up(text: str) -> Tuple[str, str]:
+    """Separa pasos de diagnóstico del bloque posterior de escalamiento."""
+    match = re.search(r"\n\s*---+\s*\n", text or "")
+    if not match:
+        return (text or "").strip(), ""
+    return text[:match.start()].strip(), text[match.end():].strip()
 
 
 def markdown_to_whatsapp(text: str) -> str:
@@ -29,7 +51,7 @@ def markdown_to_whatsapp(text: str) -> str:
     if not text:
         return ""
 
-    formatted = text.strip()
+    formatted = re.sub(r"\r\n?", "\n", text or "").strip()
 
     # 1. Convertir enlaces en Markdown [Texto](URL) a "Texto (URL)"
     formatted = re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)', r'\1 (\2)', formatted)
@@ -42,6 +64,10 @@ def markdown_to_whatsapp(text: str) -> str:
 
     # 4. Convertir líneas divisorias --- a una línea limpia
     formatted = re.sub(r'(?m)^---+$', '────────────────────', formatted)
+
+    # Normaliza el espaciado para que los mensajes largos se lean bien en móvil.
+    formatted = re.sub(r"[ \t]+\n", "\n", formatted)
+    formatted = re.sub(r"\n{3,}", "\n\n", formatted)
 
     return formatted.strip()
 
@@ -305,6 +331,16 @@ class WhatsAppService:
                         # 4. Identificador de sesión persistente vinculado al número de teléfono
                         session_id = f"wa_{from_phone}"
 
+                        if is_new_session_command(incoming_text):
+                            router_logic.reset_session(session_id, preserve_role=False)
+                            await self.send_text_message(
+                                from_phone,
+                                "🔄 *Conversación nueva*\n\nListo, limpié el contexto anterior. "
+                                "Cuéntame qué necesitas resolver y empezamos desde cero."
+                            )
+                            logger.info("[WhatsApp] Conversación reiniciada para '%s'.", from_phone)
+                            continue
+
                         # 5. Invocar el pipeline inteligente de UniMon
                         t0 = time.time()
                         resultado = await router_logic.procesar_mensaje(
@@ -315,6 +351,13 @@ class WhatsAppService:
 
                         mensaje_resp = resultado.get("mensaje", "")
                         quick_replies = resultado.get("quick_replies") or []
+                        # Reserva un botón corto para reiniciar desde cualquier flujo
+                        # que aún tenga espacio dentro del límite de WhatsApp.
+                        quick_replies = list(quick_replies)
+                        if quick_replies and len(quick_replies) < 3 and not any(
+                            (item.get("payload") or "").upper() == "NEW_CHAT" for item in quick_replies
+                        ):
+                            quick_replies.append({"label": "🔄 Nuevo chat", "payload": "NEW_CHAT"})
                         tipo = resultado.get("tipo", "DIAGNOSTICO")
                         ticket_id = resultado.get("ticket_id")
 
@@ -339,12 +382,30 @@ class WhatsAppService:
                             logger.debug(f"Aviso en telemetría de WhatsApp: {tel_err}")
 
                         # 7. Despachar la respuesta de vuelta a WhatsApp
-                        if quick_replies and len(quick_replies) <= 3:
-                            await self.send_interactive_buttons_message(
-                                to_phone=from_phone,
-                                body_text=mensaje_resp,
-                                quick_replies=quick_replies
-                            )
+                        if quick_replies and len(quick_replies) <= 3 and all(
+                            len(item.get("label", "")) <= 20 for item in quick_replies
+                        ):
+                            diagnostic_text, follow_up_text = split_whatsapp_follow_up(mensaje_resp)
+                            if follow_up_text:
+                                await self.send_text_message(from_phone, diagnostic_text)
+                                await self.send_interactive_buttons_message(
+                                    to_phone=from_phone,
+                                    body_text=follow_up_text[:1024],
+                                    quick_replies=quick_replies,
+                                )
+                            elif len(markdown_to_whatsapp(mensaje_resp)) > 1024:
+                                await self.send_text_message(from_phone, mensaje_resp)
+                                await self.send_interactive_buttons_message(
+                                    to_phone=from_phone,
+                                    body_text="¿Qué te gustaría hacer ahora?",
+                                    quick_replies=quick_replies,
+                                )
+                            else:
+                                await self.send_interactive_buttons_message(
+                                    to_phone=from_phone,
+                                    body_text=mensaje_resp,
+                                    quick_replies=quick_replies
+                                )
                         else:
                             await self.send_text_message(
                                 to_phone=from_phone,

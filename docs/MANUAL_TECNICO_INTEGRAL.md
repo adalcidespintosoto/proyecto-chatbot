@@ -1,421 +1,295 @@
-# MANUAL TÉCNICO INTEGRAL DE ARQUITECTURA, OPERACIÓN Y RESOLUCIÓN DE FALLOS
-## Asistente Virtual de Soporte Técnico TI N1 - UniMon (Universidad Simón Bolívar)
+# Manual técnico integral de UniMon
 
----
+**Versión documental:** 6 de octubre de 2026  
+**Audiencia:** practicante de TI, desarrollador, administrador del servicio y responsable de conocimiento.  
+**Fuente de verdad:** código y configuración presentes en el repositorio. Este manual corrige descripciones históricas que ya no coinciden con el flujo actual.
 
-## 1. FICHA TÉCNICA Y STACK TECNOLÓGICO
+## 1. Resumen del sistema
 
-| Componente | Tecnología / Librería | Versión Requerida | Propósito Técnico |
-| :--- | :--- | :--- | :--- |
-| **Lenguaje Base** | Python | `>= 3.10` (Recomendado 3.11 / 3.12) | Entorno de ejecución principal del backend. |
-| **Framework Web** | FastAPI | `>= 0.110.0` | Servidor REST asíncrono de alto rendimiento (ASGI). |
-| **Seguridad API** | slowapi | `>= 0.1.9` | Rate Limiting global (30 req/min) para prevención DoS. |
-| **Servidor ASGI** | Uvicorn (`[standard]`) | `>= 0.28.0` | Servidor HTTP concurrente para FastAPI. |
-| **Validación de Datos** | Pydantic / Pydantic-Settings | `>= 2.6.0` / `>= 2.2.0` | Modelado y validación de esquemas y variables de entorno. |
-| **Motor LLM Local** | Ollama (`unimon:8b`) | `>= 0.3.0` | LLM local basado en Llama 3.1 8B cuantizado en 4 bits (`Q4_K_M`). |
-| **Vision-LLM (Ingesta)** | Ollama (`llama3.2-vision:11b`)| `>= 0.3.0` | Extracción de texto y contexto de diagramas, flujos y capturas. |
-| **Base Vectorial** | ChromaDB / LangChain-Chroma | `>= 0.5.0` / `>= 0.1.0` | Persistencia y búsqueda vectorial multilingüe (HNSW + SQLite). |
-| **Embeddings Semánticos** | `BAAI/bge-m3` / `multilingual-e5-base`| `sentence-transformers >= 2.6.0` | Generación de representaciones vectoriales densas y sparse. |
-| **Reranker Semántico** | `BAAI/bge-reranker-large` / Cross-Encoder | `sentence-transformers >= 2.6.0` | Re-ordenamiento y cálculo de relevancia contextual cruzada. |
-| **Mesa de Ayuda (ITSM)** | GLPI REST API | `v9.5.x` / `v10.0.x` / Cloud | Integración bidireccional para apertura y consulta de tickets TI. |
-| **Base Telemetría/KPIs** | SQLite3 Local | Nativo Python (`data/analytics.db`) | Persistencia de sesiones, métricas de resolución, latencias y tokens. |
-| **Clustering y Analítica** | Scikit-Learn | `>= 1.4.0` | Detección de brechas de conocimiento (DBSCAN / K-Means). |
-| **Procesamiento Documentos**| PyMuPDF (fitz), PyPDF, python-pptx | `>= 1.23.0`, `>= 4.0.0` | Extracción y chunking de PDF, DOCX, PPTX e imágenes. |
+UniMon es una aplicación Python/FastAPI para soporte TI de primera línea. Incluye canales web y opcionalmente WhatsApp; un router conversacional con sesiones; recuperación documental RAG; un cliente para modelos OpenAI, Gemini u Ollama; integración opcional con GLPI; un panel administrativo y telemetría local.
 
----
+No es un agente general que pueda operar los sistemas institucionales, aprobar trámites ni confirmar permisos. La generación de texto propone una respuesta a partir de evidencia; los sistemas externos y las áreas institucionales siguen siendo responsables de ejecutar o autorizar acciones.
 
-## 2. ESTRUCTURA DEL PROYECTO Y RESPONSABILIDADES
+### Componentes principales
 
-```text
-proyecto-chatbot/
-│
-├── app/                                 # Paquete principal de la aplicación
-│   ├── config.py                        # Configuración con Pydantic Settings (.env)
-│   ├── main.py                          # Entrada ASGI, middlewares CORS, lifespan y montaje de rutas
-│   ├── routers/                         # Controladores REST API
-│   │   ├── chat.py                      # Endpoint POST /api/chat y flujo conversacional
-│   │   ├── analytics.py                 # Endpoint GET /api/analytics/kpis, clusters y exportación DPO
+| Componente | Responsabilidad |
+|---|---|
+| FastAPI | API HTTP, CORS, cabeceras básicas, páginas web, rutas y ciclo de vida. |
+| Router conversacional | Estado y contexto por session_id, reglas de dominio, diagnóstico, feedback y flujo de ticket. |
+| Recuperación RAG | Busca fragmentos de la base documental, ordena evidencia y la limita por presupuesto. |
+| ChromaDB | Índice persistente de chunks del corpus y, en otra ruta, memoria Golden Cache. |
+| Cross-Encoder | Vuelve a ordenar candidatos; su score no se trata como una probabilidad calibrada de verdad. |
+| Cliente LLM | Envía generación al proveedor configurado y tiene fallback a Ollama en los flujos conversacionales. |
+| Ingesta multimodal | Extrae páginas PDF/diapositivas PPTX, textos, tablas e imágenes y produce chunks. |
+| GLPI | Crea o consulta tickets cuando la integración externa está configurada. |
+| SQLite | Guarda telemetría y eventos consultados por el panel de analítica. |
+| Interfaz web/WhatsApp | Presenta mensajes, botones y continuidad de la conversación. |
 
-│   ├── services/                        # Capa de lógica de negocio y servicios especializados
-│   │   ├── router_logic.py              # Máquina de estados conversacional, orquestador y slot-filling
-│   │   ├── router_service.py            # Clasificador semántico y léxico de intenciones
-│   │   ├── rag_service.py               # Búsqueda vectorial, filtrado por rol, reranker y generación LLM
-│   │   ├── glpi_service.py              # Cliente HTTP para autenticación y radicación de tickets GLPI
-│   │   ├── golden_cache_service.py      # Memoria rápida de respuestas resueltas (ChromaDB golden_resolved_qa)
-│   │   ├── telemetry_service.py         # Registro de eventos, latencias y cálculo de KPIs en SQLite
-│   │   ├── clustering_service.py        # Agrupamiento de consultas y detección de vacíos documentales
-│   │   └── normalizer_service.py        # Limpieza léxica, sinónimos y lematización de consultas
-│   ├── static/                          # Frontend SPA integrado
-│   │   └── index.html                   # Interfaz de usuario interactiva, chat y modal de KPIs
-│   └── utils/                           # Utilidades auxiliares y helpers
-│
-├── chroma_db/                           # Directorio persistente de ChromaDB (Embeddings institucionales)
-│   ├── [UUIDs]/                         # Índices HNSW binarios por colección
-│   └── chroma.sqlite3                   # Metadatos y registros vectoriales
-│
-├── data/                                # Datos dinámicos y base de conocimiento institucional
-│   ├── docs/                            # Documentos fuente (.pdf, .docx, .pptx)
-│   └── analytics.db                     # Base de datos SQLite de telemetría y auditoría
-│
-├── docs/                                # Documentación arquitectónica del sistema
-│   ├── flujo_procesamiento_sistema.md   # Diagramas exhaustivos de flujo y decisiones
-│   └── MANUAL_TECNICO_INTEGRAL.md       # Este documento
-│
-├── scripts/                             # Scripts de administración por lotes
-│   ├── ingest_multimodal_docs.py        # Pipeline de extracción, OCR/Vision y vectorización
-│   ├── apply_document_taxonomy.py       # Clasificación y asignación de metadatos por rol
-│   ├── clean_golden_cache.py            # Purgado y mantenimiento de la memoria rápida
-│   └── update_chroma_metadata.py        # Actualización incremental de colecciones vectoriales
-│
-├── tests/                               # Suite de pruebas automatizadas (Pytest)
-│   ├── test_telemetry_analytics.py      # Pruebas de métricas, SQLite y endpoints de observabilidad
-│   ├── test_role_quick_replies.py       # Pruebas de filtrado por rol y botones interactivos
-│   ├── test_incremental_ingest.py       # Pruebas de ingesta por hashes SHA-256
-│   └── test_clustering.py               # Pruebas de DBSCAN y detección de brechas
-│
-├── Modelfile                            # Definición y system prompt del modelo Ollama unimon:8b
-├── requirements.txt                     # Lista de dependencias de Python
-├── setup.ps1                            # Script PowerShell de instalación y configuración automática
-├── run.ps1                              # Script PowerShell para iniciar Uvicorn en producción/desarrollo
-└── pytest.ini                           # Configuración de pruebas unitarias
-```
+CrewAI y LangGraph **no están instalados ni son necesarios para ejecutar el sistema actual**. LangChain sí aparece en requirements y se usa como integración de documentos, splitters, embeddings y Chroma; el flujo y las transiciones están programados directamente en servicios Python, no son un grafo LangGraph.
 
----
+## 2. Flujo de una consulta
 
-## 3. FLUJO DE EJECUCIÓN Y CICLO DE VIDA DEL MENSAJE
+~~~mermaid
+flowchart TD
+    U[Web o WhatsApp] --> API[FastAPI: validación y sanitización]
+    API --> R[Router conversacional por session_id]
+    R --> G{Saludo, límite de dominio, acción, ticket o consulta}
+    G -->|saludo / regla| S[Respuesta de regla]
+    G -->|avería física| D[Diagnóstico breve y oferta de escalamiento]
+    G -->|consulta documental| C[Normalización y expansión de consulta]
+    C --> F[Filtro temático por categoría si aplica]
+    F --> V[Búsqueda vectorial Chroma top 8 por variante]
+    F --> B[Recuperación léxica BM25 complementaria]
+    V --> M[Unión y deduplicación de candidatos]
+    B --> M
+    M --> X[Cross-Encoder: ordena hasta 80 candidatos]
+    X --> N[Selector de anclas y vecinos secuenciales]
+    N --> T[Presupuesto de chunks y tokens estimados]
+    T --> L[LLM configurado]
+    L --> O[Normalización y guardrails de salida]
+    O --> R
+    S --> R
+    D --> R
+    R -->|solicitud autorizada por el usuario| GL[GLPI: alta o seguimiento de ticket]
+    R --> TEL[Telemetría SQLite]
+~~~
 
-```
-                        [ USUARIO EN LA WEB ]
-                                  │
-                                  │ POST /api/chat (Rate Limit 30 req/min)
-                                  ▼
-                     [ FastAPI: app/main.py ]
-                                  │ (Verificación CORS)
-                                  ▼
-             [ Orquestador: app/services/router_logic.py ]
-                                  │
-      ┌───────────────────────────┼───────────────────────────┐
-      ▼                           ▼                           ▼
-[ REGLAS GLOBALES ]       [ CLASIFICADOR ]           [ MÁQUINA ESTADOS ]
-1. Cancelación            - Saludo                   - PIDIENDO_ROL
-2. Caso Solucionado       - Directorio / Canales TI  - DIAGNOSTICO (RAG)
-3. Fuera de Dominio       - Hardware / Físico        - RADICANDO_TICKET
-4. Confirmaciones         - Trámite / Software       - SOLUCIONADO / FIN
-      │                           │                           │
-      └───────────────────────────┼───────────────────────────┘
-                                  │
-              ┌───────────────────┴───────────────────┐
-              ▼                                       ▼
-     ¿Requiere RAG N1?                       ¿Requiere Ticket?
-              │                                       │
-     [ golden_cache_service ]               [ glpi_service.py ]
-     - Similitud >= 0.90                    - Auth initSession
-     - Inyección Few-Shot LLM               - POST /Ticket
-              │ (Miss)                      - POST /Ticket_User
-     [ rag_service.py ]                     - Cierre sesión
-     - Multi-Query Expansion
-     - Filtro por Rol                       
-     - ChromaDB Top-8
-     - Cross-Encoder Reranker Top-3
-     - LLM unimon:8b (Temp 0.0)
-     - Clean LLM Response (Output Guard)
-              │
-              └───────────────────┬───────────────────┘
-                                  │
-                                  ▼
-             [ Telemetría: telemetry_service.py ]
-             - data/analytics.db (latencia, tokens, kpis)
-                                  │
-                                  ▼
-                        [ RESPUESTA AL USUARIO ]
-```
+### Paso a paso del endpoint de chat
 
----
+1. POST /api/chat admite mensaje/mensaje alternativo en inglés y un session_id. Si el cliente no lo envía, el esquema usa default_session; los clientes deben generar un ID diferente por conversación.
+2. La capa HTTP rechaza contenido vacío, limita el texto a 600 caracteres, quita etiquetas HTML y aplica el detector de instrucciones maliciosas.
+3. RouterLogic carga o crea una TicketSession en memoria, agrega historial y detecta saludos, cancelaciones, feedback, preguntas fuera de dominio, solicitudes físicas y acciones GLPI antes de llamar RAG.
+4. Si es una pregunta institucional, el rol puede mantenerse/inferirse para el tono y reglas conversacionales. En el índice RAG no se excluyen documentos porque su metadato audience sea estudiante, docente o administrativo. Sí hay filtros **temáticos** de category para reducir colisiones en ciertos tipos de consulta.
+5. RAG recupera y ordena evidencia. Si no hay contexto que considere utilizable, devuelve una abstención/oferta de soporte; no consulta GLPI para responder una pregunta documental.
+6. El proveedor LLM genera la respuesta con instrucción de soporte N1, el contexto recuperado y partes recientes del historial. Golden Cache puede aportar una pregunta similar para ampliar búsqueda, pero la respuesta almacenada no se copia al contexto factual.
+7. Se limpian patrones de salida y se registra interacción, latencia, fuente y contadores de tokens en analytics.db.
+8. ChatResponse expone tipo, mensaje, ticket_id, estado, quick replies y fuentes cuando están disponibles. Una ruta de regla directa puede no contener fuentes documentales.
 
-## 4. VARIABLES DE ENTORNO Y CONFIGURACIÓN (.env)
+## 3. Pipeline RAG actual
 
-El archivo `.env` en la raíz del proyecto controla todo el comportamiento operativo:
+### 3.1 Indexación
 
-```ini
-# Configuración del Servidor FastAPI
-APP_NAME="UniMon - Asistente Virtual de Soporte Tecnico USB"
-APP_VERSION="1.0.0"
-ENVIRONMENT="development"        # development / production
-PORT=8000
-HOST="0.0.0.0"
-DEBUG=True
+El procesador primario es scripts/ingest_multimodal_docs.py:
 
-# Configuración de GLPI REST API
-GLPI_BASE_URL="https://pruebas.us5.glpi-network.cloud/api.php/v1"
-GLPI_APP_TOKEN="4l3q2EMwU12pdL0RCUtxcI8botN7tODo58XxD3MJ"
-GLPI_USER_TOKEN="1YfLnz0S6OIjs4yFV2rIPk9PMXIndhW7YpBagyCI"
-GLPI_TIMEOUT=15.0
+- Recorre el directorio configurado DOCS_DIR y subdirectorios; actualmente encuentra archivos PDF y PPTX.
+- PDF: extrae texto por página y metadatos de página. Páginas escaneadas pueden depender de extracción visual configurada.
+- PPTX: extrae texto por diapositiva, tablas, notas e imágenes incrustadas.
+- Interpretación visual llama al servidor local Ollama configurado para visión. Si este no está disponible, el procesamiento continúa con texto visible, pero sin el contenido que solo aparece en capturas o diagramas.
+- Limpia boilerplate y divide con RecursiveCharacterTextSplitter: chunk_size 800 y chunk_overlap 150. Son **caracteres aproximados**, no tokens.
+- Añade prefijo passage: al generar embeddings E5 normalizados y guarda en Chroma con metadatos y IDs deterministas que contienen origen/página/chunk cuando ese origen permite verificar el orden.
+- El modo incremental evita volver a procesar documentos que ya aparecen por nombre. Si se reemplaza un archivo, hay que purgar la versión anterior o usar el flujo de reemplazo del panel.
 
-# Configuración de Ollama (LLM Local)
-OLLAMA_BASE_URL="http://localhost:11434"
-LLM_MODEL="unimon:8b"
-OLLAMA_TIMEOUT=45.0
+La carpeta actual incluye 247 fuentes: 128 PDF, 115 PPTX, dos DOCX y dos XLSX. La ingesta completa indexa solo PDF/PPTX (243 archivos). Los DOCX/XLSX no se vuelven buscables por estar en data/docs. El antiguo endpoint /api/admin/upload-doc incluso acepta extensiones adicionales al guardarlas, pero la ingesta principal no extrae/indexa todas esas extensiones. La aceptación de una subida no equivale a incorporación al RAG.
 
-# Configuración de Vision-LLM (Para ingesta de diagramas y capturas)
-VISION_MODEL="llama3.2-vision:11b"
-VISION_TIMEOUT=120.0
-VISION_MAX_IMAGE_SIZE=1024
-VISION_MIN_IMAGE_KB=15
+### 3.2 Búsqueda y selección
 
-# Configuración de ChromaDB y Embeddings
-CHROMA_DB_DIR="./chroma_db"
-DOCS_DIR="./data/docs"
-EMBEDDING_MODEL="intfloat/multilingual-e5-base"
-```
+1. Las consultas se normalizan y MultiQuery produce hasta tres reformulaciones más la pregunta original (hasta cuatro consultas totales); se filtran variantes que cambian el idioma o pierden la plataforma consultada.
+2. E5 consulta Chroma con prefijo query:. La búsqueda vectorial usa hasta 8 hits por variante y el umbral MIN_RELEVANCE_SCORE_THRESHOLD configurado en el servicio.
+3. BM25 añade candidatos léxicos. El score vectorial y el léxico sirven para construir el conjunto; la recuperación híbrida no es una prueba de que el resultado resuelva la acción.
+4. Se deduplican contenidos y se filtran candidatos por algunas categorías temáticas (por ejemplo, finanzas frente a asuntos académicos). El metadato audience existe en el índice, pero **no se usa como filtro por rol**. El rol no impide consultar documentos complementarios de otras audiencias.
+5. Cross-Encoder reordena hasta 80 candidatos. Su salida es una señal de orden, no un score de confianza universal ni un umbral certificado para responder.
+6. Selector de anclas aprovecha la relación entre pregunta/variantes y nombre de fuente, además del reranking. En consultas que tienen selectores dedicados (credenciales, elecciones u otros flujos documentados) se aplican reglas específicas de evidencia.
+7. Para procedimientos se reserva un presupuesto mayor: 3.800 tokens estimados, hasta 16 anclas y 24 chunks finales. Consultas no procedimentales usan 1.400 tokens estimados, hasta 4 anclas y 8 chunks finales. El clasificador detecta verbos y frases procedimentales; si falla, se puede perder contexto necesario.
+8. El expansor trata de incluir un chunk inmediatamente anterior y posterior del mismo documento, incluso en página/diapositiva adyacente, cuando los IDs deterministas y metadatos permiten verificar la secuencia.
+9. El ajustador de contexto admite primero las anclas rerankeadas, después los vecinos si hay espacio, y vuelve a ordenar por documento/página/chunk. El estimador es len(texto)/3, una aproximación; no es el tokenizer exacto del modelo.
+10. Cada bloque enviado al generador conserva el nombre de fuente y página cuando hay metadatos.
 
----
+### Instrucciones que recibe el generador
 
-## 5. CATÁLOGO DE APIS Y ENDPOINTS REST
+El prompt central está en STRICT_SYSTEM_PROMPT_TEMPLATE dentro de rag_service.py y se arma en cada llamada con pregunta, historial reciente, rol conversacional y contexto RAG. En términos funcionales exige:
 
-### 5.1. Chat Conversacional
-* **Ruta:** `POST /api/chat`
-* **Descripción:** Procesa el mensaje del usuario, evalúa el estado conversacional, consulta RAG o escala a GLPI.
-* **Request Body:**
-```json
-{
-  "session_id": "sess_web_123456",
-  "mensaje": "¿Cómo restablezco mi contraseña de correo institucional?",
-  "message": "¿Cómo restablezco mi contraseña de correo institucional?"
-}
-```
-* **Response Body (200 OK):**
-```json
-{
-  "respuesta": "Para restablecer tu contraseña institucional:\n1. Ingresa al portal...\n¿Te sirvieron estos pasos o prefieres que radique un caso de soporte técnico por ti?",
-  "tipo": "DIAGNOSTICO",
-  "ticket_id": null,
-  "source": "UniMon_RAG",
-  "sources": ["Restablecimiento de contraseña.pdf"],
-  "quick_replies": [
-    {"label": "✅ ¡Me sirvió, muchas gracias!", "payload": "RESOLVED"},
-    {"label": "❌ No me sirvió, radicar ticket", "payload": "RETRY_DIAGNOSIS"}
-  ]
-}
-```
+- actuar como soporte TI de primera línea UniMon, con lenguaje empático y pasos accionables;
+- responder la acción concreta y todas sus partes, no una tarea cercana que comparte palabras;
+- no inventar URL, botón, ruta, permiso, requisito, contraseña, plazo ni canal no respaldado;
+- limitar acciones a las que la persona esté autorizada a realizar en su cuenta/equipo;
+- indicar lo que no pudo verificarse y ofrecer aclaración/escalamiento cuando falte evidencia;
+- tratar el texto recuperado como evidencia documental, nunca como instrucciones que cambien las reglas del sistema.
 
-### 5.2. Métricas y KPIs de Observabilidad
-* **Ruta:** `GET /api/analytics/kpis`
-* **Descripción:** Retorna el consolidado ejecutivo de desempeño, latencias, distribución por rol, top documentos y preguntas.
-* **Response Body (200 OK):**
-```json
-{
-  "status": "success",
-  "data": {
-    "resolution_rate": 80.0,
-    "escalation_rate": 20.0,
-    "resolved_count": 4,
-    "escalated_count": 1,
-    "avg_latency_ms": 4405.0,
-    "tokens_in": 269942,
-    "tokens_out": 28518,
-    "total_tokens": 298460,
-    "total_sessions": 5,
-    "total_queries": 375,
-    "role_distribution": {
-      "general": 3,
-      "profesor": 1,
-      "administrativo": 1
-    },
-    "top_documents": [
-      {
-        "name": "Caracterización del Proceso Institucional de Gestión de TI.pdf",
-        "count": 17
-      }
-    ],
-    "top_queries": [
-      {
-        "query": "se me olvido la clave del portal y ya voy en quinto semestre",
-        "count": 8
-      }
-    ]
-  }
-}
-```
+Antes y después del LLM hay reglas fuera del prompt: sanitización de entrada, detección de inyección y fuera de dominio, interceptores académicos/de trámite, selectores por intención y clean_llm_response para limpiar formato/links/contactos. No son una verificación lógica formal de cada afirmación; evaluar con los documentos originales sigue siendo necesario.
 
-### 5.3. Agrupamiento Semántico y Brechas Documentales
-* **Ruta:** `GET /api/analytics/clusters?min_samples=2&eps=0.25`
-* **Descripción:** Agrupa semánticamente las dudas de usuarios e identifica temas sin suficiente documentación de soporte.
+Los máximos anteriores son límites, no cantidades garantizadas. El número real depende de cuántos candidatos sobrevivan, cuánto texto tengan, metadatos, deduplicación, relevancia, vecino encontrado y presupuesto. Una consulta no debería recibir vecinos de otro documento solo por compartir términos.
 
-### 5.4. Exportador de Preferencias DPO
-* **Ruta:** `GET /api/analytics/export-dpo-dataset?format=jsonl`
-* **Descripción:** Descarga pares `(prompt, chosen, rejected)` para reentrenamiento de modelos de lenguaje.
+### 3.3 Qué significan los chunks y el overlap
 
----
+Un chunk es una porción de texto que se vectoriza y recupera como unidad. El overlap de 150 caracteres repite el final de un chunk al inicio del siguiente para que una frase o paso que cruce el corte conserve continuidad. No crea información nueva y puede duplicar texto/candidatos. Más overlap aumenta almacenamiento, duplicados y similitud entre segmentos; menos overlap reduce contexto en límites.
 
-## 6. INSTALACIÓN Y PUESTA EN MARCHA PASO A PASO
+El script scripts/audit_overlap_rates.py mide redundancia existente con la métrica real de la colección; incluye conversión de distancia correcta para L2. El resultado de data/rag_overlap_calibration_latest.json es un dato de diagnóstico, no una política automática de eliminación. No habilites deduplicación solo porque dos fragmentos tengan alta similitud: mide tasa, inspecciona pares y verifica consultas de evaluación.
 
-### Paso 1: Configurar el Entorno Virtual
-Abrir PowerShell en la raíz del proyecto y ejecutar:
-```powershell
+### 3.4 Validación de recuperación
+
+scripts/evaluate_rag_retrieval.py y scripts/trace_coloquial_100_retrieval.py registran candidatos, orden rerankeado y contexto final frente a una fuente esperada. Los scripts load_test_* ejercitan además el endpoint real y respuestas LLM. La promoción por scripts/promote_quality_to_golden.py requiere una evaluación marcada correcta y fuente final alineada; un feedback de usuario aislado no equivale a una auditoría independiente.
+
+Última medición documentada en este repositorio, 6-oct-2026: 50 sesiones liberadas simultáneamente, 50 respuestas HTTP exitosas, cero respuestas 429/5xx, fuente esperada en 49 de 49 respuestas comprobables. El evaluador calificó 25 correctas, 14 parciales, 9 incorrectas y 2 no verificables (50% de exactitud estricta). Latencia p50 65,1 s, p95 70,7 s, máximo 85,9 s. Es una medición local/configurada, no un SLA ni prueba de redes físicas diversas. No demuestra la meta de 90%.
+
+## 4. Conversación, diagnóstico y tickets
+
+- Las sesiones y su historial se guardan en diccionarios Python en memoria; se purgan por inactividad mayor a 20 minutos y el ciclo de limpieza corre cada 5 minutos.
+- Reiniciar el proceso pierde el estado conversacional. Varias réplicas/worker independientes no comparten memoria: sin almacenamiento compartido y afinidad de sesión, un turno puede llegar a otro proceso sin contexto.
+- El clasificador conversacional encamina mensajes a autoservicio, falla física, límites académicos, respuesta de regla y acciones de ticket. Su clasificación no modifica el corpus.
+- Una falla común puede recibir diagnóstico y botones. En hardware o problemas que exijan visita, la aplicación puede ofrecer escalamiento; los pasos sugeridos no autorizan abrir equipos, manipular cableado ni intervenir infraestructura.
+- El flujo de GLPI puede pedir nombre, correo y descripción. Puede comprobar casos activos del día y preguntar si se agrega un seguimiento o se abre otro ticket. La confirmación y respuesta final dependen de disponibilidad/configuración externa.
+- GLPI usa GLPI_BASE_URL, GLPI_APP_TOKEN, GLPI_USER_TOKEN y timeout. El cliente abre/cierra sesiones de API y puede consultar resúmenes/seguimientos. Sin credenciales válidas no crea un ticket real.
+- El estado de conversación, el código HTTP 200 y la fuente RAG no prueban por sí solos que la respuesta esté resuelta correctamente.
+
+~~~mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> DIAGNOSTICO: consulta con contexto utilizable
+    IDLE --> OFRECIENDO_RADICACION: falla física, regla directa o falta evidencia
+    DIAGNOSTICO --> DIAGNOSTICO: nueva consulta o reintento permitido
+    DIAGNOSTICO --> FINALIZADO: persona confirma resolución
+    DIAGNOSTICO --> PIDIENDO_NOMBRE: solicita ticket o escala
+    OFRECIENDO_RADICACION --> PIDIENDO_NOMBRE: persona confirma radicación
+    OFRECIENDO_RADICACION --> IDLE: cancela o inicia conversación aparte
+    PIDIENDO_NOMBRE --> PIDIENDO_CORREO: no incluye correo válido
+    PIDIENDO_NOMBRE --> PIDIENDO_DESCRIPCION: nombre y correo válidos
+    PIDIENDO_CORREO --> PIDIENDO_DESCRIPCION: correo válido
+    PIDIENDO_DESCRIPCION --> CONFIRMANDO_SEGUIMIENTO: hay caso previo del día
+    PIDIENDO_DESCRIPCION --> TICKET_CREADO: GLPI acepta alta nueva
+    CONFIRMANDO_SEGUIMIENTO --> ESCRIBIENDO_SEGUIMIENTO: elige agregar avance
+    CONFIRMANDO_SEGUIMIENTO --> TICKET_CREADO: elige un caso nuevo y GLPI lo acepta
+    ESCRIBIENDO_SEGUIMIENTO --> FINALIZADO: GLPI acepta seguimiento
+    TICKET_CREADO --> IDLE: la implementación limpia la sesión después del resultado
+    FINALIZADO --> IDLE: la persona inicia otro tema
+~~~
+
+PIDIENDO_ROL permanece como estado de compatibilidad/transición, pero IDLE normalmente asigna general y deja escribir sin selección obligatoria. PIDIENDO_UBICACION y PIDIENDO_ACTIVO aparecen como valores de compatibilidad del enum; el flujo actual estándar de ticket pide nombre, correo y descripción, no esos campos obligatoriamente.
+
+### Golden Cache
+
+La colección golden_resolved_qa vive por defecto bajo data/chroma_db y usa embeddings para buscar preguntas semánticamente similares. La interacción puede guardarse después de feedback positivo si pasa validaciones sintácticas/anomalías. El usuario que pulsa “Sí” no certifica documentalmente la respuesta. Las búsquedas recuperan una pregunta anterior para ampliar sinónimos y formulaciones; el flujo actual descarta la respuesta guardada al componer los hechos de RAG. Hay scripts de evaluación/promoción para registrar solo respuestas juzgadas y respaldadas. Revisa y purga entradas anómalas con scripts/clean_golden_cache.py.
+
+La búsqueda predeterminada pide una coincidencia de similitud coseno de al menos 0.90 y valida compatibilidad de intención/anomalías antes de devolverla. La escritura usa hash de rol+pregunta para upsert, pero la llamada actual de búsqueda no pasa rol como filtro; no usar el rol del índice Golden como control de autorización.
+
+## 5. Proveedores LLM y modelos
+
+LLM_PROVIDER selecciona gemini, openai u ollama. La opción activa, claves, endpoint y timeouts vienen de Settings/.env; .env.example no es la configuración real. El valor por defecto del código y el archivo de ejemplo no coinciden en todos los campos, por lo que el practicante debe verificar .env y /health o /api/admin/system-status.
+
+- OpenAI: OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL, OPENAI_TIMEOUT.
+- Gemini: GEMINI_API_KEY, GEMINI_MODEL, GEMINI_BASE_URL, GEMINI_TIMEOUT.
+- Ollama: OLLAMA_BASE_URL, LLM_MODEL, OLLAMA_TIMEOUT.
+- La generación de conversación intenta el proveedor cloud y el código actual puede hacer fallback a Ollama si falla o falta la clave. Los métodos auxiliares de generación también tienen contingencia local. No asumas modo cloud exclusivo solo porque LLM_PROVIDER diga openai o gemini.
+- OpenAI para modelos GPT-5/6 envía max_completion_tokens y reasoning_effort low; la interfaz oculta el manejo de los proveedores.
+- Visión de documentos utiliza Ollama, incluso cuando la generación del chat es cloud. Fallback de visión y nombre de modelo dependen de lo configurado.
+- Modelos de embeddings y Cross-Encoder se cargan localmente con archivos del cache de Hugging Face. En equipos nuevos hay que descargar esos modelos previamente; el primer inicio no necesariamente puede obtenerlos por sí solo.
+
+Modelfile define un modelo Ollama local heredado basado en llama3.1:8b. No controla la instrucción central del prompt escrita en rag_service.py. Revísalo antes de asumir que sus reglas son la fuente efectiva o que coinciden con el proveedor cloud.
+
+## 6. Configuración
+
+No copies ni publiques secretos. En un entorno nuevo copia .env.example a .env y asigna credenciales propias. Configuración disponible:
+
+| Clave | Uso |
+|---|---|
+| ENVIRONMENT, PORT, HOST, DEBUG | Ambiente y servidor. El run.ps1 admite parámetros propios de host y puerto. |
+| ADMIN_USERNAME, ADMIN_PASSWORD | HTTP Basic para panel y endpoints protegidos. El password vacío hace que el admin falle cerrado. Usa uno único y fuerte. |
+| GLPI_BASE_URL, GLPI_APP_TOKEN, GLPI_USER_TOKEN, GLPI_TIMEOUT | API de GLPI. |
+| LLM_PROVIDER | gemini, openai u ollama. |
+| OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL, OPENAI_TIMEOUT | Proveedor OpenAI. |
+| GEMINI_API_KEY, GEMINI_MODEL, GEMINI_BASE_URL, GEMINI_TIMEOUT | Proveedor Gemini. |
+| OLLAMA_BASE_URL, LLM_MODEL, OLLAMA_TIMEOUT | Generación/fallback local. |
+| VISION_MODEL, VISION_TIMEOUT | Interpretación visual de ingesta; consume Ollama local. |
+| CHROMA_DB_DIR | Índice de documentos RAG, por defecto ./chroma_db. |
+| GOLDEN_CACHE_DB_DIR | Índice separado de Golden Cache, por defecto ./data/chroma_db. |
+| DOCS_DIR | Corpus fuente, por defecto ./data/docs. |
+| EMBEDDING_MODEL | Modelo E5 de embeddings, valor configurado multilingual-e5-large. |
+| MAX_UPLOAD_SIZE_MB | Tamaño máximo de la ruta de carga simple que lo aplica. No todos los endpoints de carga hacen la misma validación. |
+| WHATSAPP_ENABLED, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_WABA_ID, WHATSAPP_ACCESS_TOKEN | Habilitación e identidad del canal Meta. |
+| WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET, WHATSAPP_API_VERSION | Validación del webhook, firma cuando se configura y versión Graph API. |
+
+La API pública tiene rate limit global predeterminado de 30 solicitudes/minuto por clave configurada. Comportamiento detrás de proxy depende de cómo se ejecute Uvicorn y de qué cabecera use el rate limiter; no aceptes una cabecera de IP no confiable como control de seguridad.
+
+## 7. Mapa de API
+
+Consulta /docs para el esquema FastAPI que corre en esa revisión.
+
+| Método y ruta | Función |
+|---|---|
+| GET / | Sirve app/static/index.html. |
+| GET /health | Estado resumido de configuración; no sustituye diagnóstico end-to-end de cada dependencia. |
+| POST /api/chat | Mensaje conversacional. Campos: mensaje/message y session_id. |
+| GET /admin, GET /admin.html | Panel administrativo; protegido por HTTP Basic desde admin_router. |
+| GET /api/admin/docs | Lista fuentes en el directorio documental. |
+| POST /api/admin/upload-doc | Sube a subcarpeta/audiencia; puede auditar/indexar según banderas. Verifica formato e indexación antes de darlo por disponible. |
+| POST /api/admin/audit-doc | Preauditoría de duplicidad/ambigüedad. |
+| POST /api/admin/resolve-upload | Resuelve staging como replace, deduplicate, force o cancel. |
+| POST /api/admin/reindex | Recorre el corpus compatible e intenta taxonomía; wipe_db borra el índice activo después de intentar backup. |
+| DELETE /api/admin/docs/{filename} | Elimina fuente y trata de purgar sus chunks. |
+| GET /api/admin/system-status | Diagnóstico de proveedor, Chroma, telemetría y servicios disponibles. |
+| GET /api/analytics/kpis | Resumen de métricas con fecha opcional. Sin Depends de admin en esta ruta. |
+| GET /api/analytics/unresolved-queries | Ranking de preguntas no resueltas. Sin Depends de admin en esta ruta. |
+| POST /api/analytics/unresolved-queries/dismiss | Descarta una consulta; HTTP Basic requerido. |
+| GET /api/analytics/unresolved-queries/dismissed | Lista consultas descartadas; HTTP Basic requerido. |
+| POST /api/analytics/unresolved-queries/restore | Restaura consulta al ranking; HTTP Basic requerido. |
+| GET /api/analytics/compare | Compara períodos de KPIs. Sin Depends de admin en esta ruta. |
+| GET /api/analytics/ai-insights | Genera resumen/insights; sin Depends de admin en esta ruta. |
+| POST /api/analytics/draft-procedure | Genera un borrador; sin Depends de admin en esta ruta. No lo indexa por sí solo. |
+| POST /api/analytics/save-procedure | Guarda e indexa un procedimiento; HTTP Basic requerido. |
+| GET /api/analytics/export-unresolved-csv | Exporta preguntas sin resolver; HTTP Basic requerido. |
+| GET /api/analytics/clusters | Devuelve clusters/temas; sin Depends de admin en esta ruta. |
+| GET /api/analytics/export-dpo-dataset | Exporta JSONL DPO; HTTP Basic requerido. |
+| POST /api/analytics/reset-metrics | Destructivo para telemetría; HTTP Basic requerido. Puede solicitar también limpiar Golden Cache. |
+| POST /api/admin/upload y POST /api/admin/reindex | Rutas compatibles heredadas definidas también en chat.py; tienen auth y sus propios límites/formatos. |
+| GET/POST /api/whatsapp | Handshake GET y recepción webhook POST. |
+| GET /api/whatsapp/status | Resumen de credenciales/estado; trata su salida como dato operativo. |
+| /static/* | Assets estáticos si el directorio existe. |
+
+Hay rutas repetidas de administración heredadas en routers distintos. No asumir que todas aceptan el mismo formato, límite, staging o comportamiento. Las rutas GET de consulta analítica descritas como “sin Depends” no heredan la autenticación del router administrativo; no expongas datos si no es intencional y agrega protección de acceso en una revisión de seguridad. Swagger muestra el contrato activo; esta tabla describe su propósito, no reemplaza revisión de autenticación de cada endpoint.
+
+## 8. Persistencia y carpetas de datos
+
+| Ubicación | Contenido | No contiene |
+|---|---|---|
+| data/docs | Archivos fuente que deben gobernarse, corregirse y reindexarse. | Garantía de que todos los formatos presentes sean indexables. |
+| chroma_db | Índice vectorial del RAG. | Fuente autoritativa de procedimientos; puede reconstruirse desde las fuentes compatibles. |
+| data/chroma_db | Índice separado de Golden Cache por defecto. | Corpus de documentos institucionales. |
+| data/analytics.db | Historial de telemetría, consultas, etiquetas, métricas y datos de tickets. | Estado persistente de TicketSession. |
+| data/.vision_cache.json | Descripciones cacheadas de imágenes calculadas durante ingesta. | Índice final de búsqueda. |
+| data/chroma_db_backup, chroma_db_backup | Respaldos de Chroma de distintas ubicaciones/revisiones. | Copia garantizada de configuración y corpus sincronizados; verifica cuál corresponde al entorno. |
+| data/scratch/staged_uploads | Subidas en espera de revisión/resolución administrativa. | Fuentes activas hasta que se acepten e indexen. |
+| reports | Informes de calidad, trazas y pruebas. Pueden contener consultas y salidas reales. | Esquema contractual estable de API. |
+| scratch | Archivos temporales, scripts de trabajo y logs locales. | Artefactos necesarios para arrancar. |
+
+No borres ni sobrescribas un índice o analytics.db activo sin validar respaldo, ruta en .env y proceso detenido.
+
+## 9. Instalación y operación
+
+La guía reproducible y el inventario fichero por fichero están en [REPLICAR_Y_OPERAR_UNIMON.md](REPLICAR_Y_OPERAR_UNIMON.md). En resumen:
+
+~~~powershell
 .\setup.ps1
-```
-*(Crea `.venv`, instala dependencias de `requirements.txt` y copia `.env.example` a `.env` si no existe).*
-
-### Paso 2: Crear el Modelo en Ollama
-Asegurarse de que el servicio de Ollama esté corriendo y crear el modelo personalizado:
-```powershell
-ollama pull llama3.1:8b
-ollama create unimon:8b -f ./Modelfile
-```
-
-### Paso 3: Ingesta de Documentos a ChromaDB
-Colocar los archivos institucionales en `data/docs/` y ejecutar el pipeline multimodal:
-```powershell
-.venv\Scripts\python.exe scripts/ingest_multimodal_docs.py
-```
-Para enriquecer los metadatos de taxonomía por roles:
-```powershell
-.venv\Scripts\python.exe scripts/apply_document_taxonomy.py
-```
-
-### Paso 4: Iniciar el Servidor
-Ejecutar el script de arranque:
-```powershell
+# Editar .env: reemplazar placeholders y configurar proveedor/credenciales.
 .\run.ps1
-```
-El sistema estará disponible en:
-* **Interfaz de Usuario Web:** `http://localhost:8000`
-* **Documentación OpenAPI interactiva (Swagger):** `http://localhost:8000/docs`
+~~~
 
----
+Comprobaciones posteriores: /health, /docs, acceso web, consulta sencilla, consulta procedimental con respuesta/fuentes, health de admin y flujo de ticket sólo en entorno de prueba controlado.
 
-## 7. GUÍA DE DIAGNÓSTICO Y RESOLUCIÓN DE FALLOS (TROUBLESHOOTING RUNBOOK)
+Carga de corpus:
 
-### 7.1. Fallo de Conexión o Timeout con Ollama (`http://localhost:11434`)
-* **Síntoma:** El chat se queda esperando o responde con error de timeout tras 45 segundos.
-* **Causa:** El daemon de Ollama no está iniciado o el modelo `unimon:8b` no está creado.
-* **Solución Paso a Paso:**
-  1. Verificar si Ollama responde en consola:
-     ```powershell
-     curl http://localhost:11434/api/tags
-     ```
-  2. Si no responde, iniciar el servicio de Ollama en Windows desde el menú inicio o ejecutando `ollama serve`.
-  3. Verificar que el modelo `unimon:8b` figure en la lista:
-     ```powershell
-     ollama list
-     ```
-  4. Si no aparece, recrearlo con `ollama create unimon:8b -f Modelfile`.
+~~~powershell
+.\.venv\Scripts\python.exe scripts\ingest_multimodal_docs.py
+.\.venv\Scripts\python.exe scripts\apply_document_taxonomy.py
+~~~
 
----
+El procesamiento de imágenes puede necesitar un Ollama local y modelo de visión disponible. La ingestión PDF/PPTX no procesa DOCX/XLSX. En una base existente, consulta los argumentos del script antes de elegir incremento, reemplazo o wipe. No uses wipe en un entorno con datos que no puedas regenerar.
 
-### 7.2. Fallo de Autenticación o Radicación con GLPI REST API
-* **Síntoma:** Al confirmar la radicación de un caso, el bot informa que ocurrió un problema al conectar con GLPI.
-* **Causa:** `GLPI_APP_TOKEN` o `GLPI_USER_TOKEN` caducados o URL errónea.
-* **Solución Paso a Paso:**
-  1. Verificar en `.env` que `GLPI_BASE_URL` termine en `/api.php/v1` (o la ruta correspondiente de la versión de GLPI).
-  2. Comprobar la sesión ejecutando una prueba manual:
-     ```python
-     from app.services.glpi_service import glpi_client
-     token = glpi_client.init_session()
-     print("Token obtenido:", token)
-     ```
-  3. Si retorna `None` o `401 Unauthorized`, ingresar al panel de administración de GLPI -> *Configuración* -> *General* -> *API* y regenerar el *App Token* y el *User Token*.
+## 10. Observabilidad, pruebas y mantenimiento
 
----
+- Logs: consola; opcionalmente run.ps1 -CaptureLogs escribe scratch/unimon-runtime.log. Trátalo como dato sensible.
+- KPIs y errores de recuperación: /admin y /api/analytics según autenticación de cada ruta.
+- Pruebas automatizadas: pytest.ini señala tests. Ejecuta tests sólo en un entorno dedicado; algunos fixtures sustituyen servicios externos, pero no uses bases de producción.
+- Revisión documental real: conserva query, candidates, reranked, final_context y documento esperado; evalúa contenido además de HTTP 200.
+- Carga: scripts/load_test_quality_50.py ofrece --concurrency 1..50; cada consulta usa sesión independiente.
+- Solapamiento: primero scripts/audit_overlap_rates.py y consulta su reporte. No activar deduplicación global sin medir precisión/recobrado.
+- Actualiza este manual cuando cambien settings, rutas, formatos, límites, flujos o dependencias.
 
-### 7.3. Errores de ChromaDB o Base de Datos Bloqueada
-* **Síntoma:** Error de lectura/escritura en `./chroma_db` o fallos de concurrencia en `chroma.sqlite3`.
-* **Causa:** Proceso previo bloqueando el archivo o colección corrupta por apagado forzado.
-* **Solución Paso a Paso:**
-  1. Cerrar todas las terminales de Python/Uvicorn activas.
-  2. Si la base de datos vectorial necesita regenerarse completamente:
-     ```powershell
-     .venv\Scripts\python.exe scripts/ingest_multimodal_docs.py --wipe
-     .venv\Scripts\python.exe scripts/apply_document_taxonomy.py
-     ```
-  3. Si la memoria rápida presenta respuestas desactualizadas:
-     ```powershell
-     .venv\Scripts\python.exe scripts/clean_golden_cache.py
-     ```
+## 11. Seguridad y límites conocidos
 
----
+- .env, credenciales Meta/GLPI, texto de consulta, analytics.db, logs y reportes pueden ser sensibles. No copiarlos en commits, capturas o documentos.
+- El admin requiere ADMIN_USERNAME/ADMIN_PASSWORD válidos; la protección actual usa HTTP Basic. La aplicación limita tamaño en algunas rutas, pero el endpoint administrativo heredado y el endpoint nuevo tienen validaciones distintas; revisa antes de exponer públicamente.
+- CORS y cabeceras de seguridad están definidos en main.py; no constituyen por sí solos una estrategia completa de producción.
+- Rate limit no reemplaza autenticación, proxy confiable, monitoreo de cuotas, protección contra abuso ni revisión de los endpoints analíticos.
+- Las sesiones están en RAM y hay una protección periódica TTL. Persistencia distribuida, balanceo multiinstancia y tareas largas escalables requieren diseño adicional.
+- No considerar el reranker, Golden Cache o la respuesta positiva como validador de verdad. Usar documentos y evaluación etiquetada.
+- Los documentos pueden contradecirse o estar obsoletos. La aplicación extrae y recupera texto; no comprueba vigencia institucional automáticamente.
 
-### 7.4. Fallo de Memoria / Carga de Embeddings en GPU/CPU
-* **Síntoma:** `CUDA out of memory` al cargar `BAAI/bge-m3` o `BAAI/bge-reranker-large`.
-* **Causa:** GPU con VRAM insuficiente (< 6 GB) para albergar tanto Ollama como los transformadores de PyTorch.
-* **Solución Paso a Paso:**
-  1. El sistema cuenta con fallback automático a CPU.
-  2. Para forzar modo CPU estricto, definir la variable de entorno antes de iniciar:
-     ```powershell
-     $env:CUDA_VISIBLE_DEVICES = "-1"
-     ```
-  3. Asegurarse de que el modelo Ollama esté en cuantización 4 bits (`Q4_K_M`) para un consumo menor a 5.5 GB de VRAM.
-
----
-
-### 7.5. Base de Datos de Telemetría Bloqueada (`data/analytics.db`)
-* **Síntoma:** `sqlite3.OperationalError: database is locked`.
-* **Causa:** Múltiples escrituras simultáneas en SQLite sin contexto transaccional corto.
-* **Solución Paso a Paso:**
-  1. Todas las operaciones en `telemetry_service.py` utilizan manejadores de contexto `with sqlite3.connect(...)`.
-  2. Si el archivo `data/analytics.db-journal` o `analytics.db-wal` queda bloqueado, detener Uvicorn y reiniciar el proceso.
-  3. Verificar integridad de la base:
-     ```powershell
-     .venv\Scripts\python.exe -c "import sqlite3; conn=sqlite3.connect('data/analytics.db'); print(conn.execute('PRAGMA integrity_check;').fetchall()); conn.close()"
-     ```
-
----
-
-### 7.6. Sesiones Conversacionales Desincronizadas o Atascadas
-* **Síntoma:** El bot insiste en pedir datos de ticket o mantiene un estado anterior.
-* **Causa:** La sesión en memoria `TicketSession` conservó un estado previo no finalizado.
-* **Solución Paso a Paso:**
-  1. Enviar el comando `"cancelar"` o `"inicio"` en el chat. La Regla Global 1 reiniciará el estado de la sesión a `PIDIENDO_ROL` o `INICIO`.
-  2. En el navegador, abrir una nueva pestaña (genera un nuevo `unimon_session_id` en `sessionStorage`) o limpiar el almacenamiento de sesión de las herramientas de desarrollador.
-  3. El limpiador en segundo plano de `main.py` purga automáticamente las sesiones con inactividad superior a 30 minutos.
-
----
-
-## 8. PRUEBAS AUTOMATIZADAS (TEST SUITE)
-
-Para validar la integridad de todo el backend, ejecutar Pytest utilizando el entorno virtual:
-
-```powershell
-.venv\Scripts\python.exe -m pytest tests/ -v
-```
-
-* **`test_telemetry_analytics.py`**: Comprueba registro de interacciones, cálculo de KPIs, tokens, latencias y endpoints REST.
-* **`test_role_quick_replies.py`**: Comprueba normalización de roles, botones interactivos y filtros de acceso a documentos.
-* **`test_incremental_ingest.py`**: Comprueba cálculo de hashes SHA-256 para no re-indexar documentos sin cambios.
-* **`test_clustering.py`**: Comprueba agrupamiento con DBSCAN y exportación de datasets DPO.
-
----
-
-### 7.7. Bloqueos por Rate Limiting (HTTP 429 Too Many Requests)
-* **Síntoma:** El chat en la web deja de responder o la API retorna código 429.
-* **Causa:** El middleware de seguridad `slowapi` detectó que la IP del usuario envió más de 30 peticiones en menos de un minuto.
-* **Solución Paso a Paso:**
-  1. El bloqueo es temporal. Esperar exactamente 60 segundos y la IP será liberada automáticamente por el servidor.
-  2. Si estás realizando pruebas de estrés (ej. JMeter, K6) y necesitas deshabilitarlo, comenta el decorador `@limiter.limit("30/minute")` en el archivo `app/routers/chat.py`.
-
----
-
-## 8. PANEL DE ADMINISTRACIÓN Y GESTIÓN DE CONOCIMIENTO (Admin Console)
-
-El **UniMon Admin Console** es una interfaz web secreta e interactiva construida para los ingenieros y coordinadores de TI, permitiéndoles auditar el comportamiento del bot y gestionar el corpus documental en tiempo real. 
-
-### 8.1. Acceso al Panel
-Para acceder al panel, el administrador debe posicionarse en la pantalla de chat web (`http://localhost:8000`) y presionar el atajo de teclado discreto: **`Ctrl + Alt + A`**. Esto abrirá una nueva pestaña redirigiendo a la ruta segura `/admin.html`.
-
-### 8.2. Dashboard de Métricas (KPIs)
-La pantalla principal presenta cuatro cuadros de mando impulsados por `telemetry_service.py` y `analytics.db`:
-* **Tasa de Resolución:** Porcentaje de consultas resueltas exitosamente ("✅ Sí, me funcionó") versus las que requirieron escalar a ticket.
-* **Tiempo de Respuesta (Latencia):** Promedio en milisegundos que tarda Ollama en generar la respuesta técnica.
-* **Consumo de Tokens:** Volumen de palabras procesadas (ideal para calcular costos si a futuro se migra a un LLM de pago como OpenAI o Claude).
-* **Distribución de Tráfico y Documentos Top:** Muestra qué manuales PDF son los más consultados y por qué roles institucionales.
-
-### 8.3. Detección de Brechas y Generador IA de Procedimientos (Draft Procedure)
-El sistema agrupa automáticamente con Inteligencia Artificial (Algoritmo DBSCAN) aquellas preguntas que los usuarios hicieron pero que el bot no supo responder porque **no existía documento**. 
-* **Botón 🪄 (Draft Procedure):** Al lado de cada "Brecha documental", el administrador puede presionar este botón con el ícono de IA. El panel enviará una orden secreta a Ollama para que analice la pregunta no resuelta y redacte un **Borrador de Manual Institucional** de forma automática y técnica.
-* **Descartar Preguntas:** Si la pregunta huérfana era basura (ej. "chistes", "ayuda con tarea"), el administrador puede presionar el botón 🗑️ para **Descartar** la métrica, indicando un motivo (Fuera de Contexto, Lenguaje Inapropiado).
-
-### 8.4. Gestor Documental (Indexación Inteligente)
-En la sección de Documentos, el administrador puede subir nuevos archivos (PDF, DOCX) y administrar la base vectorial.
-* **Botón de Subida Inteligente (Smart Indexing):** Compara los hashes (SHA-256) de los párrafos nuevos contra los que ya existen en ChromaDB. Sólo sube los fragmentos "novedosos" para no saturar ni inflar la base de datos de embeddings innecesariamente.
-* **Botón de Indexación Forzada (Force Indexing):** Salta la validación de redundancia y reemplaza a la fuerza toda la información.
-* **Borrado de Documentos:** Permite purgar un manual viejo de la base de datos haciendo clic en el botón de la papelera junto al archivo, liberando al RAG de información obsoleta.

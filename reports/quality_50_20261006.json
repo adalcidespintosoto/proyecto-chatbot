@@ -1,0 +1,1348 @@
+{
+  "timestamp": "2026-10-06T08:58:48-05:00",
+  "base_url": "http://127.0.0.1:8000",
+  "load_shape": "10 sequential waves of 10 independent concurrent sessions",
+  "summary": {
+    "users": 50,
+    "successes": 50,
+    "failures": 0,
+    "http_429": 0,
+    "http_5xx": 0,
+    "expected_source_hits": 34,
+    "source_checks": 50,
+    "wall_time_s": 108.72,
+    "p50_ms": 15259.4,
+    "p95_ms": 36635.2,
+    "max_ms": 38675.2,
+    "requests_per_second": 0.46
+  },
+  "results": [
+    {
+      "user": 1,
+      "case_id": "student_receipt_credentials",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-000",
+      "question": "Soy estudiante nuevo de primer semestre. Ya hice la matrícula, ¿dónde encuentro el usuario y la clave para entrar?",
+      "expected_source": "Activar Usuario y Correo institucional.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 34463.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "1. Estudiantes Nuevos Pregrado.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Entiendo que necesitas esos datos para empezar a ingresar. El usuario y la contraseña están **al final del recibo de matrícula**. Al finalizar el proceso de matrícula también se indica tu usuario institucional y se genera el recibo para descargar; revisa su parte final.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 2,
+      "case_id": "student_reset_password",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-001",
+      "question": "Soy estudiante y olvidé la contraseña del Portal Estudiantes, ¿cómo la puedo recuperar?",
+      "expected_source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 34956.6,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "instructivo portales estudiantes.pptx",
+        "Restablecimiento de contraseña.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "### Si eres estudiante de primer semestre (nuevo ingreso)\n1. Revisa el pie de página de tu **Recibo de Matrícula Financiera Web** para encontrar tu usuario institucional y la contraseña temporal asignada: `unisimon`.\n2. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) con esos datos.\n3. Cuando aparezca la ventana obligatoria, cambia la contraseña temporal por una personal segura.\n\n### Si eres estudiante regular (segundo semestre en adelante)\n1. Ingresa a [Portal Estudiantes](https://www.unisimon.edu.co/portales) y selecciona **Olvidé mi Usuario / Contraseña**.\n2. Digita tu documento de identidad. Recibirás en tu **correo personal registrado en el sistema** un enlace para restablecer la contraseña; el enlace es válido por **24 horas**.\n\nLa nueva contraseña debe tener entre **8 y 15 caracteres**, incluir mayúsculas, minúsculas y al menos un número, y no contener datos personales como nombres, identificación, teléfono o fecha de nacimiento.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 3,
+      "case_id": "student_remember_user",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-002",
+      "question": "Como estudiante no recuerdo mi usuario del portal, ¿dónde lo consulto?",
+      "expected_source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 33626.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "No tengo información institucional verificada sobre dónde consultar el usuario del Portal de Estudiantes. Si también necesitas recuperar la contraseña, la que establezcas para el Portal te servirá para el Aula Extendida y el Correo Estudiantil; para entrar al correo, accede desde la página web de la Universidad, en **Servicios → Correo Estudiantes**.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 4,
+      "case_id": "student_teams_login",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-003",
+      "question": "Soy estudiante, ¿cómo entro a Teams con mi cuenta de la universidad?",
+      "expected_source": "Como_acceder_MS_Teams_Estudiantes.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 34455.1,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Instructivo Planeación Actualizado.pdf",
+        "Unisimon App.pdf",
+        "Credenciales microsoft.pdf",
+        "Como_acceder_MS_Teams_Estudiantes.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "1. Desde el sitio web de Unisimón, ve a **Servicios → Correo Estudiantes** e inicia sesión en tu correo institucional de Microsoft.\n2. Luego, abre Microsoft Teams e inicia sesión con tu cuenta institucional.\n\nNo compartas tu contraseña ni códigos de verificación.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Como_acceder_MS_Teams_Estudiantes.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 5,
+      "case_id": "student_enroll_teams_moodle",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-004",
+      "question": "Soy estudiante y no me aparecen mis materias en Teams y Moodle, ¿cómo me uno a mis grupos?",
+      "expected_source": "Matricular_grupos_teams_moodle_Estudiante.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 36635.2,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Estudiantes_Matricular grupos en teams ymoodle.pdf",
+        "Fucionarios_Integración Moodle y Teams.pdf",
+        "Grupos_en_Teams.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "Puedes intentar matricular tus grupos desde el portal de Estudiantes:\n\n1. Ingresa a https://www.unisimon.edu.co/portales/estudiantes y selecciona **Calificaciones**.\n2. Espera unos segundos mientras el sistema verifica el estado de cada grupo en Teams y Moodle.\n3. Si un grupo no figura como matriculado, selecciona **Matricular en Teams…** o **Matricular en Moodle…**, según corresponda, y espera a que el sistema procese la solicitud.\n\nSi un grupo aparece como **“No activo”** en Teams, significa que aún no tiene horario escogido o no tiene profesor asignado. En Moodle, significa que no se ha asignado un docente o que el grupo no existe todavía en el aula. En esos casos, comunícate con el docente y espera a que se actualice el curso.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Matricular_grupos_teams_moodle_Estudiante.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 6,
+      "case_id": "student_office_install",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-005",
+      "question": "Como estudiante, ¿por dónde descargo e instalo Microsoft 365 con mi cuenta institucional?",
+      "expected_source": "Descarga e instalación Ms 365.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 34455.1,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Descarga e instalación Ms 365.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "El instructivo disponible es para **funcionarios**, no para estudiantes, así que no puedo confirmar que esa ruta o esos datos de acceso funcionen con tu cuenta.\n\nComo comprobación general, inicia sesión con tu cuenta institucional en Microsoft 365 y revisa si allí aparece la opción de instalar las aplicaciones. No compartas tu contraseña ni códigos de verificación. Si no ves esa opción, consulta a la Universidad cuál es el procedimiento habilitado para estudiantes.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Descarga e instalación Ms 365.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 7,
+      "case_id": "student_check_grades",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-006",
+      "question": "Soy estudiante, ¿en qué parte del portal puedo mirar las notas que llevo?",
+      "expected_source": "Calificaciones.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 38675.2,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Instructivo Credito Empresarial.pptx",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Certificados estudiantes_v2.pptx",
+        "instructivo portales estudiantes.pptx"
+      ],
+      "expected_source_found": false,
+      "answer": "El instructivo disponible confirma cómo ingresar al Portal de Estudiantes, pero no documenta la ruta para consultar notas. Para acceder al portal:\n\n1. Entra desde tu navegador a **unisimon.edu.co** y selecciona **Portales**.\n2. Elige el Portal de Estudiantes e ingresa con tu usuario y contraseña.\n\nUna vez dentro, no tengo una ruta institucional verificada para encontrar las notas; evita seleccionar opciones al azar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Calificaciones.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 8,
+      "case_id": "student_vote",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-007",
+      "question": "Soy estudiante y quiero votar en las elecciones de la universidad, ¿qué pasos sigo?",
+      "expected_source": "Aplicativo Elecciones -  Cómo votar.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 37897.7,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Aplicativo Elecciones -  Cómo votar.pptx",
+        "Aplicativo Elecciones -  Órganos colegiados.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Ingresa a https://elecciones.unisimon.edu.co/ e inicia sesión con tu cuenta institucional. Verás las elecciones disponibles según tu rol.\n\n1. Selecciona **“Votar”** en la elección en la que deseas participar.\n2. Haz clic en el nombre o la foto del candidato por quien quieres votar.\n3. Revisa la selección y confirma tu voto cuando el sistema lo solicite.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Aplicativo Elecciones -  Cómo votar.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 9,
+      "case_id": "student_download_certificate",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-008",
+      "question": "Como estudiante necesito bajar un certificado, ¿cómo lo saco desde el portal?",
+      "expected_source": "Certificados estudiantes_v2.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 34455.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Autorización de Supletorios.pdf",
+        "Certificados estudiantes_v2.pptx",
+        "Certificados Electrónicos.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "1. Ingresa desde tu navegador a [unisimon.edu.co](http://www.unisimon.edu.co/) y selecciona **«Portales»** en el menú principal. Luego entra al **Portal de Estudiantes**.\n2. Dentro del portal, selecciona el módulo **«Certificados»**.\n3. Para solicitar uno, selecciona el ícono que aparece a la derecha del certificado que necesitas. Elige el **Programa** y el **Período**, y presiona **«Generar»**.\n4. Cuando el certificado esté disponible, descárgalo desde el ícono ubicado a su derecha.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Certificados estudiantes_v2.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 10,
+      "case_id": "student_request_certificate",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-009",
+      "question": "Soy estudiante, ¿cómo solicito un certificado y luego descargo el volante o el documento?",
+      "expected_source": "Descarga de certificados.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 34669.1,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Solicitud de crédito.pptx",
+        "Autorizaciones cursos intersemestrales.pptx",
+        "Solicitud de inscripción para grado.pdf",
+        "Instructivo - Inscripción ed. continuada.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "Depende del tipo de certificado o trámite:\n\n- **Certificado de educación continuada:** después de completar el formulario, selecciona el curso aplicado para descargar el certificado. La guía disponible no indica cómo se solicita o descarga un volante para este trámite.\n- **Inscripción para grado:** envía la solicitud y espera la notificación por correo sobre su estado. Si la aprueban, vuelve al Portal de Estudiantes y entra en «Solicitud de Inscripción para grado» para descargar el volante de pago y la constancia de inscripción a grado.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Descarga de certificados.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 11,
+      "case_id": "student_intersemestral_signup",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-010",
+      "question": "Soy estudiante, ¿cómo inscribo una materia intersemestral desde el portal?",
+      "expected_source": "Inscripcion de cursos intersemestrales.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14567.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Inscripcion de cursos intersemestrales.pdf",
+        "Inscripcion de cursos intersemestrales.pptx",
+        "Instructivo Credito Empresarial.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "1. Ingresa al sistema y selecciona el módulo **«Cursos Intersemestrales»**.\n2. En el listado, elige los cursos que deseas inscribir. Allí se muestran los cursos ofertados y permitidos para tu inscripción.\n3. Presiona **«Inscribir»** para oficializar la solicitud.\n\nEl volante de pago estará disponible únicamente cuando tu programa académico autorice la inscripción. Cuando eso ocurra, podrás descargarlo con el botón **«Volante»**.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Inscripcion de cursos intersemestrales.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 12,
+      "case_id": "student_old_enrollment",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-011",
+      "question": "Soy estudiante antiguo de pregrado, ¿cómo hago la matrícula para el próximo semestre?",
+      "expected_source": "2. Estudiantes Antiguos Pregrado.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15329.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "retorno al campus 2021.pdf",
+        "2. Estudiantes Antiguos Pregrado.pptx",
+        "Matrícula Antiguos Posgrados.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Para generar el informe de inscripciones y matrículas como estudiante antiguo de pregrado:\n\n1. Desde un navegador, ingresa a [www.unisimon.edu.co](http://www.unisimon.edu.co/) y selecciona **Portales** en el menú principal.\n2. En el sistema, selecciona el módulo **Rectoría**.\n3. Abre el informe **Estudiantes Antiguos Pregrado**.\n4. Completa los filtros **Año**, **Periodo** y **Fecha**, y presiona **Generar**. Se creará un PDF para visualizar el informe.\n\nEste procedimiento corresponde a generar el informe; la información disponible no detalla cómo completar o formalizar la matrícula para el próximo semestre.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "2. Estudiantes Antiguos Pregrado.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 13,
+      "case_id": "student_full_half_enrollment",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-012",
+      "question": "Como estudiante, ¿dónde genero el informe de matrícula completa o media matrícula?",
+      "expected_source": "3. Matricula Completa-Media matricula.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15169.3,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "3. Matricula Completa-Media matricula.pptx",
+        "Matricula (2).pptx",
+        "2. Estudiantes Antiguos Pregrado.pptx",
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "GIE - ASPIRANTES NOV.2021.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Ese informe se genera en **SIAAF Web**. El instructivo disponible indica que debes ingresar al sitio web de la Universidad y seleccionar **Portales** en el menú principal; luego ingresar al módulo **Rectoría** y elegir el informe **Matrícula completa / Media matrícula**.\n\nPara generarlo, aplica los filtros de **Año, Periodo y Fecha** y presiona **Generar**. El sistema crea un PDF para visualizar. **El instructivo no especifica qué portal seleccionar ni si este módulo está disponible para estudiantes**, así que si no ves esas opciones, no intentes acceder con credenciales de otro rol.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "3. Matricula Completa-Media matricula.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 14,
+      "case_id": "student_reentry",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-013",
+      "question": "Dejé de estudiar un tiempo y quiero volver a mi programa, ¿cómo pido el reintegro?",
+      "expected_source": "6. Reintegro.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 16447.7,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Movilidad Académica - Estudiantes.pdf",
+        "Solicitud de inscripción para grado.pdf",
+        "Instructivo Credito Empresarial.pptx",
+        "Instructivo Módulo Atención Estudiantes (Completo).pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "Los fragmentos disponibles no describen cómo solicitar un **reintegro** ni sus requisitos o plazos. La información relacionada indica que, para trámites académicos, debes consultar con la Dirección de tu Programa; allí podrán confirmarte el procedimiento vigente para volver a cursar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "6. Reintegro.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 15,
+      "case_id": "student_transfer",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-014",
+      "question": "Vengo de otra universidad y quiero pasarme a Unisimón, ¿cómo inicio una transferencia externa?",
+      "expected_source": "4. Transferencia Externa.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15535.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Pagos en Linea_vPaymentz.pptx",
+        "Pagos en linea - Aspirantes.pdf",
+        "Demo tipos de admisión.pptx",
+        "4. Transferencia Externa.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Para iniciar una transferencia externa, comienza consultando las opciones de admisión para estudiantes provenientes de otra institución en el sitio de la Universidad:\n\n1. Entra a [unisimon.edu.co](http://www.unisimon.edu.co/).\n2. Dirígete a **Aspirantes** y revisa las opciones de admisión correspondientes a estudiantes de educación superior.\n\nLa información disponible confirma esa ruta general, pero no detalla los requisitos ni el proceso completo de transferencia externa. Te recomiendo verificar allí las instrucciones vigentes antes de iniciar el trámite.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "4. Transferencia Externa.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 16,
+      "case_id": "student_homologation",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-015",
+      "question": "Soy estudiante y quiero que me reconozcan materias que ya vi, ¿cómo solicito la homologación?",
+      "expected_source": "Homologaciones.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15637.3,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Instructivo Credito Empresarial.pptx",
+        "Trazabilidad de transferencia externa.pptx"
+      ],
+      "expected_source_found": false,
+      "answer": "Para solicitar el reconocimiento de materias ya cursadas, el instructivo disponible describe el trámite de **transferencia externa**:\n\n1. En el sistema, selecciona tu **sede** y abre la pestaña **«Inscritos»**.\n2. Completa los filtros de **año, período, nivel y programa**, y pulsa **«Buscar»**.\n3. Si tu registro está en la etapa **«Inscripción»**, se puede asignar una fecha de homologación desde la columna **«Acción»**; en la ventana que aparece, se modifica el campo **«Fecha»** y se pulsa **«Guardar»**.\n4. La aceptación o negación por parte del estudiante se gestiona cuando el registro está en **«Notificación Estudiante»**.\n\nEl instructivo no explica cómo iniciar una solicitud como estudiante ni qué documentos presentar. Si no estás realizando una transferencia externa, consulta con la **Dirección de Programa** para que te indiquen el procedimiento aplicable a tu caso.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Homologaciones.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 17,
+      "case_id": "student_practices",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-016",
+      "question": "Soy estudiante y ya voy a empezar prácticas, ¿qué debo hacer para cargar los requisitos?",
+      "expected_source": "Gestión Prácticas - Estudiantes.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 16900.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Gestión Prácticas - Estudiantes.pdf",
+        "Instructivo Credito Empresarial.pptx",
+        "Experiencias Extracurriculares (Estudiantes).pptx",
+        "Demo tipos de admisión.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "1. Entra desde la página de la Universidad a **Portales → Estudiantes**: https://www.unisimon.edu.co/portales/estudiantes. Ingresa tu usuario y contraseña y pulsa **Acceder**.\n2. Al ingresar, el sistema verifica que tengas matrícula y un grupo asignado a un curso de prácticas formativas. Si se cumplen esas condiciones y aún tienes requisitos obligatorios pendientes, aparecerá el formulario.\n3. Para cargar cada requisito, pulsa **Seleccionar archivo**, elige el documento y pulsa **Abrir**. Luego haz clic en **Cargar archivo(s)**. Puedes cargar los archivos por separado; revisa también las instrucciones y características indicadas para cada documento.\n4. El formulario seguirá apareciendo mientras haya requisitos obligatorios pendientes; podrás cerrarlo cuando los hayas cargado todos. Revisa el estado de cada requisito: si queda **Devuelto**, puedes cargar el documento nuevamente.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Gestión Prácticas - Estudiantes.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 18,
+      "case_id": "student_update_data",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-017",
+      "question": "Como estudiante, ¿cómo actualizo mis datos personales en el sistema?",
+      "expected_source": "Instrucciones Actualización Datos Estudiantes.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15329.1,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Manual de Usuario - Registro de Ingreso.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "Manual de Usuario - Portal CovidApp.pdf",
+        "Bienestar universitario manual.pptx",
+        "Instrucciones Actualización Datos Estudiantes.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "1. Ingresa a la opción **Datos Personales** del sistema; allí se muestra tu información básica. Actualiza los datos que necesites.\n2. Si estás diligenciando el formulario de actualización, completa todas las pestañas y los campos obligatorios marcados con asterisco rojo (*). El formulario solo permite guardar cuando no quedan campos vacíos; al terminar, selecciona **Guardar**.\n3. Si el formulario presenta problemas en Safari u Opera, prueba con Google Chrome, que es el navegador recomendado en las instrucciones.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Instrucciones Actualización Datos Estudiantes.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 19,
+      "case_id": "student_mobility",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-018",
+      "question": "Soy estudiante y quiero hacer movilidad académica, ¿por dónde empiezo el trámite?",
+      "expected_source": "Movilidad Académica - Estudiantes.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15420.6,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Movilidad Académica - Estudiantes.pdf",
+        "Instructivo Credito Empresarial.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Empieza desde el portal de estudiantes:\n\n1. Entra a Portales, ingresa con tu usuario y contraseña y selecciona **Acceder**.\n2. Ya dentro del portal, abre **Movilidad Académica**. En la página que se abre, ingresa nuevamente tu usuario y contraseña y selecciona **Entrar**.\n\nEl instructivo muestra una sección de solicitud de movilidad, pero la información disponible no permite confirmar los requisitos ni todos los pasos para completar y enviar el trámite. No compartas tus contraseñas con nadie.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Movilidad Académica - Estudiantes.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 20,
+      "case_id": "student_online_payment",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-019",
+      "question": "Soy estudiante, ¿cómo pago la matrícula por internet desde el portal?",
+      "expected_source": "Pagos en linea - Estudiantes.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 20758.9,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Pagos en Linea.pptx",
+        "Autorización de Supletorios.pdf",
+        "Matricula (2).pptx",
+        "Pagos en linea - Estudiantes.pdf",
+        "Solicitud de inscripción para grado.pdf",
+        "Matrícula Antiguos Posgrados.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Para pagar la matrícula por internet, realiza el proceso desde el **Portal de Estudiantes**. La documentación disponible indica que, una vez generado el pago, debes descargar allí el comprobante, pero no detalla la ruta exacta ni los medios de pago.\n\n1. Ingresa al Portal de Estudiantes y abre el proceso de matrícula correspondiente.\n2. Si el sistema te muestra un volante de pago, sigue las opciones que aparecen en el portal para realizar el pago.\n3. Al finalizar, descarga el comprobante de pago generado desde el Portal de Estudiantes.\n\nSi tienes un saldo pendiente de matrícula, el procedimiento documentado indica que se puede generar un volante por el monto restante mediante el botón **«Volante de matrícula»**; ese paso lo realiza quien gestiona la matrícula.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Pagos en linea - Estudiantes.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 21,
+      "case_id": "student_credit_request",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-020",
+      "question": "Como estudiante necesito pedir un crédito para pagar, ¿cómo radico la solicitud?",
+      "expected_source": "Solicitud de crédito.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14287.3,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Solicitud de inscripción para grado.pdf",
+        "Instructivo Credito Empresarial.pptx",
+        "Matricula (2).pptx"
+      ],
+      "expected_source_found": false,
+      "answer": "Para radicar la solicitud de **Crédito Empresarial**:\n\n1. En el formulario de **Solicitud Crédito Empresarial**, ingresa los datos requeridos y selecciona **Continuar**.\n2. Adjunta los documentos solicitados con **Seleccionar archivo**; elige cada documento y pulsa **Abrir**.\n3. Cuando estén cargados, confirma que son copias fieles de los originales y pulsa **Registrar**.\n\nDeberías ver un mensaje indicando que la solicitud se guardó con éxito. La aprobación o el rechazo se notifican por correo electrónico.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Solicitud de crédito.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 22,
+      "case_id": "student_moodle_courses",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-021",
+      "question": "Como estudiante, ¿cómo encuentro en Moodle los grupos de mis asignaturas?",
+      "expected_source": "Estudiantes_Matricular grupos en teams ymoodle.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15227.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Estudiantes_Matricular grupos en teams ymoodle.pdf",
+        "Fucionarios_Integración Moodle y Teams.pdf",
+        "Reporte - Asignaturas por Grupos.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Para encontrar tus grupos de asignatura en Moodle:\n\n1. En el sistema de matrícula de grupos, espera unos segundos mientras verifica el estado de cada grupo.\n2. Si un grupo aún no está matriculado en Moodle, selecciona **«Matricular en Moodle…»**.\n3. Espera unos **3 minutos** para que se complete la asignación y luego revisa Moodle.\n\nSi el grupo aparece como **«No Activo»**, significa que no se ha asignado un docente o que el grupo aún no existe en el aula. Comunícate con el docente y espera a que se actualice el curso.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Estudiantes_Matricular grupos en teams ymoodle.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 23,
+      "case_id": "student_new_enrollment",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-022",
+      "question": "Soy estudiante nuevo y ya terminé el formulario, ¿qué me falta para oficializar la matrícula?",
+      "expected_source": "GIE - ASPIRANTES NOV.2021.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14607.9,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "Instructivo Credito Empresarial.pptx",
+        "Matricula de Cursos Intersemestrales.pptx",
+        "Gestión Prácticas - Estudiantes.pdf",
+        "Demo tipos de admisión.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Al terminar la encuesta poblacional, confirma la oficialización de tu matrícula seleccionando **«Confirmar»**. Si ya tenías una inscripción o matrícula anterior, el sistema te recordará tu correo institucional; si no, te notificará el nuevo correo estudiantil y te pedirá establecer una contraseña antes de continuar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "GIE - ASPIRANTES NOV.2021.pptx"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 24,
+      "case_id": "student_evaluate_teacher",
+      "category": "Estudiantes",
+      "session_id": "load100-q50-20261006-085659-023",
+      "question": "Como estudiante, ¿dónde hago la evaluación de mis profesores?",
+      "expected_source": "Evaluacion Profesoral - Estudiante.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14214.1,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Configuracion de Evaluaciones.pptx",
+        "Autorización estudiantes en proceso de créditos.pdf",
+        "Matrícula Antiguos Posgrados.pdf",
+        "Manual Evaluación CAQ - Aspirantes.pdf",
+        "Autorización de Supletorios.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "No tengo instrucciones institucionales verificadas sobre dónde realizar la evaluación de tus profesores. El material disponible describe evaluaciones CAQ y KOLB, pero no la evaluación docente.\n\nRevisa si en el portal que usas habitualmente aparece una sección de evaluación docente. Si no la encuentras, consulta con tu programa académico para que te indiquen el acceso correcto.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Evaluacion Profesoral - Estudiante.pdf"
+      ],
+      "intended_role": "estudiante"
+    },
+    {
+      "user": 25,
+      "case_id": "faculty_enter_grades",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-024",
+      "question": "Soy docente, ¿por dónde ingreso las calificaciones de mis estudiantes en el portal?",
+      "expected_source": "Calificaciones.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13753.6,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Calificaciones.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "1. En el Portal Profesores, selecciona el ícono **Calificaciones**.\n2. En el menú lateral, entra en **Registro de Calificaciones** y selecciona el programa académico de la asignatura.\n3. En el listado, ubica la asignatura y el grupo. Bajo el parcial que corresponda, selecciona **Calificaciones** o **Diferido**. Para posgrados, módulos o vacacionales, aparecerá **Definitiva**.\n\nLas opciones de ingreso solo se muestran si el plazo de registro está activo.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Calificaciones.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 26,
+      "case_id": "faculty_save_draft",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-025",
+      "question": "Soy profesor y quiero dejar las notas guardadas como borrador antes de enviarlas, ¿qué opción uso?",
+      "expected_source": "Calificaciones.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13265.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Calificaciones.pdf",
+        "Asignación Académica.pptx",
+        "Unisimon App.pdf",
+        "Gestión de Ayudas Educativas.pdf",
+        "Evaluaciones de selección ILE-TICS (ASPIRANTES).pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "En la pantalla de calificaciones, después de ingresar las notas, selecciona **Guardar Borrador**. Así las conservarás temporalmente sin finalizar el proceso. Cuando quieras enviarlas, presiona **Finalizar**.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Calificaciones.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 27,
+      "case_id": "faculty_finalize_grades",
+      "category": "Docente",
+      "session_id": "load100-q50-20261006-085659-026",
+      "question": "Como docente ya revisé las notas, ¿qué botón las envía para que queden finalizadas?",
+      "expected_source": "Calificaciones.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13752.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Jefe Inmediato - Funcionarios.pdf",
+        "Calificaciones.pdf",
+        "Gestión Prácticas - Funcionarios.pdf",
+        "Autoevaluacion por Grupos - Funcionarios.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Presiona **«Finalizar»** para enviar las notas guardadas en el borrador. **«Guardar Borrador»** solo las conserva temporalmente.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Calificaciones.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 28,
+      "case_id": "faculty_postgraduate_grade",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-027",
+      "question": "Soy docente de posgrado, ¿cómo registro la nota definitiva de un curso?",
+      "expected_source": "Calificaciones Posgrados.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14460.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Calificaciones Posgrados-S3-DITI-PC07.pdf",
+        "Calificaciones.pdf",
+        "Evaluaciones de selección ILE-TICS (ASPIRANTES).pdf",
+        "Calificaciones Posgrados.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "1. Ingresa al Portal y selecciona **Calificaciones**.\n2. En el menú lateral, elige **Registro de Calificaciones** y selecciona el programa de posgrado correspondiente.\n3. Busca el curso del período académico indicado y abre el registro desde el ícono de la columna **Definitiva**.\n4. Ingresa la nota final de cada estudiante en la escala de **0,0 a 5,0**. Si corresponde registrar **N.P.**, marca la casilla junto al campo numérico.\n5. Selecciona **Enviar** para remitir las calificaciones. Si necesitas guardarlas temporalmente antes de enviarlas, usa **Guardar Borrador**; luego tendrás que seleccionar **Finalizar** para enviarlas.\n\nEn posgrado la evaluación es modular: no hay casillas de primer ni segundo parcial. Se registra únicamente la nota definitiva.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Calificaciones Posgrados.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 29,
+      "case_id": "faculty_teams_courses",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-028",
+      "question": "Soy profesor, ¿cómo conecto mis cursos de Moodle con los equipos de Teams?",
+      "expected_source": "Profesores_Integración teams y moodle.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15473.3,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Profesores_Integración teams y moodle.pdf",
+        "Fucionarios_Integración Moodle y Teams.pdf",
+        "Videollamadas en  Teams.pdf",
+        "Grabar videollamadas en Teams.pdf",
+        "Grabar un clase en Teams y compartir en Stream.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Como profesor, puedes revisar la integración de cada grupo y asignar a quienes falten:\n\n1. Abre la integración del grupo correspondiente y selecciona **Ver integración**.\n2. Revisa el listado para ver si los profesores están asignados y los estudiantes matriculados en Moodle y Teams.\n3. Si falta una sola persona, selecciona **Asignar** para un profesor o **Matricular** para un estudiante, según corresponda. Si necesitas actualizar el curso completo en una plataforma, selecciona **Matricular Curso en Moodle** o **Matricular Curso en Teams**.\n\nLa documentación disponible no especifica desde qué pantalla se abre la integración ni cómo iniciar sesión en ella.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Profesores_Integración teams y moodle.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 30,
+      "case_id": "faculty_record_class",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-029",
+      "question": "Soy docente y quiero grabar una clase en Teams para compartirla después, ¿cómo lo hago?",
+      "expected_source": "Grabar un clase en Teams y compartir en Stream.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14473.4,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Grabar un clase en Teams y compartir en Stream.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Como docente, puedes grabar la reunión y luego cargar el video en Stream para compartirlo:\n\n1. En Teams, entra al curso y selecciona la reunión a la que quieres unirte.\n2. Inicia la grabación. Teams te avisará cuando haya comenzado.\n3. Al finalizar la reunión, descarga la grabación. **Ten en cuenta que vence en 20 días.**\n4. Entra a https://web.microsoftstream.com/, inicia sesión y selecciona **Crear → Cargar video**.\n5. Haz clic en **busque** y selecciona la grabación en la carpeta **Descargas**.\n6. Para compartirla, selecciona las personas mediante **Usuarios → Mis grupos**. Busca «Baq», presiona Enter, selecciona la asignatura y haz clic en **Publicar**.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Grabar un clase en Teams y compartir en Stream.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 31,
+      "case_id": "faculty_schedule_meeting",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-030",
+      "question": "Soy profesor, ¿cómo creo una reunión de Teams que no pertenezca a uno de mis grupos?",
+      "expected_source": "Crear reuniones No asociadas a grupos.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13799.0,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Crear reuniones No asociadas a grupos.pdf",
+        "Crear reuniones en teams - iPads aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf",
+        "Grabar videollamadas en Teams.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Para crear una reunión de Teams que no esté asociada a un grupo:\n\n1. En Teams, abre el **Calendario** y crea una reunión.\n2. Completa los campos y agrega a los asistentes.\n3. Selecciona **Guardar**. La reunión aparecerá en el calendario; desde allí podrás seleccionarla y unirte cuando corresponda.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Crear reuniones No asociadas a grupos.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 32,
+      "case_id": "faculty_meeting_participants",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-031",
+      "question": "Como docente, ¿cómo agrego o quito participantes de una reunión de Teams?",
+      "expected_source": "Ajustes participantes reuniones  Ms Teams.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13798.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Crear reuniones en teams - iPads aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf",
+        "Grabar videollamadas en Teams.pdf",
+        "Crear reuniones No asociadas a grupos.pdf",
+        "Ajustes participantes reuniones  Ms Teams.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Como docente, puedes hacerlo desde la reunión de Teams:\n\n1. **Agregar participantes:** durante la reunión, selecciona **Mostrar participantes** y busca los contactos que deseas agregar.\n2. **Quitar un participante:** abre la lista de participantes, selecciona a la persona y usa la opción para quitarla de la reunión.\n\nTen presente que convertir a un asistente en **Moderador** le permite compartir pantalla, silenciar y quitar a otros asistentes. Puedes devolverlo al rol de **Asistente** después de su intervención.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Ajustes participantes reuniones  Ms Teams.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 33,
+      "case_id": "faculty_fill_pac",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-032",
+      "question": "Soy profesor, ¿cómo diligencio mi PAC en el portal?",
+      "expected_source": "Diligenciamiento de PAC (Profesores).pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13800.2,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "Autorización de Supletorios.pdf",
+        "Unisimon App.pdf",
+        "Instructivo Aplicativo Programas.pptx",
+        "Bienestar universitario manual.pptx"
+      ],
+      "expected_source_found": false,
+      "answer": "No tengo instrucciones institucionales verificadas sobre cómo diligenciar el PAC ni sobre la ruta correspondiente en el portal. Para no indicarte pasos de otro trámite por error, confirma con la Dirección de Programa qué proceso aplica. Si el problema es técnico al ingresar al Portal Gestión Académico-Administrativo, prueba desde otro navegador actualizado y verifica tu conexión; esas comprobaciones no modifican tu cuenta.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Diligenciamiento de PAC (Profesores).pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 34,
+      "case_id": "faculty_configure_evaluations",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-033",
+      "question": "Como docente, ¿dónde configuro las evaluaciones del curso?",
+      "expected_source": "Configuracion de Evaluaciones.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13798.6,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Jefe Inmediato - Funcionarios.pdf",
+        "Configuracion de Evaluaciones.pptx",
+        "Configuracion de Evaluacion Profesoral - Funcionarios.pptx",
+        "Proyección (agregar, elimnar, homologar).pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Como docente, la configuración de evaluaciones del curso se realiza en el módulo **Evaluaciones**, dentro de la sección **Configuración de Evaluaciones**. Allí, selecciona el tipo de evaluación (CAQ o KOLB) y pulsa **Crear** para configurar una oferta. Las ofertas pueden incluir fechas de apertura y cierre, periodo académico y, si corresponde, programa.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Configuracion de Evaluaciones.pptx"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 35,
+      "case_id": "faculty_auto_evaluation",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-034",
+      "question": "Soy profesor y debo hacer la autoevaluación por grupos, ¿en qué módulo está?",
+      "expected_source": "Autoevaluacion por Grupos - Funcionarios.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15531.7,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Autoevaluacion por Grupos - Funcionarios.pdf",
+        "Módulo de instrumentos de autoevaluación.pptx",
+        "Autorización de Supletorios.pdf",
+        "Administración de Autoevaluación.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Entra al sistema SIAAF Web y selecciona el módulo **«Autoevaluación por Grupo»**. Allí verás las asignaturas pendientes de evaluar; pulsa **«Comenzar»** en la que corresponda. Al finalizar, aparecerá marcada como completada.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Autoevaluacion por Grupos - Funcionarios.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 36,
+      "case_id": "faculty_assignment_list",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-035",
+      "question": "Como profesor, ¿dónde consulto mi asignación académica y los cursos a cargo?",
+      "expected_source": "Reporte - Asignacion Académica.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13797.7,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Profesores_Integración teams y moodle.pdf",
+        "Fucionarios_Integración Moodle y Teams.pdf",
+        "Reporte - Asignacion Académica.pptx",
+        "Reporte - Asignacion Académica.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Como profesor, consulta tu asignación académica en el reporte **Asignación Académica por Tipo de Función**: aplica el filtro **«Función»** y presiona **«Buscar»**. La documentación disponible no indica la ruta para abrir ese reporte ni dónde consultar directamente los cursos a cargo; no quiero inventar esos pasos.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Reporte - Asignacion Académica.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 37,
+      "case_id": "faculty_attendance_qr",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-036",
+      "question": "Soy docente, ¿cómo registro la asistencia de los estudiantes con el código QR?",
+      "expected_source": "Instructivo - Reporte de asistencias QR.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14990.6,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Manual de Usuario - Registro de Ingreso.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "El procedimiento disponible describe el **registro de ingreso a la institución**, no la asistencia a una clase. Si te refieres a ese registro, se escanea el QR del estudiante:\n\n1. Si el QR es válido, el sistema mostrará la información del estudiante.\n2. Registra la temperatura: **menor a 38 °C** o **mayor o igual a 38 °C**.\n3. Con menos de 38 °C, el sistema confirma que el registro se guardó y da la bienvenida. Si es de 38 °C o más, sigue la indicación del área de Bienestar Universitario; mientras se coordina, el manual indica que se puede pedir a la persona que espere a un lado y continuar registrando a los demás.\n4. Si el QR está vencido, indica al estudiante que vuelva a su menú principal y entre de nuevo al módulo de ingreso para generar otro.\n\nNo cuento con instrucciones verificadas para registrar asistencia a clases mediante QR.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Instructivo - Reporte de asistencias QR.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 38,
+      "case_id": "faculty_add_teams_members",
+      "category": "Docentes",
+      "session_id": "load100-q50-20261006-085659-037",
+      "question": "Como profesor, ¿cómo agrego a un estudiante a mi equipo de Teams?",
+      "expected_source": "Agregar_miembros_Grupos_MS_Teams.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13799.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Agregar_miembros_Grupos_MS_Teams.pdf",
+        "Fucionarios_Integración Moodle y Teams.pdf",
+        "Profesores_Integración teams y moodle.pdf",
+        "Matricula (2).pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Como profesor, puedes solicitar agregar al estudiante a tu equipo de Teams:\n\n1. En **Equipos**, selecciona el equipo correspondiente.\n2. Abre **Más opciones** y elige **Agregar miembro**.\n3. Busca al estudiante por nombre o número de cuenta, selecciónalo y pulsa **Enviar solicitud**. Deberías ver que la solicitud se envió.\n\nSi no aparece el estudiante, verifica que el nombre o número de cuenta esté escrito correctamente.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Agregar_miembros_Grupos_MS_Teams.pdf"
+      ],
+      "intended_role": "profesor"
+    },
+    {
+      "user": 39,
+      "case_id": "admin_new_student_report",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-038",
+      "question": "Trabajo en admisiones, ¿cómo genero el informe de estudiantes nuevos de pregrado y qué filtros pide?",
+      "expected_source": "1. Estudiantes Nuevos Pregrado.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 13797.9,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "2. Estudiantes Antiguos Pregrado.pptx",
+        "Manual de Usuario - Portal CovidApp.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "En SIAAF WEB, ingresa desde el sitio de la Universidad y abre **«Portales»**. Luego selecciona el módulo **«Rectoría»** y el informe **«Estudiantes Nuevos Pregrado»**.\n\nAntes de generar el reporte, completa los filtros **Año, Periodo y Fecha**. Después, presiona **«Generar»**; el sistema creará un PDF para visualizar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "1. Estudiantes Nuevos Pregrado.pptx"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 40,
+      "case_id": "admin_old_student_report",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-039",
+      "question": "Soy funcionario de registro, ¿qué informe uso para sacar el reporte de estudiantes antiguos de pregrado?",
+      "expected_source": "2. Estudiantes Antiguos Pregrado.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15996.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "2. Estudiantes Antiguos Pregrado.pptx",
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "Malla academica.pptx",
+        "Matricula (2).pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "El informe es **«Estudiantes Antiguos Pregrado»** en SIAAF WEB. Según la guía, después de ingresar debes seleccionar el módulo **«Rectoría»** y, dentro de este, el informe. Para generar el reporte, aplica los filtros de **Año, Periodo y Fecha** y presiona **«Generar»**; se creará un PDF para visualizar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "2. Estudiantes Antiguos Pregrado.pptx"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 41,
+      "case_id": "admin_full_half_report",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-040",
+      "question": "En el área administrativa, ¿cómo genero el reporte de matrícula completa y media matrícula?",
+      "expected_source": "3. Matricula Completa-Media matricula.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15681.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Matricula (2).pptx",
+        "Instructivo Planeación Actualizado.pdf",
+        "3. Matricula Completa-Media matricula.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "Desde SIAAF WEB, sigue estos pasos para generar el informe:\n\n1. Entra desde tu navegador al sitio de la Universidad: http://www.unisimon.edu.co/ y selecciona **«Portales»**.\n2. Ingresa a SIAAF WEB y selecciona el módulo **«Rectoría»**.\n3. Selecciona al estudiante y pulsa **«Reportes»**.\n4. Elige el tipo de reporte de matrícula completa o media matrícula, e indica el estado de la matrícula, periodo, programa y semestre.\n5. Pulsa **«Generar»** para obtener el informe.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "3. Matricula Completa-Media matricula.pptx"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 42,
+      "case_id": "admin_reentry_report",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-041",
+      "question": "Soy funcionario y necesito sacar el reporte de reintegros, ¿qué opción selecciono en SIAAF?",
+      "expected_source": "6. Reintegro.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15086.4,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Reporte - Reingresos y Transferencias Internas.pdf",
+        "Reporte de Seguimiento.pptx",
+        "Reporte de estudiantes inscritos.pptx",
+        "Reporte de estudiantes graduados.pptx",
+        "Distribución por procedencia educativa oficial y privada.pptx",
+        "Reporte de estudiantes graduados - Resolucion 4008.pptx"
+      ],
+      "expected_source_found": false,
+      "answer": "En SIAAF, selecciona el módulo **«Reportes»** y luego el apartado **«Reingresos y Transferencias Internas»**. Para generar el reporte, debes completar los filtros obligatorios: **Año, Periodo y Nivel de formación**. También puedes filtrar por **Programa**.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "6. Reintegro.pptx"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 43,
+      "case_id": "admin_ser_pilo_report",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-042",
+      "question": "Trabajo en registro y necesito el informe de Ser Pilo Paga, ¿cómo lo genero?",
+      "expected_source": "5. Ser Pilo Paga.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15259.4,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "5. Ser Pilo Paga.pptx",
+        "Trabajo de grado.pdf",
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "Solicitud de inscripción para grado.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Para generar el informe de Ser Pilo Paga, sigue estos pasos:\n\n1. Desde el navegador, ingresa al sitio web de la Universidad: http://www.unisimon.edu.co/ y selecciona **Portales** en el menú principal.\n2. Ingresa al sistema y selecciona el módulo **Rectoría**.\n3. Dentro del módulo, selecciona el informe **Ser Pilo Paga**.\n4. Completa los filtros de **Año**, **Periodo** y **Fecha**, y presiona **Generar**. El sistema creará un reporte en PDF para visualizarlo.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "5. Ser Pilo Paga.pptx"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 44,
+      "case_id": "admin_absence_causes",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-043",
+      "question": "Soy funcionario académico, ¿cómo registro la causa de ausencia o deserción de un estudiante?",
+      "expected_source": "Ingreso de Causas de Desertores y Ausentes.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14362.7,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Manual de Usuario - Portal CovidApp.pdf",
+        "Manual de Usuario - Registro de Ingreso.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "El procedimiento disponible no documenta cómo registrar causas de ausencia o deserción, así que no puedo indicarte pasos verificados para hacerlo. Como mencionas que eres funcionario académico, no te guiaré al Portal Estudiantes. Consulta el procedimiento de tu área o a la dependencia responsable del registro académico.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Ingreso de Causas de Desertores y Ausentes.pdf"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 45,
+      "case_id": "admin_supletorio_authorization",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-044",
+      "question": "En mi área debemos autorizar un supletorio, ¿cómo se registra la autorización?",
+      "expected_source": "Autorización de Supletorios.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 15982.8,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Autorización de Supletorios.pdf",
+        "Manual de Usuario - Portal CovidApp.pdf"
+      ],
+      "expected_source_found": true,
+      "answer": "Para registrar la autorización del supletorio:\n\n1. Ingresa al Portal y selecciona **Calificaciones**.\n2. Elige los filtros de **año, periodo y programa**, y presiona **Buscar**.\n3. Selecciona del listado al estudiante o a los estudiantes que vas a autorizar y presiona **Aprobar**.\n4. Verifica el mensaje de confirmación del sistema.\n\nLos estudiantes autorizados podrán ingresar a su portal estudiantil para descargar el volante de pago. Después de que realicen el pago, el profesor podrá registrar la calificación.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Autorización de Supletorios.pdf"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 46,
+      "case_id": "admin_credit_approval",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-045",
+      "question": "Soy funcionario y debo aprobar una solicitud de crédito estudiantil, ¿qué pasos sigo?",
+      "expected_source": "Aprobacion Solicitudes de credito.pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 17346.5,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Demo tipos de admisión.pptx",
+        "Manual de Usuario - Portal CovidApp.pdf",
+        "Instructivo Aprobación de Requisitos.pdf",
+        "Gestión de Ingreso -  Funcionarios.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "No encuentro un procedimiento institucional verificado para aprobar solicitudes de crédito estudiantil. El material disponible describe la aprobación de requisitos de admisión, que es un trámite distinto, así que no sería seguro aplicar esos pasos al crédito.\n\nConsulta con la dependencia que gestiona el crédito estudiantil para confirmar en qué sistema y con qué permisos debes realizar la aprobación. Si el problema es técnico al acceder al sistema o usar una opción ya indicada por esa dependencia, puedo ayudarte con comprobaciones generales seguras.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Aprobacion Solicitudes de credito.pptx"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 47,
+      "case_id": "admin_invoice_detail",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-046",
+      "question": "En finanzas, ¿dónde consulto los anexos y el detalle de una factura?",
+      "expected_source": "Detalle factura (Anexos).pptx",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14923.2,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Detalle factura (Anexos).pptx",
+        "Convenio Institucional.pdf",
+        "Inscripción.pptx"
+      ],
+      "expected_source_found": true,
+      "answer": "En SIAAF WEB:\n\n1. Ingresa al sitio de la Universidad y selecciona **Portales** en el menú principal.\n2. Entra al módulo **App** y selecciona **Factura (Anexos)**.\n3. Escribe el número de factura o el número interno y presiona **Visualizar** para generar el detalle y consultar los anexos.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Detalle factura (Anexos).pptx"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 48,
+      "case_id": "admin_bank_accounts",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-047",
+      "question": "Soy funcionario de tesorería, ¿dónde reviso los bancos y cuentas disponibles para pagos?",
+      "expected_source": "Bancos y cuentas_v1_20211007.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14577.3,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Matricula.pptx",
+        "Jefe Inmediato - Funcionarios.pdf",
+        "Pagos en Linea_vPaymentz.pptx",
+        "Manual de Usuario - Portal CovidApp.pdf",
+        "Manual de Usuario - Registro de Ingreso.pdf"
+      ],
+      "expected_source_found": false,
+      "answer": "No encuentro en la información disponible una ruta para que funcionarios de tesorería consulten los bancos y las cuentas habilitados para pagos. El material recuperado solo indica cómo continuar un pago en línea, no cómo administrar o revisar esas opciones. No quiero indicarte una ruta institucional que no esté verificada.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Bancos y cuentas_v1_20211007.pdf"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 49,
+      "case_id": "admin_payment_verification",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-048",
+      "question": "Trabajo en cartera, ¿cómo verifico si un pago ya quedó aplicado en el sistema?",
+      "expected_source": "Instructivo Verificación pagos V2.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 16376.3,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Solicitud de inscripción para grado.pdf",
+        "Paymentez - Manual de usuario Link de pagos y Dashboard (2).pdf",
+        "SITE 2.0.pptx"
+      ],
+      "expected_source_found": false,
+      "answer": "Para verificarlo, revisa el listado de pagos asociados a la cotización en el sistema de **Administración de Pagos**. Allí puedes consultar el **registro del pago** y el **recibo**; si no aparece en el listado, no concluyas que está aplicado solo con el comprobante del cliente.\n\nEl material disponible no especifica cómo distinguir un pago aplicado de uno pendiente o cómo actualizar su estado. Evita eliminar o modificar registros sin el procedimiento autorizado de tu área; si necesitas confirmar el estado contable, consulta el proceso interno de Cartera.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Instructivo Verificación pagos V2.pdf"
+      ],
+      "intended_role": "administrativo"
+    },
+    {
+      "user": 50,
+      "case_id": "admin_inscriptions_module",
+      "category": "Administrativos",
+      "session_id": "load100-q50-20261006-085659-049",
+      "question": "Soy funcionario de admisiones, ¿qué opciones tengo en el módulo de gestión de inscripciones?",
+      "expected_source": "Gestión de inscripciones.pdf",
+      "http_status": 200,
+      "ok": true,
+      "latency_ms": 14971.1,
+      "response_type": "DIAGNOSTICO",
+      "state": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Manual de Usuario - Registro de Ingreso.pdf",
+        "Gestión de Ingreso -  Funcionarios.pdf",
+        "Demo tipos de admisión.pptx"
+      ],
+      "expected_source_found": false,
+      "answer": "Como funcionario de admisiones, en **Gestión de Ingreso de Estudiantes** puedes consultar y gestionar el proceso de admisión desde la inscripción hasta la matrícula de un aspirante.\n\nPara consultar, selecciona el **proceso, periodo, nivel y programa académico** y pulsa **Buscar**. Si quieres precisar la búsqueda, puedes elegir un **Tipo de Búsqueda** y escribir un texto en **Buscar**. Las opciones disponibles de proceso, nivel y programa dependen de los permisos asociados a tu usuario.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "error": null,
+      "expected_sources": [
+        "Gestión de inscripciones.pdf"
+      ],
+      "intended_role": "administrativo"
+    }
+  ],
+  "markdown_report": "C:\\Users\\adalcides.pintos\\Documents\\proyecto-chatbot\\reports\\quality_50_20261006.md"
+}

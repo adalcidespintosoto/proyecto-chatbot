@@ -1,5 +1,7 @@
 # Informe Ejecutivo y Comparativa Técnica: RAG Local con IA Local vs. RAG Local con IA Externa (GPT-5.6 Luna)
 
+> **Comparativa histórica de septiembre de 2026.** Sus supuestos de modelos, precios, costos, latencia y recomendación corresponden a aquella evaluación y no describen necesariamente la configuración activa. Para el estado actual consulta `../README.md`, `MANUAL_TECNICO_INTEGRAL.md` y `REPLICAR_Y_OPERAR_UNIMON.md`.
+
 **Documento para Dirección de TI, Gerencia y Líderes de Proyecto**  
 *Proyecto: UniMon - Sistema Inteligente de Soporte y Gestión de TI*  
 *Fecha: Septiembre 2026*  

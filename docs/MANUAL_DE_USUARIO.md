@@ -1,89 +1,115 @@
-# Manual de Usuario - UniMon (Asistente Virtual TI)
+# Manual de usuario de UniMon
 
-¡Hola! Bienvenido al manual oficial de **UniMon**, el Asistente Virtual Oficial de Soporte Técnico y Gestión de TI de la Universidad Simón Bolívar (Sedes Barranquilla y Cúcuta).
+**Público:** estudiantes, docentes, administrativos y personas que usan los servicios TI de la Universidad Simón Bolívar.  
+**Propósito:** explicar cómo conversar con UniMon, aprovechar la orientación de primera línea y pedir ayuda humana cuando haga falta.
 
-Este manual está diseñado para explicarte "paso a paso y con plastilina" cómo utilizar a UniMon para resolver tus problemas técnicos en cuestión de segundos, sin tener que esperar en una línea telefónica.
+## 1. Qué es UniMon
 
----
+UniMon es un asistente conversacional de soporte TI de Nivel 1. Busca responder preguntas y orientar problemas comunes a partir de documentos institucionales, reglas de soporte configuradas y servicios conectados. Puede usar un proveedor de lenguaje en la nube o un modelo local, según la configuración del sistema.
 
-## 🤖 1. ¿Qué es UniMon y para qué sirve?
+Sus respuestas no sustituyen la aprobación de un trámite, una decisión académica ni la intervención de un área responsable. Que UniMon explique una ruta de un sistema no significa que el usuario tenga permisos para ejecutarla.
 
-UniMon no es un bot común de respuestas pregrabadas. Es una Inteligencia Artificial avanzada que ha "leído" y memorizado todos los manuales técnicos, procedimientos y reglamentos de la Dirección de Tecnologías de la Información (TI) de la universidad.
+### Puede ayudar con
 
-**UniMon te puede ayudar con:**
-* **🔑 Problemas de Acceso:** Olvido de contraseñas de Microsoft 365, Portal Estudiantil, SIAAF, correo institucional.
-* **🎓 Dudas Académicas y Administrativas (TI):** Cómo subir notas (docentes), cómo descargar recibos (estudiantes), cómo solicitar equipos audiovisuales.
-* **💻 Reporte de Averías Físicas (Hardware):** Computadores de las salas que no prenden, teclados dañados, cables de red sueltos.
+- Acceso a portales, correo institucional, Microsoft 365, Teams y Moodle cuando hay información disponible.
+- Procedimientos documentados para estudiantes, docentes y personal administrativo.
+- Diagnóstico inicial y pasos seguros para fallas comunes de equipos o conectividad.
+- Orientación para contactar a soporte o iniciar una solicitud de atención.
 
-**UniMon NO te puede ayudar con:**
-* Tareas de programación (ej. *"hazme un código en Python"*).
-* Ensayos, resúmenes de libros o cultura general.
-* Si le preguntas estas cosas, te dirá amablemente que ese no es su trabajo.
+### No debe usarse para
 
----
+- Pedir cambios de notas, autorizaciones, excepciones o decisiones académicas.
+- Solicitar que realice acciones en nombre del usuario dentro de sistemas universitarios.
+- Compartir contraseñas, códigos de verificación, tokens, datos financieros o información sensible.
+- Resolver asuntos ajenos al soporte TI y a los servicios institucionales.
 
-## 🗣️ 2. ¿Cómo hablarle a UniMon para que te entienda perfecto?
+## 2. Cómo iniciar y mantener una conversación
 
-Hablar con UniMon es como chatear con una persona real por WhatsApp. Sin embargo, para que encuentre tu solución súper rápido, sigue estos consejos:
+### Chat web
 
-### A. Dile siempre quién eres (Tu Rol)
-Los procesos de la universidad cambian dependiendo de si eres estudiante o si eres profesor. 
-Cuando le escribas por primera vez, el bot te preguntará *"¿Quién eres?"* y te mostrará botones. **Haz clic en tu rol (Estudiante, Profesor, Administrativo)**. Esto es vital para no entregarte un manual equivocado.
+1. Abre la dirección del chatbot que te haya compartido la Universidad o el equipo de TI.
+2. Escribe la situación completa en el campo de mensaje y envíala.
+3. Continúa en el mismo chat si UniMon necesita una aclaración, si vas a probar un paso o si quieres responder a la pregunta de seguimiento.
+4. Usa **Nueva conversación** en la parte superior cuando quieras empezar otro tema sin el contexto anterior.
 
-### B. Sé específico con tu problema
-* ❌ **Malo:** "No me sirve" *(¿Qué no te sirve? ¿El ratón? ¿La página web?)*
-* ❌ **Malo:** "Ayuda" 
-* ✅ **Excelente:** "No me sirve la contraseña para entrar al Portal Estudiantil, me dice error de credenciales."
+Cada pestaña del navegador mantiene un identificador de sesión. Abrir otra pestaña crea otra sesión; el botón **Nueva conversación** renueva la sesión actual. Si reinicias el servidor, las sesiones en curso pueden perderse.
 
-*Nota tecnológica: Incluso si escribes algo vago, el "cerebro" de UniMon intentará reescribir tu pregunta internamente en 3 opciones distintas para adivinar qué querías decir y buscar la mejor respuesta.*
+### WhatsApp
 
----
+Si UniMon está habilitado para el número oficial, envíale un mensaje a ese número. Escribe **nueva conversación**, **nueva sesión** o **nuevo chat** para limpiar el contexto de la conversación. Si no recibes respuesta, puede estar deshabilitada la integración, haber vencido la configuración de Meta o existir una falla del servicio; usa el canal institucional de soporte.
 
-## 🏫 3. Daños Físicos (Computadores, Pantallas, Torniquetes)
+### ¿Debo seleccionar un rol?
 
-Si estás en un salón de clases o en una oficina y algo físico se daña (ej. *"El PC 5 de la sala no prende"*, *"La pantalla está rota"*, *"El cable está quemado"*), UniMon es tan inteligente que detectará inmediatamente que es una emergencia física.
+Normalmente puedes escribir tu pregunta directamente. El sistema conserva o infiere un perfil conversacional cuando puede, pero el perfil **no limita la búsqueda documental por audiencia**. Si el procedimiento depende de tu condición, sede o permisos, indícalo en la pregunta; por ejemplo: “Soy docente de posgrado…” o “Trabajo en registro académico…”.
 
-En lugar de mandarte a leer un PDF aburrido, UniMon te mostrará inmediatamente los teléfonos de la Mesa de Ayuda y te ofrecerá **radicar un ticket para que un técnico vaya caminando hasta donde estás**.
+## 3. Cómo formular una pregunta útil
 
----
+Incluye, si lo sabes:
 
-## 🧠 4. El Súper Poder de Aprender: El botón "Sí, me funcionó"
+- Qué intentas hacer o qué dejó de funcionar.
+- En qué sistema, portal, aplicación o equipo ocurre.
+- Qué estabas haciendo justo antes del problema.
+- El mensaje de error exacto, sin incluir contraseñas ni códigos privados.
+- Tu perfil institucional y la sede, cuando cambien el procedimiento.
 
-Cada vez que UniMon te responde, al final de su mensaje te hará una pregunta muy importante:
-**"¿Pudiste resolver tu problema con estos pasos?"**
+**Vago:** “No me sirve.”  
+**Más claro:** “Soy estudiante de primer semestre. Ya pagué la matrícula y no sé dónde encuentro las credenciales para entrar al portal.”
 
-Te aparecerán tres botones:
-1. `✅ Sí, me funcionó`
-2. `🔄 No me funcionó (Intentar de nuevo)`
-3. `🎫 Generar reporte (Radicar Ticket)`
+**Vago:** “¿Cómo hago el reporte?”  
+**Más claro:** “Trabajo en registro. ¿Cómo genero el informe de estudiantes nuevos en SIAAF Web y qué filtros debo usar?”
 
-### ¿Por qué es tan importante hacer clic en "Sí, me funcionó"?
-UniMon tiene una "Memoria de Aprendizaje" secreta (llamada Golden Cache). 
-Si tú le haces una pregunta muy difícil y él logra darte la respuesta correcta, y tú haces clic en **"✅ Sí, me funcionó"**, UniMon guardará esa respuesta en su cerebro para siempre. 
+La pregunta puede ser coloquial. UniMon amplía la búsqueda con expresiones relacionadas y busca evidencia en los documentos indexados. Si distintas guías complementan el procedimiento, puede combinar sus fragmentos, siempre que el contexto recuperado lo permita.
 
-La próxima vez que otro estudiante pregunte lo mismo, UniMon no tendrá que buscar en los manuales; recordará que a ti te funcionó y le dará la misma solución al instante. **¡Tú ayudas a entrenar a UniMon!**
+## 4. Cómo leer la respuesta
 
----
+- Sigue los pasos en el orden indicado y detente si la pantalla no coincide con lo que se describe.
+- Los nombres de documentos o páginas que el sistema muestre como fuentes sirven para ubicar de dónde salió la respuesta; no son una garantía de que el archivo esté vigente.
+- Si UniMon indica que no encontró un paso, un requisito o una ruta, no completes ese dato por intuición. Pregunta qué parte sí puede confirmar o solicita atención humana.
+- Si tu caso requiere permisos, una decisión del área o una acción de un técnico, UniMon debe explicarlo y ofrecer la ruta autorizada correspondiente.
+- Usa los botones de respuesta rápida cuando aparezcan. “Sí, me funcionó” registra una señal de satisfacción; “No me funcionó” permite continuar el diagnóstico o escalar, según el estado de la conversación. La confirmación no garantiza que cada respuesta se haya incorporado a una memoria ni que el contenido haya sido verificado por una persona.
 
-## 🎫 5. ¿Qué pasa si UniMon no sabe la respuesta? (Cómo abrir un Ticket)
+### Si la respuesta no resuelve el problema
 
-A veces hay problemas muy específicos que requieren la intervención de un ingeniero humano. Si los pasos de UniMon no te sirven, sigue este proceso:
+1. Contesta **No me funcionó** o explica qué paso falló.
+2. Incluye el texto del error y el nombre de la pantalla, sin enviar datos secretos.
+3. Si aparece la opción, elige **Generar reporte** para comenzar la solicitud de soporte.
+4. Si el sistema no ofrece la opción o la falla es física, contacta al canal de TI indicado en esta guía o en los canales vigentes de tu sede.
 
-1. Haz clic en el botón **"🎫 Generar reporte"** o simplemente escríbele *"quiero radicar un ticket"*.
-2. UniMon te pedirá tu **Nombre Completo**. Escríbelo.
-3. Luego, te pedirá tu **Correo Institucional**. (Asegúrate de escribirlo bien, ej: `usuario@unisimon.edu.co`).
-4. Finalmente, te pedirá que **describas tu problema**.
-5. ¡Y listo! UniMon se conectará a los servidores internos de la Mesa de Ayuda (GLPI), creará el ticket a tu nombre y te devolverá un **Número de Radicado**. 
-6. Con ese número, un ingeniero se pondrá en contacto contigo a tu correo.
+## 5. Solicitar ayuda técnica y radicar un caso
 
----
+Cuando UniMon ofrezca radicar un caso, decide si quieres continuar. El flujo puede pedirte:
 
-## 📞 6. Canales Directos
+1. Nombre.
+2. Correo de contacto válido.
+3. Descripción concreta del problema o requerimiento.
+4. Confirmación adicional si ya tienes un caso activo o si quieres agregar información a un ticket existente.
 
-Si alguna vez sientes que no quieres hablar con el bot y necesitas los teléfonos reales, simplemente escríbele: *"Dame los canales de atención"*.
+La información se envía a GLPI solamente si la integración está configurada y la radicación se completa. Revisa la respuesta final y guarda el número de ticket si se genera. La respuesta de UniMon no garantiza que un técnico ya esté en camino ni que una solicitud esté aprobada.
 
-UniMon te entregará inmediatamente:
-* **Sede Barranquilla:** solicitudcomputo@unisimon.edu.co | WhatsApp: 3172683922 | PBX: (605) 3444333 Ext. 8003/8004
-* **Sede Cúcuta:** helpdesk@unisimon.edu.co | PBX: (607) 5827070 Ext. 129
+Nunca envíes tu contraseña, códigos de autenticación, tokens, datos completos de tarjetas ni credenciales de terceros. Para hardware, cableado, puntos de red, torniquetes o equipos que requieran intervención presencial, no abras el equipo ni manipules instalaciones: describe la ubicación y pide atención al área responsable.
 
-¡Disfruta usando UniMon, tu aliado tecnológico en la Universidad Simón Bolívar!
+## 6. Canales directos de soporte TI
+
+Los canales configurados actualmente en las respuestas del chatbot son:
+
+- **Barranquilla:** solicitudcomputo@unisimon.edu.co; WhatsApp 3172683922; PBX (605) 3444333, extensiones 8003/8004.
+- **Cúcuta:** helpdesk@unisimon.edu.co; PBX (607) 5827070, extensión 129.
+
+Confirma que sigan vigentes en los canales oficiales de la Universidad antes de usarlos. Un administrador puede actualizar esta información en la configuración de la aplicación.
+
+## 7. Problemas comunes al usar el chat
+
+| Situación | Qué hacer |
+|---|---|
+| UniMon mezcla el contexto de una conversación anterior | Usa **Nueva conversación** o escribe una pregunta completa en una sesión nueva. |
+| Pide aclarar el sistema, perfil o sede | Indica cuál sistema usas, tu perfil y la sede si el procedimiento puede cambiar. |
+| Responde con pasos generales, pero no con la ruta dentro del sistema | Di qué pantalla necesitas completar y solicita que separe lo confirmado de lo que no está documentado. |
+| Los botones no aparecen en WhatsApp | Responde con texto, por ejemplo “sí”, “no”, “nuevo chat” o “cancelar”. |
+| Un paso pide permisos que no tienes | No intentes elevar permisos ni usar credenciales ajenas. Solicita al responsable autorizado que gestione el acceso. |
+| No recibes respuesta o aparece error | Intenta una vez más. Si persiste, usa un canal directo de TI y reporta la hora aproximada del incidente. |
+
+## 8. Documentación relacionada
+
+- [Manual técnico integral](MANUAL_TECNICO_INTEGRAL.md): arquitectura y operación para soporte técnico.
+- [Guía para replicar y operar UniMon](REPLICAR_Y_OPERAR_UNIMON.md): instalación y mapa completo del repositorio.
+- [Flujo de procesamiento](flujo_procesamiento_sistema.md): recorrido técnico de una consulta.

@@ -64,7 +64,7 @@ PROMPT_HARDWARE_DIRECT = (
 
 HARDWARE_QUICK_REPLIES = [
     {"label": "🎫 Radicar ticket", "payload": "CREATE_TICKET"},
-    {"label": "✅ Tengo la información", "payload": "RESOLVED"}
+    {"label": "✅ Ya funciona", "payload": "RESOLVED"}
 ]
 
 # =============================================================================
