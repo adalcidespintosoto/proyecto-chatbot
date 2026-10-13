@@ -196,7 +196,9 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
             prompt_tokens=prompt_tokens,
             cached_tokens=cached_tokens,
             eval_tokens=eval_tokens,
-            feedback=resultado.get("feedback", "NONE")
+            feedback=resultado.get("feedback", "NONE"),
+            golden_cache_used=resultado.get("golden_cache_used", False),
+            golden_cache_similarity=resultado.get("golden_cache_similarity"),
         )
 
         # Actualizar estado de resolución / escalado

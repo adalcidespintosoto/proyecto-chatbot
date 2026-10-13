@@ -7,7 +7,9 @@ cancelación y rechazo explícito ("no", "cancelar"), entrega de canal oficial p
 radicación por Slot-Filling universal simplificado en secuencia estricta de 3 pasos (Nombre -> Correo -> Descripción).
 """
 
+import json
 import logging
+import math
 import re
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional, List
@@ -50,6 +52,35 @@ from app.services.router_service import (
 from app.services.golden_cache_service import search_golden_case, save_golden_case, invalidate_golden_cache_entry
 
 logger = logging.getLogger("unimon.router_logic")
+
+
+def _serialize_golden_reference(golden_hit: Optional[Tuple[Any, ...]]) -> str:
+    """Serializa un caso similar para que RAG valide y limite sus campos antes de usarlo."""
+    if not golden_hit:
+        return ""
+    if len(golden_hit) < 3:
+        return ""
+    previous_query, previous_response, similarity = golden_hit[:3]
+    previous_query = str(previous_query or "").strip()[:320]
+    previous_response = str(previous_response or "").strip()[:5000]
+    try:
+        similarity = float(similarity)
+    except (TypeError, ValueError):
+        return ""
+    if not previous_query or not previous_response or not math.isfinite(similarity) or not 0.90 <= similarity <= 1.0:
+        return ""
+    payload = {
+        "query": previous_query,
+        "response": previous_response,
+        "similarity": similarity,
+    }
+    if len(golden_hit) > 3 and isinstance(golden_hit[3], list):
+        payload["source_refs"] = golden_hit[3][:16]
+    return json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
 
 
 class EstadoTicket(str, Enum):
@@ -119,8 +150,35 @@ class TicketSession(BaseModel):
     pending_query: Optional[str] = None
     last_user_query: Optional[str] = None
     last_bot_response: Optional[str] = None
+    last_bot_source_refs: List[Dict[str, Any]] = Field(default_factory=list)
+    last_golden_cache_used: bool = False
+    last_golden_similarity: Optional[float] = None
     ubicacion: Optional[str] = None
     activo: Optional[str] = None
+
+
+def _record_rag_outcome(session: TicketSession, query: str, response: str, rag_result: Dict[str, Any]) -> None:
+    """Keep only bounded provenance and cache-use telemetry for later feedback/save."""
+    session.last_user_query = query
+    session.last_bot_response = response
+    source_refs = rag_result.get("source_refs")
+    session.last_bot_source_refs = [item for item in source_refs[:16] if isinstance(item, dict)] if isinstance(source_refs, list) else []
+    session.last_golden_cache_used = bool(rag_result.get("golden_cache_used"))
+    similarity = rag_result.get("golden_cache_similarity")
+    try:
+        similarity = float(similarity) if similarity is not None else None
+    except (TypeError, ValueError):
+        similarity = None
+    session.last_golden_similarity = similarity if similarity is not None and math.isfinite(similarity) else None
+
+
+def _clear_last_rag_outcome(session: TicketSession) -> None:
+    """Prevent a later feedback event from being attached to an older answer."""
+    session.last_user_query = None
+    session.last_bot_response = None
+    session.last_bot_source_refs = []
+    session.last_golden_cache_used = False
+    session.last_golden_similarity = None
 
 
 # Almacén de sesiones en memoria indexado por session_id
@@ -1006,16 +1064,20 @@ class RouterLogic:
         # -------------------------------------------------------------
         if cls.is_solved_confirmation(texto):
             # Guardar en Golden Cache si hay consulta y respuesta previas
+            resolved_query = session.last_user_query
             if session.last_user_query and session.last_bot_response:
                 try:
                     save_golden_case(
                         session_id=session_id,
                         user_query=session.last_user_query,
                         bot_response=session.last_bot_response,
-                        role=session.user_role or "general"
+                        role=session.user_role or "general",
+                        source_refs=session.last_bot_source_refs,
                     )
                 except Exception as e:
                     logger.warning(f"[GoldenCache] Error al guardar caso en cierre global: {e}")
+            golden_cache_used = session.last_golden_cache_used
+            golden_cache_similarity = session.last_golden_similarity
             cls.reset_session(session_id)
             cls.add_history(session_id, "user", texto)
             cls.add_history(session_id, "assistant", DESPEDIDA_INSTITUCIONAL)
@@ -1024,7 +1086,10 @@ class RouterLogic:
                 "mensaje": DESPEDIDA_INSTITUCIONAL,
                 "ticket_id": None,
                 "source": "UniMon_Nivel1_Resolved",
-                "feedback": "RESOLVED"
+                "query": resolved_query,
+                "feedback": "RESOLVED",
+                "golden_cache_used": golden_cache_used,
+                "golden_cache_similarity": golden_cache_similarity,
             }
 
         # -------------------------------------------------------------
@@ -1052,8 +1117,7 @@ class RouterLogic:
                     "- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte."
                 )
                 session.estado = EstadoTicket.DIAGNOSTICO
-                session.last_user_query = texto
-                session.last_bot_response = msg_directorio
+                _record_rag_outcome(session, texto, msg_directorio, {})
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", msg_directorio)
                 return {
@@ -1443,17 +1507,14 @@ class RouterLogic:
                         "quick_replies": HARDWARE_QUICK_REPLIES
                     }
 
-                # Consultar RAG con el rol confirmado y filtrar chunks
-                # Golden Cache aporta otra formulación para recuperar evidencia;
-                # sus respuestas guardadas no se reusan como fuente factual.
+                # Golden Cache aporta una consulta y respuesta históricas como
+                # referencia secundaria; RAG valida los hechos con documentos.
                 golden_context = ""
-                golden_hit = search_golden_case(query_to_run)
+                golden_hit = search_golden_case(query_to_run, include_source_refs=True)
                 if golden_hit:
-                    prev_q, _prev_ans, sim = golden_hit
-                    golden_context = (
-                        f"Consulta similar validada para ampliar la búsqueda documental:\n{prev_q}\n"
-                    )
-                    logger.info(f"[GoldenCache] Usando consulta similar solo como expansión RAG (sim={sim:.2f}) en PIDIENDO_ROL.")
+                    _prev_q, _prev_ans, sim = golden_hit[:3]
+                    golden_context = _serialize_golden_reference(golden_hit)
+                    logger.info(f"[GoldenCache] Caso similar entregado a RAG como referencia secundaria (sim={sim:.2f}) en PIDIENDO_ROL.")
 
                 history = cls.get_history(session_id)
                 rag_res = await rag_service.answer_query(
@@ -1487,6 +1548,7 @@ class RouterLogic:
                    resp_text == MENSAJE_NO_DOCUMENTADO or \
                    "No dispongo de un procedimiento documentado" in resp_text or \
                    "No dispongo de un instructivo" in resp_text:
+                    _clear_last_rag_outcome(session)
                     session.falla = query_to_run
                     cat, cat_name = cls.detect_category(query_to_run)
                     session.categoria = cat
@@ -1519,8 +1581,7 @@ class RouterLogic:
                 session.intentos_diagnostico = 1
                 session.diagnosis_attempts = 1
                 session.estado = EstadoTicket.DIAGNOSTICO
-                session.last_user_query = query_to_run
-                session.last_bot_response = resp_text
+                _record_rag_outcome(session, query_to_run, resp_text, rag_res)
 
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", resp_text)
@@ -1537,6 +1598,8 @@ class RouterLogic:
                     "prompt_tokens": rag_res.get("prompt_tokens", 0),
                     "cached_tokens": rag_res.get("cached_tokens", 0),
                     "eval_tokens": rag_res.get("eval_tokens", 0),
+                    "golden_cache_used": session.last_golden_cache_used,
+                    "golden_cache_similarity": session.last_golden_similarity,
                     "quick_replies": rag_res.get("quick_replies", [
                         {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
                         {"label": "🔄 No me funcionó", "payload": "RETRY_DIAGNOSIS"},
@@ -1659,6 +1722,7 @@ class RouterLogic:
                    resp_text == MENSAJE_NO_DOCUMENTADO or \
                    "No dispongo de un procedimiento documentado" in resp_text or \
                    "No dispongo de un instructivo" in resp_text:
+                    _clear_last_rag_outcome(session)
                     session.falla = texto
                     session.estado = EstadoTicket.OFRECIENDO_RADICACION
                     cls.add_history(session_id, "user", texto)
@@ -1678,6 +1742,7 @@ class RouterLogic:
                 session.estado = EstadoTicket.DIAGNOSTICO
                 session.intentos_diagnostico = 1
                 session.falla = texto
+                _record_rag_outcome(session, texto, resp_text, rag_res)
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", resp_text)
                 return {
@@ -1689,6 +1754,11 @@ class RouterLogic:
                     "ticket_id": None,
                     "sources": rag_res.get("sources"),
                     "source": rag_res.get("source", "ollama_rag"),
+                    "prompt_tokens": rag_res.get("prompt_tokens", 0),
+                    "cached_tokens": rag_res.get("cached_tokens", 0),
+                    "eval_tokens": rag_res.get("eval_tokens", 0),
+                    "golden_cache_used": session.last_golden_cache_used,
+                    "golden_cache_similarity": session.last_golden_similarity,
                     "quick_replies": rag_res.get("quick_replies", [
                         {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
                         {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
@@ -1704,16 +1774,20 @@ class RouterLogic:
             if feedback_res:
                 if feedback_res.get("state") == "FINALIZADO" or feedback_res.get("tipo") == "FINALIZADO":
                     # Golden Cache: guardar caso resuelto con feedback positivo
+                    resolved_query = session.last_user_query
                     if session.last_user_query and session.last_bot_response:
                         try:
                             save_golden_case(
                                 session_id=session_id,
                                 user_query=session.last_user_query,
                                 bot_response=session.last_bot_response,
-                                role=session.user_role or "general"
+                                role=session.user_role or "general",
+                                source_refs=session.last_bot_source_refs,
                             )
                         except Exception as e:
                             logger.warning(f"[GoldenCache] Error al guardar caso resuelto: {e}")
+                    golden_cache_used = session.last_golden_cache_used
+                    golden_cache_similarity = session.last_golden_similarity
                     cls.reset_session(session_id)
                     cls.add_history(session_id, "user", texto)
                     cls.add_history(session_id, "assistant", feedback_res["response"])
@@ -1725,8 +1799,11 @@ class RouterLogic:
                         "reply": feedback_res["response"],
                         "ticket_id": None,
                         "source": feedback_res.get("source", "UniMon_Feedback_Success"),
+                        "query": resolved_query,
                         "quick_replies": [],
-                        "feedback": "RESOLVED"
+                        "feedback": "RESOLVED",
+                        "golden_cache_used": golden_cache_used,
+                        "golden_cache_similarity": golden_cache_similarity,
                     }
                 elif feedback_res.get("state") == "DIAGNOSTICO" or feedback_res.get("tipo") == "DIAGNOSTICO":
                     # Invalidar caso previo en Golden Cache si el usuario reporta que no le funcionó (RETRY_DIAGNOSIS)
@@ -1746,10 +1823,13 @@ class RouterLogic:
                         "reply": feedback_res["response"],
                         "ticket_id": None,
                         "source": feedback_res.get("source", "UniMon_Diagnostico_Retry"),
+                        "query": session.last_user_query,
                         "quick_replies": feedback_res.get("quick_replies", [
                             {"label": "🎫 Generar reporte a soporte", "payload": "CREATE_TICKET"}
                         ]),
-                        "feedback": "RETRY"
+                        "feedback": "RETRY",
+                        "golden_cache_used": session.last_golden_cache_used,
+                        "golden_cache_similarity": session.last_golden_similarity,
                     }
                 elif feedback_res.get("state") == "RADICANDO_TICKET" or feedback_res.get("tipo") == "RADICANDO_TICKET":
                     # Invalidar caso previo en Golden Cache si el usuario decide escalar a ticket por falla
@@ -1772,8 +1852,11 @@ class RouterLogic:
                         "reply": feedback_res["response"],
                         "ticket_id": None,
                         "source": feedback_res.get("source", "UniMon_SlotFilling"),
+                        "query": session.last_user_query,
                         "quick_replies": [],
-                        "feedback": "ESCALATED"
+                        "feedback": "ESCALATED",
+                        "golden_cache_used": session.last_golden_cache_used,
+                        "golden_cache_similarity": session.last_golden_similarity,
                     }
 
             # Caso A: Saludo en medio de diagnóstico -> Saludar y resetear
@@ -1822,15 +1905,14 @@ class RouterLogic:
             history = cls.get_history(session_id)
             query_ctx = texto
 
-            # Golden Cache aporta una formulación adicional para buscar evidencia.
+            # Golden Cache aporta un caso previo para ampliar la búsqueda y
+            # orientar la síntesis; no sustituye los documentos institucionales.
             golden_context = ""
-            golden_hit = search_golden_case(query_ctx)
+            golden_hit = search_golden_case(query_ctx, include_source_refs=True)
             if golden_hit:
-                prev_q, _prev_ans, sim = golden_hit
-                golden_context = (
-                    f"Consulta similar validada para ampliar la búsqueda documental:\n{prev_q}\n"
-                )
-                logger.info(f"[GoldenCache] Usando consulta similar solo como expansión RAG (sim={sim:.2f}) en diagnóstico.")
+                _prev_q, _prev_ans, sim = golden_hit[:3]
+                golden_context = _serialize_golden_reference(golden_hit)
+                logger.info(f"[GoldenCache] Caso similar entregado a RAG como referencia secundaria (sim={sim:.2f}) en diagnóstico.")
 
 
             rag_res = await rag_service.answer_query(
@@ -1848,6 +1930,7 @@ class RouterLogic:
                "capacidad de brindarte" in resp_text or \
                "No dispongo de un procedimiento documentado" in resp_text or \
                "No dispongo de un instructivo" in resp_text:
+                _clear_last_rag_outcome(session)
                 session.estado = EstadoTicket.OFRECIENDO_RADICACION
                 cls.add_history(session_id, "user", texto)
                 cls.add_history(session_id, "assistant", resp_text)
@@ -1881,8 +1964,7 @@ class RouterLogic:
                 }
 
             # Rastrear consulta y respuesta para Golden Cache
-            session.last_user_query = query_ctx
-            session.last_bot_response = resp_text
+            _record_rag_outcome(session, query_ctx, resp_text, rag_res)
 
             cls.add_history(session_id, "user", texto)
             cls.add_history(session_id, "assistant", resp_text)
@@ -1899,6 +1981,8 @@ class RouterLogic:
                 "prompt_tokens": rag_res.get("prompt_tokens", 0),
                 "cached_tokens": rag_res.get("cached_tokens", 0),
                 "eval_tokens": rag_res.get("eval_tokens", 0),
+                "golden_cache_used": session.last_golden_cache_used,
+                "golden_cache_similarity": session.last_golden_similarity,
                 "quick_replies": rag_res.get("quick_replies", [
                     {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
                     {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}
@@ -2011,15 +2095,14 @@ class RouterLogic:
                 }
 
             # 7. Consultar RAG con historial conversacional y rol de usuario
-            # Golden Cache aporta una formulación adicional para buscar evidencia.
+            # Golden Cache aporta un caso previo para ampliar la búsqueda y
+            # orientar la síntesis; no sustituye los documentos institucionales.
             golden_context = ""
-            golden_hit = search_golden_case(texto)
+            golden_hit = search_golden_case(texto, include_source_refs=True)
             if golden_hit:
-                prev_q, _prev_ans, sim = golden_hit
-                golden_context = (
-                    f"Consulta similar validada para ampliar la búsqueda documental:\n{prev_q}\n"
-                )
-                logger.info(f"[GoldenCache] Usando consulta similar solo como expansión RAG (sim={sim:.2f}) en IDLE.")
+                _prev_q, _prev_ans, sim = golden_hit[:3]
+                golden_context = _serialize_golden_reference(golden_hit)
+                logger.info(f"[GoldenCache] Caso similar entregado a RAG como referencia secundaria (sim={sim:.2f}) en IDLE.")
 
             history = cls.get_history(session_id)
             rag_res = await rag_service.answer_query(
@@ -2048,6 +2131,7 @@ class RouterLogic:
                resp_text == MENSAJE_NO_DOCUMENTADO or \
                "No dispongo de un procedimiento documentado" in resp_text or \
                "No dispongo de un instructivo" in resp_text:
+                _clear_last_rag_outcome(session)
                 session.falla = texto
                 cat, cat_name = cls.detect_category(texto)
                 session.categoria = cat
@@ -2072,8 +2156,7 @@ class RouterLogic:
             session.urgency, session.impact = cls.calculate_urgency_and_impact(texto)
             session.intentos_diagnostico = 1
             session.estado = EstadoTicket.DIAGNOSTICO
-            session.last_user_query = texto
-            session.last_bot_response = resp_text
+            _record_rag_outcome(session, texto, resp_text, rag_res)
 
             cls.add_history(session_id, "user", texto)
             cls.add_history(session_id, "assistant", resp_text)
@@ -2090,6 +2173,8 @@ class RouterLogic:
                 "prompt_tokens": rag_res.get("prompt_tokens", 0),
                 "cached_tokens": rag_res.get("cached_tokens", 0),
                 "eval_tokens": rag_res.get("eval_tokens", 0),
+                "golden_cache_used": session.last_golden_cache_used,
+                "golden_cache_similarity": session.last_golden_similarity,
                 "quick_replies": rag_res.get("quick_replies", [
                     {"label": "✅ Sí, me funcionó", "payload": "RESOLVED"},
                     {"label": "🎫 No, radicar ticket", "payload": "CREATE_TICKET"}

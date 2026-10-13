@@ -8,9 +8,10 @@ Aplica validación estricta de calidad y grounding para evitar envenenamiento de
 
 import os
 import logging
+import json
 import re
 import hashlib
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 
@@ -240,7 +241,46 @@ def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
     return True
 
 
-def save_golden_case(session_id: str, user_query: str, bot_response: str, role: str = "general") -> bool:
+def _normalize_source_refs(source_refs: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """Allowlist minimal document/page provenance; never retain chunk text here."""
+    normalized: List[Dict[str, Any]] = []
+    seen = set()
+    for item in source_refs or []:
+        if not isinstance(item, dict):
+            continue
+        source = item.get("source")
+        page_field = item.get("page_field")
+        page = item.get("page")
+        if not isinstance(source, str) or not source.strip() or len(source) > 500:
+            continue
+        if re.search(r"[\x00-\x1f]", source) or page_field not in {"page_number", "slide_number", "page"}:
+            continue
+        if isinstance(page, bool):
+            continue
+        try:
+            page = int(page)
+        except (TypeError, ValueError):
+            continue
+        minimum_page = 0 if page_field == "page" else 1
+        if not minimum_page <= page <= 5000:
+            continue
+        key = (source, page_field, page)
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append({"source": source.strip(), "page_field": page_field, "page": page})
+        if len(normalized) >= 16:
+            break
+    return normalized
+
+
+def save_golden_case(
+    session_id: str,
+    user_query: str,
+    bot_response: str,
+    role: str = "general",
+    source_refs: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
     """
     Guarda o actualiza una interacción validada con feedback positivo en la colección golden tras pasar control de calidad.
     Utiliza un hash determinista basado en el rol y consulta para evitar duplicidad (Upsert idempotente).
@@ -276,7 +316,8 @@ def save_golden_case(session_id: str, user_query: str, bot_response: str, role: 
                 "user_query": user_query,
                 "role": role_clean,
                 "session_id": session_id,
-                "source": "user_feedback_positive"
+                "source": "user_feedback_positive",
+                "source_refs_json": json.dumps(_normalize_source_refs(source_refs), ensure_ascii=False),
             }]
         )
         logger.info("[GoldenCache] Caso guardado o actualizado (ID: %s...)", doc_id[:8])
@@ -312,7 +353,12 @@ def invalidate_golden_cache_entry(query: str, role: str = "general") -> bool:
         return False
 
 
-def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[str] = None) -> Optional[Tuple[str, str, float]]:
+def search_golden_case(
+    user_query: str,
+    threshold: float = 0.90,
+    role: Optional[str] = None,
+    include_source_refs: bool = False,
+) -> Optional[tuple]:
     """
     Busca si existe una consulta similar previamente resuelta con éxito.
     
@@ -376,6 +422,13 @@ def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[
                     f"[GoldenCache] Coincidencia encontrada (similitud={similarity:.4f}): "
                     f"'{matched_query[:50]}...'"
                 )
+                if include_source_refs:
+                    metadata = results["metadatas"][0][0] or {}
+                    try:
+                        source_refs = json.loads(metadata.get("source_refs_json", "[]"))
+                    except (TypeError, ValueError):
+                        source_refs = []
+                    return (matched_query, matched_response, similarity, _normalize_source_refs(source_refs))
                 return (matched_query, matched_response, similarity)
             else:
                 logger.debug(

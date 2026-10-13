@@ -390,7 +390,10 @@ class WhatsAppService:
                                 latency_ms=round(latency_ms, 2),
                                 prompt_tokens=resultado.get("prompt_tokens", 0) or 0,
                                 cached_tokens=resultado.get("cached_tokens", 0) or 0,
-                                eval_tokens=resultado.get("eval_tokens", 0) or 0
+                                eval_tokens=resultado.get("eval_tokens", 0) or 0,
+                                feedback=resultado.get("feedback", "NONE"),
+                                golden_cache_used=resultado.get("golden_cache_used", False),
+                                golden_cache_similarity=resultado.get("golden_cache_similarity"),
                             )
                         except Exception as tel_err:
                             logger.debug(f"Aviso en telemetría de WhatsApp: {tel_err}")

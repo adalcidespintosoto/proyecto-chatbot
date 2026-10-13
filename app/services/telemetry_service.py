@@ -10,6 +10,7 @@ import re
 import logging
 import io
 import csv
+import math
 from datetime import datetime
 from collections import Counter
 from pathlib import Path
@@ -50,6 +51,8 @@ def init_telemetry_db():
                     prompt_tokens INTEGER DEFAULT 0,
                     eval_tokens INTEGER DEFAULT 0,
                     feedback TEXT DEFAULT 'NONE',
+                    golden_cache_used INTEGER DEFAULT 0,
+                    golden_cache_similarity REAL,
                     FOREIGN KEY (session_id) REFERENCES telemetry_sessions(session_id)
                 )
             """)
@@ -79,6 +82,10 @@ def init_telemetry_db():
                 cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN bot_response TEXT;")
             if "cached_tokens" not in cols:
                 cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN cached_tokens INTEGER DEFAULT 0;")
+            if "golden_cache_used" not in cols:
+                cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN golden_cache_used INTEGER DEFAULT 0;")
+            if "golden_cache_similarity" not in cols:
+                cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN golden_cache_similarity REAL;")
             conn.commit()
             logger.info("Base de datos de telemetría inicializada en: %s", DB_PATH)
     except Exception as e:
@@ -167,7 +174,9 @@ def log_interaction(
     prompt_tokens: int = 0,
     cached_tokens: int = 0,
     eval_tokens: int = 0,
-    feedback: str = "NONE"
+    feedback: str = "NONE",
+    golden_cache_used: bool = False,
+    golden_cache_similarity: Optional[float] = None,
 ):
     """
     Registra una interacción y actualiza/inserta la sesión en la base de datos de telemetría.
@@ -184,11 +193,18 @@ def log_interaction(
             """, (session_id, role or "general"))
             
             docs_str = ", ".join(docs) if docs else "None"
+            try:
+                golden_similarity_value = float(golden_cache_similarity) if golden_cache_similarity is not None else None
+                if golden_similarity_value is not None and not math.isfinite(golden_similarity_value):
+                    golden_similarity_value = None
+            except (TypeError, ValueError):
+                golden_similarity_value = None
             cursor.execute("""
                 INSERT INTO telemetry_interactions (
                     session_id, user_query, bot_response, intent_category, source_used,
-                    referenced_docs, latency_ms, prompt_tokens, cached_tokens, eval_tokens, feedback
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    referenced_docs, latency_ms, prompt_tokens, cached_tokens, eval_tokens, feedback,
+                    golden_cache_used, golden_cache_similarity
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session_id, 
                 query, 
@@ -200,7 +216,9 @@ def log_interaction(
                 prompt_tokens, 
                 cached_tokens,
                 eval_tokens, 
-                feedback
+                feedback,
+                1 if golden_cache_used else 0,
+                golden_similarity_value,
             ))
             conn.commit()
     except Exception as e:

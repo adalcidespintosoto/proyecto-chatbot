@@ -1711,9 +1711,9 @@
         </div>
 
         <div class="kpi-card">
-          <div class="kpi-title">⚡ Latencia Media GPU</div>
+          <div class="kpi-title">⚡ Latencia Media</div>
           <div class="kpi-value" id="kpiLatencia">0 ms</div>
-          <div class="kpi-subtext">Inferencia Ollama + Reranker</div>
+          <div class="kpi-subtext">Respuesta completa del asistente</div>
         </div>
 
         <div class="kpi-card purple">
@@ -1844,8 +1844,8 @@
           <div>
             <h3 style="font-size: 1.15rem; font-weight: 800; color: #EDE9FE; display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
               🤖 Diagnóstico y Recomendaciones con IA
-              <span style="font-size: 0.72rem; font-weight: 700; background: rgba(124, 58, 237, 0.25); color: #C4B5FD; padding: 2px 8px; border-radius: 9999px; border: 1px solid rgba(124, 58, 237, 0.4);">
-                Ollama • unimon:8b Local
+              <span id="aiInsightsProviderBadge" style="font-size: 0.72rem; font-weight: 700; background: rgba(124, 58, 237, 0.25); color: #C4B5FD; padding: 2px 8px; border-radius: 9999px; border: 1px solid rgba(124, 58, 237, 0.4);">
+                Proveedor IA configurado
               </span>
             </h3>
             <div style="font-size: 0.82rem; color: #C4B5FD;">
@@ -1860,7 +1860,7 @@
 
         <div id="aiInsightsContainer" class="ai-insights-body">
           <div style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
-            Haz clic en <strong>"Analizar Período con IA"</strong> para que el modelo local evalúe las métricas del período actual y proponga mejoras documentales.
+            Haz clic en <strong>"Analizar Período con IA"</strong> para que el proveedor de IA configurado evalúe las métricas del período actual y proponga mejoras documentales.
           </div>
         </div>
       </div>
@@ -1943,7 +1943,7 @@
           </div>
 
           <div class="delta-card">
-            <div class="delta-title">⚡ Latencia Media GPU</div>
+            <div class="delta-title">⚡ Latencia Media</div>
             <div class="delta-values-row">
               <span class="delta-main-val" id="deltaLatMain">--</span>
               <span class="delta-pill neutral" id="deltaLatPill">--</span>
@@ -2496,6 +2496,16 @@
 
   <!-- Scripts -->
   <script>
+    function escapeChunkHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     let allDocuments = [];
     let currentFilterStart = 'today';
     let currentFilterEnd = 'today';
@@ -2855,7 +2865,7 @@
                 <span class="badge" style="background: rgba(255,255,255,0.08); font-weight: 700;">
                   ${escapeChunkHtml(item.count)} ${item.count === 1 ? 'consulta' : 'consultas'}
                 </span>
-                <button type="button" class="btn-action-ia" data-unresolved-action="draft" data-index="${idx}" title="Pedirle a Ollama que redacte la guía institucional">
+                <button type="button" class="btn-action-ia" data-unresolved-action="draft" data-index="${idx}" title="Pedirle al proveedor de IA configurado que redacte un borrador de guía">
                   ✨ Redactar Guía RAG
                 </button>
                 <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="toggleUnresolvedResponse(${idx})">
@@ -3092,12 +3102,12 @@
 
       btn.disabled = true;
       icon.innerHTML = '<span class="ai-pulse-spinner"></span>';
-      text.innerText = 'Analizando con unimon:8b...';
+      text.innerText = 'Analizando con IA...';
 
       container.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: center; gap: 10px; padding: 2rem; color: #A78BFA;">
           <span class="ai-pulse-spinner" style="width: 20px; height: 20px;"></span>
-          <span>Analizando KPIs, brechas y formulando plan de acción estratégico con Ollama...</span>
+          <span>Analizando KPIs, brechas y formulando un plan de acción con el proveedor de IA configurado...</span>
         </div>
       `;
 
@@ -3118,14 +3128,14 @@
         container.innerHTML = `
           <div style="font-size: 0.78rem; color: #C4B5FD; margin-bottom: 1rem; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
             <span>Diagnóstico generado para: <strong>${escapeChunkHtml(data.period || activePeriodLabel)}</strong></span>
-            <span>Modelo: <code>${escapeChunkHtml(data.model || 'unimon:8b')}</code></span>
+            <span>Modelo: <code>${escapeChunkHtml(data.model || 'No informado')}</code></span>
           </div>
           <div class="ai-report-content">${formatted}</div>
         `;
         showToast('Diagnóstico con IA generado con éxito', 'success');
       } catch (err) {
         console.error('Error generando diagnóstico IA:', err);
-        container.innerHTML = '<div style="color: #EF4444; padding: 1rem;">No fue posible contactar a la IA local en este momento. Verifique que Ollama esté ejecutándose.</div>';
+        container.innerHTML = '<div style="color: #EF4444; padding: 1rem;">No fue posible generar el análisis con el proveedor de IA configurado. Revisa su estado en el diagnóstico del sistema e inténtalo de nuevo.</div>';
         showToast('Error al generar análisis con IA', 'error');
       } finally {
         btn.disabled = false;
@@ -3240,8 +3250,8 @@
       backdrop.classList.add('show');
 
       document.getElementById('draftProcedureQueryRef').value = query;
-      document.getElementById('draftProcedureTitle').value = 'Redactando borrador con Ollama...';
-      document.getElementById('draftProcedureContent').value = 'Generando propuesta institucional oficial con unimon:8b...\nPor favor espera unos segundos.';
+      document.getElementById('draftProcedureTitle').value = 'Redactando borrador con IA...';
+      document.getElementById('draftProcedureContent').value = 'Generando una propuesta para revisión con el proveedor de IA configurado...\nPor favor espera unos segundos.';
 
       const roleSelect = document.getElementById('draftProcedureRoleSelect');
       const rLower = String(role || '').toLowerCase();
@@ -3569,16 +3579,6 @@
         docsListEl.innerHTML = '<div style="color: #64748B; font-size: 0.82rem; padding: 4px;">No se detectaron colisiones directas con otros archivos.</div>';
         replaceBtn.style.display = 'none';
       }
-
-    function escapeChunkHtml(str) {
-      if (str === null || str === undefined) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
 
     function createChunkDiffCard(chk) {
       const cardEl = document.createElement('div');
@@ -3997,10 +3997,15 @@
         const res = await fetch('/api/admin/system-status');
         const data = await res.json();
 
-        const prov = (data.llm ? data.llm.provider : 'openai').toUpperCase();
-        const activeMod = data.llm ? data.llm.active_model : data.ollama.model_configured;
-        const activeOk = data.llm ? data.llm.active : data.ollama.active;
-        const endp = data.llm ? data.llm.endpoint : data.ollama.endpoint;
+        const llm = data.llm || {};
+        const legacy = data.ollama || {};
+        const prov = String(llm.provider || legacy.provider || (legacy.model_configured ? 'ollama' : 'desconocido')).toUpperCase();
+        const activeMod = llm.active_model || legacy.model_configured || 'No disponible';
+        const activeOk = llm.active ?? legacy.active ?? false;
+        const endp = llm.endpoint || legacy.endpoint || 'No disponible';
+
+        const aiProviderBadge = document.getElementById('aiInsightsProviderBadge');
+        if (aiProviderBadge) aiProviderBadge.textContent = `${prov} • ${activeMod}`;
 
         diag.innerHTML = `
           <div><strong>Aplicación:</strong> ${escapeChunkHtml(data.app_name)} (v${escapeChunkHtml(data.app_version)})</div>
