@@ -184,10 +184,8 @@ class LLMClient:
                     "source": f"gemini_{model_name}"
                 }
 
-            error_text = response.text
-            print(f"[GEMINI CLOUD] [ERROR] Código {response.status_code}: {error_text}\n", flush=True)
-            logger.error("[LLMClient] Error HTTP %s de Gemini: %s", response.status_code, error_text)
-            raise RuntimeError(f"Gemini API error {response.status_code}: {error_text}")
+            logger.error("[LLMClient] Error HTTP %s de Gemini", response.status_code)
+            raise RuntimeError(f"Gemini API error {response.status_code}")
 
     async def _call_openai_chat(
         self,
@@ -258,10 +256,8 @@ class LLMClient:
                     "source": f"openai_{model_name}"
                 }
 
-            error_text = response.text
-            print(f"[OPENAI CLOUD] [ERROR] Código {response.status_code}: {error_text}\n", flush=True)
-            logger.error("[LLMClient] Error HTTP %s de OpenAI: %s", response.status_code, error_text)
-            raise RuntimeError(f"OpenAI API error {response.status_code}: {error_text}")
+            logger.error("[LLMClient] Error HTTP %s de OpenAI", response.status_code)
+            raise RuntimeError(f"OpenAI API error {response.status_code}")
 
     async def _call_ollama_chat(
         self,
@@ -310,9 +306,8 @@ class LLMClient:
                     "source": f"ollama_{self.settings.llm_model}"
                 }
 
-            error_text = response.text
-            print(f"[OLLAMA LOCAL] [ERROR] Código {response.status_code}: {error_text}\n", flush=True)
-            raise RuntimeError(f"Ollama error {response.status_code}: {error_text}")
+            logger.error("[LLMClient] Error HTTP %s de Ollama", response.status_code)
+            raise RuntimeError(f"Ollama error {response.status_code}")
 
     async def generate_async(
         self,

@@ -2713,7 +2713,7 @@
             li.className = 'item-row';
             const rLower = String(r).toLowerCase();
             const icon = rLower.includes('prof') || rLower.includes('doc') ? '👨‍🏫' : rLower.includes('est') ? '🎓' : rLower.includes('admin') || rLower.includes('func') ? '💼' : '👤';
-            li.innerHTML = `<span class="item-label">${icon} ${r}</span> <span class="badge">${roles[r]} sesiones</span>`;
+            li.innerHTML = `<span class="item-label">${icon} ${escapeChunkHtml(r)}</span> <span class="badge">${escapeChunkHtml(roles[r])} sesiones</span>`;
             rolesContainer.appendChild(li);
           });
         }
@@ -2729,7 +2729,7 @@
             const li = document.createElement('li');
             li.className = 'item-row';
             const docName = d.name || d.referenced_docs || 'Documento';
-            li.innerHTML = `<span class="item-label">📄 <code>${docName}</code></span> <span class="badge">${d.count} consultas</span>`;
+            li.innerHTML = `<span class="item-label">📄 <code>${escapeChunkHtml(docName)}</code></span> <span class="badge">${escapeChunkHtml(d.count)} consultas</span>`;
             docsContainer.appendChild(li);
           });
         }
@@ -2745,7 +2745,7 @@
             const li = document.createElement('li');
             li.className = 'item-row';
             const text = q.query || q.user_query || '';
-            li.innerHTML = `<span class="item-label" title="${text}">💬 "${text}"</span> <span class="badge">${q.count} veces</span>`;
+            li.innerHTML = `<span class="item-label" title="${escapeChunkHtml(text)}">💬 "${escapeChunkHtml(text)}"</span> <span class="badge">${escapeChunkHtml(q.count)} veces</span>`;
             queriesContainer.appendChild(li);
           });
         }
@@ -2836,35 +2836,32 @@
         const rolesHtml = (item.roles || []).map(r => {
           const rLower = String(r).toLowerCase();
           const icon = rLower.includes('prof') || rLower.includes('doc') ? '👨‍🏫' : rLower.includes('est') ? '🎓' : '💼';
-          return `<span style="font-size:0.75rem; color:#94A3B8;">${icon} ${r}</span>`;
+          return `<span style="font-size:0.75rem; color:#94A3B8;">${icon} ${escapeChunkHtml(r)}</span>`;
         }).join(' · ');
 
         const reasonsHtml = (item.reasons || []).map(reason => {
-          return `<span class="badge-reason">${reason}</span>`;
+          return `<span class="badge-reason">${escapeChunkHtml(reason)}</span>`;
         }).join(' ');
-
-        const safeQuery = item.query.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const primaryRole = (item.roles && item.roles[0]) || 'general';
 
         html += `
           <div class="unresolved-item-card">
             <div class="unresolved-header-row">
               <div class="unresolved-query-title">
-                <span class="badge-rank">#${item.rank || (idx + 1)}</span>
-                <span>"${item.query}"</span>
+                <span class="badge-rank">#${escapeChunkHtml(item.rank || (idx + 1))}</span>
+                <span>"${escapeChunkHtml(item.query)}"</span>
                 <span class="${pClass}">${pIcon}</span>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
                 <span class="badge" style="background: rgba(255,255,255,0.08); font-weight: 700;">
-                  ${item.count} ${item.count === 1 ? 'consulta' : 'consultas'}
+                  ${escapeChunkHtml(item.count)} ${item.count === 1 ? 'consulta' : 'consultas'}
                 </span>
-                <button type="button" class="btn-action-ia" onclick="openDraftProcedureModal('${safeQuery}', '${primaryRole}')" title="Pedirle a Ollama que redacte la guía institucional">
+                <button type="button" class="btn-action-ia" data-unresolved-action="draft" data-index="${idx}" title="Pedirle a Ollama que redacte la guía institucional">
                   ✨ Redactar Guía RAG
                 </button>
                 <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="toggleUnresolvedResponse(${idx})">
                   👁️ Ver Detalle
                 </button>
-                <button type="button" class="btn-danger-outline" onclick="openDismissModal('${safeQuery}')" title="Descartar esta pregunta del ranking si no es relevante">
+                <button type="button" class="btn-danger-outline" data-unresolved-action="dismiss" data-index="${idx}" title="Descartar esta pregunta del ranking si no es relevante">
                   🗑️ Descartar
                 </button>
               </div>
@@ -2878,19 +2875,29 @@
               <div style="display: flex; gap: 6px; align-items: center;">
                 <span style="color: var(--text-muted);">Causa:</span>
                 ${reasonsHtml}
-                <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 8px;">Última: ${item.last_seen || 'Hoy'}</span>
+                <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 8px;">Última: ${escapeChunkHtml(item.last_seen || 'Hoy')}</span>
               </div>
             </div>
 
             <div id="unresolvedDrawer_${idx}" style="display: none; margin-top: 8px; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: 6px; border-left: 3px solid #F59E0B; font-size: 0.8rem; color: #E2E8F0; line-height: 1.5;">
               <div style="font-weight: 700; color: #F59E0B; margin-bottom: 4px;">💬 Respuesta que entregó el bot:</div>
-              <div>${item.sample_response || 'Sin registro detallado de respuesta.'}</div>
+              <div>${escapeChunkHtml(item.sample_response || 'Sin registro detallado de respuesta.')}</div>
             </div>
           </div>
         `;
       });
 
       container.innerHTML = html;
+      container.querySelectorAll('[data-unresolved-action]').forEach(button => {
+        button.addEventListener('click', () => {
+          const item = list[Number(button.dataset.index)];
+          if (button.dataset.unresolvedAction === 'draft') {
+            openDraftProcedureModal(item.query, (item.roles && item.roles[0]) || 'general');
+          } else {
+            openDismissModal(item.query);
+          }
+        });
+      });
     }
 
     function toggleUnresolvedResponse(idx) {
@@ -2950,8 +2957,7 @@
         const res = await fetch('/api/analytics/unresolved-queries/dismiss', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*')
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             query: query,
@@ -2982,9 +2988,7 @@
 
     async function loadDismissedBadgeCount() {
       try {
-        const res = await fetch('/api/analytics/unresolved-queries/dismissed', {
-          headers: { 'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*') }
-        });
+        const res = await fetch('/api/analytics/unresolved-queries/dismissed');
         if (res.ok) {
           const data = await res.json();
           const badge = document.getElementById('dismissedCountBadge');
@@ -3004,9 +3008,7 @@
       container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Cargando preguntas descartadas...</div>';
 
       try {
-        const res = await fetch('/api/analytics/unresolved-queries/dismissed', {
-          headers: { 'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*') }
-        });
+        const res = await fetch('/api/analytics/unresolved-queries/dismissed');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const list = data.data || [];
@@ -3028,14 +3030,14 @@
             <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
               <div style="flex: 1; min-width: 0;">
                 <div style="font-weight: 700; color: #F1F5F9; font-size: 0.9rem; word-break: break-word;">
-                  "${item.query}"
+                  "${escapeChunkHtml(item.query)}"
                 </div>
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap;">
-                  <span>Motivo: <strong style="color: #CBD5E1;">${item.reason || 'No relevante'}</strong></span>
-                  <span>Fecha: <strong>${item.dismissed_at || 'Desconocida'}</strong></span>
+                  <span>Motivo: <strong style="color: #CBD5E1;">${escapeChunkHtml(item.reason || 'No relevante')}</strong></span>
+                  <span>Fecha: <strong>${escapeChunkHtml(item.dismissed_at || 'Desconocida')}</strong></span>
                 </div>
               </div>
-              <button type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; white-space: nowrap;" onclick="restoreDismissedQuery(${item.id})">
+              <button type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; white-space: nowrap;" data-restore-id="${escapeChunkHtml(item.id)}">
                 ↩️ Restaurar al Ranking
               </button>
             </div>
@@ -3043,6 +3045,9 @@
         });
         html += '</div>';
         container.innerHTML = html;
+        container.querySelectorAll('[data-restore-id]').forEach(button => {
+          button.addEventListener('click', () => restoreDismissedQuery(Number(button.dataset.restoreId)));
+        });
       } catch (err) {
         console.error('Error cargando descartadas:', err);
         container.innerHTML = '<div style="color: #EF4444; padding: 1rem;">Error al cargar las preguntas descartadas.</div>';
@@ -3058,8 +3063,7 @@
         const res = await fetch('/api/analytics/unresolved-queries/restore', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*')
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ id: id })
         });
@@ -3104,7 +3108,7 @@
         const data = await res.json();
         const markdown = data.insights || 'No se recibieron recomendaciones.';
 
-        let formatted = markdown
+        let formatted = escapeChunkHtml(markdown)
           .replace(/^### (.*$)/gim, '<h3>$1</h3>')
           .replace(/^## (.*$)/gim, '<h2>$1</h2>')
           .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
@@ -3113,8 +3117,8 @@
 
         container.innerHTML = `
           <div style="font-size: 0.78rem; color: #C4B5FD; margin-bottom: 1rem; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
-            <span>Diagnóstico generado para: <strong>${data.period || activePeriodLabel}</strong></span>
-            <span>Modelo: <code>${data.model || 'unimon:8b'}</code></span>
+            <span>Diagnóstico generado para: <strong>${escapeChunkHtml(data.period || activePeriodLabel)}</strong></span>
+            <span>Modelo: <code>${escapeChunkHtml(data.model || 'unimon:8b')}</code></span>
           </div>
           <div class="ai-report-content">${formatted}</div>
         `;
@@ -3291,8 +3295,7 @@
         const res = await fetch('/api/analytics/save-procedure', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + btoa('admin:UniMonAdmin2026*')
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             title: title,
@@ -3347,16 +3350,17 @@
       docs.forEach(doc => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><strong>📄 ${doc.filename}</strong></td>
-          <td><span class="badge">${doc.audience}</span> <span style="font-size:0.75rem; color:var(--text-muted)">(${doc.folder})</span></td>
-          <td>${doc.size_formatted}</td>
-          <td>${doc.modified_at}</td>
+          <td><strong>📄 ${escapeChunkHtml(doc.filename)}</strong></td>
+          <td><span class="badge">${escapeChunkHtml(doc.audience)}</span> <span style="font-size:0.75rem; color:var(--text-muted)">(${escapeChunkHtml(doc.folder)})</span></td>
+          <td>${escapeChunkHtml(doc.size_formatted)}</td>
+          <td>${escapeChunkHtml(doc.modified_at)}</td>
           <td>
-            <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="deleteDocument('${doc.filename}')">
+            <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;">
               🗑️ Eliminar
             </button>
           </td>
         `;
+        tr.querySelector('button').addEventListener('click', () => deleteDocument(doc.filename));
         tbody.appendChild(tr);
       });
     }
@@ -3545,11 +3549,11 @@
           item.innerHTML = `
             <div class="overlapping-doc-name">
               <span>📄</span>
-              <span title="${doc.source}">${doc.source}</span>
+              <span title="${escapeChunkHtml(doc.source)}">${escapeChunkHtml(doc.source)}</span>
             </div>
             <div class="overlapping-doc-badges">
-              <span class="pill-solapados">${doc.matched_chunks} solapados</span>
-              <span class="sim-rate-text" style="color:#60A5FA; font-weight:700;">${doc.max_similarity}% sim</span>
+              <span class="pill-solapados">${escapeChunkHtml(doc.matched_chunks)} solapados</span>
+              <span class="sim-rate-text" style="color:#60A5FA; font-weight:700;">${escapeChunkHtml(doc.max_similarity)}% sim</span>
             </div>
           `;
           docsListEl.appendChild(item);
@@ -3567,7 +3571,7 @@
       }
 
     function escapeChunkHtml(str) {
-      if (!str) return '';
+      if (str === null || str === undefined) return '';
       return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -3642,7 +3646,7 @@
         <div class="chunk-diff-header chunk-card-header">
           <div class="chunk-diff-header-left">
             <span class="chunk-main-badge ${mainBadgeClass}">
-              <span>${mainBadgeIcon}</span> ${mainBadgeText}
+              <span>${mainBadgeIcon}</span> ${escapeChunkHtml(mainBadgeText)}
             </span>
           </div>
           <div class="chunk-diff-header-right">
@@ -3677,7 +3681,7 @@
                 <span>Existente en ChromaDB</span>
               </span>
               <span class="diff-similarity-pill ${simPillClass}">
-                ${hasMatch ? `${chk.similarity}% similitud` : '0% colisión'}
+                ${hasMatch ? `${escapeChunkHtml(chk.similarity)}% similitud` : '0% colisión'}
               </span>
             </div>
             ${rightColContentHtml}
@@ -3815,11 +3819,11 @@
           item.innerHTML = `
             <div class="overlapping-doc-name">
               <span>📄</span>
-              <span title="${doc.source}">${doc.source}</span>
+              <span title="${escapeChunkHtml(doc.source)}">${escapeChunkHtml(doc.source)}</span>
             </div>
             <div class="overlapping-doc-badges">
-              <span class="pill-solapados">${doc.matched_chunks} solapados</span>
-              <span class="sim-rate-text">${doc.max_similarity}% sim</span>
+              <span class="pill-solapados">${escapeChunkHtml(doc.matched_chunks)} solapados</span>
+              <span class="sim-rate-text">${escapeChunkHtml(doc.max_similarity)}% sim</span>
             </div>
           `;
           docsListEl.appendChild(item);
@@ -3999,18 +4003,18 @@
         const endp = data.llm ? data.llm.endpoint : data.ollama.endpoint;
 
         diag.innerHTML = `
-          <div><strong>Aplicación:</strong> ${data.app_name} (v${data.app_version})</div>
-          <div><strong>Aceleración Hardware:</strong> ⚡ ${data.gpu_active}</div>
-          <div><strong>Proveedor IA Activo:</strong> <code>${prov}</code> (${activeOk ? '🟢 En línea' : '🔴 Desconectado'})</div>
-          <div><strong>Modelo Configurado:</strong> <code>${activeMod}</code></div>
-          <div><strong>Endpoint Inferencia:</strong> <code>${endp}</code></div>
-          <div><strong>Archivos Fuente en Disco:</strong> ${data.knowledge_base.total_source_files} documentos</div>
+          <div><strong>Aplicación:</strong> ${escapeChunkHtml(data.app_name)} (v${escapeChunkHtml(data.app_version)})</div>
+          <div><strong>Aceleración Hardware:</strong> ⚡ ${escapeChunkHtml(data.gpu_active)}</div>
+          <div><strong>Proveedor IA Activo:</strong> <code>${escapeChunkHtml(prov)}</code> (${activeOk ? '🟢 En línea' : '🔴 Desconectado'})</div>
+          <div><strong>Modelo Configurado:</strong> <code>${escapeChunkHtml(activeMod)}</code></div>
+          <div><strong>Endpoint Inferencia:</strong> <code>${escapeChunkHtml(endp)}</code></div>
+          <div><strong>Archivos Fuente en Disco:</strong> ${escapeChunkHtml(data.knowledge_base.total_source_files)} documentos</div>
         `;
 
         glpiDiag.innerHTML = `
-          <div><strong>GLPI REST Endpoint:</strong> <code>${data.glpi.endpoint}</code></div>
+          <div><strong>GLPI REST Endpoint:</strong> <code>${escapeChunkHtml(data.glpi.endpoint)}</code></div>
           <div><strong>Estado de Tokens:</strong> ${data.glpi.configured ? '🟢 Configurados (App & User Token OK)' : '🟡 Incompletos en .env'}</div>
-          <div style="margin-top:10px;"><a href="${data.glpi.endpoint}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem;">Abrir GLPI Network Cloud</a></div>
+          <div style="margin-top:10px;"><a href="${/^https:\/\//i.test(data.glpi.endpoint || '') ? escapeChunkHtml(data.glpi.endpoint) : '#'}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size:0.75rem;">Abrir GLPI Network Cloud</a></div>
         `;
       } catch (err) {
         diag.innerText = 'No se pudo consultar el estado del servidor.';

@@ -6,7 +6,8 @@ para proteger el panel administrativo y las APIs de gestión.
 
 import secrets
 import logging
-from fastapi import Depends, HTTPException, status
+from urllib.parse import urlsplit
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.config import get_settings
@@ -16,6 +17,20 @@ logger = logging.getLogger("unimon.security")
 security = HTTPBasic()
 
 
+def require_admin_origin(request: Request) -> None:
+    """Bloquea solicitudes administrativas mutantes provenientes de otro sitio."""
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    if request.headers.get("sec-fetch-site") == "cross-site":
+        raise HTTPException(status_code=403, detail="Origen no autorizado")
+    origin = request.headers.get("origin")
+    if origin:
+        submitted = urlsplit(origin)
+        host = request.headers.get("host", "")
+        if submitted.netloc.lower() != host.lower() or submitted.scheme not in {"http", "https"}:
+            raise HTTPException(status_code=403, detail="Origen no autorizado")
+
+
 def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     """
     Valida las credenciales administrativas mediante comparación en tiempo constante
@@ -23,7 +38,8 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
     """
     settings = get_settings()
 
-    if not settings.admin_username or not settings.admin_password:
+    if (not settings.admin_username or not settings.admin_password
+            or secrets.compare_digest(settings.admin_password, "UniMonAdmin2026*")):
         logger.error("Vulnerabilidad prevenida: ADMIN_USERNAME o ADMIN_PASSWORD no están definidos en .env")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -39,10 +55,7 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
     is_password_correct = secrets.compare_digest(correct_password_bytes, provided_password_bytes)
 
     if not (is_username_correct and is_password_correct):
-        logger.warning(
-            "Intento de acceso administrativo no autorizado con usuario: '%s'",
-            credentials.username
-        )
+        logger.warning("Intento de acceso administrativo no autorizado")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales de administración inválidas.",

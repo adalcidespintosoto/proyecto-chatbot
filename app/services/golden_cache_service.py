@@ -279,7 +279,7 @@ def save_golden_case(session_id: str, user_query: str, bot_response: str, role: 
                 "source": "user_feedback_positive"
             }]
         )
-        logger.info(f"[GoldenCache] Caso guardado/actualizado exitosamente (ID: {doc_id[:8]}...): '{user_query[:50]}...'")
+        logger.info("[GoldenCache] Caso guardado o actualizado (ID: %s...)", doc_id[:8])
         return True
     except Exception as e:
         logger.warning(f"[GoldenCache] Error guardando caso: {e}")
@@ -305,7 +305,7 @@ def invalidate_golden_cache_entry(query: str, role: str = "general") -> bool:
         doc_id = hashlib.sha256(f"{role_clean}:{clean_query}".encode("utf-8")).hexdigest()
         collection = get_golden_collection()
         collection.delete(ids=[doc_id])
-        logger.info(f"[GoldenCache] Entrada invalidada/eliminada por feedback negativo (ID: {doc_id[:8]}...): '{query[:50]}...'")
+        logger.info("[GoldenCache] Entrada invalidada por feedback negativo (ID: %s...)", doc_id[:8])
         return True
     except Exception as e:
         logger.warning(f"[GoldenCache] Error al invalidar entrada: {e}")

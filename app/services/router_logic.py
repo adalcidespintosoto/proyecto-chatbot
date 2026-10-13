@@ -393,22 +393,16 @@ class RouterLogic:
 
     @classmethod
     def clean_inactive_sessions(cls, ttl_minutes: int = 20) -> int:
-        """Reinicia a IDLE o purga las sesiones inactivas que superen el TTL."""
+        """Purga estado e historial de las sesiones que superan el TTL."""
         now = datetime.now(timezone.utc)
         cleaned_count = 0
         for session_id, session in list(ticket_sessions.items()):
             inactive_seconds = (now - session.last_interaction).total_seconds()
             if inactive_seconds > (ttl_minutes * 60):
-                if session.estado != EstadoTicket.IDLE or session.pending_query is not None:
-                    session.estado = EstadoTicket.IDLE
-                    session.pending_query = None
-                    session.intentos_fallidos = 0
-                    session.falla = None
-                    session.descripcion = None
-                    session.nombre = None
-                    session.correo = None
-                    cleaned_count += 1
-                    logger.info(f"Sesión {session_id} expirada por TTL ({ttl_minutes} min). Reiniciada a IDLE.")
+                ticket_sessions.pop(session_id, None)
+                session_history.pop(session_id, None)
+                cleaned_count += 1
+                logger.info("Sesión e historial purgados tras %s min de inactividad", ttl_minutes)
         return cleaned_count
 
     @classmethod
@@ -914,7 +908,7 @@ class RouterLogic:
         inactive_seconds = (now - session.last_interaction).total_seconds()
         if inactive_seconds > (20 * 60):
             if session.estado != EstadoTicket.IDLE or session.pending_query is not None:
-                logger.info(f"[Session: {session_id}] Sesión expirada por inactividad ({inactive_seconds:.0f}s > 1200s). Reiniciando a IDLE.")
+                logger.info("Sesión expirada por inactividad (%.0fs > 1200s). Reiniciando a IDLE.", inactive_seconds)
                 session.estado = EstadoTicket.IDLE
                 session.pending_query = None
                 session.intentos_fallidos = 0
@@ -935,15 +929,15 @@ class RouterLogic:
             detected_role = cls.detect_user_role(texto) or normalize_role(texto)
             if detected_role:
                 session.user_role = detected_role
-                logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
+                logger.info("Rol confirmado en PIDIENDO_ROL: %s", session.user_role)
         else:
             # Reevaluar el rol dinámicamente si el usuario cambia de contexto o se identifica de otra forma
             dynamic_role = cls.detect_user_role(texto)
             if dynamic_role and dynamic_role != session.user_role:
                 session.user_role = dynamic_role
-                logger.info(f"[Session: {session_id}] Rol actualizado dinámicamente por contexto a: '{session.user_role}'")
+                logger.info("Rol actualizado por contexto: %s", session.user_role)
 
-        logger.info(f"[Session: {session_id}] Estado: {estado_actual} | Rol: {session.user_role} | Intentos: {session.intentos_diagnostico}/{session.max_intentos_diagnostico} | Mensaje ({len(texto)} chars): '{texto}'")
+        logger.info("Estado de chat: %s | Rol: %s | Intentos: %s/%s | Mensaje: %s caracteres", estado_actual, session.user_role, session.intentos_diagnostico, session.max_intentos_diagnostico, len(texto))
 
         # -------------------------------------------------------------
         # GUARDRAIL GLOBAL DE CIBERSEGURIDAD: Prompt Injection, Jailbreak y Desvío de Directrices
@@ -952,7 +946,7 @@ class RouterLogic:
         # en CUALQUIER estado del flujo y sin importar si el usuario tiene rol o no.
         # -------------------------------------------------------------
         if is_prompt_injection_query(texto):
-            logger.warning(f"[SECURITY GUARDRAIL] Intento de Prompt Injection / Jailbreak interceptado en sesión '{session_id}': '{texto}'")
+            logger.warning("[SECURITY GUARDRAIL] Intento de inyección de prompt interceptado")
             session.pending_query = None
             cls.add_history(session_id, "user", texto)
             cls.add_history(session_id, "assistant", MENSAJE_PROMPT_INJECTION)
@@ -1397,7 +1391,7 @@ class RouterLogic:
                 }
 
             session.user_role = detected
-            logger.info(f"[Session: {session_id}] Rol confirmado en PIDIENDO_ROL: '{session.user_role}'")
+            logger.info("Rol confirmado en PIDIENDO_ROL: %s", session.user_role)
 
             # Si la consulta previa retenida era fuera de dominio o inyección, purgarla inmediatamente
             if session.pending_query and (is_prompt_injection_query(session.pending_query) or is_out_of_domain_query(session.pending_query)):

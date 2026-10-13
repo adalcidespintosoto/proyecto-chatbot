@@ -4,11 +4,13 @@ Define los esquemas de validación Pydantic y procesa las peticiones de los usua
 """
 
 import logging
+import secrets
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, status, Depends, Request, UploadFile, File
 from pydantic import BaseModel, Field
 
-from app.security import require_admin_auth
+from app.security import require_admin_auth, require_admin_origin
+from app.upload_security import save_upload, validated_filename
 from app.services.router_logic import router_logic, RouterLogic, EstadoTicket, IntentType, is_prompt_injection_query
 from app.services.glpi_service import glpi_client, GLPIService, GLPIException, is_valid_email
 from app.services.rag_service import rag_service, RAGService
@@ -31,9 +33,9 @@ class ChatRequest(BaseModel):
     Petición enviada al endpoint /api/chat.
     Admite tanto 'mensaje' como 'message' para máxima compatibilidad.
     """
-    mensaje: Optional[str] = Field(default=None, description="Mensaje o consulta técnica enviada por el usuario", example="No enciende el computador de la sala 2.")
-    message: Optional[str] = Field(default=None, description="Alias en inglés para el mensaje", example="No enciende el computador de la sala 2.")
-    session_id: Optional[str] = Field(default="default_session", description="Identificador único de la sesión conversacional", example="sess_12345")
+    mensaje: Optional[str] = Field(default=None, max_length=2000, description="Mensaje o consulta técnica enviada por el usuario", example="No enciende el computador de la sala 2.")
+    message: Optional[str] = Field(default=None, max_length=2000, description="Alias en inglés para el mensaje", example="No enciende el computador de la sala 2.")
+    session_id: Optional[str] = Field(default=None, max_length=128, description="Identificador único de la sesión conversacional", example="sess_12345")
 
     def get_texto(self) -> str:
         """Obtiene el texto del mensaje asegurando no vacíos."""
@@ -47,6 +49,7 @@ class ChatResponse(BaseModel):
     tipo: str = Field(..., description="Tipo de respuesta (SALUDO, DIAGNOSTICO, SOLUCIONADO, FINALIZADO, RADICANDO_TICKET, TICKET_CREADO, ERROR)", example="DIAGNOSTICO")
     mensaje: str = Field(..., description="Mensaje de respuesta en lenguaje natural para el usuario en español")
     ticket_id: Optional[Any] = Field(default=None, description="ID del ticket en GLPI si fue generado", example=1042)
+    session_id: Optional[str] = Field(default=None, description="Identificador de la sesión para continuar la conversación")
 
     # Campos de compatibilidad para clientes web y quick replies
     intent: Optional[str] = Field(default=None, description="Alias de compatibilidad para tipo")
@@ -88,21 +91,9 @@ INJECTION_PATTERNS = [
 
 
 def get_client_ip(request: Optional[Request]) -> str:
-    """Extrae la dirección IP real del cliente soportando Cloudflare Tunnel, Nginx y Load Balancers."""
+    """Obtiene la IP del salto inmediato sin confiar en cabeceras enviadas por clientes."""
     if not request:
         return "127.0.0.1"
-    # Encabezado Cloudflare Tunnel / CDN
-    cf_ip = request.headers.get("cf-connecting-ip")
-    if cf_ip:
-        return cf_ip.strip()
-    # Encabezado estándar de proxy
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    # Encabezado X-Real-IP
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip()
     if request.client and request.client.host:
         return request.client.host
     return "127.0.0.1"
@@ -145,7 +136,11 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
             detail="El campo 'mensaje' no puede estar vacío."
         )
 
-    session_id = request.session_id or "default_session"
+    session_id = request.session_id or f"sess_{secrets.token_urlsafe(24)}"
+    if (not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", session_id)
+            or session_id.lower().startswith("wa_")
+            or session_id == "default_session"):
+        raise HTTPException(status_code=400, detail="Identificador de sesión inválido")
 
 
     # Sanitizar y validar longitud del mensaje (máx 600 chars)
@@ -159,7 +154,7 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
             detail="El mensaje ingresado no contiene texto válido tras la sanitización."
         )
 
-    logger.info(f"Procesando mensaje para session_id '{session_id}' (longitud: {len(texto)} chars)")
+    logger.info("Procesando mensaje de chat (longitud: %d caracteres)", len(texto))
 
     # Medir tiempo de procesamiento (latencia)
     t0 = time.time()
@@ -220,6 +215,7 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
         tipo=tipo,
         mensaje=mensaje_resp,
         ticket_id=ticket_id,
+        session_id=session_id,
         intent=tipo,
         reply=mensaje_resp,
         state=state,
@@ -248,7 +244,7 @@ from scripts.ingest_multimodal_docs import ingest_multimodal
 @router.post(
     "/admin/upload",
     tags=["Administración RAG"],
-    dependencies=[Depends(require_admin_auth)],
+    dependencies=[Depends(require_admin_auth), Depends(require_admin_origin)],
     summary="Subir documento PDF o PPTX e indexar automáticamente",
     description="Recibe un archivo PDF o PPTX, lo almacena en ./data/docs/ y ejecuta la reindexación multimodal automática inmediata en ChromaDB (con interpretación visual de imágenes si el Vision-LLM está disponible)."
 )
@@ -259,39 +255,26 @@ async def upload_document(
     Guarda el archivo subido y dispara la reindexación multimodal y recarga automática del vector store.
     Soporta archivos PDF (.pdf) y PowerPoint (.pptx).
     """
-    allowed_extensions = (".pdf", ".pptx")
-    if not file.filename.lower().endswith(allowed_extensions):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Solo se admiten documentos en formato PDF (.pdf) o PowerPoint (.pptx)."
-        )
+    filename = validated_filename(file.filename, {".pdf", ".pptx"})
 
     settings = get_settings()
     docs_dir = Path(settings.docs_dir)
     docs_dir.mkdir(parents=True, exist_ok=True)
 
-    target_path = docs_dir / Path(file.filename).name
+    target_path = docs_dir / filename
 
     # Guardar archivo en disco validando tamaño máximo
     try:
-        content = await file.read()
         max_bytes = settings.max_upload_size_mb * 1024 * 1024
-        if len(content) > max_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail=f"El archivo excede el tamaño máximo permitido de {settings.max_upload_size_mb} MB."
-            )
-
-        with open(target_path, "wb") as f:
-            f.write(content)
-        logger.info(f"Nuevo documento guardado en: {target_path} ({len(content) / 1024:.1f} KB)")
+        file_size = await save_upload(file, target_path, max_bytes)
+        logger.info(f"Nuevo documento guardado en: {target_path} ({file_size / 1024:.1f} KB)")
     except HTTPException:
         raise
     except Exception as exc:
         logger.error(f"Error al escribir archivo en disco: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se pudo guardar el archivo: {str(exc)}"
+            detail="No se pudo guardar el archivo"
         )
 
     # Indexar únicamente el nuevo archivo con pipeline multimodal incremental
@@ -302,7 +285,7 @@ async def upload_document(
             "status": "success",
             "message": f"Documento '{file.filename}' subido e indexado exitosamente en ChromaDB (pipeline incremental multimodal).",
             "filename": file.filename,
-            "size_kb": round(len(content) / 1024, 2)
+            "size_kb": round(file_size / 1024, 2)
         }
     else:
         raise HTTPException(
@@ -314,7 +297,7 @@ async def upload_document(
 @router.post(
     "/admin/reindex",
     tags=["Administración RAG"],
-    dependencies=[Depends(require_admin_auth)],
+    dependencies=[Depends(require_admin_auth), Depends(require_admin_origin)],
     summary="Forzar reindexación multimodal completa de documentos",
     description="Ejecuta la limpieza y reindexación multimodal de todos los PDFs y PPTX en ./data/docs/ con interpretación visual de imágenes y recarga ChromaDB en memoria."
 )

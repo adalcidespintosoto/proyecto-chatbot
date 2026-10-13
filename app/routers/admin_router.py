@@ -20,7 +20,8 @@ import json
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.config import get_settings
-from app.security import require_admin_auth
+from app.security import require_admin_auth, require_admin_origin
+from app.upload_security import save_upload, validated_filename
 from app.services.rag_service import rag_service
 from app.services.telemetry_service import get_kpis_summary
 from scripts.ingest_multimodal_docs import (
@@ -36,7 +37,7 @@ logger = logging.getLogger("unimon.admin_router")
 
 router = APIRouter(
     tags=["Panel de Administración UniMon"],
-    dependencies=[Depends(require_admin_auth)]
+    dependencies=[Depends(require_admin_auth), Depends(require_admin_origin)]
 )
 
 settings = get_settings()
@@ -47,8 +48,8 @@ STAGED_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class ResolveUploadRequest(BaseModel):
-    staged_id: str = Field(..., description="ID de sesión temporal de subida")
-    action: str = Field(..., description="Acción de resolución: 'replace', 'deduplicate', 'force' o 'cancel'")
+    staged_id: str = Field(..., pattern=r"^(?:[0-9a-f]{10}|[0-9a-f]{32})$", description="ID de sesión temporal de subida")
+    action: str = Field(..., pattern=r"^(replace|deduplicate|force|cancel)$", description="Acción de resolución: 'replace', 'deduplicate', 'force' o 'cancel'")
     target_to_replace: Optional[str] = Field(default=None, description="Documento previo a purgar (opcional)")
 
 
@@ -245,17 +246,7 @@ async def upload_document(
     auto_index: bool = Form(False)
 ) -> Dict[str, Any]:
     """Recibe un archivo y lo almacena en la estructura de data/docs/."""
-    filename = Path(file.filename).name
-    if not filename:
-        raise HTTPException(status_code=400, detail="Nombre de archivo inválido.")
-
-    ext = Path(filename).suffix.lower()
-    allowed_exts = {".pdf", ".docx", ".pptx", ".txt", ".xlsx", ".md"}
-    if ext not in allowed_exts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Extensión '{ext}' no soportada. Use: {', '.join(allowed_exts)}"
-        )
+    filename = validated_filename(file.filename)
 
     # Determinar subdirectorio según audiencia
     subfolder_name = AUDIENCE_FOLDER_MAP.get(audience.lower().strip(), "4_general_normativa")
@@ -265,10 +256,7 @@ async def upload_document(
     dest_path = target_dir / filename
 
     try:
-        with open(dest_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        file_size = dest_path.stat().st_size
+        file_size = await save_upload(file, dest_path, settings.max_upload_size_mb * 1024 * 1024)
         logger.info(f"✅ Documento '{filename}' guardado en: {dest_path} ({file_size} bytes)")
 
         # Si se solicitó auto-indexar este archivo inmediatamente
@@ -292,9 +280,11 @@ async def upload_document(
             "indexing_result": indexing_result
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error guardando documento '{filename}': {e}")
-        raise HTTPException(status_code=500, detail=f"Error al guardar archivo en el servidor: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al guardar archivo en el servidor")
 
 
 # =============================================================================
@@ -313,34 +303,14 @@ async def audit_document(
     ambiguity_threshold: float = Form(0.65)
 ) -> Dict[str, Any]:
     """Analiza en memoria/staging un documento para calcular solapamiento semántico y ambigüedad contra ChromaDB."""
-    filename = Path(file.filename).name
-    if not filename:
-        raise HTTPException(status_code=400, detail="Nombre de archivo inválido.")
+    filename = validated_filename(file.filename)
 
-    ext = Path(filename).suffix.lower()
-    allowed_exts = {".pdf", ".docx", ".pptx", ".txt", ".xlsx", ".md"}
-    if ext not in allowed_exts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Extensión '{ext}' no soportada. Use: {', '.join(allowed_exts)}"
-        )
-
-    staged_id = uuid.uuid4().hex[:10]
+    staged_id = uuid.uuid4().hex
     staged_filename = f"{staged_id}_{filename}"
     staged_file_path = STAGED_DIR / staged_filename
 
     try:
-        with open(staged_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Validar tamaño máximo permitido
-        max_bytes = settings.max_upload_size_mb * 1024 * 1024
-        if staged_file_path.stat().st_size > max_bytes:
-            staged_file_path.unlink(missing_ok=True)
-            raise HTTPException(
-                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail=f"El archivo excede el tamaño máximo permitido de {settings.max_upload_size_mb} MB."
-            )
+        await save_upload(file, staged_file_path, settings.max_upload_size_mb * 1024 * 1024)
 
         # Extraer fragmentos para pre-auditoría
         chunks = extract_chunks_from_staged_file(staged_file_path)
@@ -471,10 +441,12 @@ async def audit_document(
         }
 
     except HTTPException:
+        staged_file_path.unlink(missing_ok=True)
         raise
     except Exception as e:
+        staged_file_path.unlink(missing_ok=True)
         logger.error(f"Error auditando documento '{filename}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error durante la auditoría del documento: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error durante la auditoría del documento")
 
 
 @router.post(
@@ -486,7 +458,7 @@ async def resolve_staged_upload(
     request: ResolveUploadRequest
 ) -> Dict[str, Any]:
     """Aplica la resolución elegida por el administrador para un documento en staging."""
-    clean_staged_id = Path(request.staged_id).name
+    clean_staged_id = request.staged_id
     meta_file = STAGED_DIR / f"{clean_staged_id}_meta.json"
 
     if not meta_file.exists():
@@ -497,8 +469,8 @@ async def resolve_staged_upload(
 
     try:
         meta = json.loads(meta_file.read_text(encoding="utf-8"))
-        staged_path = Path(meta.get("staged_path", ""))
-        filename = meta.get("filename", "")
+        filename = validated_filename(meta.get("filename"))
+        staged_path = STAGED_DIR / f"{clean_staged_id}_{filename}"
         audience = meta.get("audience", "general")
 
         # 1. CASO: Cancelar / Descartar
@@ -523,7 +495,17 @@ async def resolve_staged_upload(
         dest_path = target_dir / filename
 
         # Mover o copiar archivo a su ubicación permanente
-        shutil.copy2(staged_path, dest_path)
+        if staged_path.is_symlink() or not staged_path.is_file():
+            raise HTTPException(status_code=400, detail="Archivo temporal inválido")
+        with staged_path.open("rb") as source:
+            from tempfile import NamedTemporaryFile
+            with NamedTemporaryFile(dir=target_dir, prefix=".upload-", delete=False) as output:
+                temp_dest = Path(output.name)
+                shutil.copyfileobj(source, output)
+        try:
+            os.replace(temp_dest, dest_path)
+        finally:
+            temp_dest.unlink(missing_ok=True)
 
         # 2. CASO: Actualizar / Reemplazar Documento Existente
         if request.action == "replace":
@@ -605,7 +587,7 @@ async def resolve_staged_upload(
         raise
     except Exception as e:
         logger.error(f"Error resolviendo subida '{clean_staged_id}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error resolviendo la subida del documento: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error resolviendo la subida del documento")
 
 
 # =============================================================================

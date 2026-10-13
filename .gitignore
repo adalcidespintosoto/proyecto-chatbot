@@ -23,9 +23,15 @@ htmlcov/
 *.db-shm
 data/analytics.db-journal
 data/analytics.db-wal
+data/analytics.db
+data/chroma_db/
+chroma_db/
+data/chroma_db_backup/
+chroma_db_backup/
 
 # Archivos temporales y descargas
 data/temp_uploads/
+data/scratch/
 scratch/
 *.log
 

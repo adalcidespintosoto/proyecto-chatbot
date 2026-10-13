@@ -92,9 +92,14 @@ class WhatsAppService:
 
     def is_message_duplicate(self, message_id: str) -> bool:
         """Verifica si el mensaje ya fue recibido y procesado previamente por Meta."""
+        if not message_id:
+            return False
         self._cleanup_dedup_cache()
         if message_id in self._processed_messages:
             return True
+        if len(self._processed_messages) >= self._max_cache_size:
+            oldest = min(self._processed_messages, key=self._processed_messages.get)
+            del self._processed_messages[oldest]
         self._processed_messages[message_id] = time.time()
         return False
 
@@ -104,7 +109,12 @@ class WhatsAppService:
         return bool(
             settings.whatsapp_enabled
             and settings.whatsapp_phone_number_id
+            and not settings.whatsapp_phone_number_id.startswith("tu_")
             and settings.whatsapp_access_token
+            and not settings.whatsapp_access_token.startswith("tu_")
+            and settings.whatsapp_app_secret
+            and settings.whatsapp_verify_token
+            and settings.whatsapp_verify_token != "UniMon_USB_Verify_Token_2026"
         )
 
     def verify_webhook_token(self, mode: Optional[str], token: Optional[str], challenge: Optional[str]) -> Tuple[bool, Optional[str]]:
@@ -115,11 +125,15 @@ class WhatsAppService:
         settings = get_settings()
         expected_token = settings.whatsapp_verify_token
 
-        if mode == "subscribe" and token == expected_token:
+        import hmac
+        if (settings.whatsapp_enabled and mode == "subscribe" and challenge is not None
+                and token and expected_token
+                and expected_token != "UniMon_USB_Verify_Token_2026"
+                and hmac.compare_digest(token, expected_token)):
             logger.info("✅ Handshake de Webhook de WhatsApp validado exitosamente con Meta.")
             return True, challenge
         else:
-            logger.warning(f"❌ Intento de verificación de Webhook fallido. Token recibido: '{token}', esperado: '{expected_token}'")
+            logger.warning("Intento de verificación de Webhook fallido")
             return False, None
 
     async def mark_message_as_read(self, message_id: str) -> bool:
@@ -188,12 +202,12 @@ class WhatsAppService:
                 async with httpx.AsyncClient(timeout=20.0) as client:
                     resp = await client.post(url, headers=headers, json=payload)
                     if resp.status_code in [200, 201]:
-                        logger.info(f"[WhatsApp] Mensaje enviado exitosamente a '{to_phone}'.")
+                        logger.info("[WhatsApp] Mensaje enviado exitosamente")
                     else:
-                        logger.error(f"[WhatsApp] Error HTTP {resp.status_code} de Meta al enviar a '{to_phone}': {resp.text}")
+                        logger.error("[WhatsApp] Error HTTP %s al enviar mensaje", resp.status_code)
                         success = False
             except Exception as exc:
-                logger.error(f"[WhatsApp] Excepción de conexión enviando mensaje a '{to_phone}': {exc}")
+                logger.error("[WhatsApp] Falló la conexión al enviar mensaje: %s", type(exc).__name__)
                 success = False
 
         return success
@@ -260,14 +274,14 @@ class WhatsAppService:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 resp = await client.post(url, headers=headers, json=payload)
                 if resp.status_code in [200, 201]:
-                    logger.info(f"[WhatsApp] Mensaje interactivo con botones enviado a '{to_phone}'.")
+                    logger.info("[WhatsApp] Mensaje interactivo enviado")
                     return True
                 else:
-                    logger.warning(f"[WhatsApp] Meta rechazó mensaje interactivo ({resp.status_code}): {resp.text}. Reintentando con texto simple...")
+                    logger.warning("[WhatsApp] Meta rechazó mensaje interactivo (%s); reintentando como texto", resp.status_code)
                     # Reintento con texto plano si Meta rechaza el interactivo
                     return await self.send_text_message(to_phone, body_text)
         except Exception as exc:
-            logger.error(f"[WhatsApp] Error enviando interactivo a '{to_phone}': {exc}")
+            logger.error("[WhatsApp] Error enviando interactivo: %s", type(exc).__name__)
             return await self.send_text_message(to_phone, body_text)
 
     async def process_incoming_webhook_payload(self, payload: Dict[str, Any]) -> None:
@@ -301,7 +315,7 @@ class WhatsAppService:
 
                         # 1. Deduplicación estricta de mensajes de Meta
                         if self.is_message_duplicate(msg_id):
-                            logger.info(f"[WhatsApp] Mensaje duplicado '{msg_id}' ignorado.")
+                            logger.info("[WhatsApp] Mensaje duplicado ignorado")
                             continue
 
                         # 2. Marcar como leído en segundo plano
@@ -320,13 +334,13 @@ class WhatsAppService:
                             incoming_text = msg.get("button", {}).get("text", "").strip()
                         else:
                             # Otros tipos de mensaje (audio, imagen, sticker, ubicación)
-                            logger.info(f"[WhatsApp] Tipo de mensaje '{msg_type}' recibido de '{from_phone}'.")
+                            logger.info("[WhatsApp] Tipo de mensaje recibido: %s", msg_type)
                             incoming_text = "[Archivo/Adjunto enviado por el usuario]"
 
                         if not incoming_text:
                             continue
 
-                        logger.info(f"📱 [WhatsApp Inbound] De: {from_phone} | Mensaje: '{incoming_text}'")
+                        logger.info("[WhatsApp] Mensaje entrante recibido (%d caracteres)", len(incoming_text))
 
                         # 4. Identificador de sesión persistente vinculado al número de teléfono
                         session_id = f"wa_{from_phone}"
@@ -338,7 +352,7 @@ class WhatsAppService:
                                 "🔄 *Conversación nueva*\n\nListo, limpié el contexto anterior. "
                                 "Cuéntame qué necesitas resolver y empezamos desde cero."
                             )
-                            logger.info("[WhatsApp] Conversación reiniciada para '%s'.", from_phone)
+                            logger.info("[WhatsApp] Conversación reiniciada")
                             continue
 
                         # 5. Invocar el pipeline inteligente de UniMon

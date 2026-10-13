@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str = ""
     whatsapp_waba_id: str = ""
     whatsapp_access_token: str = ""
-    whatsapp_verify_token: str = "UniMon_USB_Verify_Token_2026"
+    whatsapp_verify_token: str = ""
     whatsapp_app_secret: str = ""
     whatsapp_api_version: str = "v20.0"
 

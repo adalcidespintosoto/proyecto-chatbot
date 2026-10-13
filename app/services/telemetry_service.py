@@ -118,7 +118,7 @@ def log_ticket_activity(
                 VALUES (?, ?, ?, ?)
             """, (session_id, email.strip().lower(), int(ticket_id), action.upper()))
             conn.commit()
-            logger.info("Actividad de ticket registrada: email=%s, ticket_id=%s, action=%s", email, ticket_id, action)
+            logger.info("Actividad de ticket registrada: ticket_id=%s, action=%s", ticket_id, action)
     except Exception as e:
         logger.error("Error al registrar actividad de ticket en telemetría: %s", e)
 
@@ -151,7 +151,7 @@ def get_tickets_today_for_email_db(email: str) -> List[Dict[str, Any]]:
             rows = cursor.fetchall()
             return [{"ticket_id": r["ticket_id"], "action": r["action"], "created_at": r["created_at"]} for r in rows]
     except Exception as e:
-        logger.error("Error al consultar tickets del día para %s: %s", email, e)
+        logger.error("Error al consultar tickets del día: %s", type(e).__name__)
         return []
 
 
@@ -834,7 +834,7 @@ def restore_dismissed_unresolved_query(
         conn.commit()
 
     if affected > 0:
-        logger.info("Consulta restaurada en Knowledge Gaps (query=%s, id=%s)", query, item_id)
+        logger.info("Consulta restaurada en Knowledge Gaps (id=%s)", item_id)
         return {"status": "success", "message": "Pregunta restaurada en el ranking exitosamente."}
     else:
         return {"status": "warning", "message": "No se encontró ningún registro para restaurar."}

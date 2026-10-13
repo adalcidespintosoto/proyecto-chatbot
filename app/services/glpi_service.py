@@ -102,8 +102,8 @@ class GLPIService:
             response = await client.get(url, headers=headers, timeout=self.timeout)
             
             if response.status_code != 200:
-                logger.error(f"Error al iniciar sesión en GLPI: {response.status_code} - {response.text}")
-                raise GLPIException(f"Fallo de autenticación en GLPI (Código {response.status_code}): {response.text}")
+                logger.error("Error al iniciar sesión en GLPI: HTTP %s", response.status_code)
+                raise GLPIException(f"Fallo de autenticación en GLPI (HTTP {response.status_code})")
 
             data = response.json()
             session_token = data.get("session_token")
@@ -134,7 +134,7 @@ class GLPIService:
                 logger.info("Sesión de GLPI cerrada exitosamente.")
                 return True
             else:
-                logger.warning(f"Respuesta inesperada al cerrar sesión en GLPI: {response.status_code} - {response.text}")
+                logger.warning("Respuesta inesperada al cerrar sesión en GLPI: HTTP %s", response.status_code)
                 return False
         except Exception as exc:
             logger.warning(f"Error al intentar cerrar la sesión en GLPI: {exc}")
@@ -175,13 +175,13 @@ class GLPIService:
         }
 
         try:
-            logger.info(f"Asociando actor solicitante ({email.strip()}) al ticket #{ticket_id}...")
+            logger.info("Asociando solicitante al ticket #%s", ticket_id)
             response = await client.post(url, json=actor_payload, headers=headers, timeout=self.timeout)
             if response.status_code in (200, 201):
-                logger.info(f"Actor solicitante ({email.strip()}) asociado exitosamente al ticket #{ticket_id}.")
+                logger.info("Solicitante asociado al ticket #%s", ticket_id)
                 return response.json()
             else:
-                logger.warning(f"Respuesta inesperada al asociar actor al ticket #{ticket_id}: {response.status_code} - {response.text}")
+                logger.warning("Respuesta inesperada al asociar actor al ticket #%s: HTTP %s", ticket_id, response.status_code)
                 return None
         except Exception as exc:
             logger.warning(f"Error al asociar actor solicitante al ticket #{ticket_id}: {exc}")
@@ -236,7 +236,7 @@ class GLPIService:
                 urls = [f"{self.base_url}/Assistance/Ticket", f"{self.base_url}/Ticket"]
                 headers = self._get_headers(session_token=session_token)
 
-                logger.info(f"Enviando solicitud de creación de ticket a GLPI: {name}")
+                logger.info("Enviando solicitud de creación de ticket a GLPI")
                 response = None
                 for url in urls:
                     try:
@@ -249,9 +249,8 @@ class GLPIService:
 
                 if response is None or response.status_code not in (200, 201):
                     err_code = response.status_code if response else "NO_RESP"
-                    err_text = response.text if response else "Sin respuesta"
-                    logger.error(f"Error al crear ticket en GLPI: {err_code} - {err_text}")
-                    raise GLPIException(f"Error al registrar el ticket en GLPI ({err_code}): {err_text}")
+                    logger.error("Error al crear ticket en GLPI: HTTP %s", err_code)
+                    raise GLPIException(f"Error al registrar el ticket en GLPI (HTTP {err_code})")
 
                 res_data = response.json()
                 ticket_id = res_data.get("id")
@@ -307,7 +306,7 @@ class GLPIService:
                             t_copy["status"] = int(st) if str(st).isdigit() else st
                             active_tickets.append(t_copy)
                         else:
-                            logger.info("Ticket #%s para %s excluido por estar en estado inactivo (status=%s)", tid, email, st)
+                            logger.info("Ticket #%s excluido por estado inactivo (status=%s)", tid, st)
                     else:
                         active_tickets.append(t)
                 except Exception as ex:
@@ -339,7 +338,7 @@ class GLPIService:
                                     })
                         return active_tickets
             except Exception as e:
-                logger.warning(f"Aviso al consultar tickets en GLPI API para {email}: {e}")
+                logger.warning("Aviso al consultar tickets en GLPI API: %s", type(e).__name__)
             finally:
                 if session_token:
                     await self.kill_session(client, session_token)

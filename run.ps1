@@ -2,8 +2,9 @@
 param(
     [switch]$Tunnel,
     [switch]$CaptureLogs,
+    [switch]$DevReload,
     [int]$Port = 8000,
-    [string]$HostIP = "0.0.0.0"
+    [string]$HostIP = "127.0.0.1"
 )
 
 <#
@@ -14,7 +15,7 @@ param(
     2. Comprueba y levanta el servicio local de Ollama e inspecciona el modelo institucional unimon:8b.
     3. Detecta la direccion IP local (LAN) y GPU activa (NVIDIA RTX 2000 Ada / CUDA).
     4. Opcionalmente inicia un tunel publico seguro con Cloudflare (cloudflared).
-    5. Ejecuta el servidor ASGI FastAPI con Uvicorn en 0.0.0.0:8000 con recarga en caliente.
+    5. Ejecuta Uvicorn en localhost:8000. La recarga en caliente requiere -DevReload.
     6. Maneja senales de interrupcion (Ctrl+C) limpiando subprocesos asociados.
 .PARAMETER Tunnel
     Activa un tunel Cloudflare para generar una URL publica temporal hacia el asistente.
@@ -23,7 +24,7 @@ param(
 .PARAMETER CaptureLogs
     Guarda una copia local de los logs de la aplicación en scratch/unimon-runtime.log.
 .PARAMETER HostIP
-    Direccion IP de escucha (por defecto 0.0.0.0).
+    Direccion IP de escucha (por defecto 127.0.0.1).
 .EXAMPLE
     .\run.ps1
 .EXAMPLE
@@ -192,7 +193,7 @@ try {
         $cloudflaredCmd = Get-Command "cloudflared" -ErrorAction SilentlyContinue
         if ($cloudflaredCmd) {
             Write-Host "      Iniciando Cloudflare Tunnel en segundo plano hacia http://localhost:$Port..." -ForegroundColor Yellow
-            $tunnelProcess = Start-Process -FilePath "cloudflared" -ArgumentList "tunnel --url http://localhost:$Port" -PassThru -WindowStyle Minimized
+            $tunnelProcess = Start-Process -FilePath "cloudflared" -ArgumentList "tunnel --url http://localhost:$Port" -PassThru -WindowStyle Hidden
             Write-Host "      [OK] Tunel iniciado exitosamente (PID: $($tunnelProcess.Id))." -ForegroundColor Green
         } else {
             Write-Host "      [AVISO] 'cloudflared' no esta instalado en el sistema." -ForegroundColor Yellow
@@ -224,7 +225,9 @@ try {
         $env:UNIMON_LOG_FILE = $logPath
         Write-Host " Captura local de logs:   $logPath" -ForegroundColor Yellow
     }
-    & $venvUvicorn app.main:app --host $HostIP --port $Port --reload
+    $serverArgs = @('app.main:app', '--host', $HostIP, '--port', "$Port")
+    if ($DevReload) { $serverArgs += '--reload' }
+    & $venvUvicorn @serverArgs
 
 } catch {
     Write-Host "`n[ERROR CRITICO] Ocurrio un fallo durante la ejecucion: $_" -ForegroundColor Red

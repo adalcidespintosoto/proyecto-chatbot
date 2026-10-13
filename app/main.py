@@ -4,6 +4,7 @@ Configura middlewares de CORS, eventos de ciclo de vida (lifespan), endpoints de
 """
 
 import asyncio
+import ipaddress
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -82,7 +83,7 @@ async def lifespan(app: FastAPI):
                 await asyncio.sleep(300)  # Cada 5 minutos
                 cleaned = RouterLogic.clean_inactive_sessions(ttl_minutes=20)
                 if cleaned > 0:
-                    logger.info(f"[TTL Background] {cleaned} sesiones inactivas reiniciadas a IDLE.")
+                    logger.info("[TTL Background] %s sesiones inactivas purgadas.", cleaned)
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -101,21 +102,32 @@ async def lifespan(app: FastAPI):
 
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from starlette.requests import Request
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# Limiter inicializado con límite global
-limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"])
+def rate_limit_ip(request: Request) -> str:
+    """Usa la IP de Cloudflare solo cuando el salto inmediato es el túnel local."""
+    peer = request.client.host if request.client else "unknown"
+    if peer in {"127.0.0.1", "::1"}:
+        forwarded = request.headers.get("cf-connecting-ip", "")
+        try:
+            return str(ipaddress.ip_address(forwarded))
+        except ValueError:
+            pass
+    return peer
+
+
+limiter = Limiter(key_func=rate_limit_ip, default_limits=["30/minute"])
 
 # Inicialización de la aplicación FastAPI
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Backend oficial del Asistente Virtual de Soporte Técnico para la Universidad Simón Bolívar (USB). Provee conexión con GLPI REST API y módulo RAG con proveedor LLM configurable.",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=None if settings.environment == "production" else "/docs",
+    redoc_url=None if settings.environment == "production" else "/redoc",
+    openapi_url=None if settings.environment == "production" else "/openapi.json",
     lifespan=lifespan
 )
 
@@ -127,9 +139,9 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "https://www.unisimon.edu.co"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 @app.middleware("http")
@@ -140,6 +152,11 @@ async def add_security_headers(request, call_next):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+    response.headers["Content-Security-Policy"] = "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+    if request.url.path.startswith(("/api/analytics", "/api/admin", "/api/chat", "/admin")):
+        response.headers["Cache-Control"] = "no-store"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
     return response
 
 # Inclusión de Routers
@@ -150,8 +167,14 @@ app.include_router(whatsapp.router)
 
 # Ruta estática para la interfaz gráfica del Chatbot
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+class PublicStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        if Path(path).name.lower() == "admin.html":
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        return await super().get_response(path, scope)
+
 if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", PublicStaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get(
@@ -186,19 +209,8 @@ async def health_check():
     """
     Endpoint de chequeo de salud y configuración activa.
     """
-    provider = settings.llm_provider.strip().lower()
-    provider_models = {
-        "openai": settings.openai_model,
-        "gemini": settings.gemini_model,
-        "ollama": settings.llm_model,
-    }
     return {
         "status": "healthy",
         "app": settings.app_name,
         "version": settings.app_version,
-        "environment": settings.environment,
-        "glpi_endpoint_configured": bool(settings.glpi_base_url and settings.glpi_app_token),
-        "llm_provider": provider,
-        "llm_model": provider_models.get(provider, "no configurado"),
-        "ollama_endpoint": settings.ollama_base_url,
     }

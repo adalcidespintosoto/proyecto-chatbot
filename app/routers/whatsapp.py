@@ -3,11 +3,16 @@ Router de Webhook y Diagnóstico para WhatsApp Cloud API (Meta) en UniMon.
 Procesa el handshake de validación de Meta (GET) y los eventos entrantes de mensajería (POST).
 """
 
+import hashlib
+import hmac
+import json
 import logging
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Query, Response, status, BackgroundTasks, Request
+import re
+from typing import Optional
+from fastapi import APIRouter, Query, Response, status, BackgroundTasks, Request, Header, HTTPException, Depends
 
 from app.config import get_settings
+from app.security import require_admin_auth
 from app.services.whatsapp_service import whatsapp_service
 
 logger = logging.getLogger("unimon.whatsapp_router")
@@ -50,10 +55,6 @@ async def verify_webhook(
     )
 
 
-import hmac
-import hashlib
-from fastapi import Header, HTTPException
-
 @router.post(
     "",
     status_code=status.HTTP_200_OK,
@@ -61,7 +62,6 @@ from fastapi import Header, HTTPException
     description="Endpoint donde Meta envía en tiempo real los mensajes que escriben los estudiantes, profesores y funcionarios."
 )
 async def receive_webhook(
-    payload: Dict[str, Any],
     background_tasks: BackgroundTasks,
     request: Request,
     x_hub_signature_256: Optional[str] = Header(None)
@@ -73,19 +73,32 @@ async def receive_webhook(
     """
     settings = get_settings()
 
-    # Validación de Firma de Meta (Seguridad)
-    if settings.whatsapp_app_secret and x_hub_signature_256:
-        raw_body = await request.body()
-        expected_signature = hmac.new(
-            settings.whatsapp_app_secret.encode('utf-8'),
-            raw_body,
-            hashlib.sha256
-        ).hexdigest()
-        
-        # El header viene en formato sha256=hash
-        if not hmac.compare_digest(f"sha256={expected_signature}", x_hub_signature_256):
-            logger.warning("Firma de Meta inválida. Se rechaza el payload por posible spoofing.")
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
+    if not whatsapp_service.is_configured():
+        logger.error("Webhook de WhatsApp deshabilitado: configuración incompleta")
+        raise HTTPException(status_code=503, detail="Webhook no configurado")
+
+    if not x_hub_signature_256 or not re.fullmatch(r"sha256=[0-9a-f]{64}", x_hub_signature_256):
+        raise HTTPException(status_code=403, detail="Firma inválida")
+
+    # Verificar la firma del cuerpo original antes de interpretar el JSON.
+    body = bytearray()
+    async for part in request.stream():
+        body.extend(part)
+        if len(body) > 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Evento demasiado grande")
+    expected_signature = "sha256=" + hmac.new(
+        settings.whatsapp_app_secret.encode("utf-8"), body, hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, x_hub_signature_256):
+        logger.warning("Firma de Meta inválida")
+        raise HTTPException(status_code=403, detail="Firma inválida")
+
+    try:
+        payload = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="JSON inválido") from None
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Evento inválido")
 
     # Despachar procesamiento en segundo plano para respuesta ultra rápida a Meta
     background_tasks.add_task(whatsapp_service.process_incoming_webhook_payload, payload)
@@ -96,6 +109,7 @@ async def receive_webhook(
 
 @router.get(
     "/status",
+    dependencies=[Depends(require_admin_auth)],
     summary="Estado de la Integración con WhatsApp",
     description="Permite verificar si las credenciales y el webhook están listos para operar."
 )
@@ -113,11 +127,7 @@ async def whatsapp_status():
         else "No configurado"
     )
 
-    token_preview = (
-        f"Presente (Longitud: {len(settings.whatsapp_access_token)} caracteres)"
-        if settings.whatsapp_access_token
-        else "No configurado (Pegar en .env)"
-    )
+    token_preview = "Configurado" if settings.whatsapp_access_token else "No configurado"
 
     return {
         "whatsapp_channel_enabled": settings.whatsapp_enabled,
@@ -125,11 +135,12 @@ async def whatsapp_status():
         "phone_number_id": phone_id_preview,
         "waba_id_configured": bool(settings.whatsapp_waba_id),
         "access_token_status": token_preview,
-        "verify_token_configured": bool(settings.whatsapp_verify_token),
+        "verify_token_configured": bool(settings.whatsapp_verify_token and settings.whatsapp_verify_token != "UniMon_USB_Verify_Token_2026"),
+        "app_secret_configured": bool(settings.whatsapp_app_secret),
         "api_version": settings.whatsapp_api_version,
         "instructions": (
             "✅ Listo para operar."
             if configured
-            else "⏳ Pendiente: Pega en tu archivo .env las variables WHATSAPP_PHONE_NUMBER_ID y WHATSAPP_ACCESS_TOKEN cuando te las entregue la dependencia."
+            else "Pendiente: configura las credenciales de WhatsApp, el token de verificación y WHATSAPP_APP_SECRET en .env."
         )
     }

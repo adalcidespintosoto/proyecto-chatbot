@@ -705,10 +705,15 @@
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
 
+    function generateSessionId() {
+      const bytes = crypto.getRandomValues(new Uint8Array(24));
+      return 'sess_' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     // Generar o recuperar ID de sesión único por pestaña
     let sessionId = sessionStorage.getItem('unimon_session_id');
     if (!sessionId) {
-      sessionId = 'sess_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+      sessionId = generateSessionId();
       sessionStorage.setItem('unimon_session_id', sessionId);
     }
 
@@ -755,6 +760,12 @@
       }, 300);
     });
 
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      })[char]);
+    }
+
     function formatMarkdown(text) {
       if (!text) return "";
       let formatted = String(text)
@@ -774,7 +785,7 @@
     }
 
     function resetChat() {
-      sessionId = 'sess_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+      sessionId = generateSessionId();
       sessionStorage.setItem('unimon_session_id', sessionId);
 
       chatMessages.innerHTML = `
@@ -828,7 +839,9 @@
       const textContainer = document.createElement('div');
       textContainer.className = 'msg-text';
       if (sender === 'user') {
-        textContainer.innerHTML = `<p>${String(rawText || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
+        const paragraph = document.createElement('p');
+        paragraph.textContent = String(rawText || '');
+        textContainer.appendChild(paragraph);
       } else {
         textContainer.innerHTML = formatMarkdown(rawText);
       }
@@ -841,10 +854,10 @@
         ticketCard.innerHTML = `
           <div class="ticket-header">
             <span>🎫 Solicitud de Soporte Radicada</span>
-            <span class="ticket-id">#${ticketDetails.ticket_id}</span>
+          <span class="ticket-id">#${escapeHtml(ticketDetails.ticket_id)}</span>
           </div>
-          <div><strong>Categoría:</strong> ${ticketDetails.category}</div>
-          <div><strong>Urgencia:</strong> ${ticketDetails.urgency}/5 | <strong>Impacto:</strong> ${ticketDetails.impact}/5</div>
+          <div><strong>Categoría:</strong> ${escapeHtml(ticketDetails.category)}</div>
+          <div><strong>Urgencia:</strong> ${escapeHtml(ticketDetails.urgency)}/5 | <strong>Impacto:</strong> ${escapeHtml(ticketDetails.impact)}/5</div>
           <div style="font-size:0.75rem; color:#a7f3d0;">Estado: Radicado exitosamente en Mesa de Ayuda TI</div>
         `;
         bubble.appendChild(ticketCard);
@@ -872,7 +885,7 @@
       if (meta) {
         const metaTag = document.createElement('div');
         metaTag.className = 'meta-tag';
-        metaTag.innerHTML = meta;
+        metaTag.textContent = meta;
         bubble.appendChild(metaTag);
       }
 

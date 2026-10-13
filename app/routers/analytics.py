@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, status, Response, Query, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.security import require_admin_auth
+from app.security import require_admin_auth, require_admin_origin
 from app.services.telemetry_service import (
     get_kpis_summary, 
     reset_telemetry_db,
@@ -30,6 +30,7 @@ logger = logging.getLogger("unimon.analytics_router")
 
 router = APIRouter(
     prefix="/api/analytics",
+    dependencies=[Depends(require_admin_auth), Depends(require_admin_origin)],
     tags=["Analítica & KPIs UniMon"]
 )
 
