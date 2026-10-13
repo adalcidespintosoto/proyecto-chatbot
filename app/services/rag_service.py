@@ -246,8 +246,8 @@ def is_account_identifier_query(question: str) -> bool:
     if is_suspicious_email_query(q):
         return False
     asks_for_identity = any(term in q for term in (
-        "usuario", "correo", "email", "e-mail", "credencial", "cuenta institucional",
-        "correo institucional", "red institucional", "datos de acceso", "dato de acceso",
+        "usuario", "correo", "email", "e-mail", "cuenta institucional",
+        "correo institucional", "red institucional",
     ))
     asks_for_account_access = any(term in q for term in (
         "entrar", "ingresar", "acceder", "iniciar sesión", "iniciar sesion",
@@ -285,8 +285,8 @@ def _is_forgotten_email_query(question: str) -> bool:
     return _is_forgotten_identity_query(question) and has_email and not asks_password
 
 
-def _is_ambiguous_student_password_query(question: str, user_role: Optional[str]) -> bool:
-    """Activa el flujo de contraseñas solo ante señales de clave/acceso, no por olvidar un usuario."""
+def _is_ambiguous_student_password_query(question: str, user_role: Optional[str] = None) -> bool:
+    """Detecta recuperación de clave usando la consulta, nunca el rol de sesión."""
     q = _fold_accents(strip_query_header_noise(question or ""))
     if _is_forgotten_email_query(question):
         return False
@@ -299,8 +299,14 @@ def _is_ambiguous_student_password_query(question: str, user_role: Optional[str]
         "clave mala", "clave incorrecta", "datos incorrectos",
     ))
     is_password_query = has_password_topic or (has_password_action and not _is_forgotten_identity_query(question)) or login_failure
-    role = (user_role or "").casefold()
-    is_student_user = not role or any(term in role for term in ("estudiante", "alumno", "general"))
+    explicitly_other_audience = bool(re.search(
+        r"\b(?:docentes?|profesor(?:es|a|as)?|funcionarios?|administrativ[oa]s?|colaborador(?:es|a|as)?)\b",
+        q,
+    ))
+    # El perfil de sesión no restringe el corpus ni decide qué flujo consultar.
+    # Solo una audiencia mencionada en esta pregunta evita asumir el flujo
+    # estudiantil para una consulta de contraseña ambigua.
+    is_student_context = not explicitly_other_audience
     is_upper_sem = bool(re.search(
         r"\b(estudiante\s+antiguo|estudiante\s+viejo|estudiante\s+regular|semestres?\s+(?:avanzados?|superiores?)|"
         r"(?:[2-9]|10)\s*(?:do|er|ro|to|mo|vo|no|°)?\s*semestre|"
@@ -314,7 +320,8 @@ def _is_ambiguous_student_password_query(question: str, user_role: Optional[str]
         r"soy\s+nuevo|recien\s+ingresado|primiparo)\b",
         q,
     ))
-    return is_password_query and is_student_user and not is_upper_sem and not is_first_sem
+    del user_role  # Conservado en la firma para compatibilidad con callers existentes.
+    return is_password_query and is_student_context and not is_upper_sem and not is_first_sem
 
 
 def _is_forgotten_email_evidence(doc: Document) -> bool:
@@ -468,13 +475,20 @@ def rerank_chunks(
             r"\b(primer\s+semestre|1er\s+semestre|1\s*°?\s*semestre|nuevo\s+ingreso|estudiante\s+nuevo|soy\s+nuevo|reci[eé]n\s+ingresado|primipar[oa])\b",
             q_lower
         ))
-        is_hardware_dotation_query = any(w in q_lower for w in [
+        def mentions_hardware_term(term: str) -> bool:
+            # Acronyms such as "PC" must match as complete tokens: substring
+            # checks made "opción" trigger the hardware/financial exclusion.
+            if term == "pc":
+                return bool(re.search(r"\bpc\b", q_lower))
+            return term in q_lower
+
+        is_hardware_dotation_query = any(mentions_hardware_term(w) for w in [
             "portatil", "portátil", "laptop", "computador", "pc", "equipo de computo",
             "dotacion", "dotación", "solicitar un portatil", "solicitar un computador", "pedir computador",
             "prestar", "préstamo", "prestamo", "reemplazo", "mientras arreglan", "otro equipo", "asignación de equipo",
             "teclado", "mouse", "mause", "raton", "ratón", "periferico", "periférico", "perifericos", "periféricos"
         ])
-        is_peripheral_or_hardware_query = any(w in q_lower for w in [
+        is_peripheral_or_hardware_query = any(mentions_hardware_term(w) for w in [
             "teclado", "teclados", "mouse", "mause", "raton", "ratón", "ratones", "pad",
             "periferico", "periférico", "perifericos", "periféricos", "pantalla", "monitor",
             "display", "cable", "cables", "hdmi", "vga", "adaptador", "videobeam", "video beam",
@@ -881,8 +895,7 @@ async def async_generate_multi_query_variants(
     try:
         llm_client = get_llm_client()
         raw_text = await llm_client.generate_async(
-            # El rol queda para adaptar la respuesta, pero no segmenta ni sesga
-            # las consultas de búsqueda documental.
+            # Las variantes se determinan solo por la pregunta, nunca por el rol de sesión.
             prompt=f"Consulta informal: {cleaned_query}\nVariantes de búsqueda:",
             system_prompt=system_prompt,
             max_tokens=150,
@@ -991,7 +1004,7 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
     try:
         llm_client = get_llm_client()
         expanded = llm_client.generate_sync(
-            prompt=f"Rol: {user_role}\nConsulta informal: {cleaned_query}\nConsulta técnica formal:",
+            prompt=f"Consulta informal: {cleaned_query}\nConsulta técnica formal:",
             system_prompt=system_prompt,
             max_tokens=80,
             timeout=5.0
@@ -1060,6 +1073,17 @@ DIRECTIVAS DE ADAPTACIÓN DE RESPUESTA
 - FALLAS TÉCNICAS: empieza por comprobaciones sencillas y seguras; indica qué resultado observar y qué hacer si persiste.
 - Usa lenguaje natural, concreto y alentador. Evita títulos de reglas internas, hablar del prompt, disculpas repetidas o decirle a la persona que lea un manual.
 - No repitas la consulta ni agregues una pregunta de cierre sobre si funcionó: la aplicación añade una sola pregunta de seguimiento al final.
+
+7. ALCANCE EXACTO DE LA RESPUESTA
+- Empieza resolviendo la pregunta concreta. Si pide un botón, campo, credencial, ruta, estado o siguiente paso, responde ese punto directamente y añade solo el contexto mínimo para usarlo.
+- Si pregunta cómo llegar desde un portal o sistema hasta una opción, conserva toda la ruta documentada desde el punto de entrada hasta el destino, incluidos módulos y pantallas intermedias; no saltes directamente al último botón o reporte.
+- Si pide un procedimiento, enumera cada paso pertinente en su orden. Si pregunta qué opciones, datos, campos, filtros, credenciales o requisitos debe usar, incluye todos los elementos pertinentes del procedimiento exacto y sus valores por defecto; no reduzcas una lista a una descripción general.
+- Comprueba que coincidan la acción y el objeto exactos: por ejemplo, autorización frente a solicitud, módulo frente a reporte y edición de una oferta frente a configuración de otro aplicativo. No respondas un trámite parecido solo porque comparte palabras.
+- Si la consulta no identifica cuál de varios sistemas o trámites se refiere y el contexto documenta más de uno, presenta las alternativas por separado con su sistema y pregunta cuál usa la persona; no elijas uno en silencio ni combines sus pasos.
+- Si un fragmento del procedimiento exacto no documenta el siguiente paso, dilo claramente. No completes ese vacío con un botón habitual —como «Guardar»— tomado de otro sistema o trámite.
+- No agregues permisos, requisitos, advertencias, contactos, URLs alternativas ni recomendaciones condicionales salvo que la pregunta los pida o una instrucción institucional configurada los requiera explícitamente.
+- Conserva el alcance y la certeza del texto fuente: no conviertas «aparece un mensaje de confirmación» en una garantía de éxito ni una posibilidad en una regla.
+- Antes de responder, descarta mentalmente los fragmentos que solo comparten palabras con la pregunta. Cada detalle concreto de la respuesta debe vincularse con el procedimiento exacto o una política configurada aplicable.
 
 [CONTEXTO INSTITUCIONAL RECUPERADO]
 {context}"""
@@ -1542,6 +1566,8 @@ def _select_context_chunks(
     *,
     question: str = "",
     query_variants: Optional[list[str]] = None,
+    max_per_source: Optional[int] = 4,
+    max_per_preferred_source: Optional[int] = None,
 ) -> list[tuple[Document, str]]:
     """Retiene los mejores fragmentos con contenido útil, sin cortar por documento.
 
@@ -1553,7 +1579,8 @@ def _select_context_chunks(
         return []
 
     selected: list[tuple[Document, str]] = []
-    seen_contents: set[str] = set()
+    selected_source_counts: Counter[str] = Counter()
+    seen_contents: set[tuple[str, str]] = set()
     generic_title_terms = {
         "universidad", "unisimon", "estudiante", "estudiantes", "alumno", "alumnos",
         "docente", "docentes", "profesor", "profesores", "funcionario", "funcionarios",
@@ -1561,9 +1588,14 @@ def _select_context_chunks(
         "portal", "sistema", "documento", "documentos", "manual", "consulta", "consultar",
         "registro", "registrar", "historial", "programa", "programas", "tramite", "solicitud",
         "instructivo", "procedimiento", "guia", "informe", "reporte", "modulo",
+        "ingreso", "acceso", "generar", "generacion",
         "institucional", "institucionales", "academico", "academica", "gestion",
     }
-    query_terms = set(_lexical_terms(" ".join([question, *(query_variants or [])]))) - generic_title_terms
+    # Los MultiQuery variants ayudan al vector search, pero sus sinónimos pueden
+    # priorizar títulos de documentos que el usuario nunca mencionó. La reserva
+    # de fuente por título usa solo la consulta original; los vecinos semánticos
+    # siguen compitiendo normalmente por reranker y presupuesto.
+    query_terms = set(_lexical_terms(question)) - generic_title_terms
     actor_terms = {
         "estudiante", "estudiantes", "alumno", "alumnos", "docente", "docentes",
         "profesor", "profesores", "funcionario", "funcionarios", "administrativo",
@@ -1578,7 +1610,7 @@ def _select_context_chunks(
             return term[:-1]
         return term
 
-    ranked_title_sources: dict[str, tuple[float, int, Document, float]] = {}
+    ranked_preferred_sources: dict[str, tuple[float, int, Document, float]] = {}
     for position, (doc, score) in enumerate(reranked):
         source = str((doc.metadata or {}).get("source") or "")
         source_key = Path(source).name.casefold()
@@ -1603,31 +1635,88 @@ def _select_context_chunks(
             )
         }
         title_score = sum(min(len(term), 12) / 8 for term in matched) + 0.45 * len(actor_match)
-        previous = ranked_title_sources.get(source_key)
+        previous = ranked_preferred_sources.get(source_key)
         if previous is None or title_score > previous[0] or (title_score == previous[0] and position < previous[1]):
-            ranked_title_sources[source_key] = (title_score, position, doc, score)
+            ranked_preferred_sources[source_key] = (title_score, position, doc, score)
 
-    # Reserva espacio para documentos cuyo título nombra la intención exacta.
+    # El título del manual puede ser institucional/genérico y no contener el
+    # nombre coloquial del flujo. También damos preferencia a una fuente cuyo
+    # contenido sí coincide con varios términos informativos de la pregunta.
+    for position, (doc, score) in enumerate(reranked):
+        source_key = Path(str((doc.metadata or {}).get("source") or "")).name.casefold()
+        content_terms = set(_lexical_terms(strip_chunk_boilerplate(doc.page_content)))
+        matched = query_terms & content_terms
+        has_specific_match = any(len(term) >= 7 for term in matched)
+        if len(matched) < 2 and not has_specific_match:
+            continue
+        content_score = sum(min(len(term), 12) / 8 for term in matched)
+        previous = ranked_preferred_sources.get(source_key)
+        if previous is None or content_score > previous[0] or (
+            content_score == previous[0] and position < previous[1]
+        ):
+            ranked_preferred_sources[source_key] = (content_score, position, doc, score)
+
+    preferred_sources = {
+        source_key
+        for source_key, _details in sorted(
+            ranked_preferred_sources.items(), key=lambda item: (-item[1][0], item[1][1])
+        )[:min(3, max_chunks)]
+    }
+
+    preferred_source_limit = max_per_preferred_source
+    if preferred_source_limit is None:
+        preferred_source_limit = (
+            max_per_source * 2
+            if max_per_source is not None and _is_step_by_step_query(question)
+            else max_per_source
+        )
+
+    def source_limit(source_key: str) -> Optional[int]:
+        if source_key in preferred_sources:
+            return preferred_source_limit
+        return max_per_source
+
+    def content_key(source_key: str, content: str) -> tuple[str, str]:
+        return source_key, re.sub(r"\s+", " ", content).casefold()
+
+    def mark_selected_anchor(doc: Document, source_key: str) -> Document:
+        metadata = dict(doc.metadata or {})
+        metadata["_rag_anchor"] = True
+        if source_key in preferred_sources:
+            metadata["_rag_preferred_source"] = True
+        return Document(page_content=doc.page_content, metadata=metadata)
+
+    # Reserva espacio para documentos cuyo título o contenido nombra la intención exacta.
     # Esto evita que un resultado genérico del top-4 expulse el instructivo
     # pertinente, incluso cuando el cross-encoder lo dejó más abajo.
-    for _source, (_title_score, _position, doc, _score) in sorted(
-        ranked_title_sources.items(), key=lambda item: (-item[1][0], item[1][1])
+    for _source, (_source_score, _position, doc, _score) in sorted(
+        ranked_preferred_sources.items(), key=lambda item: (-item[1][0], item[1][1])
     )[:min(3, max_chunks)]:
+        source_key = Path(str((doc.metadata or {}).get("source") or "")).name.casefold()
+        limit = source_limit(source_key)
+        if limit is not None and selected_source_counts[source_key] >= limit:
+            continue
         cleaned = strip_chunk_boilerplate(doc.page_content)
-        content_key = re.sub(r"\s+", " ", cleaned).casefold()
-        if cleaned and content_key not in seen_contents:
-            selected.append((doc, cleaned))
-            seen_contents.add(content_key)
+        dedupe_key = content_key(source_key, cleaned)
+        if cleaned and dedupe_key not in seen_contents:
+            selected.append((mark_selected_anchor(doc, source_key), cleaned))
+            seen_contents.add(dedupe_key)
+            selected_source_counts[source_key] += 1
             if len(selected) >= max_chunks:
                 return selected
 
     for doc, _score in reranked:
-        cleaned = strip_chunk_boilerplate(doc.page_content)
-        content_key = re.sub(r"\s+", " ", cleaned).casefold()
-        if not content_key or content_key in seen_contents:
+        source_key = Path(str((doc.metadata or {}).get("source") or "")).name.casefold()
+        limit = source_limit(source_key)
+        if limit is not None and selected_source_counts[source_key] >= limit:
             continue
-        seen_contents.add(content_key)
-        selected.append((doc, cleaned))
+        cleaned = strip_chunk_boilerplate(doc.page_content)
+        dedupe_key = content_key(source_key, cleaned)
+        if not cleaned or dedupe_key in seen_contents:
+            continue
+        seen_contents.add(dedupe_key)
+        selected.append((mark_selected_anchor(doc, source_key), cleaned))
+        selected_source_counts[source_key] += 1
         if len(selected) >= max_chunks:
             break
     return selected
@@ -1708,6 +1797,7 @@ def _is_step_by_step_query(question: str) -> bool:
     action = (
         r"hacer|realizar|completar|oficializ\w*|gener\w*|obten\w*|consult\w*|sacar|descarg\w*|"
         r"llevar\s+a\s+cabo|ingres\w*|entr\w*|activ\w*|restablec\w*|recuper\w*|"
+        r"modific\w*|export\w*|lleg\w*|inclu\w*|hag\w*|"
         r"registr\w*|solicit\w*|pedir|pido|radic\w*|inscrib\w*|matricul\w*|"
         r"configur\w*|acced\w*|vot\w*|guard\w*|finaliz\w*|unir\w*|pag\w*|"
         r"inici\w*|conect\w*|cre\w*|agreg\w*|quit\w*|diligenci\w*|autoriz\w*|"
@@ -1737,10 +1827,16 @@ def _is_step_by_step_query(question: str) -> bool:
     asks_where_to_act = bool(re.search(rf"\b(?:donde|por\s+donde)\b.{{0,50}}\b(?:{multi_step_actions})\b", q))
     asks_what_is_next = bool(re.search(r"\bque\s+me\s+falta\b.{0,80}\b(?:tramite|matricula|registro|oficializ|completar|hacer)\w*\b", q))
     asks_module_capabilities = bool(re.search(
-        r"\b(?:que|cuales)\s+opciones\b.{0,80}\b(?:modulo|sistema|plataforma)\b|"
+        r"\b(?:que|cuales)\s+opciones\b.{0,80}\b(?:modulo|sistema|plataforma|reunion|reuni[oó]n)\b|"
         r"\bopciones\s+(?:del|en\s+el)\s+modulo\b", q
     ))
-    return explicit_sequence or how_to_action or intent_action or asks_operational_choice or asks_where_to_act or asks_what_is_next or asks_module_capabilities
+    asks_for_a_complete_set = bool(re.search(
+        r"\b(?:que|cuales)\s+(?:datos|campos|filtros|credenciales|requisitos|informacion|informaci[oó]n|"
+        r"opciones|pasos|periodo|per[ií]odo)\b|"
+        r"\b(?:todos|todas|cada\s+uno|cada\s+una)\b.{0,50}\b(?:dato|campo|filtro|opcion|paso|requisito)",
+        q,
+    ))
+    return explicit_sequence or how_to_action or intent_action or asks_operational_choice or asks_where_to_act or asks_what_is_next or asks_module_capabilities or asks_for_a_complete_set
 
 
 def _is_new_pregrado_report_query(question: str) -> bool:
@@ -1757,7 +1853,7 @@ def _select_new_pregrado_report_anchors(
     candidates: list[tuple[Document, float]],
 ) -> list[tuple[Document, str]]:
     """Prioriza las diapositivas del informe pedido y su entrada al módulo."""
-    anchors: list[tuple[Document, float]] = []
+    anchors: list[tuple[Document, str]] = []
     for doc, score in candidates:
         metadata = doc.metadata or {}
         source = Path(str(metadata.get("source") or "")).name.casefold()
@@ -1765,7 +1861,9 @@ def _select_new_pregrado_report_anchors(
         if "1. estudiantes nuevos pregrado" not in source:
             continue
         if "seleccionar el informe" in text or "ingrese desde su navegador" in text or "opcion portales" in text:
-            anchors.append((doc, score))
+            # _expand_chunks_with_neighbors recibe (documento, texto), no el
+            # score del reranker. Pasar el float hacía fallar clean_chunk().
+            anchors.append((doc, str(doc.page_content or "")))
     # La expansión contigua de cada ancla aporta la diapositiva de filtros y
     # genera PDF junto a la selección del informe, en orden verificable.
     return anchors[:2]
@@ -1807,10 +1905,17 @@ def _fit_context_budget(
     fitted = []
     used = 0
     indexed_chunks = list(enumerate(chunks))
-    ordered_candidates = (
-        [item for item in indexed_chunks if (item[1][0].metadata or {}).get("_rag_anchor")]
-        + [item for item in indexed_chunks if not (item[1][0].metadata or {}).get("_rag_anchor")]
-    )
+    def priority(item: tuple[int, tuple[Document, str]]) -> int:
+        metadata = item[1][0].metadata or {}
+        if metadata.get("_rag_preferred_source") and metadata.get("_rag_anchor"):
+            return 0
+        if metadata.get("_rag_preferred_source"):
+            return 1
+        if metadata.get("_rag_anchor"):
+            return 2
+        return 3
+
+    ordered_candidates = sorted(indexed_chunks, key=lambda item: (priority(item), item[0]))
     chosen_indices = set()
     for original_index, (doc, text) in ordered_candidates:
         if max_chunks is not None and len(fitted) >= max_chunks:
@@ -1881,7 +1986,7 @@ def _select_election_context_chunks(
     user_role: Optional[str],
     max_chunks: int = 3,
 ) -> list[tuple[Document, str]]:
-    """Selecciona evidencia electoral rerankeada y compatible con el electorado."""
+    """Selecciona evidencia electoral; filtra electorado solo si se explicita."""
     q = (question or "").casefold()
     voter_flow_query = _is_election_voting_query(question)
     if re.search(r"\b(?:egresad[oa]s?)\b", q):
@@ -1893,15 +1998,10 @@ def _select_election_context_chunks(
     elif re.search(r"\b(?:docentes?|profesor[oa]s?)\b", q):
         constituency = "docentes"
     else:
-        role = (user_role or "").casefold()
-        if any(term in role for term in ("estudiante", "alumno")):
-            constituency = "estudiantes"
-        elif any(term in role for term in ("profesor", "docente")):
-            constituency = "docentes"
-        elif any(term in role for term in ("administrativo", "funcionario", "colaborador")):
-            constituency = "funcionarios"
-        else:
-            constituency = None
+        # El rol de sesión no es una restricción de búsqueda. Si la pregunta no
+        # identifica electorado, conserva los módulos y deja que el flujo pida
+        # aclaración cuando la evidencia no determine cuál aplica.
+        constituency = None
 
     election_candidates = [
         (doc, score)
@@ -1975,7 +2075,7 @@ def _expand_chunks_with_neighbors(
         return strip_chunk_boilerplate(text)
 
     expanded: list[tuple[Document, str]] = []
-    seen_contents: set[str] = set()
+    seen_contents: set[tuple[str, str]] = set()
     source_order: dict[str, int] = {}
     page_cache: dict[tuple[str, str, int], list[tuple[int, int, str, dict]]] = {}
     anchor_keys = {
@@ -1984,6 +2084,11 @@ def _expand_chunks_with_neighbors(
             re.sub(r"\s+", " ", clean_chunk(text)).casefold(),
         )
         for doc, text in anchor_chunks
+    }
+    preferred_sources = {
+        str((doc.metadata or {}).get("source") or "")
+        for doc, _text in anchor_chunks
+        if (doc.metadata or {}).get("_rag_preferred_source")
     }
 
     def load_page(source: str, page_field: str, page_value: int) -> list[tuple[int, int, str, dict]]:
@@ -2010,11 +2115,13 @@ def _expand_chunks_with_neighbors(
 
     def append_once(doc: Document, text: str) -> None:
         cleaned = clean_chunk(text)
-        key = re.sub(r"\s+", " ", cleaned).casefold()
+        source = str((doc.metadata or {}).get("source") or "")
+        key = (source, re.sub(r"\s+", " ", cleaned).casefold())
         if cleaned and key not in seen_contents:
             seen_contents.add(key)
             metadata = dict(doc.metadata or {})
-            source = str(metadata.get("source") or "")
+            if source in preferred_sources:
+                metadata["_rag_preferred_source"] = True
             if (source, key) in anchor_keys:
                 metadata["_rag_anchor"] = True
                 sequence = metadata.get("page_number", metadata.get("slide_number", metadata.get("page")))
@@ -2051,11 +2158,13 @@ def _expand_chunks_with_neighbors(
             append_once(anchor_doc, anchor_text)
             continue
 
-        start = max(0, anchor_position - neighbors_each_side)
-        end = min(len(page_rows), anchor_position + neighbors_each_side + 1)
-        for _page_number, _chunk_index, text, chunk_metadata in page_rows[start:end]:
+        first_page = max(1, page_value - neighbors_each_side)
+        last_page = page_value + neighbors_each_side
+        for row_page, _chunk_index, text, chunk_metadata in page_rows:
+            if not first_page <= row_page <= last_page:
+                continue
             ordered_metadata = dict(chunk_metadata)
-            ordered_metadata["_rag_sequence"] = (_page_number, _chunk_index)
+            ordered_metadata["_rag_sequence"] = (row_page, _chunk_index)
             neighbor_doc = Document(page_content=text, metadata=ordered_metadata)
             append_once(neighbor_doc, text)
 
@@ -2260,57 +2369,14 @@ class RAGService:
 
     def _build_query_filter(self, question: str, user_role: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Construye filtros semánticos y de taxonomía en ChromaDB para evitar colisiones entre dominios:
-        - Consultas académicas/docentes: excluye categoría 'financiero' (evita colisiones con Notas Crédito o Pagos).
-        - Consultas financieras: restringe a 'financiero', 'portales', 'academico', 'general'.
-        - Consultas de hardware/redes: excluye manuales financieros y académicos irrelevantes.
-        El rol no excluye documentos: manuales institucionales pueden complementar
-        respuestas entre audiencias y las etiquetas del índice no son exhaustivas.
+        No restringe documentos por rol, audiencia ni categoría.
+
+        Los pasos de un procedimiento pueden estar repartidos entre documentos
+        de categorías distintas; las etiquetas de ingesta tampoco son exhaustivas.
+        La relevancia se decide en recuperación/reranking y no con exclusiones
+        duras que puedan ocultar evidencia complementaria.
         """
-        q_low = question.lower()
-        if is_suspicious_email_query(question):
-            logger.info("[ChromaFilter] Reporte de correo sospechoso: excluyendo contenido financiero.")
-            return {"category": {"$ne": "financiero"}}
-        if is_account_identifier_query(question):
-            category_filter = {"category": {"$ne": "financiero"}}
-            logger.info("[ChromaFilter] Consulta de cuenta institucional: excluyendo categoría financiero.")
-            return category_filter
-
-        category_filter = None
-
-        # 1. Detección de ámbito académico / docente (notas, calificaciones, parciales, inasistencias, programas)
-        is_academic = any(w in q_low for w in [
-            "nota", "notas", "calificaci", "parcial", "parciales", "asignatura", "asignaturas",
-            "materia", "materias", "horario", "horarios", "docente", "profesor", "profesores",
-            "estudiante", "estudiantes", "alumno", "alumnos", "montar notas", "subir notas",
-            "supletorio", "inasistencia", "inasistencias", "promedio", "boletin"
-        ]) and not any(fin in q_low for fin in ["factura", "facturas", "volante", "liquidaci", "arancel", "cartera", "tesorer", "pago"])
-
-        if is_academic:
-            logger.info("[ChromaFilter] Consulta académica/docente detectada: Excluyendo categoría 'financiero' a nivel de base de datos.")
-            category_filter = {"category": {"$ne": "financiero"}}
-        else:
-            # 2. Detección de ámbito estrictamente financiero / pagos / facturas
-            is_financial = any(w in q_low for w in [
-                "pago", "pagos", "pagar", "factura", "facturas", "volante", "recibo",
-                "liquidaci", "arancel", "tarifa", "cartera", "tesorer", "paymentez", "link de pago"
-            ])
-            if is_financial:
-                logger.info("[ChromaFilter] Consulta financiera detectada: Restringiendo a categorías pertinentes.")
-                category_filter = {"category": {"$in": ["financiero", "cuentas_accesos", "portales", "academico", "general"]}}
-            else:
-                # 3. Detección de ámbito de hardware y conectividad
-                is_hardware = any(re.search(rf"\b{re.escape(w)}\b", q_low) for w in [
-                    "wifi", "internet", "red", "cable", "hdmi", "vga", "teclado", "mouse", "pantalla",
-                    "monitor", "proyector", "videobeam", "computador", "portatil", "portátil"
-                ]) and not any(app in q_low for app in ["teams", "moodle", "kactus", "seven", "correo"])
-                if is_hardware:
-                    logger.info("[ChromaFilter] Consulta de hardware/redes: Excluyendo financiero y académico.")
-                    category_filter = {"category": {"$nin": ["financiero", "academico"]}}
-
-        if category_filter:
-            return category_filter
-            
+        del question, user_role
         return None
 
     # Alias para compatibilidad con código existente
@@ -2330,7 +2396,7 @@ class RAGService:
         Ejecuta el pipeline RAG completo:
         1. Expande la consulta y conserva la pregunta original entre sus variantes.
         2. Busca candidatos con E5/Chroma y amplía por coincidencia léxica BM25,
-           aplicando filtros de rol y categoría.
+           sin excluir fuentes por rol o categoría.
         3. Reordena candidatos con Cross-Encoder (o heurísticas si no está disponible)
            y arma el contexto con fragmentos limpios y deduplicados.
         4. Si no queda contexto, usa las respuestas temáticas acotadas o se abstiene.
@@ -2384,7 +2450,7 @@ class RAGService:
         filter_condition = self._build_query_filter(question, user_role)
 
         # 1. Expansión Multi-Consulta asíncrona tolerante a jerga
-        query_variants = await async_generate_multi_query_variants(question, user_role or "general", max_variants=3)
+        query_variants = await async_generate_multi_query_variants(question, max_variants=3)
         # Los manuales suelen llamar a la recuperación de usuario "Recordar
         # usuario con contraseña" aunque la pregunta coloquial diga "no recuerdo
         # mi usuario". Añadir esta reformulación léxica permite encontrar esa
@@ -2563,7 +2629,7 @@ class RAGService:
 
         # La recuperación de una dirección/usuario no debe abrir el flujo de
         # recuperación de contraseña ni inyectar sus pasos por defecto.
-        is_ambiguous_student_pwd = _is_ambiguous_student_password_query(question, user_role)
+        is_ambiguous_student_pwd = _is_ambiguous_student_password_query(question)
 
         if is_ambiguous_student_pwd and self.vector_store is not None:
             has_first_doc = any("primer semestre" in (doc.metadata.get("source") or "").lower() or "activar usuario" in (doc.metadata.get("source") or "").lower() for doc, _ in valid_docs_with_scores)
@@ -2856,11 +2922,23 @@ class RAGService:
         # Aplica el límite sobre el contexto expandido. Cada bloque conserva su
         # fuente y página; si un ancla queda fuera, los siguientes sí pueden caber.
         if context_parts:
+            expanded_context_chunks = list(zip(
+                retrieved_docs,
+                [part.split("\n", 1)[-1] for part in context_parts],
+            ))
+            emit_retrieval_trace(
+                "expanded_context",
+                [(doc, None, text) for doc, text in expanded_context_chunks],
+            )
             budgeted_chunks = _fit_context_budget(
-                list(zip(retrieved_docs, [part.split("\n", 1)[-1] for part in context_parts])),
+                expanded_context_chunks,
                 question,
                 budget=context_budget_tokens,
                 max_chunks=24 if procedural_context else 8,
+            )
+            emit_retrieval_trace(
+                "budgeted_context",
+                [(doc, None, text) for doc, text in budgeted_chunks],
             )
             retrieved_docs = [doc for doc, _text in budgeted_chunks]
             context_parts = []
@@ -3024,8 +3102,7 @@ class RAGService:
                 + "\n\n".join(system_policy_instructions)
             )
         user_greeting = f"El usuario se llama {user_name}. " if user_name else ""
-        role_ctx = f"[Rol del usuario: {user_role}] " if user_role else ""
-        user_prompt = f"{user_greeting}{role_ctx}Consulta del usuario: {question}"
+        user_prompt = f"{user_greeting}Consulta del usuario: {question}"
 
         messages = [{"role": "system", "content": system_prompt}]
         if chat_history:

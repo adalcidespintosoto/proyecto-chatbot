@@ -36,17 +36,12 @@ def make_doc(source, text, category="general"):
     )
 
 
-def test_new_student_account_query_filters_financial_sources():
+def test_new_student_account_query_searches_all_categories_for_complementary_evidence():
     question = "Soy nuevo en Barranquilla, ¿cómo sé cuál es mi usuario para entrar al correo institucional?"
 
     assert is_account_identifier_query(question)
     assert _is_onboarding_query(question)
-    assert rag_service._build_query_filter(question) == {
-        "$and": [
-            {"audience": {"$in": ["estudiante", "general"]}},
-            {"category": {"$ne": "financiero"}},
-        ]
-    }
+    assert rag_service._build_query_filter(question) is None
 
 
 def test_colloquial_enrede_does_not_trigger_hardware_network_filter():
@@ -58,9 +53,7 @@ def test_colloquial_enrede_does_not_trigger_hardware_network_filter():
 def test_explicit_network_question_still_gets_hardware_network_filter():
     question = "No puedo conectarme a la red wifi institucional desde mi portátil."
 
-    assert rag_service._build_query_filter(question, "general") == {
-        "category": {"$nin": ["financiero", "academico"]}
-    }
+    assert rag_service._build_query_filter(question, "general") is None
 
 
 def test_account_reranker_prefers_activation_and_drops_unrelated_login_docs():
@@ -176,6 +169,83 @@ def test_context_selection_keeps_more_than_two_chunks_from_same_document_and_cle
     assert "Paso 3" in selected[2][1]
 
 
+def test_procedural_context_selector_preserves_source_diversity_for_neighbor_pages():
+    docs = [
+        (make_doc("General_Access_Policy.pdf", f"Account policy section {index}"), float(20 - index))
+        for index in range(6)
+    ]
+    docs.extend([
+        (make_doc("Target Procedure.pdf", "Step from the requested procedure"), 5.0),
+        (make_doc("Complementary Procedure.pdf", "Complementary documented step"), 4.0),
+    ])
+
+    selected = _select_context_chunks(docs, max_chunks=6, question="¿Cómo sigo el trámite?")
+    selected_sources = [doc.metadata["source"] for doc, _ in selected]
+
+    assert selected_sources.count("General_Access_Policy.pdf") <= 4
+    assert "Target Procedure.pdf" in selected_sources
+    assert "Complementary Procedure.pdf" in selected_sources
+
+
+def test_context_selection_keeps_identical_chunks_from_different_sources():
+    shared = "Para crear una elección, seleccione Agregar y luego Guardar."
+    target = make_doc("Elecciones - Módulo Estudiantes.pptx", shared)
+    complementary = make_doc("Elecciones - Módulo Funcionarios.pptx", shared)
+
+    selected = _select_context_chunks(
+        [(target, 3.0), (complementary, 2.0)],
+        max_chunks=2,
+        question="¿Cómo creo una elección?",
+    )
+
+    assert [doc.metadata["source"] for doc, _ in selected] == [
+        "Elecciones - Módulo Estudiantes.pptx",
+        "Elecciones - Módulo Funcionarios.pptx",
+    ]
+
+
+def test_procedural_context_can_keep_eight_chunks_from_an_exactly_relevant_source():
+    source = "Asignación Académica.pptx"
+    docs = [
+        (make_doc(source, f"Crear franja horaria, campo de datos {index}."), float(20 - index))
+        for index in range(8)
+    ]
+
+    selected = _select_context_chunks(
+        docs,
+        max_chunks=10,
+        question="¿Qué datos debo completar al crear una franja horaria?",
+        max_per_source=4,
+        max_per_preferred_source=8,
+    )
+
+    assert len(selected) == 8
+    assert all(doc.metadata.get("_rag_preferred_source") for doc, _ in selected)
+
+
+def test_multquery_synonyms_do_not_make_unmentioned_titles_preferred_sources():
+    target = make_doc("6. Reintegro.pptx", "Luego seleccione el informe Reintegro.")
+    account_policy = make_doc(
+        "P-GT-02 Procedimiento de acceso a usuarios.pdf",
+        "Procedimiento institucional para cuentas de usuario.",
+    )
+    user_manual = make_doc("Manual de Usuario - Registro de Ingreso.pdf", "Manual general de acceso.")
+
+    selected = _select_context_chunks(
+        [(account_policy, 12.0), (user_manual, 11.0), (target, 2.0)],
+        max_chunks=3,
+        question="¿Cómo ingreso al sistema para generar el informe de reintegro?",
+        query_variants=["¿Cómo accedo al sistema con mi usuario y contraseña?"],
+    )
+
+    preferred_sources = {
+        doc.metadata["source"]
+        for doc, _text in selected
+        if doc.metadata.get("_rag_preferred_source")
+    }
+    assert preferred_sources == {"6. Reintegro.pptx"}
+
+
 def test_chunk_cleaner_preserves_procedural_lines_that_mention_university_or_login():
     text = (
         "UNIVERSIDAD SIMÓN BOLÍVAR\n"
@@ -208,6 +278,25 @@ def test_election_context_selection_matches_constituency_and_accented_source_nam
     assert not any("Egresados" in source for source in selected_sources)
     assert not any("Crear una elección" in text for _, text in selected)
     assert not any("Reglamento académico" in source for source in selected_sources)
+
+
+def test_election_retrieval_does_not_filter_by_session_role_when_query_is_unspecified():
+    candidates = [
+        (make_doc("Aplicativo Elecciones - Módulo Estudiantes.pptx", "Módulo Estudiantes: administrar elecciones."), 5.0),
+        (make_doc("Aplicativo Elecciones - Módulo Funcionarios.pptx", "Módulo Funcionarios: administrar elecciones."), 4.0),
+    ]
+
+    selected = _select_election_context_chunks(
+        candidates,
+        "¿Cómo administro una elección?",
+        "estudiante",
+        max_chunks=4,
+    )
+
+    assert {doc.metadata["source"] for doc, _ in selected} == {
+        "Aplicativo Elecciones - Módulo Estudiantes.pptx",
+        "Aplicativo Elecciones - Módulo Funcionarios.pptx",
+    }
 
 
 def test_abstention_detector_catches_the_no_documentation_wording_seen_by_the_user():
@@ -254,12 +343,32 @@ async def test_vote_conjugation_routes_to_election_retrieval_and_keeps_election_
     assert _is_election_voting_query(question)
 
 
+@pytest.mark.asyncio
+async def test_multiquery_expansion_prompt_does_not_depend_on_session_role():
+    question = "¿Cómo restablezco mi clave institucional?"
+    prompts = []
+    outputs = []
+    for session_role in ("estudiante", "profesor", "administrativo"):
+        client = MagicMock()
+        client.generate_async = AsyncMock(return_value=(
+            "1. Restablecimiento de contraseña institucional\n"
+            "2. Recuperar acceso a la cuenta\n"
+            "3. contraseña acceso portal usuario"
+        ))
+        with patch("app.services.rag_service.get_llm_client", return_value=client):
+            outputs.append(await async_generate_multi_query_variants(question, user_role=session_role))
+        prompts.append(client.generate_async.await_args.kwargs["prompt"])
+
+    assert prompts[0] == prompts[1] == prompts[2]
+    assert outputs[0] == outputs[1] == outputs[2]
+
+
 def test_suspicious_email_is_not_misclassified_as_account_activation():
     question = "Me llegó un correo rarísimo con un enlace urgente o me quitan la cuenta institucional. ¿A quién aviso?"
 
     assert is_suspicious_email_query(question)
     assert not is_account_identifier_query(question)
-    assert rag_service._build_query_filter(question) == {"category": {"$ne": "financiero"}}
+    assert rag_service._build_query_filter(question) is None
 
 
 def test_spanish_all_instructions_injection_is_detected_before_input_sanitization():
@@ -413,11 +522,12 @@ async def test_llm_retries_once_when_it_abstains_despite_context_and_golden_is_n
     assert result["has_context"] is True
     assert "No abras el enlace" in result["response"]
     assert llm.await_count == 2
-    system_prompt = llm.await_args_list[0].kwargs["messages"][0]["content"]
-    assert "[REFERENCIA DE FORMATO; NO ES FUENTE DOCUMENTAL]" in system_prompt
-    assert "abre el enlace" not in system_prompt.split("[CONTEXTO INSTITUCIONAL RECUPERADO]", 1)[1].split(
-        "[REFERENCIA DE FORMATO; NO ES FUENTE DOCUMENTAL]", 1
-    )[0]
+    prompt_messages = "\n".join(
+        str(message.get("content", ""))
+        for message in llm.await_args_list[0].kwargs["messages"]
+    )
+    assert "abre el enlace y responde" not in prompt_messages.casefold()
+    assert "[rol del usuario:" not in prompt_messages.casefold()
 
 
 @pytest.mark.asyncio
@@ -450,7 +560,7 @@ def test_forgotten_institutional_email_is_routed_to_account_retrieval(question):
     assert _is_forgotten_email_query(question)
     assert is_account_identifier_query(question)
     assert not _is_ambiguous_student_password_query(question, None)
-    assert rag_service._build_query_filter(question) == {"category": {"$ne": "financiero"}}
+    assert rag_service._build_query_filter(question) is None
 
 
 def test_forgotten_password_stays_in_password_flow_and_not_email_identity_flow():
@@ -458,6 +568,20 @@ def test_forgotten_password_stays_in_password_flow_and_not_email_identity_flow()
 
     assert not _is_forgotten_email_query(question)
     assert _is_ambiguous_student_password_query(question, None)
+
+
+@pytest.mark.parametrize("session_role", [None, "general", "estudiante", "profesor", "administrativo"])
+def test_password_recovery_retrieval_is_independent_of_session_role(session_role):
+    question = "Olvidé la contraseña de mi correo institucional"
+
+    assert _is_ambiguous_student_password_query(question, session_role)
+
+
+def test_password_recovery_uses_explicit_question_context_instead_of_session_role():
+    question = "Soy profesor y olvidé la contraseña de mi correo institucional"
+
+    assert not _is_ambiguous_student_password_query(question, "estudiante")
+    assert not _is_ambiguous_student_password_query(question, "general")
 
 
 def test_mixed_forgotten_user_or_password_query_keeps_recovery_manual():
@@ -528,7 +652,7 @@ def test_forgotten_email_context_keeps_identification_steps_and_drops_payment_no
     assert all("[Imagen:" not in text for _, text in selected)
 
 
-def test_context_expansion_adds_only_adjacent_chunks_from_same_page():
+def test_context_expansion_adds_all_chunks_from_adjacent_pages_in_verified_order():
     page_chunks = [
         ("Manual_TI_ab12cd_p4_c0", "Paso anterior", {"source": "Manual TI.pdf", "page_number": 4}),
         ("Manual_TI_ab12cd_p4_c1", "Chunk relevante", {"source": "Manual TI.pdf", "page_number": 4}),
@@ -549,8 +673,9 @@ def test_context_expansion_adds_only_adjacent_chunks_from_same_page():
     anchor.metadata["page_number"] = 4
     expanded = _expand_chunks_with_neighbors([(anchor, "Chunk relevante")], FakeCollection())
 
-    assert [text for _, text in expanded] == ["Paso anterior", "Chunk relevante", "Paso siguiente"]
-    assert [text for _, text in expanded] == ["Paso anterior", "Chunk relevante", "Paso siguiente"]
+    assert [text for _, text in expanded] == [
+        "Paso anterior", "Chunk relevante", "Paso siguiente", "Contenido de otra página"
+    ]
 
 
 def test_context_expansion_crosses_page_boundary_in_verified_document_order():
@@ -578,6 +703,38 @@ def test_context_expansion_crosses_page_boundary_in_verified_document_order():
     ]
 
 
+def test_context_expansion_keeps_all_useful_chunks_from_adjacent_pages_in_order():
+    rows = {
+        4: [
+            ("Manual_ab12cd_p4_c0", "Digite usuario y contraseña y presione Acceder", {"source": "Manual.pdf", "page_number": 4}),
+            ("Manual_ab12cd_p4_c1", "[Imagen: captura del formulario de acceso]", {"source": "Manual.pdf", "page_number": 4}),
+            ("Manual_ab12cd_p4_c2", "[Imagen: decoración de la página]", {"source": "Manual.pdf", "page_number": 4}),
+        ],
+        5: [("Manual_ab12cd_p5_c0", "Luego seleccione el módulo Rectoría", {"source": "Manual.pdf", "page_number": 5})],
+        6: [("Manual_ab12cd_p6_c0", "Después elija el informe Reintegro", {"source": "Manual.pdf", "page_number": 6})],
+    }
+
+    class FakeCollection:
+        def get(self, **kwargs):
+            page = kwargs["where"]["$and"][1]["page_number"]
+            page_rows = rows.get(page, [])
+            return {
+                "ids": [row[0] for row in page_rows],
+                "documents": [row[1] for row in page_rows],
+                "metadatas": [row[2] for row in page_rows],
+            }
+
+    anchor = make_doc("Manual.pdf", "Luego seleccione el módulo Rectoría")
+    anchor.metadata["page_number"] = 5
+    expanded = _expand_chunks_with_neighbors([(anchor, anchor.page_content)], FakeCollection())
+
+    assert [text for _, text in expanded] == [
+        "Digite usuario y contraseña y presione Acceder",
+        "Luego seleccione el módulo Rectoría",
+        "Después elija el informe Reintegro",
+    ]
+
+
 def test_procedural_context_budget_is_larger_and_keeps_chunks_whole():
     question = "¿Cuál es el paso a paso para realizar el trámite?"
     simple_question = "¿Cuál es el horario?"
@@ -587,11 +744,30 @@ def test_procedural_context_budget_is_larger_and_keeps_chunks_whole():
         (make_doc("Manual.pdf", f"Texto del paso {index}. " * 45), f"Texto del paso {index}. " * 45)
         for index in range(8)
     ]
-    procedural = _fit_context_budget(chunks, question)
-    simple = _fit_context_budget(chunks, simple_question)
+    procedural = _fit_context_budget(chunks, question, budget=3800)
+    simple = _fit_context_budget(chunks, simple_question, budget=1400)
     assert 3 < len(procedural) <= 8
     assert len(simple) < len(procedural)
     assert all(text.endswith(" ") or text.endswith(".") for _, text in procedural + simple)
+
+
+def test_context_budget_reserves_preferred_document_neighbors_before_weak_anchors():
+    weak_anchor = make_doc("Generic Access Policy.pdf", "Generic policy " * 14)
+    weak_anchor.metadata["_rag_anchor"] = True
+    preferred_neighbor = make_doc("Target Procedure.pdf", "Digite el usuario y presione Acceder.")
+    preferred_neighbor.metadata.update({
+        "_rag_preferred_source": True,
+        "_rag_sequence": (4, 0),
+    })
+
+    fitted = _fit_context_budget(
+        [(weak_anchor, weak_anchor.page_content), (preferred_neighbor, preferred_neighbor.page_content)],
+        "¿Cómo ingreso al sistema?",
+        budget=80,
+        max_chunks=2,
+    )
+
+    assert [doc.metadata["source"] for doc, _ in fitted] == ["Target Procedure.pdf"]
 
 
 @pytest.mark.parametrize("question", [

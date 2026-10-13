@@ -82,6 +82,15 @@ def _compatible_query_intents(current: str, matched: str) -> bool:
     return current_intent == matched_intent
 
 
+def _requires_canonical_voting_url(user_query: str) -> bool:
+    """True when an answer directs a user through the public voting flow."""
+    return bool(re.search(
+        r"\b(?:vot\w*|sufragio|elector\w*|portal\s+(?:de\s+)?(?:votaci[oó]n|elecciones)|(?:url|enlace)\s+(?:de|para)\s+(?:las?\s+)?elecci[oó]n(?:es)?)\b",
+        user_query or "",
+        flags=re.IGNORECASE,
+    ))
+
+
 def is_anomalous_golden_pair(user_query: str, response: str) -> Tuple[bool, str]:
     """
     Evalúa si un par query/response almacenado en Golden Cache es anómalo,
@@ -183,8 +192,8 @@ def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
         logger.debug("[GoldenCache] Descartado: consulta vacía o demasiado corta.")
         return False
 
-    if not bot_response or len(bot_response.strip()) < 60:
-        logger.debug("[GoldenCache] Descartado: respuesta vacía o demasiado corta (< 60 chars).")
+    if not bot_response or len(bot_response.strip()) < 25:
+        logger.debug("[GoldenCache] Descartado: respuesta vacía o demasiado corta (< 25 chars).")
         return False
 
     resp_lower = bot_response.strip().lower()
@@ -210,8 +219,10 @@ def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
             logger.info(f"[GoldenCache] Descartado por patrón de baja confianza/fallback: '{pat}'")
             return False
 
-    # Descartar consultas sobre elecciones que no contengan la URL canónica
-    if any(k in user_query.lower() for k in ["eleccion", "elecciones", "votar", "votacion", "candidato"]):
+    # Exigir el enlace canónico al orientar a una persona para votar. No aplicar
+    # esta regla a trámites administrativos que configuran periodos o candidatos;
+    # además, los límites de palabra evitan confundir "seleccionar" con "elección".
+    if _requires_canonical_voting_url(user_query):
         if "https://elecciones.unisimon.edu.co" not in bot_response:
             logger.info("[GoldenCache] Descartado: consulta electoral sin URL canónica https://elecciones.unisimon.edu.co")
             return False
@@ -356,7 +367,7 @@ def search_golden_case(user_query: str, threshold: float = 0.90, role: Optional[
                     return None
 
                 # Descartar si la consulta es electoral y la respuesta carece de la URL canónica
-                if any(k in user_query.lower() for k in ["eleccion", "elecciones", "votar", "votacion", "candidato"]):
+                if _requires_canonical_voting_url(user_query):
                     if "https://elecciones.unisimon.edu.co" not in matched_response:
                         logger.warning("[GoldenCache] Coincidencia electoral descartada por carecer de https://elecciones.unisimon.edu.co")
                         return None

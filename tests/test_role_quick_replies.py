@@ -67,35 +67,11 @@ def test_normalize_role_synonyms():
     assert normalize_role("persona externa") == "otros"
 
 
-def test_build_role_filter_unrestricted_otros():
-    """Verifica que el rol 'otros' y variantes reciban acceso irrestricto (filter=None) a toda la base ChromaDB."""
-    # Rol 'otros' -> Acceso Total (None)
-    assert rag_service._build_role_filter("otros") is None
-    assert rag_service._build_role_filter("otro") is None
-    assert rag_service._build_role_filter("visitante") is None
-    assert rag_service._build_role_filter("aspirante") is None
-    assert rag_service._build_role_filter("egresado") is None
-    assert rag_service._build_role_filter(None) is None
-
-    # Rol 'administrativo'
-    admin_filter = rag_service._build_role_filter("administrativo")
-    assert admin_filter is not None
-    assert "administrativo" in admin_filter["audience"]["$in"]
-    assert "funcionario" in admin_filter["audience"]["$in"]
-    assert "general" in admin_filter["audience"]["$in"]
-
-    # Rol 'profesor'
-    prof_filter = rag_service._build_role_filter("profesor")
-    assert prof_filter is not None
-    assert "profesor" in prof_filter["audience"]["$in"]
-    assert "funcionario" in prof_filter["audience"]["$in"]
-    assert "general" in prof_filter["audience"]["$in"]
-
-    # Rol 'estudiante'
-    est_filter = rag_service._build_role_filter("estudiante")
-    assert est_filter is not None
-    assert "estudiante" in est_filter["audience"]["$in"]
-    assert "general" in est_filter["audience"]["$in"]
+def test_build_role_filter_does_not_restrict_retrieval_by_session_role():
+    """Todos los roles buscan en el mismo conjunto de documentos institucionales."""
+    for role in ("otros", "otro", "visitante", "aspirante", "egresado", None,
+                 "administrativo", "profesor", "estudiante"):
+        assert rag_service._build_role_filter(role) is None
 
 
 def test_metadata_mapping_administrativo_path():
@@ -112,22 +88,13 @@ def test_metadata_mapping_administrativo_path():
 
 
 @pytest.mark.asyncio
-async def test_pidiendo_rol_delivers_quick_replies():
-    """Verifica que el estado PIDIENDO_ROL entregue los botones ROLE_QUICK_REPLIES."""
+async def test_initial_greeting_does_not_force_role_selection():
+    """La conversación puede comenzar sin clasificar al usuario por rol."""
     sess_id = "sess_test_qr_roles"
     router_logic.reset_session(sess_id)
 
-    # 1. Mensaje inicial sin rol -> PIDIENDO_ROL
     res = await router_logic.procesar_mensaje("Hola, necesito ayuda", session_id=sess_id)
-    assert res["tipo"] == "PIDIENDO_ROL"
-    assert "quick_replies" in res
-    assert len(res["quick_replies"]) == 4
-    assert res["quick_replies"] == ROLE_QUICK_REPLIES
-
-    # 2. El usuario presiona el botón '🌐 Otros / Visitante' (payload: "otros")
-    with patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
-        res2 = await router_logic.procesar_mensaje("otros", session_id=sess_id)
-        assert res2["tipo"] == "DIAGNOSTICO"
-        assert router_logic.get_session(sess_id).user_role == "otros"
-        assert res2.get("quick_replies") == []
-        mock_rag.assert_not_called()
+    assert res["tipo"] == "SALUDO"
+    assert not res.get("quick_replies")
+    # El valor general es un fallback de sesión; no se solicita ni se deduce el rol.
+    assert router_logic.get_session(sess_id).user_role == "general"
