@@ -1,0 +1,18 @@
+{
+  "run_id": "effectiveness_20261014_114425",
+  "method": "RouterLogic real, sesiones aisladas; sin API, telemetría ni promoción a Golden Cache",
+  "results": [
+    {
+      "id": "access_email",
+      "category": "Cuentas y acceso",
+      "question": "No puedo entrar al correo institucional, ¿qué reviso?",
+      "answer": "Prueba estas comprobaciones seguras:\n\n1. Confirma que tienes conexión a internet y vuelve a abrir el acceso al correo desde la página institucional que usas habitualmente.\n2. Revisa que el usuario esté escrito correctamente y que la tecla **Bloq Mayús** no esté activada. No compartas tu contraseña ni códigos de verificación.\n3. Si sigue fallando, prueba en una ventana privada o en otro navegador. Si aparece un mensaje de error, anota su texto exacto; no envíes capturas que muestren contraseñas o códigos.\n\nNo tengo aquí el procedimiento institucional verificado para recuperar el acceso. El siguiente paso depende de si tu cuenta es de estudiante, docente o funcionario; ¿cuál es tu perfil?\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [],
+      "route": "OFRECIENDO_RADICACION",
+      "source": "UniMon_SinDocumentacion",
+      "latency_ms": 15843.0,
+      "quality_verdict": null,
+      "quality_reason": null
+    }
+  ]
+}

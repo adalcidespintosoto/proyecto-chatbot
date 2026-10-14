@@ -1717,7 +1717,7 @@
         </div>
 
         <div class="kpi-card purple">
-          <div class="kpi-title">🧠 Tokens Consumidos</div>
+          <div class="kpi-title">🧠 Tokens LLM registrados</div>
           <div class="kpi-value" id="kpiTokens">0</div>
           <div class="kpi-subtext" id="kpiTokensSubtext">0 in / 0 out</div>
         </div>
@@ -1732,7 +1732,7 @@
       <!-- Panel Detallado de Facturación y Tokens OpenAI / Gemini / Cloud -->
       <div class="panel-card" style="margin-bottom: 2rem; border: 1px solid rgba(124, 58, 237, 0.3); background: linear-gradient(135deg, rgba(124, 58, 237, 0.07) 0%, rgba(16, 185, 129, 0.03) 100%);">
         <div class="panel-header">
-          <h3 class="panel-title">⚡ Desglose de Tokens y Facturación IA (<span id="llmProviderDisplay" style="color:#A78BFA;">Google Gemini</span>)</h3>
+          <h3 class="panel-title">⚡ Desglose de Tokens y Costo Estimado (<span id="llmProviderDisplay" style="color:#A78BFA;">Google Gemini</span>)</h3>
           <span class="badge" style="background:#0284C7; color:#fff;" id="openaiModelBadge">gemini-flash-lite-latest</span>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; padding: 1.2rem;">
@@ -1756,6 +1756,9 @@
             <div style="font-size: 1.45rem; font-weight: 800; color: #FBBF24;" id="tokTotalCost">$0.0000 USD</div>
             <div style="font-size: 0.78rem; color: #DDD6FE; margin-top: 4px;" id="tokCopCost">≈ $0 COP</div>
           </div>
+        </div>
+        <div id="tokenUsageCoverageNote" role="status" style="margin: 0 1.2rem 1.2rem; padding: 0.75rem 0.9rem; border-radius: 8px; background: rgba(148,163,184,0.08); color: #CBD5E1; font-size: 0.8rem; line-height: 1.45;">
+          Costo estimado con las tarifas configuradas; COP se calcula con una tasa fija aproximada de $4.150 por USD.
         </div>
       </div>
 
@@ -2642,7 +2645,8 @@
         // Métricas de tarjetas
         document.getElementById('kpiTotalConsultas').innerText = (kpis.total_queries ?? 0).toLocaleString();
         document.getElementById('kpiTotalSesiones').innerText = (kpis.total_sessions ?? 0).toLocaleString();
-        document.getElementById('kpiTotalSesionesSubtext').innerText = `${kpis.total_sessions ?? 0} sesiones en ${activePeriodLabel}`;
+        const interactions = kpis.total_interactions ?? kpis.total_queries ?? 0;
+        document.getElementById('kpiTotalSesionesSubtext').innerText = `${interactions.toLocaleString()} interacciones registradas (incluye seguimientos) · ${kpis.total_sessions ?? 0} sesiones en ${activePeriodLabel}`;
 
         document.getElementById('kpiTasaResolucion').innerText = `${kpis.resolution_rate ?? 0}%`;
         document.getElementById('kpiResolucionSubtext').innerText = `${kpis.resolved_count ?? 0} resueltas en Nivel 1`;
@@ -2660,7 +2664,21 @@
         const costCop = kpis.estimated_cost_cop ?? (kpis.gasto_estimado_cop ?? 0);
 
         document.getElementById('kpiTokens').innerText = (kpis.total_tokens ?? 0).toLocaleString();
-        document.getElementById('kpiTokensSubtext').innerText = `${tokRegular.toLocaleString()} in (${tokCached.toLocaleString()} caché) / ${tokOut.toLocaleString()} out`;
+        document.getElementById('kpiTokensSubtext').innerText = `${tokRegular.toLocaleString()} entrada + ${tokCached.toLocaleString()} caché / ${tokOut.toLocaleString()} salida`;
+
+        const coverageNote = document.getElementById('tokenUsageCoverageNote');
+        if (coverageNote) {
+          const incompleteUsage = Number(kpis.usage_tracking_incomplete_interactions ?? 0);
+          if (incompleteUsage > 0) {
+            coverageNote.innerText = `Histórico parcial: ${incompleteUsage.toLocaleString()} consultas no tienen medición completa de llamadas auxiliares del RAG. El gasto mostrado puede ser menor al real. Las consultas nuevas registran la expansión, la respuesta y los reintentos cuando el proveedor informa su uso. El costo usa las tarifas configuradas y COP una tasa fija aproximada de $4.150 por USD.`;
+            coverageNote.style.background = 'rgba(245, 158, 11, 0.12)';
+            coverageNote.style.color = '#FCD34D';
+          } else {
+            coverageNote.innerText = 'La medición incluye expansión RAG, respuesta y reintentos cuando el proveedor informa su uso. Costo estimado con las tarifas configuradas; COP usa una tasa fija aproximada de $4.150 por USD.';
+            coverageNote.style.background = 'rgba(16, 185, 129, 0.10)';
+            coverageNote.style.color = '#A7F3D0';
+          }
+        }
 
         if (document.getElementById('tokRegular')) {
           const pInfo = kpis.provider_info || {};

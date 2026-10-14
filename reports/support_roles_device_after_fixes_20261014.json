@@ -1,0 +1,46 @@
+{
+  "run_id": "effectiveness_20261014_121117",
+  "method": "RouterLogic real, sesiones aisladas; sin API, telemetría ni promoción a Golden Cache",
+  "results": [
+    {
+      "id": "peripherals",
+      "category": "Conexión y equipos",
+      "question": "Soy funcionario administrativo. Se dañaron el mouse y el teclado de mi puesto, ¿cómo solicito que los revisen?",
+      "role": "administrativo",
+      "base_question": "Se dañaron el mouse y el teclado de mi puesto, ¿cómo solicito que los revisen?",
+      "answer": "Para solicitar la revisión del mouse y el teclado, registra una solicitud de servicio en la herramienta institucional Mesa de Ayuda TI. El procedimiento de mantenimiento indica que allí se tramitan las solicitudes de servicio; incluye qué equipos presentan la falla y una descripción breve del problema para que puedan gestionar la revisión.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "SITE 2.0.pptx",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "Paymentez - Manual de usuario Link de pagos y Dashboard (2).pdf",
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+        "CP-GT-01_Gestion_de_TI.pdf",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "P-GT-13_Procedimiento_para_la_gestion_de_requerimientos_de_recursos_y_soluciones_tecnologicas.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 13402.1,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "teams_audio",
+      "category": "Aplicaciones y reuniones",
+      "question": "Soy docente. En Teams no me escuchan cuando entro a una reunión, ¿qué reviso?",
+      "role": "profesor",
+      "base_question": "En Teams no me escuchan cuando entro a una reunión, ¿qué reviso?",
+      "answer": "Prueba estas comprobaciones en orden; los nombres exactos de las opciones pueden variar según tu dispositivo:\n\n1. **Revisa si estás silenciado** dentro de la reunión y activa el micrófono si lo está.\n2. **Comprueba el micrófono seleccionado** en las opciones de audio de la reunión. Habla y observa si el indicador de nivel responde; si no, prueba otro micrófono disponible.\n3. **Verifica el micrófono fuera de Teams**: asegúrate de que esté conectado, que no tenga un interruptor físico de silencio activado y que otra aplicación no lo esté usando.\n4. **Revisa los permisos de micrófono** de Teams en el dispositivo y comprueba que el volumen de entrada no esté al mínimo.\n5. Si sigue igual, sal de la reunión y vuelve a entrar; también puedes cerrar y abrir Teams y probar de nuevo.\n\nNo tengo una guía institucional verificada para esta falla específica de Teams. Si persiste después de estas pruebas, será necesario escalarlo por el canal de soporte disponible en tu institución.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Crear reuniones en teams - iPads aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf",
+        "Ajustes participantes reuniones  Ms Teams.pdf",
+        "Grabar videollamadas en Teams.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 12353.9,
+      "quality_verdict": null,
+      "quality_reason": null
+    }
+  ]
+}

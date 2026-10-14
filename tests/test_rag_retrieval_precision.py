@@ -21,11 +21,15 @@ from app.services.rag_service import (
     _is_forgotten_identity_query,
     _is_forgotten_email_query,
     _is_ambiguous_student_password_query,
+    _explicit_account_scope,
+    _is_unspecified_account_scope,
     _select_forgotten_email_context_chunks,
     _expand_chunks_with_neighbors,
     _fit_context_budget,
     _is_step_by_step_query,
     _is_safe_first_line_self_help_query,
+    _redact_unverified_email_addresses,
+    _strip_declared_role_prefix,
 )
 
 
@@ -34,6 +38,43 @@ def make_doc(source, text, category="general"):
         page_content=text,
         metadata={"source": source, "category": category, "audience": "general"},
     )
+
+
+def test_broken_ocr_email_is_not_passed_to_llm_or_user():
+    broken = "Escribe a trabajodesdecasa@unisim onbolivar.edu.co."
+    assert "trabajodesdecasa@" not in _redact_unverified_email_addresses(broken)
+    assert "solicitudcomputo@unisimon.edu.co" in _redact_unverified_email_addresses(
+        "Escribe a solicitudcomputo@unisimon.edu.co."
+    )
+
+
+def test_role_intro_does_not_dominate_document_title_terms():
+    assert _strip_declared_role_prefix(
+        "Soy funcionario administrativo. Se dañaron el mouse y el teclado"
+    ) == "Se dañaron el mouse y el teclado"
+    assert _strip_declared_role_prefix(
+        "¿Cómo genero el reporte de estudiantes nuevos?"
+    ) == "¿Cómo genero el reporte de estudiantes nuevos?"
+
+
+def test_request_channel_evidence_survives_context_budget():
+    question = "Necesito recuperar una copia de seguridad, ¿cómo solicito ayuda?"
+    source = "Procedimiento de respaldo.pdf"
+    introduction = make_doc(source, "Definiciones generales y alcance del respaldo de información.")
+    policy = make_doc(source, "Condiciones de custodia y aprobación de las copias.")
+    channel = make_doc(
+        source,
+        "Solicitud de restauración: envíe correo a soporte@unisimon.edu.co para gestionar el requerimiento.",
+    )
+    selected = _select_context_chunks(
+        [(introduction, 0.9), (policy, 0.8), (channel, 0.6)],
+        max_chunks=2,
+        question=question,
+    )
+    assert any("soporte@unisimon.edu.co" in text for _doc, text in selected)
+    fitted = _fit_context_budget(selected, question, budget=100, max_chunks=1)
+    assert len(fitted) == 1
+    assert "soporte@unisimon.edu.co" in fitted[0][1]
 
 
 def test_new_student_account_query_searches_all_categories_for_complementary_evidence():
@@ -567,14 +608,18 @@ def test_forgotten_password_stays_in_password_flow_and_not_email_identity_flow()
     question = "Olvidé la contraseña de mi correo institucional"
 
     assert not _is_forgotten_email_query(question)
-    assert _is_ambiguous_student_password_query(question, None)
+    assert _is_unspecified_account_scope(question)
+    assert not _is_ambiguous_student_password_query(question, None)
 
 
 @pytest.mark.parametrize("session_role", [None, "general", "estudiante", "profesor", "administrativo"])
 def test_password_recovery_retrieval_is_independent_of_session_role(session_role):
     question = "Olvidé la contraseña de mi correo institucional"
 
-    assert _is_ambiguous_student_password_query(question, session_role)
+    assert not _is_ambiguous_student_password_query(question, session_role)
+    student_question = "Olvidé la contraseña del Portal Estudiantes"
+    assert _explicit_account_scope(student_question) == "estudiante"
+    assert _is_ambiguous_student_password_query(student_question, session_role)
 
 
 def test_password_recovery_uses_explicit_question_context_instead_of_session_role():
@@ -639,7 +684,7 @@ def test_forgotten_email_context_keeps_identification_steps_and_drops_payment_no
             "identificar correo institucional olvidado",
             docs,
             top_k=5,
-            original_query="se me olvido mi correo institucional como hago",
+            original_query="Soy estudiante, se me olvido mi correo institucional como hago",
         )
     selected = _select_forgotten_email_context_chunks(ranked)
     sources = [doc.metadata["source"] for doc, _ in selected]
@@ -701,6 +746,7 @@ def test_context_expansion_crosses_page_boundary_in_verified_document_order():
     assert [(doc.metadata["page_number"], text) for doc, text in expanded] == [
         (1, "Primer paso"), (2, "Paso intermedio"), (3, "Paso final")
     ]
+    assert [bool(doc.metadata.get("_rag_anchor")) for doc, _ in expanded] == [False, True, False]
 
 
 def test_context_expansion_keeps_all_useful_chunks_from_adjacent_pages_in_order():

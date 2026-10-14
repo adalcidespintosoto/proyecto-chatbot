@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     golden_cache_db_dir: str = "./data/chroma_db"
     docs_dir: str = "./data/docs"
     embedding_model: str = "intfloat/multilingual-e5-large"
+    # Solo reordena pasajes recuperados; cambiarlo no modifica los embeddings de Chroma.
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     # Límites de Seguridad
     max_upload_size_mb: int = 15

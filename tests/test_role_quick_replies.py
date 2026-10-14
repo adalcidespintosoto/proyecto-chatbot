@@ -67,6 +67,13 @@ def test_normalize_role_synonyms():
     assert normalize_role("persona externa") == "otros"
 
 
+def test_role_mentioned_as_object_does_not_change_session_identity():
+    assert router_logic.detect_user_role("Necesito restablecer la cuenta de un profesor") is None
+    assert router_logic.detect_user_role("¿Cómo creo usuarios para estudiantes nuevos?") is None
+    assert router_logic.detect_user_role("Soy docente y no puedo entrar al correo") == "profesor"
+    assert router_logic.detect_user_role("estudiante") == "estudiante"
+
+
 def test_build_role_filter_does_not_restrict_retrieval_by_session_role():
     """Todos los roles buscan en el mismo conjunto de documentos institucionales."""
     for role in ("otros", "otro", "visitante", "aspirante", "egresado", None,

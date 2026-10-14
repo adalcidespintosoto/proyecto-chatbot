@@ -79,6 +79,7 @@ import time
 import re
 from fastapi import Request
 from app.services.telemetry_service import log_interaction, update_session_status
+from app.services.llm_usage import begin_llm_usage_capture, finish_llm_usage_capture
 
 
 INJECTION_PATTERNS = [
@@ -158,7 +159,11 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
 
     # Medir tiempo de procesamiento (latencia)
     t0 = time.time()
-    resultado = await router_logic.procesar_mensaje(mensaje=texto, session_id=session_id)
+    llm_usage_token = begin_llm_usage_capture()
+    try:
+        resultado = await router_logic.procesar_mensaje(mensaje=texto, session_id=session_id)
+    finally:
+        llm_usage = finish_llm_usage_capture(llm_usage_token)
     latency_ms = (time.time() - t0) * 1000
 
     tipo = resultado.get("tipo", "DIAGNOSTICO")
@@ -170,6 +175,18 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
     prompt_tokens = resultado.get("prompt_tokens", 0) or 0
     cached_tokens = resultado.get("cached_tokens", 0) or 0
     eval_tokens = resultado.get("eval_tokens", 0) or 0
+    llm_calls = int(llm_usage.get("llm_calls", 0) or 0)
+    usage_tracked = bool(llm_usage.get("complete", False))
+    if llm_calls:
+        # Incluye expansión MultiQuery, respuesta y posibles reintentos. El acumulador
+        # es ContextVar, así que consultas simultáneas conservan contadores separados.
+        prompt_tokens = llm_usage.get("prompt_tokens", 0) or 0
+        cached_tokens = llm_usage.get("cached_tokens", 0) or 0
+        eval_tokens = llm_usage.get("eval_tokens", 0) or 0
+    else:
+        # Una respuesta servida sin llamar al modelo no debe heredar contadores
+        # colocados por otra ruta o una respuesta cacheada.
+        prompt_tokens = cached_tokens = eval_tokens = 0
 
     # Obtener rol del usuario registrado en la sesión
     session_obj = router_logic.get_session(session_id)
@@ -199,6 +216,8 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
             feedback=resultado.get("feedback", "NONE"),
             golden_cache_used=resultado.get("golden_cache_used", False),
             golden_cache_similarity=resultado.get("golden_cache_similarity"),
+            llm_calls=llm_calls,
+            usage_tracked=usage_tracked,
         )
 
         # Actualizar estado de resolución / escalado

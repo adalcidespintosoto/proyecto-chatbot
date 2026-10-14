@@ -1,0 +1,341 @@
+{
+  "run_id": "effectiveness_20261014_121429",
+  "method": "RouterLogic real, sesiones aisladas; sin API, telemetría ni promoción a Golden Cache",
+  "results": [
+    {
+      "id": "access_email",
+      "category": "Cuentas y acceso",
+      "question": "No puedo entrar al correo institucional, ¿qué reviso?",
+      "answer": "Prueba estas comprobaciones seguras:\n\n1. Verifica que tengas conexión a internet y que estés usando la dirección de correo institucional correcta.\n2. Revisa que la contraseña esté bien escrita y que el teclado no tenga activadas mayúsculas o un idioma distinto.\n3. Intenta entrar desde una ventana privada o desde otro navegador actualizado. Si allí funciona, borra la caché y las cookies del navegador habitual.\n4. Si aparece un mensaje de error, anota el texto exacto; no compartas tu contraseña ni códigos de verificación.\n\nNo tengo instrucciones institucionales verificadas para restablecer el acceso. Si persiste, dime qué servicio de correo usas y si tu perfil es de estudiante, docente o funcionario, porque el siguiente paso puede variar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [],
+      "route": "OFRECIENDO_RADICACION",
+      "source": "UniMon_SinDocumentacion",
+      "latency_ms": 15607.8,
+      "quality_verdict": "partial",
+      "quality_reason": "Comprobaciones seguras, pero falta precisar el servicio y la vía institucional de recuperación."
+    },
+    {
+      "id": "access_teams",
+      "category": "Cuentas y acceso",
+      "question": "Teams no me deja iniciar sesión, ¿qué puedo hacer?",
+      "answer": "Prueba primero a entrar desde el sitio web de Unisimon, en **Servicios**:\n\n- Si eres **estudiante**, selecciona **Correo Estudiantes**.\n- Si eres **funcionario**, selecciona **Correo Funcionarios Microsoft**.\n\nInicia sesión con tu usuario y contraseña de Microsoft. Si tampoco puedes entrar al correo, revisa que estés usando las credenciales de la cuenta institucional y que no haya un error al escribirlas. La guía para funcionarios indica que sus credenciales son las señaladas en el Portal de Gestión Académico-Administrativa; para estudiantes, indica iniciar sesión con su usuario y contraseña de Microsoft.\n\nComo comprobaciones generales, verifica que tengas conexión a internet y prueba en una ventana privada del navegador. Si el correo institucional sí abre, pero Teams sigue rechazando el inicio de sesión, anota el mensaje de error y contacta al soporte institucional para que revisen el acceso. No compartas tu contraseña ni códigos de verificación.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Como_acceder_a_Microsoft_Teams.pdf",
+        "Como_acceder_MS_Teams_Estudiantes.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 18591.7,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "forgot_password",
+      "category": "Cuentas y acceso",
+      "question": "Se me olvidó la contraseña de la cuenta institucional, ¿cómo la recupero?",
+      "answer": "Depende de cuál cuenta olvidaste. **Si es la cuenta unificada del Portal Estudiantes, Aula Extendida o correo institucional**, desde el sitio de la Universidad entra en **Portales** y busca **«Olvidé mi Usuario / Contraseña»**. La guía indica que se enviará información para restablecerla a tu correo personal; luego escribe la contraseña nueva, confírmala y presiona **«Enviar»**.\n\n**Si es una cuenta de Kactus o Seven**, el procedimiento es distinto: para el portal de autogestión, el colaborador debe gestionar el reinicio con Talento Humano. Si se trata del ERP y la cuenta está bloqueada, la recuperación se solicita por la mesa de servicio.\n\nNo compartas tu contraseña ni códigos de verificación. ¿Cuál de estas cuentas estás intentando recuperar?\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Restablecimiento de contraseña.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 9779.0,
+      "quality_verdict": "correct",
+      "quality_reason": "Falta identificar la cuenta para confirmar el procedimiento aplicable."
+    },
+    {
+      "id": "locked_account",
+      "category": "Cuentas y acceso",
+      "question": "Me bloquearon el usuario, ¿cómo vuelvo a entrar?",
+      "answer": "Entiendo; no sigas intentando muchas veces, porque eso podría prolongar el bloqueo. Verifica que estés usando el usuario del servicio correcto y, si aparece una opción oficial para recuperar o restablecer la contraseña, sigue ese proceso desde el propio servicio. No compartas tu contraseña ni códigos de verificación.\n\nNo puedo confirmar un procedimiento único para desbloquear la cuenta sin saber de qué servicio se trata. Si es una cuenta de estudiante, la guía indica que la contraseña del Portal de Estudiantes también se usa para Aula Extendida y el correo estudiantil; para inconvenientes con la contraseña, usa los canales oficiales de la Universidad. ¿Qué servicio estás intentando abrir y cuál es tu perfil (estudiante, docente o funcionario)?\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "instructivo portales estudiantes.pdf",
+        "Como_acceder_MS_Teams_Estudiantes.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 9013.1,
+      "quality_verdict": "partial",
+      "quality_reason": "Solicita la plataforma, pero no entrega todavía una ruta de desbloqueo concreta."
+    },
+    {
+      "id": "changed_password",
+      "category": "Cuentas y acceso",
+      "question": "Ya cambié la contraseña y todavía no puedo acceder, ¿qué hago?",
+      "answer": "Entiendo; prueba primero cerrar la sesión, volver a abrir el servicio y escribir la contraseña nueva manualmente. Verifica que el usuario corresponda a ese servicio y que no haya errores de mayúsculas, teclado o espacios; no compartas tu contraseña ni códigos de verificación.\n\nLa ruta depende de la cuenta: para Microsoft Teams, la guía indica iniciar sesión con las credenciales de Microsoft; para otras cuentas, esas credenciales podrían no ser las mismas. ¿En qué servicio intentas entrar y qué tipo de cuenta usas (estudiante, docente o funcionario)?\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Como_acceder_a_Microsoft_Teams.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8840.3,
+      "quality_verdict": "partial",
+      "quality_reason": "Diagnóstico genérico; requiere plataforma y error exacto para resolver."
+    },
+    {
+      "id": "wifi",
+      "category": "Conexión y equipos",
+      "question": "No me funciona el wifi de la Universidad, ¿qué puedo revisar?",
+      "answer": "Prueba estas comprobaciones sencillas:\n\n1. Desactiva y vuelve a activar el Wi‑Fi de tu dispositivo; luego intenta conectarte de nuevo a la red de la Universidad.\n2. Comprueba si otros dispositivos pueden conectarse en el mismo lugar. Si ninguno puede, podría tratarse de una interrupción de la red.\n3. Si estás conectado pero no tienes acceso a internet, desconéctate y vuelve a conectarte. También puedes probar abrir una página web distinta.\n\nLos fragmentos disponibles no incluyen instrucciones verificadas para configurar el Wi‑Fi universitario. Si el problema continúa, indícale a soporte en qué campus o zona estás, qué dispositivo usas y qué mensaje aparece; no compartas tu contraseña ni códigos de verificación.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "retorno al campus 2021.pdf",
+        "Instructivo Verificación pagos V2.pdf",
+        "Autoevaluacion por Grupos - Funcionarios.pdf",
+        "Instructivo Activar Periodo.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 6853.6,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "internet",
+      "category": "Conexión y equipos",
+      "question": "El computador dice que está conectado, pero no abre ninguna página, ¿cómo reviso si es la red?",
+      "answer": "Puedes comprobarlo comparando la conexión con otra página y otro dispositivo:\n\n1. Prueba abrir varias páginas y vuelve a cargarlas. Si solo falla una, el problema podría ser de ese sitio.\n2. Revisa si otro dispositivo conectado a la misma red puede navegar. Si tampoco puede, es más probable que la falla esté en la red; si sí puede, podría estar en el computador.\n3. Desconecta y vuelve a conectar el computador al Wi‑Fi y prueba de nuevo. Si puedes, acércate al router para ver si mejora la conexión.\n\nEstas son comprobaciones generales y seguras. Si otros dispositivos de esa red tampoco navegan, o el problema persiste solo en el computador después de probar lo anterior, contacta al canal autorizado de soporte técnico.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "CP-GT-01_Gestion_de_TI.pdf",
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "instructivo portales estudiantes.pdf",
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+        "Descarga de certificados.pptx",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "Ajustes participantes reuniones  Ms Teams.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7479.7,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "network_point",
+      "category": "Conexión y equipos",
+      "question": "El punto de red de mi oficina no funciona, ¿cómo reporto esa falla?",
+      "answer": "Para reportar la falla del punto de red, registra una solicitud en la mesa de ayuda **Mesa de Ayuda TI**. Describe que el punto de red de tu oficina no funciona e indica la ubicación y qué ocurre al conectarte; así podrán identificar el caso. Los fragmentos disponibles no especifican la ruta dentro de Mesa de Ayuda TI ni los campos que debes completar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "P-GT-13_Procedimiento_para_la_gestion_de_requerimientos_de_recursos_y_soluciones_tecnologicas.pdf",
+        "P-GT-14_Procedimiento_para_la_gestion_de_actualizaciones_de_versiones_en_Kactus_y_o_Seven.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 5580.6,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "computer_off",
+      "category": "Conexión y equipos",
+      "question": "Mi computador no enciende, ¿qué debo hacer?",
+      "answer": "Revisa primero que el cable de alimentación esté bien conectado al computador y al tomacorriente; si usas una regleta o un cargador, comprueba también que esté conectado correctamente. Prueba otro tomacorriente que sepas que funciona y, si es un portátil, déjalo conectado unos minutos antes de intentar encenderlo.\n\nSi sigue sin encender, no lo abras ni intentes repararlo por tu cuenta: puede requerir una revisión técnica. La Universidad contempla el mantenimiento correctivo de equipos de cómputo; reporta la falla por el canal de atención de TI que corresponda a tu sede. Los fragmentos disponibles no muestran el correo o contacto específico.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "Reportes de Desertores.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "CP-GT-01_Gestion_de_TI.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7544.4,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "peripherals",
+      "category": "Conexión y equipos",
+      "question": "Se dañaron el mouse y el teclado de mi puesto, ¿cómo solicito que los revisen?",
+      "answer": "Para solicitar la revisión del mouse y el teclado, repórtalo a Soporte Técnico mediante uno de los canales de atención disponibles. Las solicitudes se atienden según el orden de recepción y la prioridad; incluye que fallaron ambos periféricos y describe qué ocurre con cada uno para facilitar la evaluación.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "SITE 2.0.pptx",
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+        "Paymentez - Manual de usuario Link de pagos y Dashboard (2).pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "CP-GT-01_Gestion_de_TI.pdf",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 6287.9,
+      "quality_verdict": "partial",
+      "quality_reason": "Da canales generales, pero no identifica con claridad la Mesa de Ayuda ni el procedimiento de radicación."
+    },
+    {
+      "id": "slow_computer",
+      "category": "Conexión y equipos",
+      "question": "El equipo está muy lento desde esta mañana, ¿qué puedo revisar antes de pedir soporte?",
+      "answer": "Puedes hacer estas comprobaciones seguras antes de solicitar soporte:\n\n1. **Guarda tu trabajo** y reinicia el equipo; a veces una aplicación o proceso temporal queda consumiendo recursos.\n2. **Cierra las aplicaciones y pestañas que no estés usando** y vuelve a probar.\n3. **Revisa si hay tareas en curso**, como descargas, sincronización o actualizaciones, que puedan estar usando muchos recursos; espera a que terminen si corresponde.\n4. **Comprueba si el equipo está caliente o si sus ventilaciones están obstruidas**. Déjalo sobre una superficie firme y despeja las rejillas, sin abrirlo ni manipular componentes.\n5. Si la lentitud continúa, anota desde cuándo ocurre y si afecta a todo el equipo o solo a una aplicación. Esa información ayudará a soporte a identificar la falla.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Paymentez - Manual de usuario Link de pagos y Dashboard (2).pdf",
+        "P-GT-14_Procedimiento_para_la_gestion_de_actualizaciones_de_versiones_en_Kactus_y_o_Seven.pdf",
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8488.8,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "teams_app",
+      "category": "Aplicaciones y reuniones",
+      "question": "Teams no abre en mi computador, ¿qué puedo intentar?",
+      "answer": "Prueba primero a entrar por la ruta institucional: desde el sitio web de Unisimon, ve a **Servicios** y selecciona **Correo Estudiantes** si eres estudiante, o **Correo Funcionarios Microsoft** si eres funcionario. Inicia sesión con tu cuenta institucional de Microsoft; para funcionarios, la guía indica usar el usuario y la clave señalados en el Portal de Gestión Académico-Administrativa.\n\nSi Teams sigue sin abrir, como comprobación general y segura, actualiza la página o cierra y vuelve a abrir el navegador, y prueba con otro navegador actualizado. Si el problema persiste, dime si eres estudiante o funcionario y qué ocurre al intentar entrar (por ejemplo, si aparece un mensaje de error).\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Como_acceder_a_Microsoft_Teams.pdf",
+        "Como_acceder_MS_Teams_Estudiantes.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 11119.8,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "teams_audio",
+      "category": "Aplicaciones y reuniones",
+      "question": "En Teams no me escuchan cuando entro a una reunión, ¿qué reviso?",
+      "answer": "Prueba estas comprobaciones rápidas en Teams:\n\n1. **Revisa que no estés silenciado:** dentro de la reunión, comprueba que el icono del micrófono no indique silencio y actívalo si está silenciado.\n2. **Comprueba el micrófono seleccionado:** en las opciones de audio de la reunión, verifica que Teams esté usando el micrófono correcto, especialmente si tienes audífonos conectados.\n3. **Haz una prueba fuera de la reunión:** revisa que el micrófono funcione en otra aplicación y que no esté bloqueado por los permisos de audio del dispositivo.\n4. Si sigue sin funcionar, sal y vuelve a entrar a la reunión; también puedes desconectar y reconectar los audífonos y probar otra vez.\n\nLa guía institucional disponible explica cómo crear reuniones, pero no documenta la configuración del micrófono. Estos pasos son comprobaciones generales y seguras.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Crear reuniones en teams - iPads aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf",
+        "Ajustes participantes reuniones  Ms Teams.pdf",
+        "Grabar videollamadas en Teams.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 11517.0,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "teams_devices",
+      "category": "Aplicaciones y reuniones",
+      "question": "No puedo activar el micrófono o la cámara en una videollamada de Teams, ¿cómo lo soluciono?",
+      "answer": "Prueba estas comprobaciones sencillas:\n\n1. En la reunión, revisa que los controles de micrófono y cámara no estén silenciados o apagados.\n2. Comprueba que el micrófono y la cámara funcionen fuera de Teams y que no estén siendo usados por otra aplicación.\n3. Si usas Teams desde un navegador, verifica en la configuración de permisos del navegador que Teams tenga acceso al micrófono y la cámara. Si usas la aplicación, revisa que el sistema permita ese acceso.\n4. Cierra y vuelve a abrir Teams; si sigue igual, sal de la reunión y vuelve a entrar.\n\nLa guía institucional indica que, para iniciar una videollamada, debes seleccionar el curso en **«Equipos»** y pulsar el icono de llamada del panel inferior, pero no describe cómo resolver problemas de permisos de audio o video. Si las comprobaciones no ayudan, dime si usas Teams en navegador o en la aplicación y qué dispositivo tienes; los siguientes pasos dependen de eso.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Videollamadas en  Teams.pdf",
+        "Grabar videollamadas en Teams.pdf",
+        "Grabar un clase en Teams y compartir en Stream.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 11600.0,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "install_software",
+      "category": "Aplicaciones y reuniones",
+      "question": "Necesito instalar un programa para trabajar, ¿cómo solicito la instalación?",
+      "answer": "Entiendo que necesitas el programa para poder trabajar. Según el procedimiento institucional, la solicitud de instalación de software debe presentarla el jefe de tu Dependencia a través de la Mesa de Servicio; luego Soporte la registra y la asigna para su atención.\n\nDile a tu jefe qué programa necesitas y para qué lo usarás; si tienes a mano la placa del equipo, puedes compartirla para ayudar a identificarlo. Si me indicas el nombre del programa, puedo ayudarte a redactar la solicitud para tu jefe.\n\n📌 **Canales de Soporte TI:**\n• **Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp `3172683922` | PBX (605) 3444333 Ext. 8003/8004\n• **Cúcuta:** `helpdesk@unisimon.edu.co` | PBX (607) 5827070 Ext. 129",
+      "sources": [
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 2668.4,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "vpn",
+      "category": "Aplicaciones y reuniones",
+      "question": "No puedo conectarme a la VPN desde fuera de la Universidad, ¿a quién debo pedir ayuda?",
+      "answer": "Debes solicitar apoyo a la Dirección de TI. El procedimiento indica que el acceso remoto a la infraestructura de la Universidad se realiza mediante VPN o SSH y que se debe informar la necesidad del acceso y por cuánto tiempo; no especifica un contacto directo ni el canal para hacer esa solicitud.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "Evaluaciones de selección ILE-TICS (FUNCIONARIOS).pdf",
+        "Gestión Prácticas - Funcionarios.pdf",
+        "Gestión Prácticas - Estudiantes.pdf",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Trazabilidad de transferencia externa.pptx",
+        "4. Transferencia Externa.pptx",
+        "Solicitud de crédito.pptx",
+        "instructivo portales estudiantes.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7663.2,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "phishing",
+      "category": "Seguridad y atención",
+      "question": "Me llegó un correo extraño con un enlace, ¿lo abro o qué hago?",
+      "answer": "No abras el correo ni hagas clic en el enlace. La indicación institucional es informar de inmediato al Oficial de Seguridad de la Información o, en su defecto, a la Dirección de TI para que lo inspeccionen; tampoco lo reenvíes ni lo difundas.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-07_Procedimiento_Proteccion_de_Codigo_Malicioso_.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 17494.2,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "malware",
+      "category": "Seguridad y atención",
+      "question": "Creo que mi computador tiene un virus, ¿qué pasos debo seguir?",
+      "answer": "Si sospechas que tu computador tiene un virus, evita usarlo para iniciar sesión o ingresar contraseñas y desconéctalo de la red (Wi‑Fi o cable) si puedes hacerlo sin manipular alertas o archivos sospechosos. No abras ni reenvíes correos sospechosos, y no borres archivos ni ejecutes análisis por tu cuenta.\n\nInforma de inmediato al **Oficial de Seguridad de la Información** o, en su defecto, a la **Dirección de TI**. El personal de Seguridad Informática o TI debe evaluar el incidente y encargarse del análisis y la desinfección.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-07_Procedimiento_Proteccion_de_Codigo_Malicioso_.pdf",
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 11313.7,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "backup",
+      "category": "Seguridad y atención",
+      "question": "Necesito recuperar un archivo de una copia de seguridad, ¿cómo solicito esa ayuda?",
+      "answer": "Para solicitar ayuda con la recuperación de un archivo, envía la solicitud al correo **solicitudcomputo@unisimon.edu.co** o comunícate con el área de **Soporte Técnico**. Indica qué archivo necesitas recuperar y dónde estaba guardado para que puedan orientarte.\n\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "Grupos_en_Teams.pdf",
+        "Solicitud de inscripción para grado.pdf",
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "Descarga e instalación Ms 365.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7916.5,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    },
+    {
+      "id": "onsite",
+      "category": "Seguridad y atención",
+      "question": "La falla necesita que un técnico revise mi puesto presencialmente, ¿cómo radico el caso?",
+      "answer": "Radica la solicitud en el sistema de información **Mesa de Ayuda TI**, describiendo la falla y el equipo afectado. Si la atención requiere una revisión presencial, el procedimiento contempla que Soporte Técnico programe una visita en sitio; también puede coordinar la recogida del equipo para llevarlo al taller.\n\nSi necesitas reportar varios equipos, indica cuáles tienen la misma falla; el procedimiento permite asociarlos a un mismo ticket cuando la actividad es la misma.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+        "P-GT-14_Procedimiento_para_la_gestion_de_actualizaciones_de_versiones_en_Kactus_y_o_Seven.pdf",
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "retorno al campus 2021.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 9178.6,
+      "quality_verdict": "correct",
+      "quality_reason": "Respuesta útil, segura y ajustada a la solicitud y evidencia disponible."
+    }
+  ]
+}

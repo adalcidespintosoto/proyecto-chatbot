@@ -495,10 +495,13 @@ class RouterLogic:
         ]):
             return "profesor"
 
-        # 2. Búsqueda directa por sinónimos estándar
-        for key, role_val in ROLE_SYNONYMS.items():
-            if re.search(rf"\b{key}\b", msg_lower):
-                return role_val
+        # Los sinónimos sueltos sirven para una respuesta de perfil ("docente"),
+        # pero en una pregunta larga pueden nombrar a otra persona o documento.
+        # En ese caso no deben cambiar el rol de la sesión.
+        if len(msg_lower.split()) <= 2:
+            for key, role_val in ROLE_SYNONYMS.items():
+                if re.fullmatch(rf"(?:soy\s+|un\s+|una\s+)?{re.escape(key)}[.!?]?", msg_lower):
+                    return role_val
         return None
 
     @classmethod

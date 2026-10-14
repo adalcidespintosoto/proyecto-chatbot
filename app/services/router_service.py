@@ -53,6 +53,14 @@ REGLAS:
 - No des procedimientos largos ni pidas que desarme nada.
 - No ofrezcas crear tickets ni des números de contacto (el sistema lo hará después)."""
 
+
+def is_security_incident_query(user_message: str) -> bool:
+    """Los indicios de infección requieren el procedimiento de seguridad, no tips de hardware."""
+    return bool(re.search(
+        r"\b(?:virus|malware|ransomware|troyano|infectad[oa]s?|infecci[oó]n|c[oó]digo\s+malicioso)\b",
+        (user_message or "").casefold(),
+    ))
+
 PROMPT_HARDWARE_DIRECT = (
     "Para fallas físicas, averías de hardware, puntos de red o problemas con torniquetes y equipos de cómputo, "
     "el personal técnico de la Dirección de TI realiza la revisión y atención presencial en sitio.\n\n"
@@ -162,7 +170,7 @@ async def classify_request_intent_async(user_message: str, user_role: str = "gen
     Clasificador semántico asíncrono con LLM local para determinar AUTOSERVICIO vs SOPORTE_FISICO.
     Prioriza consultas informativas y procedimentales para entrega de RAG explicativo.
     """
-    if is_informative_procedure_query(user_message):
+    if is_security_incident_query(user_message) or is_informative_procedure_query(user_message):
         return "AUTOSERVICIO"
 
     prompt = f"Rol de usuario: {user_role}\nConsulta del usuario: \"{user_message}\"\nClasificación JSON:"
@@ -202,7 +210,7 @@ def classify_request_intent(user_message: str, user_role: str = "general") -> st
     Clasificador semántico síncrono con LLM local para determinar AUTOSERVICIO vs SOPORTE_FISICO.
     Prioriza consultas informativas y procedimentales para entrega de RAG explicativo.
     """
-    if is_informative_procedure_query(user_message):
+    if is_security_incident_query(user_message) or is_informative_procedure_query(user_message):
         return "AUTOSERVICIO"
 
     prompt = f"Rol de usuario: {user_role}\nConsulta del usuario: \"{user_message}\"\nClasificación JSON:"

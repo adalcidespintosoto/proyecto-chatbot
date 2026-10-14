@@ -24,6 +24,7 @@ from app.services.router_service import (
     TICKET_EXPLICIT_INTENTS,
     classify_request_intent_async,
     is_informative_procedure_query,
+    is_security_incident_query,
 )
 from app.services.rag_service import rag_service
 from app.routers.chat import sanitize_input_text
@@ -39,6 +40,13 @@ async def test_hardware_question_is_routed_to_rag_before_direct_physical_escalat
     for question in questions:
         assert is_informative_procedure_query(question)
         assert await classify_request_intent_async(question) == "AUTOSERVICIO"
+
+
+@pytest.mark.asyncio
+async def test_suspected_malware_bypasses_hardware_tips():
+    question = "Soy docente. Creo que mi computador tiene un virus"
+    assert is_security_incident_query(question)
+    assert await classify_request_intent_async(question) == "AUTOSERVICIO"
 
 
 def test_chat_sanitization_preserves_detectable_injection_without_preserving_html():

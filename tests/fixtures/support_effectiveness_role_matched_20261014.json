@@ -1,0 +1,142 @@
+[
+  {
+    "id": "access_email",
+    "category": "Cuentas y acceso",
+    "question": "Soy estudiante. No puedo entrar al correo institucional, ¿qué reviso?",
+    "role": "estudiante",
+    "base_question": "No puedo entrar al correo institucional, ¿qué reviso?"
+  },
+  {
+    "id": "access_teams",
+    "category": "Cuentas y acceso",
+    "question": "Soy docente. Teams no me deja iniciar sesión, ¿qué puedo hacer?",
+    "role": "profesor",
+    "base_question": "Teams no me deja iniciar sesión, ¿qué puedo hacer?"
+  },
+  {
+    "id": "forgot_password",
+    "category": "Cuentas y acceso",
+    "question": "Soy funcionario administrativo. Se me olvidó la contraseña de la cuenta institucional, ¿cómo la recupero?",
+    "role": "administrativo",
+    "base_question": "Se me olvidó la contraseña de la cuenta institucional, ¿cómo la recupero?"
+  },
+  {
+    "id": "locked_account",
+    "category": "Cuentas y acceso",
+    "question": "Soy docente. Me bloquearon el usuario, ¿cómo vuelvo a entrar?",
+    "role": "profesor",
+    "base_question": "Me bloquearon el usuario, ¿cómo vuelvo a entrar?"
+  },
+  {
+    "id": "changed_password",
+    "category": "Cuentas y acceso",
+    "question": "Soy estudiante. Ya cambié la contraseña y todavía no puedo acceder, ¿qué hago?",
+    "role": "estudiante",
+    "base_question": "Ya cambié la contraseña y todavía no puedo acceder, ¿qué hago?"
+  },
+  {
+    "id": "wifi",
+    "category": "Conexión y equipos",
+    "question": "Soy estudiante. No me funciona el wifi de la Universidad, ¿qué puedo revisar?",
+    "role": "estudiante",
+    "base_question": "No me funciona el wifi de la Universidad, ¿qué puedo revisar?"
+  },
+  {
+    "id": "internet",
+    "category": "Conexión y equipos",
+    "question": "Soy funcionario administrativo. El computador dice que está conectado, pero no abre ninguna página, ¿cómo reviso si es la red?",
+    "role": "administrativo",
+    "base_question": "El computador dice que está conectado, pero no abre ninguna página, ¿cómo reviso si es la red?"
+  },
+  {
+    "id": "network_point",
+    "category": "Conexión y equipos",
+    "question": "Soy funcionario administrativo. El punto de red de mi oficina no funciona, ¿cómo reporto esa falla?",
+    "role": "administrativo",
+    "base_question": "El punto de red de mi oficina no funciona, ¿cómo reporto esa falla?"
+  },
+  {
+    "id": "computer_off",
+    "category": "Conexión y equipos",
+    "question": "Soy docente. Mi computador no enciende, ¿qué debo hacer?",
+    "role": "profesor",
+    "base_question": "Mi computador no enciende, ¿qué debo hacer?"
+  },
+  {
+    "id": "peripherals",
+    "category": "Conexión y equipos",
+    "question": "Soy funcionario administrativo. Se dañaron el mouse y el teclado de mi puesto, ¿cómo solicito que los revisen?",
+    "role": "administrativo",
+    "base_question": "Se dañaron el mouse y el teclado de mi puesto, ¿cómo solicito que los revisen?"
+  },
+  {
+    "id": "slow_computer",
+    "category": "Conexión y equipos",
+    "question": "Soy docente. El equipo está muy lento desde esta mañana, ¿qué puedo revisar antes de pedir soporte?",
+    "role": "profesor",
+    "base_question": "El equipo está muy lento desde esta mañana, ¿qué puedo revisar antes de pedir soporte?"
+  },
+  {
+    "id": "teams_app",
+    "category": "Aplicaciones y reuniones",
+    "question": "Soy estudiante. Teams no abre en mi computador, ¿qué puedo intentar?",
+    "role": "estudiante",
+    "base_question": "Teams no abre en mi computador, ¿qué puedo intentar?"
+  },
+  {
+    "id": "teams_audio",
+    "category": "Aplicaciones y reuniones",
+    "question": "Soy docente. En Teams no me escuchan cuando entro a una reunión, ¿qué reviso?",
+    "role": "profesor",
+    "base_question": "En Teams no me escuchan cuando entro a una reunión, ¿qué reviso?"
+  },
+  {
+    "id": "teams_devices",
+    "category": "Aplicaciones y reuniones",
+    "question": "Soy docente. No puedo activar el micrófono o la cámara en una videollamada de Teams, ¿cómo lo soluciono?",
+    "role": "profesor",
+    "base_question": "No puedo activar el micrófono o la cámara en una videollamada de Teams, ¿cómo lo soluciono?"
+  },
+  {
+    "id": "install_software",
+    "category": "Aplicaciones y reuniones",
+    "question": "Soy funcionario administrativo. Necesito instalar un programa para trabajar, ¿cómo solicito la instalación?",
+    "role": "administrativo",
+    "base_question": "Necesito instalar un programa para trabajar, ¿cómo solicito la instalación?"
+  },
+  {
+    "id": "vpn",
+    "category": "Aplicaciones y reuniones",
+    "question": "Soy funcionario administrativo. No puedo conectarme a la VPN desde fuera de la Universidad, ¿a quién debo pedir ayuda?",
+    "role": "administrativo",
+    "base_question": "No puedo conectarme a la VPN desde fuera de la Universidad, ¿a quién debo pedir ayuda?"
+  },
+  {
+    "id": "phishing",
+    "category": "Seguridad y atención",
+    "question": "Soy estudiante. Me llegó un correo extraño con un enlace, ¿lo abro o qué hago?",
+    "role": "estudiante",
+    "base_question": "Me llegó un correo extraño con un enlace, ¿lo abro o qué hago?"
+  },
+  {
+    "id": "malware",
+    "category": "Seguridad y atención",
+    "question": "Soy docente. Creo que mi computador tiene un virus, ¿qué pasos debo seguir?",
+    "role": "profesor",
+    "base_question": "Creo que mi computador tiene un virus, ¿qué pasos debo seguir?"
+  },
+  {
+    "id": "backup",
+    "category": "Seguridad y atención",
+    "question": "Soy funcionario administrativo. Necesito recuperar un archivo de una copia de seguridad, ¿cómo solicito esa ayuda?",
+    "role": "administrativo",
+    "base_question": "Necesito recuperar un archivo de una copia de seguridad, ¿cómo solicito esa ayuda?"
+  },
+  {
+    "id": "onsite",
+    "category": "Seguridad y atención",
+    "question": "Soy estudiante. La falla necesita que un técnico revise mi puesto presencialmente, ¿cómo radico el caso?",
+    "role": "estudiante",
+    "base_question": "La falla necesita que un técnico revise mi puesto presencialmente, ¿cómo radico el caso?"
+  }
+]

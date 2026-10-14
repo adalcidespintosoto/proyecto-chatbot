@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.config import get_settings
+from app.services.llm_usage import record_llm_usage
 
 logger = logging.getLogger("unimon.llm_client")
 
@@ -161,6 +162,12 @@ class LLMClient:
                 usage = data.get("usageMetadata", {})
                 prompt_tokens = usage.get("promptTokenCount", 0)
                 completion_tokens = usage.get("candidatesTokenCount", 0)
+                record_llm_usage(
+                    prompt_tokens=prompt_tokens,
+                    cached_tokens=usage.get("cachedContentTokenCount", 0),
+                    eval_tokens=completion_tokens,
+                    usage_reported=bool(usage),
+                )
 
                 print(
                     f"[GEMINI CLOUD] <<< Respuesta exitosa de '{model_name}'!\n"
@@ -227,6 +234,12 @@ class LLMClient:
                 prompt_tokens = usage.get("prompt_tokens", 0)
                 completion_tokens = usage.get("completion_tokens", 0)
                 cached_tokens = usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)
+                record_llm_usage(
+                    prompt_tokens=prompt_tokens,
+                    cached_tokens=cached_tokens,
+                    eval_tokens=completion_tokens,
+                    usage_reported=bool(usage),
+                )
                 regular_input = max(0, prompt_tokens - cached_tokens)
 
                 is_g6 = "gpt-6" in model_name.lower()
@@ -288,6 +301,11 @@ class LLMClient:
                 content = data.get("message", {}).get("content", "").strip()
                 prompt_tokens = data.get("prompt_eval_count", 0) or 0
                 eval_tokens = data.get("eval_count", 0) or 0
+                record_llm_usage(
+                    prompt_tokens=prompt_tokens,
+                    eval_tokens=eval_tokens,
+                    usage_reported=("prompt_eval_count" in data or "eval_count" in data),
+                )
 
                 print(
                     f"[OLLAMA LOCAL] <<< Respuesta exitosa de '{self.settings.llm_model}'!\n"
@@ -341,6 +359,13 @@ class LLMClient:
                     resp = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
                     if resp.status_code == 200:
                         data = resp.json()
+                        usage = data.get("usageMetadata", {})
+                        record_llm_usage(
+                            prompt_tokens=usage.get("promptTokenCount", 0),
+                            cached_tokens=usage.get("cachedContentTokenCount", 0),
+                            eval_tokens=usage.get("candidatesTokenCount", 0),
+                            usage_reported=bool(usage),
+                        )
                         candidates = data.get("candidates", [{}])
                         parts = candidates[0].get("content", {}).get("parts", [{}])
                         return parts[0].get("text", "").strip() if parts else ""
@@ -365,7 +390,15 @@ class LLMClient:
                 async with httpx.AsyncClient(timeout=timeout or self.settings.openai_timeout) as client:
                     resp = await client.post(url, json=payload, headers=headers)
                     if resp.status_code == 200:
-                        return resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        data = resp.json()
+                        usage = data.get("usage", {})
+                        record_llm_usage(
+                            prompt_tokens=usage.get("prompt_tokens", 0),
+                            cached_tokens=usage.get("prompt_tokens_details", {}).get("cached_tokens", 0),
+                            eval_tokens=usage.get("completion_tokens", 0),
+                            usage_reported=bool(usage),
+                        )
+                        return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                     logger.warning("[LLMClient] Error HTTP %s de OpenAI en generate_async: %s", resp.status_code, resp.text)
             except Exception as e:
                 logger.warning("[LLMClient] Falló generate_async con OpenAI (%s). Conmutando a contingencia Ollama...", e)
@@ -384,7 +417,13 @@ class LLMClient:
                     body["system"] = system_prompt
                 resp = await client.post(ollama_url, json=body)
                 if resp.status_code == 200:
-                    return resp.json().get("response", "").strip()
+                    data = resp.json()
+                    record_llm_usage(
+                        prompt_tokens=data.get("prompt_eval_count", 0),
+                        eval_tokens=data.get("eval_count", 0),
+                        usage_reported=("prompt_eval_count" in data or "eval_count" in data),
+                    )
+                    return data.get("response", "").strip()
         except Exception as e:
             logger.warning("[LLMClient] Falló generate_async con Ollama (%s)", e)
 

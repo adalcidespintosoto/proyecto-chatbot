@@ -900,6 +900,9 @@ def audit_chroma_database_redundancy(
     try:
         col = vector_store._collection
         count = col.count()
+        configuration = getattr(col, "configuration", None) or {}
+        collection_metadata = getattr(col, "metadata", None) or {}
+        metric = (configuration.get("hnsw") or {}).get("space") or collection_metadata.get("hnsw:space", "l2")
         print(f" Total de fragmentos indexados en la colección: {count}")
         if count == 0:
             print(" La base de datos está vacía. No hay fragmentos que auditar.")
@@ -940,7 +943,7 @@ def audit_chroma_database_redundancy(
                     other_src = meta.get("source") if meta else None
                     if not other_src or other_src == src:
                         continue
-                    sim = 1.0 - dist
+                    sim = _distance_to_similarity(dist, metric)
                     if sim >= threshold:
                         pair = tuple(sorted([src, other_src]))
                         if pair not in overlap_matrix:

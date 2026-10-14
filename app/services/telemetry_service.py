@@ -86,6 +86,10 @@ def init_telemetry_db():
                 cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN golden_cache_used INTEGER DEFAULT 0;")
             if "golden_cache_similarity" not in cols:
                 cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN golden_cache_similarity REAL;")
+            if "llm_calls" not in cols:
+                cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN llm_calls INTEGER DEFAULT 0;")
+            if "usage_tracked" not in cols:
+                cursor.execute("ALTER TABLE telemetry_interactions ADD COLUMN usage_tracked INTEGER DEFAULT 0;")
             conn.commit()
             logger.info("Base de datos de telemetría inicializada en: %s", DB_PATH)
     except Exception as e:
@@ -177,6 +181,8 @@ def log_interaction(
     feedback: str = "NONE",
     golden_cache_used: bool = False,
     golden_cache_similarity: Optional[float] = None,
+    llm_calls: int = 0,
+    usage_tracked: bool = False,
 ):
     """
     Registra una interacción y actualiza/inserta la sesión en la base de datos de telemetría.
@@ -203,8 +209,8 @@ def log_interaction(
                 INSERT INTO telemetry_interactions (
                     session_id, user_query, bot_response, intent_category, source_used,
                     referenced_docs, latency_ms, prompt_tokens, cached_tokens, eval_tokens, feedback,
-                    golden_cache_used, golden_cache_similarity
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    golden_cache_used, golden_cache_similarity, llm_calls, usage_tracked
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session_id, 
                 query, 
@@ -219,6 +225,8 @@ def log_interaction(
                 feedback,
                 1 if golden_cache_used else 0,
                 golden_similarity_value,
+                max(0, int(llm_calls or 0)),
+                1 if usage_tracked else 0,
             ))
             conn.commit()
     except Exception as e:
@@ -280,11 +288,28 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
 
         # Soporte para esquema unificado 'interactions'
         if "interactions" in tables and "telemetry_sessions" not in tables:
+            interaction_cols = {row[1] for row in cursor.execute("PRAGMA table_info(interactions)").fetchall()}
             int_conds, int_params = _build_sql_date_filter("timestamp", norm_start, norm_end)
             w_int = (" WHERE " + " AND ".join(int_conds)) if int_conds else ""
             and_int = (" AND " + " AND ".join(int_conds)) if int_conds else ""
+            # Los botones de cierre/reintento/escalamiento también se almacenan como
+            # interacciones, pero no representan una nueva consulta de soporte.
+            event_filter = (
+                "COALESCE(UPPER(feedback), 'NONE') NOT IN ('RESOLVED', 'RETRY', 'RETRY_DIAGNOSIS', 'ESCALATED')"
+                if "feedback" in interaction_cols else "1 = 1"
+            )
 
-            total_queries = cursor.execute(f"SELECT COUNT(*) FROM interactions{w_int}", int_params).fetchone()[0] or 0
+            total_interactions = cursor.execute(f"SELECT COUNT(*) FROM interactions{w_int}", int_params).fetchone()[0] or 0
+            total_queries = cursor.execute(
+                f"SELECT COUNT(*) FROM interactions WHERE {event_filter}{and_int}", int_params
+            ).fetchone()[0] or 0
+            usage_tracking_incomplete = (
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM interactions WHERE {event_filter} AND COALESCE(usage_tracked, 0) = 0{and_int}",
+                    int_params,
+                ).fetchone()[0] or 0
+                if "usage_tracked" in interaction_cols else total_queries
+            )
             total_sessions = cursor.execute(f"SELECT COUNT(DISTINCT session_id) FROM interactions{w_int}", int_params).fetchone()[0] or 0
 
             resolved = cursor.execute(f"SELECT COUNT(*) FROM interactions WHERE resolved = 1{and_int}", int_params).fetchone()[0] or 0
@@ -293,7 +318,9 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             rate_resolved = round((resolved / total_sessions * 100), 1) if total_sessions > 0 else 0.0
             rate_escalated = round((escalated / total_sessions * 100), 1) if total_sessions > 0 else 0.0
 
-            avg_latency = cursor.execute(f"SELECT AVG(latency_ms) FROM interactions WHERE latency_ms > 0{and_int}", int_params).fetchone()[0] or 0.0
+            avg_latency = cursor.execute(
+                f"SELECT AVG(latency_ms) FROM interactions WHERE latency_ms > 0 AND {event_filter}{and_int}", int_params
+            ).fetchone()[0] or 0.0
             tokens_in = cursor.execute(f"SELECT SUM(prompt_tokens) FROM interactions{w_int}", int_params).fetchone()[0] or 0
             tokens_out = cursor.execute(f"SELECT SUM(eval_tokens) FROM interactions{w_int}", int_params).fetchone()[0] or 0
 
@@ -308,7 +335,7 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             top_docs_data = cursor.execute(f"""
                 SELECT docs_used, COUNT(*) as count 
                 FROM interactions 
-                WHERE docs_used IS NOT NULL AND docs_used NOT IN ('', 'None', '[]', 'null'){and_int}
+                WHERE {event_filter} AND docs_used IS NOT NULL AND docs_used NOT IN ('', 'None', '[]', 'null'){and_int}
                 GROUP BY docs_used 
                 ORDER BY count DESC 
                 LIMIT 5
@@ -325,7 +352,7 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             top_queries_data = cursor.execute(f"""
                 SELECT user_query, COUNT(*) as count 
                 FROM interactions 
-                WHERE length(TRIM(user_query)) > 5 
+                WHERE {event_filter} AND length(TRIM(user_query)) > 5
                   AND LOWER(TRIM(user_query)) NOT IN ('hola', 'estudiante', 'profesor', 'docente', 'administrativo', 'funcionario', 'otros', 'otro', 'resolved', 'retry_diagnosis'){and_int}
                 GROUP BY LOWER(TRIM(user_query)) 
                 ORDER BY count DESC 
@@ -351,7 +378,24 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             and_int = (" AND " + " AND ".join(int_conds)) if int_conds else ""
 
             total_sessions = cursor.execute(f"SELECT COUNT(*) FROM telemetry_sessions{w_sess}", sess_params).fetchone()[0] or 0
-            total_queries = cursor.execute(f"SELECT COUNT(*) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
+            total_interactions = cursor.execute(f"SELECT COUNT(*) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
+            interaction_cols = {row[1] for row in cursor.execute("PRAGMA table_info(telemetry_interactions)").fetchall()}
+            # RESOLVED/RETRY/ESCALATED son respuestas a botones del flujo conversacional,
+            # no nuevas preguntas que deban inflar el volumen de consultas.
+            event_filter = (
+                "COALESCE(UPPER(feedback), 'NONE') NOT IN ('RESOLVED', 'RETRY', 'RETRY_DIAGNOSIS', 'ESCALATED')"
+                if "feedback" in interaction_cols else "1 = 1"
+            )
+            total_queries = cursor.execute(
+                f"SELECT COUNT(*) FROM telemetry_interactions WHERE {event_filter}{and_int}", int_params
+            ).fetchone()[0] or 0
+            usage_tracking_incomplete = (
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM telemetry_interactions WHERE {event_filter} AND COALESCE(usage_tracked, 0) = 0{and_int}",
+                    int_params,
+                ).fetchone()[0] or 0
+                if "usage_tracked" in interaction_cols else total_queries
+            )
 
             resolved = cursor.execute(
                 f"SELECT COUNT(*) FROM telemetry_sessions WHERE final_status IN ('FINALIZADO', 'SOLUCIONADO', 'RESOLVED'){and_sess}",
@@ -366,7 +410,9 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             rate_resolved = round((resolved / total_sessions * 100), 1) if total_sessions > 0 else 0.0
             rate_escalated = round((escalated / total_sessions * 100), 1) if total_sessions > 0 else 0.0
 
-            avg_lat_row = cursor.execute(f"SELECT AVG(latency_ms) FROM telemetry_interactions WHERE latency_ms > 0{and_int}", int_params).fetchone()[0]
+            avg_lat_row = cursor.execute(
+                f"SELECT AVG(latency_ms) FROM telemetry_interactions WHERE latency_ms > 0 AND {event_filter}{and_int}", int_params
+            ).fetchone()[0]
             avg_latency = avg_lat_row or 0.0
             tokens_in = cursor.execute(f"SELECT SUM(prompt_tokens) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
             try:
@@ -420,7 +466,7 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             top_docs_data = cursor.execute(f"""
                 SELECT referenced_docs, COUNT(*) as count 
                 FROM telemetry_interactions 
-                WHERE referenced_docs IS NOT NULL AND referenced_docs NOT IN ('', 'None', '[]', 'null'){and_int}
+                WHERE {event_filter} AND referenced_docs IS NOT NULL AND referenced_docs NOT IN ('', 'None', '[]', 'null'){and_int}
                 GROUP BY referenced_docs 
                 ORDER BY count DESC 
                 LIMIT 5
@@ -438,7 +484,7 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             top_queries_data = cursor.execute(f"""
                 SELECT user_query, COUNT(*) as count 
                 FROM telemetry_interactions 
-                WHERE user_query IS NOT NULL 
+                WHERE {event_filter} AND user_query IS NOT NULL
                   AND length(TRIM(user_query)) > 5 
                   AND LOWER(TRIM(user_query)) NOT IN ('hola', 'estudiante', 'profesor', 'docente', 'administrativo', 'funcionario', 'otros', 'otro', 'resolved', 'retry_diagnosis'){and_int}
                 GROUP BY LOWER(TRIM(user_query)) 
@@ -481,6 +527,8 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             "estimated_cost_cop": round(cost_cop, 0),
             "total_sessions": total_sessions,
             "total_queries": total_queries,
+            "total_interactions": total_interactions,
+            "usage_tracking_incomplete_interactions": usage_tracking_incomplete,
             "role_distribution": role_distribution,
             "top_documents": top_documents,
             "top_queries": top_queries,
@@ -499,6 +547,8 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             "gasto_estimado_cop": round(cost_cop, 0),
             "total_sesiones": total_sessions,
             "total_consultas": total_queries,
+            "total_interacciones": total_interactions,
+            "interacciones_con_uso_llm_incompleto": usage_tracking_incomplete,
             "distribucion_roles": role_distribution,
             "top_documentos_referenciados": top_documents,
             "top_preguntas_frecuentes": top_queries

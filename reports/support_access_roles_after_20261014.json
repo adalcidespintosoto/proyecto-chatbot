@@ -1,0 +1,83 @@
+{
+  "run_id": "effectiveness_20261014_114216",
+  "method": "RouterLogic real, sesiones aisladas; sin API, telemetría ni promoción a Golden Cache",
+  "results": [
+    {
+      "id": "access_email",
+      "category": "Cuentas y acceso",
+      "question": "No puedo entrar al correo institucional, ¿qué reviso?",
+      "answer": "Prueba estas verificaciones seguras:\n\n1. Confirma que la dirección esté escrita completa y sin errores, y revisa que la contraseña no tenga activadas accidentalmente las mayúsculas o un idioma de teclado distinto.\n2. Recarga la página o intenta desde una ventana privada u otro navegador actualizado. Si puedes, prueba también desde otra red.\n3. Si el servicio ofrece recuperación de contraseña, úsala desde la página oficial del correo institucional; no compartas tu contraseña ni códigos de verificación.\n\nLos fragmentos disponibles describen el acceso a Paymentez, no al correo institucional, así que no puedo confirmar la ruta de acceso ni recuperación de la Universidad. ¿A qué perfil corresponde tu cuenta: estudiante, docente o funcionario?\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Paymentez - Manual de usuario Link de pagos y Dashboard (2).pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 21870.2,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "access_teams",
+      "category": "Cuentas y acceso",
+      "question": "Teams no me deja iniciar sesión, ¿qué puedo hacer?",
+      "answer": "Prueba primero iniciar sesión en el **correo institucional de Microsoft** desde el sitio web de Unisimon: ve a **Servicios** y elige la opción correspondiente a tu perfil:\n\n- **Si eres estudiante:** **Correo Estudiantes**. Usa tu usuario y contraseña de Microsoft.\n- **Si eres funcionario:** **Correo Funcionarios Microsoft**. Usa el usuario y la clave indicados en el Portal de Gestión Académico-Administrativa; el instructivo **Credenciales de Microsoft** explica cómo consultar tus credenciales.\n\nSi el acceso falla, revisa que no haya errores al escribir el usuario o la contraseña y prueba desde una ventana privada del navegador o desde otro navegador actualizado. Si el correo institucional tampoco te permite entrar, el problema puede estar en las credenciales de Microsoft; no compartas tu contraseña ni códigos de verificación.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Como_acceder_a_Microsoft_Teams.pdf",
+        "Como_acceder_MS_Teams_Estudiantes.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 20139.8,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "forgot_password",
+      "category": "Cuentas y acceso",
+      "question": "Se me olvidó la contraseña de la cuenta institucional, ¿cómo la recupero?",
+      "answer": "El procedimiento depende del servicio asociado a la cuenta, y no quiero indicarte una ruta que no corresponda. ¿Es la contraseña del **portal de estudiantes, aula extendida o correo institucional**, o la de **Kactus/Seven**?\n\n- **Portal de estudiantes, aula extendida o correo institucional:** la guía indica ir a **«Olvidé mi Usuario / Contraseña»**. Describe un restablecimiento con un enlace enviado al correo personal, pero los fragmentos disponibles no precisan todos los pasos para iniciarlo.\n- **Kactus/Seven:** si ya puedes iniciar sesión, puedes cambiar la contraseña en el portal de autogestión. Si olvidaste la clave del portal de autogestión, debes gestionar el reinicio con Talento Humano; si es un bloqueo del ERP, la recuperación se solicita por la mesa de servicio.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Paymentez - Manual de usuario Link de pagos y Dashboard (2).pdf",
+        "Restablecimiento de contraseña.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7841.7,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "locked_account",
+      "category": "Cuentas y acceso",
+      "question": "Me bloquearon el usuario, ¿cómo vuelvo a entrar?",
+      "answer": "Si el bloqueo aparece al intentar entrar a Microsoft, evita seguir probando contraseñas para no prolongarlo. La guía institucional disponible explica cómo consultar o cambiar las credenciales de Microsoft, pero no indica cómo desbloquear una cuenta.\n\nSi el bloqueo aparece en otro servicio, el procedimiento puede ser distinto. ¿En qué servicio te aparece el bloqueo y qué perfil tienes (estudiante, docente o funcionario)?\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Credenciales microsoft.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8521.6,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "changed_password",
+      "category": "Cuentas y acceso",
+      "question": "Ya cambié la contraseña y todavía no puedo acceder, ¿qué hago?",
+      "answer": "Prueba primero estas verificaciones seguras: confirma que estás usando el usuario correspondiente a ese servicio y vuelve a escribir la contraseña, revisando mayúsculas, idioma del teclado y espacios accidentales. No compartas tu contraseña ni códigos de verificación.\n\nLos pasos dependen de qué cuenta estés intentando abrir:\n\n- **Usuario y correo institucional durante la activación:** el instructivo indica que el usuario y la contraseña inicial están al final del recibo de matrícula. Si el inconveniente con la contraseña continúa, señala como contacto **trabajodesdecasa@unisim onbolivar.edu.co**; la dirección aparece partida en el documento, así que verifica su escritura antes de enviar.\n- **Microsoft Teams:** el instructivo indica iniciar sesión con las credenciales de Microsoft que se consultan en el Portal de Gestión Académico-Administrativa.\n\n¿A qué servicio intentas acceder y cuál es tu perfil (estudiante, docente o funcionario)? Eso determina el siguiente paso.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Como_acceder_a_Microsoft_Teams.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8890.8,
+      "quality_verdict": null,
+      "quality_reason": null
+    }
+  ]
+}
