@@ -1,0 +1,22 @@
+[
+  {"id":"h1_teams_new_student","category":"Teams","question":"Un compañero se inscribió tarde en la materia y no le sale el equipo en Teams. ¿Qué puede hacer él desde el portal?"},
+  {"id":"h2_teams_teacher_member","category":"Teams","question":"Doy clase y debo invitar a una alumna al equipo de Teams de mi curso, ¿qué botones toco?"},
+  {"id":"h3_student_grade_period","category":"Portal Estudiantes","question":"Quiero mirar mis calificaciones del semestre pasado y, si se puede, imprimirlas. ¿Dónde lo hago?"},
+  {"id":"h4_teacher_enter_grades","category":"Portal Profesores","question":"Soy profesor, ¿cómo guardo un borrador de las notas antes de enviarlas definitivamente?"},
+  {"id":"h5_new_student_report","category":"SIAAF","question":"Soy administrativo y me piden en PDF el consolidado de alumnos nuevos de pregrado. ¿Dónde pongo el año, el periodo y la fecha?"},
+  {"id":"h6_kactus_access","category":"Kactus","question":"Entré a Kactus, pero me pide actualizar la contraseña. ¿La cambio yo desde Autogestión o la tiene que asignar TI?"},
+  {"id":"h7_seven_user","category":"Seven","question":"Llegó una funcionaria que necesita acceso a Seven para su trabajo. ¿Quién debe pedir la cuenta y qué datos envía?"},
+  {"id":"h8_student_password","category":"Portal Estudiantes","question":"No recuerdo la clave con la que entro a Aula Extendida y al Portal Estudiantes. ¿Qué opción uso para recuperarla?"},
+  {"id":"h9_first_semester_credentials","category":"Cuentas","question":"Acabo de entrar a primer semestre. Ya pagué; ¿en el recibo viene la contraseña o me la manda alguien por correo?"},
+  {"id":"h10_suspicious_verification","category":"Seguridad","question":"Me llegó por correo un enlace para confirmar mi usuario y contraseña institucional y yo no pedí nada. ¿Se lo paso a soporte?"},
+  {"id":"h11_antivirus_alert","category":"Seguridad","question":"El antivirus del computador de la Universidad encontró un archivo sospechoso. ¿Puedo mandarlo a cuarentena yo mismo?"},
+  {"id":"h12_vpn_request","category":"VPN","question":"Para entrar a un servidor de la Universidad desde mi casa me dijeron que use VPN. ¿A quién solicito el acceso y qué tengo que explicar?"},
+  {"id":"h13_restore_backup","category":"Copias","question":"Necesito recuperar información de una copia de seguridad de mi dependencia. ¿Quién la pide y a qué correo se envía?"},
+  {"id":"h14_office_install","category":"Software","question":"En mi cuenta institucional veo Microsoft 365, pero no sé dónde está el botón para bajar Office al portátil. ¿Cuál es la ruta?"},
+  {"id":"h15_other_software","category":"Software","question":"Necesitamos instalar un aplicativo diferente de Office en un equipo de la oficina. ¿Lo pido yo o mi jefe?"},
+  {"id":"h16_teams_share_recording","category":"Teams","question":"Soy docente y quiero publicar en Stream la clase que grabé en Teams para que solo la vea mi grupo. ¿Cómo le doy permisos?"},
+  {"id":"h17_teams_independent_meeting","category":"Teams","question":"Tengo que convocar por Teams a una persona de otra dependencia sin crear un equipo. ¿Lo hago desde Calendario?"},
+  {"id":"h18_cert_electronic","category":"Portal Estudiantes","question":"Entré a Certificados Electrónicos y veo varios. ¿Cuál es el paso para descargar el certificado que necesito?"},
+  {"id":"h19_campus_wifi","category":"Conectividad","question":"Mi portátil se conecta al wifi de la sede, pero se cae a cada rato. ¿Qué puedo comprobar antes de reportarlo?"},
+  {"id":"h20_network_point_report","category":"Red","question":"El cable de red de mi puesto no da conexión y otros compañeros sí navegan. ¿Dónde radico la revisión del punto?"}
+]

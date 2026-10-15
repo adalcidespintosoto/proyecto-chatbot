@@ -1,0 +1,31 @@
+{
+  "run_id": "effectiveness_20261014_145157",
+  "method": "RouterLogic real, sesiones aisladas; sin API, telemetría ni promoción a Golden Cache",
+  "results": [
+    {
+      "id": "r2_student_grades",
+      "category": "Plataformas académicas",
+      "question": "¿En qué parte del portal miro las notas que me puso el profesor?",
+      "answer": "Revisa el módulo **Calificaciones** del **Portal de Estudiantes**. La guía disponible confirma que es el instructivo para consultar calificaciones, pero no muestra la ruta completa dentro del portal; por eso no puedo confirmar qué opción debes seleccionar después de entrar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Calificaciones.pptx",
+        "Calificaciones.pdf",
+        "Gestión Prácticas - Funcionarios.pdf",
+        "instructivo portales estudiantes.pptx",
+        "instructivo portales estudiantes.pdf",
+        "Matrícula Antiguos Posgrados.pdf",
+        "Asignación Académica.pptx",
+        "Reporte - Asignaturas por Grupos.pptx",
+        "Bancos y cuentas_v1_20211007.pdf",
+        "Autorización de Supletorios.pdf",
+        "Evaluacion Profesoral - Estudiante.pdf",
+        "Instructivo Módulo Atención Estudiantes (Completo).pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 15625.4,
+      "quality_verdict": null,
+      "quality_reason": null
+    }
+  ]
+}

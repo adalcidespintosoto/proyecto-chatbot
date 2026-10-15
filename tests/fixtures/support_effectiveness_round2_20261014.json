@@ -1,0 +1,22 @@
+[
+  {"id":"r2_student_first_access","category":"Cuentas y acceso","question":"Ya pagué la matrícula y soy nuevo, ¿dónde encuentro las credenciales para entrar por primera vez?"},
+  {"id":"r2_staff_reset_password","category":"Cuentas y acceso","question":"Olvidé la clave de Kactus, ¿la puedo recuperar desde el portal o debe pedírmela alguien de TI?"},
+  {"id":"r2_account_creation_request","category":"Cuentas y acceso","question":"A una persona nueva de mi área todavía no le han creado el usuario institucional, ¿cómo se solicita?"},
+  {"id":"r2_account_access_change","category":"Cuentas y acceso","question":"A un compañero le cambiaron las funciones y necesita otros permisos en el sistema, ¿quién pide ese cambio?"},
+  {"id":"r2_teams_class_access","category":"Teams y docencia","question":"Soy estudiante y no me aparece la materia en Teams, ¿cómo hago para que me agreguen al grupo?"},
+  {"id":"r2_teams_add_member","category":"Teams y docencia","question":"Soy docente y necesito meter a un estudiante nuevo al equipo de la asignatura, ¿por dónde se agrega?"},
+  {"id":"r2_teams_meeting_recording","category":"Teams y docencia","question":"Grabé una reunión de Teams y ahora no encuentro el video, ¿dónde queda guardado?"},
+  {"id":"r2_teams_recording_share","category":"Teams y docencia","question":"¿Cómo comparto con mis estudiantes la grabación de una clase que hice por Teams?"},
+  {"id":"r2_teams_guest_meeting","category":"Teams y docencia","question":"Necesito reunirme por Teams con alguien que no pertenece a un grupo o curso, ¿cómo creo esa reunión?"},
+  {"id":"r2_teams_microphone_ipad","category":"Teams y docencia","question":"En mi iPad entro a Teams pero no me oyen en la reunión, ¿qué ajustes reviso?"},
+  {"id":"r2_student_moodle_groups","category":"Plataformas académicas","question":"Ya veo mis cursos en Teams, pero me faltan en Moodle; ¿cómo se matriculan esos grupos?"},
+  {"id":"r2_student_grades","category":"Plataformas académicas","question":"¿En qué parte del portal miro las notas que me puso el profesor?"},
+  {"id":"r2_student_certificates","category":"Plataformas académicas","question":"Necesito bajar un certificado de estudiante, ¿qué opción del sistema debo usar?"},
+  {"id":"r2_report_new_students","category":"Sistemas e informes","question":"Me pidieron el listado de estudiantes nuevos de pregrado con fecha y periodo, ¿cómo saco ese PDF?"},
+  {"id":"r2_request_software","category":"Equipos y software","question":"Me asignaron un portátil del trabajo y necesito un programa que no trae, ¿quién debe tramitar que lo instalen?"},
+  {"id":"r2_remote_access_vpn","category":"Red y acceso remoto","question":"Voy a trabajar desde casa y necesito conectarme a recursos internos, ¿qué información debo mandar para pedir VPN?"},
+  {"id":"r2_backup_restore","category":"Copias y recuperación","question":"Borré por error un archivo de trabajo de una carpeta compartida, ¿cómo solicito que lo restauren?"},
+  {"id":"r2_phishing_report","category":"Seguridad","question":"Me llegó un mensaje que parece de la Universidad y me pide validar la contraseña en un enlace; ¿a quién se lo reporto?"},
+  {"id":"r2_malware_response","category":"Seguridad","question":"Windows mostró una alerta de posible malware en el equipo institucional, ¿debo intentar limpiarlo yo?"},
+  {"id":"r2_kactus_update","category":"Sistemas e informes","question":"Kactus me muestra una versión distinta y dejó de funcionar una opción, ¿cómo se reporta o gestiona esa actualización?"}
+]

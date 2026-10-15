@@ -25,11 +25,12 @@ from app.services.rag_service import (
     _is_unspecified_account_scope,
     _select_forgotten_email_context_chunks,
     _expand_chunks_with_neighbors,
-    _fit_context_budget,
     _is_step_by_step_query,
+    _asks_for_contact_channel,
     _is_safe_first_line_self_help_query,
     _redact_unverified_email_addresses,
     _strip_declared_role_prefix,
+    _is_ui_navigation_query,
 )
 
 
@@ -57,6 +58,76 @@ def test_role_intro_does_not_dominate_document_title_terms():
     ) == "¿Cómo genero el reporte de estudiantes nuevos?"
 
 
+@pytest.mark.parametrize("question", [
+    "¿Dónde escribo mi usuario y contraseña en el Portal Estudiante?",
+    "Estoy en la página de Portales, ¿qué botón debo seleccionar?",
+    "¿Cómo llego desde el inicio al portal para iniciar sesión?",
+])
+def test_ui_map_retrieval_is_enabled_for_interface_location_questions(question):
+    assert _is_ui_navigation_query(question)
+
+
+def test_ui_map_retrieval_is_not_enabled_for_general_process_questions():
+    assert not _is_ui_navigation_query("¿Cómo solicito una constancia de estudios?")
+
+
+@pytest.mark.asyncio
+async def test_ui_map_is_added_to_context_for_interface_location_question():
+    question = "¿Dónde escribo mi usuario y contraseña en el Portal Estudiante?"
+    ui_doc = SimpleNamespace(
+        page_content=(
+            "MAPA VISUAL VERIFICADO: Portal Estudiante. Sección Credenciales, columna izquierda: "
+            "campo Usuario, campo Contraseña y botón Acceder. Columna derecha: Política de tratamiento "
+            "de datos personales y enlace Olvidé mi Usuario / Contraseña."
+        ),
+        metadata={
+            "source": "Web_UI_Unisimon_Portal_Estudiantes.md",
+            "source_type": "public_web_ui",
+            "ui_verified": True,
+            "audience": "general",
+        },
+    )
+
+    class FakeCollection:
+        def count(self):
+            return 1
+
+        def get(self, **kwargs):
+            return {"ids": [], "documents": [], "metadatas": []}
+
+    class FakeVectorStore:
+        _collection = FakeCollection()
+
+        def __init__(self):
+            self.ui_filter_used = False
+
+        def similarity_search_with_relevance_scores(self, _query, k=8, filter=None):
+            if filter == {"source_type": "public_web_ui"}:
+                self.ui_filter_used = True
+                return [(ui_doc, 0.92)]
+            return []
+
+    llm = AsyncMock(return_value={"content": "En Credenciales, escribe los datos y pulsa Acceder."})
+    vector_store = FakeVectorStore()
+    expanded_chunks = [
+        (make_doc(f"Manual {index}.pdf", f"Fragmento de contexto de apoyo número {index}."),
+         f"Fragmento de contexto de apoyo número {index}.")
+        for index in range(10)
+    ] + [(ui_doc, ui_doc.page_content)]
+    with patch.object(rag_service, "_vector_store", vector_store):
+        with patch("app.services.rag_service.async_generate_multi_query_variants", new=AsyncMock(return_value=[question])):
+            with patch("app.services.rag_service.get_reranker", return_value=None):
+                    with patch("app.services.rag_service._expand_chunks_with_neighbors", return_value=expanded_chunks):
+                        with patch.object(rag_service.llm_client, "chat_completion", new=llm):
+                            result = await rag_service.query_rag(question, user_role="general")
+
+    sent_messages = "\n".join(str(message.get("content", "")) for message in llm.await_args.kwargs["messages"])
+    assert vector_store.ui_filter_used
+    assert "Web_UI_Unisimon_Portal_Estudiantes.md" in result["sources"]
+    assert "columna izquierda" in sent_messages
+    assert result["retrieved_chunks"] == 8
+
+
 def test_request_channel_evidence_survives_context_budget():
     question = "Necesito recuperar una copia de seguridad, ¿cómo solicito ayuda?"
     source = "Procedimiento de respaldo.pdf"
@@ -72,9 +143,27 @@ def test_request_channel_evidence_survives_context_budget():
         question=question,
     )
     assert any("soporte@unisimon.edu.co" in text for _doc, text in selected)
-    fitted = _fit_context_budget(selected, question, budget=100, max_chunks=1)
-    assert len(fitted) == 1
-    assert "soporte@unisimon.edu.co" in fitted[0][1]
+
+
+def test_colloquial_contact_request_keeps_restoration_channel():
+    question = "Necesito recuperar una copia de seguridad, ¿a qué correo se envía?"
+    source = "Procedimiento de respaldo.pdf"
+    introduction = make_doc(source, "Definiciones generales del respaldo de información.")
+    channel = make_doc(
+        source,
+        "Solicitud de restauración de Backup: envíe correo a solicitudcomputo@unisimon.edu.co.",
+    )
+    assert _asks_for_contact_channel(question)
+    selected = _select_context_chunks(
+        [(introduction, 0.9), (channel, 0.6)], max_chunks=1, question=question,
+    )
+    assert "solicitudcomputo@unisimon.edu.co" in selected[0][1]
+
+
+def test_download_question_is_procedural_and_not_an_account_lookup():
+    question = "En mi cuenta institucional, ¿dónde está el botón para bajar Office?"
+    assert _is_step_by_step_query(question)
+    assert not is_account_identifier_query(question)
 
 
 def test_new_student_account_query_searches_all_categories_for_complementary_evidence():
@@ -779,41 +868,6 @@ def test_context_expansion_keeps_all_useful_chunks_from_adjacent_pages_in_order(
         "Luego seleccione el módulo Rectoría",
         "Después elija el informe Reintegro",
     ]
-
-
-def test_procedural_context_budget_is_larger_and_keeps_chunks_whole():
-    question = "¿Cuál es el paso a paso para realizar el trámite?"
-    simple_question = "¿Cuál es el horario?"
-    assert _is_step_by_step_query(question)
-    assert not _is_step_by_step_query(simple_question)
-    chunks = [
-        (make_doc("Manual.pdf", f"Texto del paso {index}. " * 45), f"Texto del paso {index}. " * 45)
-        for index in range(8)
-    ]
-    procedural = _fit_context_budget(chunks, question, budget=3800)
-    simple = _fit_context_budget(chunks, simple_question, budget=1400)
-    assert 3 < len(procedural) <= 8
-    assert len(simple) < len(procedural)
-    assert all(text.endswith(" ") or text.endswith(".") for _, text in procedural + simple)
-
-
-def test_context_budget_reserves_preferred_document_neighbors_before_weak_anchors():
-    weak_anchor = make_doc("Generic Access Policy.pdf", "Generic policy " * 14)
-    weak_anchor.metadata["_rag_anchor"] = True
-    preferred_neighbor = make_doc("Target Procedure.pdf", "Digite el usuario y presione Acceder.")
-    preferred_neighbor.metadata.update({
-        "_rag_preferred_source": True,
-        "_rag_sequence": (4, 0),
-    })
-
-    fitted = _fit_context_budget(
-        [(weak_anchor, weak_anchor.page_content), (preferred_neighbor, preferred_neighbor.page_content)],
-        "¿Cómo ingreso al sistema?",
-        budget=80,
-        max_chunks=2,
-    )
-
-    assert [doc.metadata["source"] for doc, _ in fitted] == ["Target Procedure.pdf"]
 
 
 @pytest.mark.parametrize("question", [

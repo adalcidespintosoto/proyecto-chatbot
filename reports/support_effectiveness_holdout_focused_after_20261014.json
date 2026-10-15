@@ -1,0 +1,94 @@
+{
+  "run_id": "effectiveness_20261014_150211",
+  "method": "RouterLogic real, sesiones aisladas; sin API, telemetría ni promoción a Golden Cache",
+  "results": [
+    {
+      "id": "h2_teams_teacher_member",
+      "category": "Teams",
+      "question": "Doy clase y debo invitar a una alumna al equipo de Teams de mi curso, ¿qué botones toco?",
+      "answer": "En Teams, ve a **Equipos** y selecciona el equipo de tu curso. Luego:\n\n1. Haz clic en **Más opciones**.\n2. Selecciona **Agregar miembro**.\n3. Escribe el correo electrónico o nombre de usuario de la alumna y selecciónala.\n4. Pulsa **Enviar solicitud**.\n\nTeams indicará que la solicitud fue enviada a la alumna para que se una al grupo.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Agregar_miembros_Grupos_MS_Teams.pdf",
+        "Grupos_en_Teams.pdf",
+        "Matricular_grupos_teams_Estudiante.pdf",
+        "Grabar un clase en Teams y compartir en Stream.pdf",
+        "Videollamadas en  Teams.pdf",
+        "Grabar videollamadas en Teams.pdf",
+        "Profesores_Integración teams y moodle.pdf",
+        "Fucionarios_Integración Moodle y Teams.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 16312.6,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "h11_antivirus_alert",
+      "category": "Seguridad",
+      "question": "El antivirus del computador de la Universidad encontró un archivo sospechoso. ¿Puedo mandarlo a cuarentena yo mismo?",
+      "answer": "No. Si el antivirus detecta malware, la desinfección o cuarentena corresponde a Seguridad Informática; no manipules el archivo ni intentes ponerlo en cuarentena por tu cuenta. Evita abrirlo o reenviarlo y reporta la detección por el canal oficial de soporte de la Universidad para que el personal autorizado la atienda.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-07_Procedimiento_Proteccion_de_Codigo_Malicioso_.pdf",
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "CP-GT-01_Gestion_de_TI.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 13147.2,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "h12_vpn_request",
+      "category": "VPN",
+      "question": "Para entrar a un servidor de la Universidad desde mi casa me dijeron que use VPN. ¿A quién solicito el acceso y qué tengo que explicar?",
+      "answer": "Solicita el apoyo de la Dirección de TI. Explica qué acceso remoto necesitas, cuál es la necesidad y durante cuánto tiempo lo requieres. La Universidad indica que el acceso remoto a su infraestructura debe realizarse mediante VPN o conexiones SSH.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 6157.0,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "h13_restore_backup",
+      "category": "Copias",
+      "question": "Necesito recuperar información de una copia de seguridad de mi dependencia. ¿Quién la pide y a qué correo se envía?",
+      "answer": "La solicitud de restauración debe estar justificada y autorizada por el líder del proceso o subproceso al que pertenece la información. Los fragmentos no indican quién debe enviarla ni confirman un correo específico para tramitar la restauración.\n\nPara una copia de seguridad de información de una dependencia, consulta con el área de Soporte Técnico cómo registrar la solicitud; no uses el correo indicado para copias de dispositivos de usuario, ya que corresponde a otro procedimiento.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7390.2,
+      "quality_verdict": null,
+      "quality_reason": null
+    },
+    {
+      "id": "h14_office_install",
+      "category": "Software",
+      "question": "En mi cuenta institucional veo Microsoft 365, pero no sé dónde está el botón para bajar Office al portátil. ¿Cuál es la ruta?",
+      "answer": "La ruta documentada para descargar Office es para **funcionarios**:\n\n1. En el sitio web de Unisimon, ve a **Servicios → Correo Funcionarios Microsoft** e inicia sesión con tus credenciales de Microsoft indicadas en el Portal de Gestión Académico-Administrativa.\n2. En el panel principal, selecciona **Instalar Office** y luego **Otras opciones de instalación**.\n3. Selecciona nuevamente **Instalar Office** y guarda el archivo descargado en tu portátil.\n4. Abre el archivo y sigue las instrucciones de instalación; al terminar, haz clic en **Cerrar**.\n\nSi tu cuenta es de estudiante, los documentos disponibles no confirman que esa misma ruta permita descargar Office con una cuenta estudiantil.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Credenciales microsoft.pdf",
+        "Descarga e instalación Ms 365.pdf",
+        "instructivo portales estudiantes.pptx",
+        "instructivo portales estudiantes.pdf",
+        "Servicios Institucionales - Profesores.pdf",
+        "Activar Usuario y Correo institucional.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 9613.0,
+      "quality_verdict": null,
+      "quality_reason": null
+    }
+  ]
+}

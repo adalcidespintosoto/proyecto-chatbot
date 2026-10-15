@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "description": "Lista revisada de páginas públicas útiles para orientar a estudiantes, aspirantes y visitantes de Unisimón. Se indexa el texto estático y, para rutas revisadas visualmente, un mapa de regiones y controles sin valores de campos. No se envían formularios ni se accede a áreas autenticadas.",
+  "pages": [
+    {"url": "https://unisimon.edu.co/", "title": "Inicio Unisimón", "section": "Navegación general", "slug": "Inicio",
+      "ui_snapshot_date": "2026-10-15",
+      "ui_map": {
+        "regions": [
+          {"name": "Cabecera", "items": ["Acreditación institucional y logotipo", "Unisimón Radio", "Contacto", "Ir a Campus Cúcuta"]},
+          {"name": "Menú principal horizontal", "items": ["Inicio", "Aspirantes", "La Universidad", "Oferta Académica", "Investigación", "Noticias", "Portales", "Intranet", "Servicios"]},
+          {"name": "Accesos académicos", "items": ["Pregrado", "Especializaciones", "Maestrías", "Doctorados", "Educación Continuada"]},
+          {"name": "Accesos de Aspirantes", "items": ["Inscripciones", "Admitidos", "Calendario Académico", "Valores de Matrícula y Pecuniarios", "Apoyo Financiero"]},
+          {"name": "Contenido principal", "items": ["Banner rotativo con enlace de más información", "Eventos Unisimón", "Noticias Unisimón"]},
+          {"name": "Pie de página", "items": ["La Universidad", "La Comunidad", "Enlaces de Interés", "Centro de Ayuda", "Datos de las sedes"]}
+        ],
+        "headings": [],
+        "navigation": [
+          {"label": "Inicio", "url": "https://unisimon.edu.co/"},
+          {"label": "Aspirantes", "url": "https://unisimon.edu.co/aspirantes"},
+          {"label": "La Universidad", "url": "https://unisimon.edu.co/launiversidad"},
+          {"label": "Oferta Académica", "url": "https://unisimon.edu.co/aspirantes/ofertasacademicas"},
+          {"label": "Investigación", "url": "https://unisimon.edu.co/iie"},
+          {"label": "Noticias", "url": "https://unisimon.edu.co/blog"},
+          {"label": "Portales", "url": "https://unisimon.edu.co/portales"},
+          {"label": "Intranet", "url": "https://unisimonedu.sharepoint.com/sites/IntranetUnisimon"}
+        ],
+        "fields": [{"label": "Buscar", "type": "search"}],
+        "actions": ["Más información", "Ver más", "Ver todos", "Ver todas las noticias"]
+      }},
+    {"url": "https://unisimon.edu.co/portales", "title": "Portales institucionales", "section": "Portales", "slug": "Portales"},
+    {"url": "https://unisimon.edu.co/portales/estudiantes", "title": "Portal Estudiantes", "section": "Portales", "slug": "Portal_Estudiantes",
+      "ui_snapshot_date": "2026-10-15",
+      "ui_map": {
+        "regions": [
+          {"name": "Cabecera", "items": ["Logotipo institucional", "Menú principal horizontal", "Contacto", "Ir a Campus Cúcuta"]},
+          {"name": "Título de página", "items": ["Portal Estudiante"]},
+          {"name": "Sección Credenciales — columna izquierda", "items": ["Campo Usuario", "Campo Contraseña", "Recomendación de usar Google Chrome", "Botón Acceder"]},
+          {"name": "Sección Credenciales — columna derecha", "items": ["Política de tratamiento de datos personales", "Olvidé mi Usuario / Contraseña"]},
+          {"name": "Pie de página", "items": ["Enlaces institucionales", "Sedes Barranquilla y Cúcuta"]}
+        ],
+        "headings": ["Portal Estudiante", "Credenciales"],
+        "navigation": [
+          {"label": "Inicio", "url": "https://unisimon.edu.co/"},
+          {"label": "Aspirantes", "url": "https://unisimon.edu.co/aspirantes"},
+          {"label": "La Universidad", "url": "https://unisimon.edu.co/launiversidad"},
+          {"label": "Oferta Académica", "url": "https://unisimon.edu.co/aspirantes/ofertasacademicas"},
+          {"label": "Investigación", "url": "https://unisimon.edu.co/iie"},
+          {"label": "Noticias", "url": "https://unisimon.edu.co/blog"},
+          {"label": "Portales", "url": "https://unisimon.edu.co/portales"},
+          {"label": "Intranet", "url": "https://unisimonedu.sharepoint.com/sites/IntranetUnisimon"}
+        ],
+        "fields": [
+          {"label": "Usuario", "type": "text"},
+          {"label": "Contraseña", "type": "password"}
+        ],
+        "actions": ["Acceder", "Política de tratamiento de datos personales", "Olvidé mi Usuario / Contraseña"]
+      }},
+    {"url": "https://unisimon.edu.co/portales/administrativos", "title": "Portal Profesores y Administrativos", "section": "Portales", "slug": "Portal_Profesores_y_Administrativos"},
+    {"url": "https://unisimon.edu.co/aspirantes", "title": "Aspirantes", "section": "Aspirantes", "slug": "Aspirantes"},
+    {"url": "https://unisimon.edu.co/aspirantes/admisionespregrado", "title": "Admisiones de pregrado", "section": "Aspirantes", "slug": "Admisiones_Pregrado"},
+    {"url": "https://unisimon.edu.co/aspirantes/apoyofinanciero", "title": "Apoyo financiero", "section": "Aspirantes", "slug": "Apoyo_Financiero"},
+    {"url": "https://unisimon.edu.co/aspirantes/inscripciones", "title": "Inscripciones", "section": "Aspirantes", "slug": "Inscripciones"},
+    {"url": "https://unisimon.edu.co/aspirantes/admitidos", "title": "Listado de admitidos", "section": "Aspirantes", "slug": "Admitidos"},
+    {"url": "https://unisimon.edu.co/aspirantes/calendario", "title": "Calendario académico", "section": "Aspirantes", "slug": "Calendario_Academico"},
+    {"url": "https://unisimon.edu.co/aspirantes/matriculas", "title": "Matrículas y valores", "section": "Aspirantes", "slug": "Matriculas_y_Valores"},
+    {"url": "https://unisimon.edu.co/pregrados", "title": "Programas de pregrado", "section": "Oferta académica", "slug": "Pregrados"},
+    {"url": "https://unisimon.edu.co/posgrados", "title": "Programas de posgrado", "section": "Oferta académica", "slug": "Posgrados"},
+    {"url": "https://unisimon.edu.co/servicios/centrodeayuda", "title": "Centro de Ayuda", "section": "Atención y servicios", "slug": "Centro_de_Ayuda"},
+    {"url": "https://unisimon.edu.co/servicios/contacto", "title": "Contacto institucional", "section": "Atención y servicios", "slug": "Contacto"},
+    {"url": "https://unisimon.edu.co/servicios/bienestaruniversitario", "title": "Bienestar Universitario", "section": "Atención y servicios", "slug": "Bienestar_Universitario"}
+  ]
+}

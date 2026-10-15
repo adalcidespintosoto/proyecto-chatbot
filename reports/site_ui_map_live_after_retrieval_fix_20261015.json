@@ -1,0 +1,85 @@
+{
+  "collection_count": 7408,
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "cases": [
+    {
+      "id": "credenciales_ui",
+      "question": "Estoy en Portal Estudiante y no sé dónde colocar usuario y contraseña ni qué botón presionar.",
+      "answer": "En la sección **Credenciales** del Portal Estudiante, ingresa tu usuario en el campo **Usuario** y tu contraseña en el campo **Contraseña**. Luego presiona **Acceder** para entrar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 7761,
+      "model": "gpt-6-luna",
+      "prompt_tokens": 3996,
+      "cached_tokens": 1986,
+      "output_tokens": null,
+      "sources": [
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "instructivo portales estudiantes.pdf",
+        "Instructivo - Estudiantes.pptx",
+        "instructivo portales estudiantes.pptx",
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "Caracterización de estudiantes.pptx",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Autorización estudiantes en proceso de créditos_v2.pdf",
+        "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+        "Web_UI_Unisimon_Portal_Estudiantes.md",
+        "Instructivo Módulo Atención Estudiantes (Completo).pdf"
+      ],
+      "ui_final_sources": [
+        "Web_UI_Unisimon_Portal_Estudiantes.md"
+      ],
+      "final_sources": [
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "instructivo portales estudiantes.pdf",
+        "instructivo portales estudiantes.pdf",
+        "instructivo portales estudiantes.pdf",
+        "Instructivo - Estudiantes.pptx",
+        "Instructivo - Estudiantes.pptx",
+        "Instructivo - Estudiantes.pptx",
+        "Instructivo - Estudiantes.pptx",
+        "Instructivo - Estudiantes.pptx",
+        "instructivo portales estudiantes.pptx",
+        "instructivo portales estudiantes.pptx",
+        "instructivo portales estudiantes.pptx",
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "Caracterización de estudiantes.pptx",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Autorización estudiantes en proceso de créditos_v2.pdf",
+        "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+        "Web_UI_Unisimon_Portal_Estudiantes.md",
+        "Instructivo Módulo Atención Estudiantes (Completo).pdf"
+      ]
+    },
+    {
+      "id": "navegacion_inicio",
+      "question": "Desde la página principal, ¿por dónde llego al acceso del Portal Estudiantes?",
+      "answer": "Desde la página principal de la Universidad, selecciona **Portales** en el menú principal y luego **Portal de estudiantes**. También puedes entrar directamente a la página oficial del portal: https://unisimon.edu.co/portales/estudiantes.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 5361,
+      "model": "gpt-6-luna",
+      "prompt_tokens": 3110,
+      "cached_tokens": 3107,
+      "output_tokens": null,
+      "sources": [
+        "instructivo portales estudiantes.pptx",
+        "Web_Unisimon_Portal_Estudiantes.md",
+        "Autorización estudiantes en proceso de créditos.pdf",
+        "instructivo portales estudiantes.pdf"
+      ],
+      "ui_final_sources": [],
+      "final_sources": [
+        "instructivo portales estudiantes.pptx",
+        "Web_Unisimon_Portal_Estudiantes.md",
+        "Web_Unisimon_Portal_Estudiantes.md",
+        "Autorización estudiantes en proceso de créditos.pdf",
+        "Autorización estudiantes en proceso de créditos.pdf",
+        "instructivo portales estudiantes.pdf",
+        "instructivo portales estudiantes.pdf"
+      ]
+    }
+  ]
+}

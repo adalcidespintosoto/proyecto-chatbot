@@ -56,10 +56,16 @@ REGLAS:
 
 def is_security_incident_query(user_message: str) -> bool:
     """Los indicios de infección requieren el procedimiento de seguridad, no tips de hardware."""
-    return bool(re.search(
+    message = (user_message or "").casefold()
+    known_threat = bool(re.search(
         r"\b(?:virus|malware|ransomware|troyano|infectad[oa]s?|infecci[oó]n|c[oó]digo\s+malicioso)\b",
-        (user_message or "").casefold(),
+        message,
     ))
+    antivirus_alert = bool(re.search(r"\b(?:antivirus|antimalware)\b", message)) and bool(re.search(
+        r"\b(?:alerta|detect\w*|encontr\w*|sospechos\w*|cuarentena|desinfect\w*)\b",
+        message,
+    ))
+    return known_threat or antivirus_alert
 
 PROMPT_HARDWARE_DIRECT = (
     "Para fallas físicas, averías de hardware, puntos de red o problemas con torniquetes y equipos de cómputo, "

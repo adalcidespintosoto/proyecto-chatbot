@@ -33,7 +33,7 @@ Los mensajes de estado pueden solicitar retroalimentación, solicitar nombre/cor
 4. Reordena hasta ochenta candidatos con Cross-Encoder. El score sirve para ordenar; no equivale a probabilidad calibrada de acierto ni hay un cutoff general validado.
 5. Selectores y coincidencia entre intención/pregunta/título ayudan a preservar documentos candidatos pertinentes.
 6. Si se puede verificar el ID determinista y los metadatos, trae secuencia cercana del mismo archivo en páginas adyacentes. Marca anclas y ordena por fuente/página/chunk.
-7. El ajustador prioriza anclas y luego vecinos dentro del presupuesto estimado. Procedimental: 3.800 tokens estimados, hasta 16 anclas y 24 chunks finales. Consulta directa: 1.400 tokens, hasta 4 anclas y 8 chunks finales. La estimación usa caracteres/3, no tokenizer exacto.
+7. El ensamblado conserva el orden de anclas y vecinos sin descartar chunks por una estimación de tokens. Mantiene topes de cantidad: procedimientos/contexto extendido, hasta 16 anclas y 24 chunks finales; consultas directas, hasta 4 anclas y 8 chunks finales. Los mapas visuales verificados se priorizan para preguntas de ubicación y navegación. El consumo en tokens varía con la longitud real de los fragmentos.
 
 ### Ingesta
 

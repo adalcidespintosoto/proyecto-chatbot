@@ -1,0 +1,292 @@
+{
+  "collection_count": 7408,
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "cases": [
+    {
+      "id": "ruta_inicio_portal",
+      "question": "¿Cómo llego desde la página de inicio al Portal Estudiantes?",
+      "expected_ui_source": "Web_UI_Unisimon_Inicio.md",
+      "answer": "Desde la página de inicio de la Universidad, selecciona **Portales** en el menú principal y luego **Portal estudiantes**. Esto te llevará al acceso del portal.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "model_used": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 3654,
+      "prompt_tokens": 4884,
+      "cached_tokens": 1986,
+      "output_tokens": 37,
+      "source_hit_in_final_context": false,
+      "final_context_sources": [
+        "instructivo portales estudiantes.pptx",
+        "Experiencias Extracurriculares (Estudiantes).pptx",
+        "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+        "instructivo portales estudiantes.pdf",
+        "Web_Unisimon_Portal_Estudiantes.md",
+        "Certificados estudiantes_v2.pptx",
+        "Manual de Usuario - Portal CovidApp.pdf",
+        "Pagos en linea - Estudiantes.pdf",
+        "Depuración de cursos (Teams y Aula Extendida).pdf",
+        "Bancos y cuentas_v1_20211007.pdf",
+        "Diligenciamiento de PAC (Profesores).pdf"
+      ],
+      "final_context": [
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 3,
+          "score": null,
+          "text": "Portal de Estudiantes"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 15,
+          "score": null,
+          "text": "Seleccione el apartado “Correo estudiantes“"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 15,
+          "score": null,
+          "text": "En la parte superior de la página, hay un menú de navegación con opciones como \"Inicio\", \"Estudios\", \"Investigación\", \"Universidad\", \"Estudiantes\", \"Profesores\", \"Administración\", \"Rectorado\", \"Comunicación\", \"Campus\", \"Centros\", \"Unidades\", \"Servicios\", \"Recursos\", \"Cultura\", \"Sport\", \"Alumni\", \"Empresas\", \"Convocatorias\", \"Bibliotecas\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\", \"Convocatorias\","
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 31,
+          "score": null,
+          "text": ". A continuación, se encuentra el menú principal de la página, que incluye opciones como \"Inicio\", \"Acerca de la USB\", \"Estudiantes\", \"Profesores\", \"Investigación\", \"Extensión\", \"Convocatorias\", \"Noticias\", \"Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de Investigación\", \"Portal de Extensión\", \"Portal de Convocatorias\", \"Portal de Noticias\", \"Portal de Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de Investigación\", \"Portal de Extensión\", \"Portal de Convocatorias\", \"Portal de Noticias\", \"Portal de Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de Investigación\", \"Portal de Extensión\", \"Portal de Convocatorias\", \"Portal de Noticias\", \"Portal de Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de"
+        },
+        {
+          "source": "Experiencias Extracurriculares (Estudiantes).pptx",
+          "page": 2,
+          "score": null,
+          "text": "Ingrese desde su navegador al sitio web de estudiantes de la Universidad: https://portal.unisimon.edu.co/estudiantes/ e inicia sesión"
+        },
+        {
+          "source": "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+          "page": 3,
+          "score": null,
+          "text": ". En la parte superior de la página, hay un menú principal con opciones como \"Inicio\", \"Acerca de la Universidad\", \"Estudios\", \"Investigación\", \"Extensión\", \"Arte y Cultura\", \"Sportes\", \"Vida Estudiantil\", \"Convocatorias\", \"Portal de Profesores Administrativos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal de Profesores Adjuntos\", \"Portal"
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 4,
+          "score": null,
+          "text": "Acceso al portal estudiantes\nIngrese desde su navegador al sitio web de la Universidad: http://www.unisimon.edu.co/ y \nseleccionar en menú principal la opción «Portales»"
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 5,
+          "score": null,
+          "text": "Dirigirse a la sección «Portal estudiantes»"
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 5,
+          "score": null,
+          "text": ". A continuación, se encuentra el menú principal de la página, que incluye opciones como \"Inicio\", \"Acerca de la universidad\", \"Estudios\", \"Investigación\", \"Extensión\", \"Convocatorias\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\","
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 31,
+          "score": null,
+          "text": "En la parte superior de la página, hay un encabezado con el nombre de la universidad y una imagen de un libro abierto, que simboliza la educación. A continuación, hay un menú de navegación con opciones como \"Inicio\", \"Acerca de la USB\", \"Estudios\", \"Investigación\", \"Extensión\", \"Arte y Cultura\", \"Sportes\", \"Vida Estudiantil\", \"Contacto\", y \"Acerca de la USB\".\n\nEl contenido principal de la página está organizado en secciones con títulos como \"Estudios\", \"Investigación\", \"Extensión\", \"Arte y Cultura\", \"Sportes\", \"Vida Estudiantil\", y \"Contacto\". Cada sección contiene información detallada sobre los programas, proyectos, eventos y servicios ofrecidos por la universidad en cada área."
+        },
+        {
+          "source": "Web_Unisimon_Portal_Estudiantes.md",
+          "page": 1,
+          "score": null,
+          "text": "Fuente oficial: Universidad Simón Bolívar — Universidad Simón Bolivar - Portales\nSección: Portales\nURL oficial: https://unisimon.edu.co/portales/estudiantes\n\nContenido visible de la página:\nPortal Estudiante\nCredenciales\nLa Universidad\nHistoria\nNormativa General\nAcceso Consultorio Jurídico\nExperiencia Virtual\nReglamento de profesores\nReglamento Estudiantil\nPagos en línea\nCentro de Ayuda\nBarranquilla\nSEDE PRINCIPAL\nCarrera 59 No. 59-65\nPBX +57 (605) 344 4333.\nFax : +57 (605) 3682892\nProgramas Extendidos\nen Cúcuta\nAv 3 No. 13-34 La Playa\nP.B.X: +57 (607) 582 7070\nUniversidad Simón Bolívar. Todos los derechos reservados ©\n|\nDirección Tecnología de Información\nTérminos y Condiciones de Uso de Página Web"
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 2,
+          "score": null,
+          "text": "Instructivo para solicitud y generación de certificados\n\nPORTAL DE ESTUDIANTES"
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 3,
+          "score": null,
+          "text": "Acceso al portal estudiantes\n\nIngrese desde su navegador al sitio web de la Universidad: http://www.unisimon.edu.co/ y seleccionar en menú principal la opción «Portales»"
+        },
+        {
+          "source": "Manual de Usuario - Portal CovidApp.pdf",
+          "page": 4,
+          "score": null,
+          "text": "Para iniciar sesión al sistema, si eres estudiante podrás iniciar sesión con tus\ncredenciales del “Portal Estudiantes”\no si eres docente/funcionario administrativo podrás iniciar sesión con tu credenciales\ndel “Portal Gestión Académico - Administrativo”\nInicio de Sesión"
+        },
+        {
+          "source": "Pagos en linea - Estudiantes.pdf",
+          "page": 3,
+          "score": null,
+          "text": ". A continuación, se encuentra el menú principal de la página, que incluye opciones como \"Inicio\", \"Acerca de la universidad\", \"Estudios\", \"Investigación\", \"Extensión\", \"Convocatorias\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\","
+        },
+        {
+          "source": "Pagos en linea - Estudiantes.pdf",
+          "page": 4,
+          "score": null,
+          "text": ". En la parte superior de la página, se encuentra el logo de la universidad y se muestran los menús \"Inicio\", \"Acerca de la Universidad\", \"Estudios\", \"Investigación\", \"Extensión\", \"Academia\", \"Administración\", \"Comunidad\", \"Portal Estudiantil\", \"Portal Docente\", \"Portal de Investigación\", \"Portal de Extensión\", \"Portal de Comunidad\", \"Portal de Administración\", \"Portal de Apoyo\", \"Portal de Apoyo a la Investigación\", \"Portal de Apoyo a la Extensión\", \"Portal de Apoyo a la Comunidad\", \"Portal de Apoyo a la Administración\", \"Portal de Apoyo a la Docencia\", \"Portal de Apoyo a la Docencia\", \"Portal de Apoyo a la Investigación\", \"Portal de Apoyo a la Extensión\", \"Portal de Apoyo a la Comunidad\", \"Portal de Apoyo a la Administración\", \"Portal de Apoyo a la Docencia\", \"Portal de Apoyo a la"
+        },
+        {
+          "source": "Depuración de cursos (Teams y Aula Extendida).pdf",
+          "page": 4,
+          "score": null,
+          "text": ". A continuación, se encuentra el menú principal de la página, que incluye opciones como \"Inicio\", \"Acerca de la universidad\", \"Estudios\", \"Investigación\", \"Extensión\", \"Convocatorias\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\","
+        },
+        {
+          "source": "Depuración de cursos (Teams y Aula Extendida).pdf",
+          "page": 5,
+          "score": null,
+          "text": "En la parte inferior de la página, hay un menú desplegable con opciones como \"Inicio\", \"Acerca de la universidad\", \"Estudios\", \"Investigación\", \"Extensión\", \"Comunidad\", \"Convocatorias\", \"Noticias\", \"Contacto\", \"Área de profesores\", \"Área de administrativos\", \"Área de estudiantes\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\", \"Área de visitantes\", \"Área de alumnos\", \"Área de empleados\","
+        },
+        {
+          "source": "Bancos y cuentas_v1_20211007.pdf",
+          "page": 5,
+          "score": null,
+          "text": ". En la parte superior de la página, se encuentra el logo de la universidad y el menú principal con opciones como \"Inicio\", \"Acerca de la USB\", \"Estudios\", \"Investigación\", \"Extensión\", \"Comunidad\", \"Convocatorias\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\", \"Portal de Estudiantes\", \"Portal de Profesores y Administrativos\","
+        },
+        {
+          "source": "Diligenciamiento de PAC (Profesores).pdf",
+          "page": 6,
+          "score": null,
+          "text": ". En la parte superior de la página, se encuentra el logo de la institución y el menú principal con opciones como \"Inicio\", \"Acerca de nosotros\", \"Estudios\", \"Investigación\", \"Extensión\", \"Portal de profesores\", \"Portal de estudiantes\", \"Portal de empleados\", \"Portal de alumnos\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de empleados\", \"Portal de"
+        }
+      ]
+    },
+    {
+      "id": "campos_portal_estudiante",
+      "question": "Estoy en la página Portal Estudiante. ¿Dónde escribo mi usuario y contraseña y qué botón sigo?",
+      "expected_ui_source": "Web_UI_Unisimon_Portal_Estudiantes.md",
+      "answer": "En la página del Portal de Estudiantes, escribe tu usuario y contraseña en los campos de acceso y presiona **«Acceder»** para ingresar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "model_used": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 3131,
+      "prompt_tokens": 2744,
+      "cached_tokens": 1986,
+      "output_tokens": 34,
+      "source_hit_in_final_context": false,
+      "final_context_sources": [
+        "Restablecimiento de contraseña.pptx",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Gestión Prácticas - Estudiantes.pdf"
+      ],
+      "final_context": [
+        {
+          "source": "Restablecimiento de contraseña.pptx",
+          "page": 8,
+          "score": null,
+          "text": "Se ha realizado el envío de contraseña a su correo personal, a continuación se mostrarán los pasos que deberá seguir."
+        },
+        {
+          "source": "Restablecimiento de contraseña.pptx",
+          "page": 9,
+          "score": null,
+          "text": "Presione el enlace “Restablecer contraseña” ubicado en el mensaje de correo recibido"
+        },
+        {
+          "source": "Restablecimiento de contraseña.pptx",
+          "page": 9,
+          "score": null,
+          "text": ". A continuación, se encuentra el menú principal de la página, que incluye opciones como \"Inicio\", \"Acerca de la USB\", \"Estudiantes\", \"Profesores\", \"Investigación\", \"Extensión\", \"Convocatorias\", \"Noticias\", \"Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de Investigación\", \"Portal de Extensión\", \"Portal de Convocatorias\", \"Portal de Noticias\", \"Portal de Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de Investigación\", \"Portal de Extensión\", \"Portal de Convocatorias\", \"Portal de Noticias\", \"Portal de Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de Investigación\", \"Portal de Extensión\", \"Portal de Convocatorias\", \"Portal de Noticias\", \"Portal de Contacto\", \"Portal de Estudiantes\", \"Portal de Profesores\", \"Portal de"
+        },
+        {
+          "source": "Restablecimiento de contraseña.pptx",
+          "page": 10,
+          "score": null,
+          "text": "Posteriormente, digite su contraseña nueva y la confirmación"
+        },
+        {
+          "source": "Restablecimiento de contraseña.pptx",
+          "page": 10,
+          "score": null,
+          "text": "- Se debe ingresar al menos 8 caracteres, incluyendo al menos una letra mayúscula, una letra minúscula, un número y un símbolo especial.\n- Se debe ingresar al menos 1 letra mayúscula.\n- Se debe ingresar al menos 1 letra minúscula.\n- Se debe ingresar al menos 1 número.\n- Se debe ingresar al menos 1 símbolo especial.\n\nA continuación, se encuentra un botón \"Enviar\" que el usuario debe presionar para confirmar su contraseña.\n\nEn la parte inferior, se encuentra un enlace \"Ley de protección de datos\" que el usuario puede seguir para obtener más información sobre la protección de datos."
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 3,
+          "score": null,
+          "text": "Desde\nla\npágina\nweb\nde\nla\nUniversidad,\nen\nla\nsección\n“Portales”\n(http://www.unisimon.edu.co/portales/estudiantes), ingrese su usuario y contraseña, y presione\nel botón “Acceder”"
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 4,
+          "score": null,
+          "text": "Una vez dentro del portal laboral damos clic en el icono llamado “Movilidad Académica”, nos\nabrirá la pagina en la que ingresamos el usuario y contraseña, luego dar clic en el botón “Entrar”"
+        },
+        {
+          "source": "Gestión Prácticas - Estudiantes.pdf",
+          "page": 2,
+          "score": null,
+          "text": "Desde\nla\npágina\nweb\nde\nla\nUniversidad,\nen\nla\nsección\n“Portales”\n(https://www.unisimon.edu.co/portales/estudiantes), ingrese su usuario y contraseña, y presione\nel botón “Acceder”"
+        }
+      ]
+    },
+    {
+      "id": "recuperar_acceso_portal",
+      "question": "Olvidé mi usuario o contraseña para el Portal Estudiante, ¿qué hago?",
+      "expected_ui_source": "Web_UI_Unisimon_Portal_Estudiantes.md",
+      "answer": "La guía disponible cubre el **restablecimiento de contraseña**, pero no explica cómo recuperar el **usuario** ni cómo iniciar la solicitud para recibir el correo. Indica que la contraseña es unificada para el Portal de Estudiantes, Aula Extendida y el correo institucional.\n\nSi ya recibiste el mensaje de restablecimiento:\n1. Abre el correo y pulsa **«Restablecer contraseña»**.\n2. Escribe la contraseña nueva y su confirmación. Debe tener al menos 8 caracteres e incluir una mayúscula, una minúscula, un número y un símbolo especial.\n3. Pulsa **«Enviar»** para confirmarla.\n\nNo puedo confirmar con la información disponible cómo solicitar ese correo ni recuperar el usuario. ¿Necesitas recuperar el usuario o restablecer la contraseña?\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "model_used": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8739,
+      "prompt_tokens": 2704,
+      "cached_tokens": 0,
+      "output_tokens": 325,
+      "source_hit_in_final_context": false,
+      "final_context_sources": [
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "Restablecimiento de contraseña.pptx",
+        "instructivo portales estudiantes.pptx",
+        "instructivo portales estudiantes.pdf"
+      ],
+      "final_context": [
+        {
+          "source": "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+          "page": 2,
+          "score": null,
+          "text": "RESTABLECIMIENTO DE CONTRASEÑA\n(Contraseña unificada para el portal de estudiantes, aula extendida y correo \ninstitucional)"
+        },
+        {
+          "source": "Restablecimiento de contraseña.pptx",
+          "page": 4,
+          "score": null,
+          "text": "Dirigirse a la sección «Portal estudiantes»"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 31,
+          "score": null,
+          "text": "Presione el enlace “Restablecer contraseña” ubicado en el mensaje de correo recibido"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 32,
+          "score": null,
+          "text": "Posteriormente, digite su contraseña nueva y la confirmación"
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 32,
+          "score": null,
+          "text": "- Se debe ingresar al menos 8 caracteres, incluyendo al menos una letra mayúscula, una letra minúscula, un número y un símbolo especial.\n- Se debe ingresar al menos 1 letra mayúscula.\n- Se debe ingresar al menos 1 letra minúscula.\n- Se debe ingresar al menos 1 número.\n- Se debe ingresar al menos 1 símbolo especial.\n\nA continuación, se encuentra un botón \"Enviar\" que el usuario debe presionar para confirmar su contraseña.\n\nEn la parte inferior, se encuentra un enlace \"Ley de protección de datos\" que el usuario puede seguir para obtener más información sobre la protección de datos."
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 31,
+          "score": null,
+          "text": "Presione el enlace “Restablecer contraseña” ubicado en el mensaje de correo recibido"
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 32,
+          "score": null,
+          "text": "Posteriormente, digite su contraseña nueva y la confirmación"
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 32,
+          "score": null,
+          "text": "A continuación, hay un campo de texto donde el usuario debe ingresar su nueva contraseña. Bajo el campo de texto, hay un botón \"Enviar\" que el usuario debe presionar para confirmar la nueva contraseña.\n\nEn la parte inferior de la pantalla, hay un enlace que dice \"Ley de protección de datos\" que probablemente es un enlace a la política de privacidad o a la ley de protección de datos aplicable en el contexto de la empresa.\n\nEl diseño de la pantalla es limpio y utiliza colores claros para diferenciar las secciones y opciones. La imagen es una captura de pantalla de un sistema de gestión de identidades y accesos, lo que indica que se trata de una interfaz web de usuario.]"
+        }
+      ]
+    }
+  ]
+}

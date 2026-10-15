@@ -1,0 +1,359 @@
+{
+  "run_id": "effectiveness_20261014_145450",
+  "method": "RouterLogic real, sesiones aisladas; sin API, telemetría ni promoción a Golden Cache",
+  "results": [
+    {
+      "id": "h1_teams_new_student",
+      "category": "Teams",
+      "question": "Un compañero se inscribió tarde en la materia y no le sale el equipo en Teams. ¿Qué puede hacer él desde el portal?",
+      "answer": "Desde el portal, que entre en **Calificaciones** y espere unos segundos mientras se verifica el estado de sus grupos en Teams. Si el grupo no figura como matriculado, puede seleccionar **“Matricular en Teams…”**; el envío de la información puede tardar unos segundos.\n\nSi el estado aparece como **“No activo”**, significa que ese grupo no tiene horario escogido o no tiene profesor asignado.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Grupos_en_Teams.pdf",
+        "Estudiantes_Matricular grupos en teams ymoodle.pdf",
+        "Matricular_grupos_teams_Estudiante.pdf",
+        "Videollamadas en  Teams.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 16964.1,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h2_teams_teacher_member",
+      "category": "Teams",
+      "question": "Doy clase y debo invitar a una alumna al equipo de Teams de mi curso, ¿qué botones toco?",
+      "answer": "En Teams, ve a **Equipos** y selecciona **Unirse a un equipo o crear uno**. Sin embargo, la guía disponible no confirma cómo agregar a una alumna a un equipo ya existente: el paso documentado de **Enviar solicitud** corresponde a otra guía y no puedo confirmar que aplique aquí.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Agregar_miembros_Grupos_MS_Teams.pdf",
+        "Grupos_en_Teams.pdf",
+        "Matricular_grupos_teams_Estudiante.pdf",
+        "Grabar un clase en Teams y compartir en Stream.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 16208.4,
+      "quality_verdict": "incorrect",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h3_student_grade_period",
+      "category": "Portal Estudiantes",
+      "question": "Quiero mirar mis calificaciones del semestre pasado y, si se puede, imprimirlas. ¿Dónde lo hago?",
+      "answer": "En el **Portal de Estudiantes**, entra al módulo **Calificaciones**. Selecciona tu **programa** y el **período** del semestre pasado para consultar las notas; para imprimir el listado, usa el ícono de impresión.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Calificaciones Posgrados-S3-DITI-PC07.pdf",
+        "Calificaciones.pdf",
+        "Calificaciones.pptx",
+        "Reporte - Horas x Docente.pptx",
+        "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+        "Instructivo Remisiones desde Calificaciones y Módulo Atención.pdf",
+        "Matricula (2).pptx",
+        "Detalle factura (Anexos).pptx",
+        "Reporte - No matriculados (1).pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8582.6,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h4_teacher_enter_grades",
+      "category": "Portal Profesores",
+      "question": "Soy profesor, ¿cómo guardo un borrador de las notas antes de enviarlas definitivamente?",
+      "answer": "En el módulo de calificaciones, ingrese las notas correspondientes y presione **«Guardar Borrador»**. Esto mantiene un registro temporal sin finalizar el proceso; cuando esté listo para enviarlas, presione **«Finalizar»**.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Calificaciones.pdf",
+        "Asignación Académica.pptx",
+        "Unisimon App.pdf",
+        "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+        "Evaluaciones de selección ILE-TICS (ASPIRANTES).pdf",
+        "Instrucciones Actualización Datos Estudiantes.pdf",
+        "P-GT-14_Procedimiento_para_la_gestion_de_actualizaciones_de_versiones_en_Kactus_y_o_Seven.pdf",
+        "Demo tipos de admisión.pptx",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "Matricula (2).pptx",
+        "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+        "Autorizacion de Inscripcion Curso de Enfasis.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 6570.0,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h5_new_student_report",
+      "category": "SIAAF",
+      "question": "Soy administrativo y me piden en PDF el consolidado de alumnos nuevos de pregrado. ¿Dónde pongo el año, el periodo y la fecha?",
+      "answer": "En SIAAF WEB, el informe **«Estudiantes Nuevos Pregrado»** se genera desde el módulo **«Rectoría»**. Allí aplica los filtros **Año**, **Periodo** y **Fecha**, y luego presiona **«Generar»**; el reporte se crea en PDF para su visualización.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "Instructivo Reportes Consolidados.pdf",
+        "2. Estudiantes Antiguos Pregrado.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 5994.7,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h6_kactus_access",
+      "category": "Kactus",
+      "question": "Entré a Kactus, pero me pide actualizar la contraseña. ¿La cambio yo desde Autogestión o la tiene que asignar TI?",
+      "answer": "Si Kactus te solicita el cambio al ingresar, debes actualizarla tú; no necesitas que TI te asigne una nueva. El procedimiento indica que el sistema fuerza el cambio al cumplirse el periodo establecido, y que puedes cambiar la contraseña desde el portal de Autogestión. Si te pide ingresar una contraseña nueva y confirmarla, completa ambos campos para finalizar el cambio.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Restablecimiento de contraseña.pptx",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "P-GT-14_Procedimiento_para_la_gestion_de_actualizaciones_de_versiones_en_Kactus_y_o_Seven.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 6164.3,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h7_seven_user",
+      "category": "Seven",
+      "question": "Llegó una funcionaria que necesita acceso a Seven para su trabajo. ¿Quién debe pedir la cuenta y qué datos envía?",
+      "answer": "La solicitud debe enviarla la **persona líder del área** de la funcionaria, a través de la mesa de ayuda. Para solicitar la cuenta de Seven, debe incluir:\n\n- Nombre completo\n- Cédula\n- Sistema de información: **Seven**\n- Módulos que necesita\n- Perfil de usuario: administrador o usuario\n- Cargo\n\nEl acceso a Seven está destinado a funcionarios con alcance financiero. Usa los canales oficiales de Soporte TI; el correo que aparece en la documentación no se puede verificar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "Trabajo de grado.pdf",
+        "P-GT-11_Proc._Atencion_de_Incidencias_y_Requerimientos_Katus_Y_Seven_.pdf",
+        "P-GT-14_Procedimiento_para_la_gestion_de_actualizaciones_de_versiones_en_Kactus_y_o_Seven.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7401.2,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h8_student_password",
+      "category": "Portal Estudiantes",
+      "question": "No recuerdo la clave con la que entro a Aula Extendida y al Portal Estudiantes. ¿Qué opción uso para recuperarla?",
+      "answer": "Usa el procedimiento de **restablecimiento de contraseña** del Portal Estudiantes; la contraseña es unificada para el Portal, Aula Extendida y el correo institucional.\n\n1. Entra a **www.unisimon.edu.co**, selecciona **Portales** y luego **Portal estudiantes**.\n2. Selecciona la sede **Barranquilla** e ingresa tu código de estudiante o número de identificación; presiona **Enviar**.\n3. Revisa el correo recibido y abre el enlace **Restablecer contraseña**.\n4. Escribe y confirma la nueva contraseña, y presiona **Enviar**. Debería aparecer un mensaje de confirmación del restablecimiento.\n\nLa nueva clave debe tener entre 8 y 15 caracteres, incluir mayúsculas, minúsculas y al menos un número, y no contener datos personales.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf",
+        "instructivo portales estudiantes.pptx",
+        "instructivo portales estudiantes.pdf",
+        "Restablecimiento de contraseña.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7435.1,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h9_first_semester_credentials",
+      "category": "Cuentas",
+      "question": "Acabo de entrar a primer semestre. Ya pagué; ¿en el recibo viene la contraseña o me la manda alguien por correo?",
+      "answer": "La contraseña está al final del recibo de matrícula; no se indica que te la envíen por correo. Al finalizar la matrícula también se informa tu usuario institucional y se genera el recibo para descargar.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Activar Usuario y Correo institucional.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "Restablecimiento de contraseña este yaaaaaaaaaaaaaaaaaa listo.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 6844.3,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h10_suspicious_verification",
+      "category": "Seguridad",
+      "question": "Me llegó por correo un enlace para confirmar mi usuario y contraseña institucional y yo no pedí nada. ¿Se lo paso a soporte?",
+      "answer": "No abras el enlace ni respondas al correo. La guía institucional indica que, ante un correo sospechoso, debes informar de inmediato al Oficial de Seguridad de la Información o, en su defecto, a la Dirección de TI para que lo inspeccionen.\n\nNo compartas tu contraseña ni códigos de verificación. Si ya abriste el enlace o ingresaste tus datos, evita seguir usándolo y comunícalo de inmediato por ese mismo canal autorizado.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-07_Procedimiento_Proteccion_de_Codigo_Malicioso_.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7983.9,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h11_antivirus_alert",
+      "category": "Seguridad",
+      "question": "El antivirus del computador de la Universidad encontró un archivo sospechoso. ¿Puedo mandarlo a cuarentena yo mismo?",
+      "answer": "No puedo confirmar con la información disponible si la Universidad autoriza que lo pongas en cuarentena por tu cuenta. **No abras el archivo ni elijas opciones como “Permitir” o “Restaurar”**; conserva el aviso del antivirus y comunícate con el canal oficial de soporte de TI para que te indiquen cómo proceder.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "CP-GT-01_Gestion_de_TI.pdf",
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 9277.5,
+      "quality_verdict": "partial",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h12_vpn_request",
+      "category": "VPN",
+      "question": "Para entrar a un servidor de la Universidad desde mi casa me dijeron que use VPN. ¿A quién solicito el acceso y qué tengo que explicar?",
+      "answer": "La documentación disponible no especifica quién tramita el acceso por VPN ni el canal para solicitarlo. Sí indica que los permisos deben corresponder a las funciones y necesidades del servicio; como orientación general, consulta con tu responsable o con el área que administra el servidor para que te indiquen el canal autorizado.\n\nAl pedirlo, explica qué servidor o sistema necesitas usar, para qué tarea institucional, qué funciones necesitas realizar y por cuánto tiempo. No envíes contraseñas ni códigos de verificación.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8413.3,
+      "quality_verdict": "partial",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h13_restore_backup",
+      "category": "Copias",
+      "question": "Necesito recuperar información de una copia de seguridad de mi dependencia. ¿Quién la pide y a qué correo se envía?",
+      "answer": "La solicitud debe hacerla el **líder del proceso o subproceso al que pertenece la información**; la restauración requiere su autorización y una justificación de la recuperación.\n\nLos fragmentos consultados no confirman a qué correo debe enviarse una solicitud de restauración de backup. No uses el correo de creación o modificación de accesos, porque corresponde a otro trámite.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "P-GT-11_Proc._Atencion_de_Incidencias_y_Requerimientos_Katus_Y_Seven_.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8334.3,
+      "quality_verdict": "partial",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h14_office_install",
+      "category": "Software",
+      "question": "En mi cuenta institucional veo Microsoft 365, pero no sé dónde está el botón para bajar Office al portátil. ¿Cuál es la ruta?",
+      "answer": "La guía disponible documenta esta ruta para funcionarios: en el sitio web de Unisimon, ve a **Servicios → Correo Funcionarios Microsoft** e inicia sesión con tus credenciales de Microsoft indicadas en el Portal de Gestión Académico-Administrativa.\n\nLa documentación confirma el acceso, pero no muestra dónde aparece el botón para descargar Office después de iniciar sesión. Además, esa guía es para funcionarios, así que no puedo confirmar que la misma ruta aplique a una cuenta estudiantil.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Credenciales microsoft.pdf",
+        "Como_acceder_a_Microsoft_Teams.pdf",
+        "Descarga e instalación Ms 365.pdf",
+        "instructivo portales estudiantes.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8996.3,
+      "quality_verdict": "partial",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h15_other_software",
+      "category": "Software",
+      "question": "Necesitamos instalar un aplicativo diferente de Office en un equipo de la oficina. ¿Lo pido yo o mi jefe?",
+      "answer": "La solicitud debe realizarla el **jefe de la dependencia**, porque el procedimiento indica que las solicitudes de software solo pueden ser presentadas por esa persona. Debe contactar a la mesa de servicio por alguno de sus canales de atención y describir qué aplicativo necesitan.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Aplicativo Elecciones -  Cómo votar.pptx",
+        "Aplicativo Elecciones -  Órganos colegiados.pptx",
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+        "Descarga e instalación Ms 365.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8724.4,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h16_teams_share_recording",
+      "category": "Teams",
+      "question": "Soy docente y quiero publicar en Stream la clase que grabé en Teams para que solo la vea mi grupo. ¿Cómo le doy permisos?",
+      "answer": "Para compartir la grabación con tu grupo, la guía indica que, al elegir con quién compartirla, debes seleccionar **Usuarios → Mis grupos**, escribir **«Baq»** en el campo de búsqueda y presionar **Enter**. Luego selecciona la asignatura correspondiente a la grabación y haz clic en **Publicar**.\n\nLa guía no especifica cómo comprobar que ningún otro usuario tenga acceso; solo documenta esos pasos para compartirla con el grupo seleccionado.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Grabar un clase en Teams y compartir en Stream.pdf",
+        "Matricular_grupos_teams_Estudiante.pdf",
+        "Estudiantes_Matricular grupos en teams ymoodle.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 8525.4,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h17_teams_independent_meeting",
+      "category": "Teams",
+      "question": "Tengo que convocar por Teams a una persona de otra dependencia sin crear un equipo. ¿Lo hago desde Calendario?",
+      "answer": "Sí. Para convocar a una persona sin crear un equipo, en Teams ve a **Calendario** y selecciona **Nueva reunión**. Completa los campos, agrega a esa persona como asistente y selecciona **Guardar**. Luego podrás seleccionar la reunión en el calendario y unirte cuando corresponda.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Crear reuniones No asociadas a grupos.pdf",
+        "Grupos_en_Teams.pdf",
+        "Matricular_grupos_teams_Estudiante.pdf",
+        "Crear reuniones en teams - iPads aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf",
+        "Videollamadas en  Teams.pdf",
+        "Ajustes participantes reuniones  Ms Teams.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7800.6,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h18_cert_electronic",
+      "category": "Portal Estudiantes",
+      "question": "Entré a Certificados Electrónicos y veo varios. ¿Cuál es el paso para descargar el certificado que necesito?",
+      "answer": "En **Certificados Electrónicos**, ubica el certificado que necesitas y presiona el ícono que aparece a su derecha. La guía indica que ese ícono descarga el certificado electrónico; si te muestra varios programas, selecciona el correspondiente al certificado que buscas.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "Certificados Electrónicos.pptx",
+        "Reportes - Certificados electrónicos.pptx",
+        "Descarga de certificados.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 6683.0,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h19_campus_wifi",
+      "category": "Conectividad",
+      "question": "Mi portátil se conecta al wifi de la sede, pero se cae a cada rato. ¿Qué puedo comprobar antes de reportarlo?",
+      "answer": "Prueba estas comprobaciones seguras antes de reportarlo:\n\n1. **Acércate a un punto con mejor señal** y observa si la conexión se mantiene; paredes y distancia pueden afectar el Wi‑Fi.\n2. **Desconecta y vuelve a conectar el Wi‑Fi** desde los ajustes de red de tu portátil. Si sigue igual, reinicia el equipo.\n3. **Comprueba si también les ocurre a otros dispositivos** en el mismo lugar. Si solo le pasa a tu portátil, puede ser un problema del equipo; si afecta a varios, podría ser la señal o la red de esa zona.\n4. Anota **dónde ocurre y con qué frecuencia**, y si aparece algún mensaje de error. Si persiste, reporta esos datos por el canal oficial de Soporte TI.\n\nLa documentación disponible no especifica pasos institucionales para diagnosticar caídas del Wi‑Fi de la sede, así que estas son comprobaciones generales.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "Instrucciones Actualización Datos Estudiantes.pdf",
+        "Reportes de Evaluaciones.pptx"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7946.8,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    },
+    {
+      "id": "h20_network_point_report",
+      "category": "Red",
+      "question": "El cable de red de mi puesto no da conexión y otros compañeros sí navegan. ¿Dónde radico la revisión del punto?",
+      "answer": "Puedes radicar la revisión como un **ticket en el Sistema de Información (Mesa de Ayuda TI)**. Como el problema parece estar limitado al punto de red de tu puesto, describe que no tienes conexión por cable y que otros compañeros sí navegan; así podrán orientar el caso al equipo correspondiente. No desconectes ni manipules cableado de red institucional.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "sources": [
+        "P-GT-08_Procedimiento_Aseguramiento_de_Servicios_en_la_Red_.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "Inscripcion - Educacion Continuada.pptx",
+        "instructivo portales estudiantes.pdf",
+        "P-GT-01_Procedimiento_mantenimiento_equipos_de_computo.pdf",
+        "P-GT-11_Proc._Atencion_de_Incidencias_y_Requerimientos_Katus_Y_Seven_.pdf",
+        "P-GT-10_Procedimiento_para_la_Generacion_y_Restauracion_de_Backup_de_la_Informacion_de_la_Universidad_Simon_Bolivar.pdf",
+        "P-GT-02_Procedimiento_para_el_otorgamiento_modificacion_o_retiro_de_acceso_a_usuarios_del_sistema_de_Informacion.pdf",
+        "CP-GT-01_Gestion_de_TI.pdf"
+      ],
+      "route": "DIAGNOSTICO",
+      "source": "openai_gpt-6-luna",
+      "latency_ms": 7849.7,
+      "quality_verdict": "correct",
+      "quality_reason": "Revisión manual inicial; los casos no correctos se detallan en el informe de estabilidad."
+    }
+  ]
+}

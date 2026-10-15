@@ -30,6 +30,12 @@ from app.services.rag_service import rag_service
 from app.routers.chat import sanitize_input_text
 
 
+def test_antivirus_detection_uses_security_incident_policy():
+    assert is_security_incident_query(
+        "El antivirus encontró un archivo sospechoso. ¿Puedo ponerlo en cuarentena?"
+    )
+
+
 @pytest.mark.asyncio
 async def test_hardware_question_is_routed_to_rag_before_direct_physical_escalation():
     questions = [
@@ -200,21 +206,21 @@ async def test_explicit_ticket_escalation():
 
 @pytest.mark.asyncio
 async def test_role_welcome_without_premature_rag_or_buttons():
-    """BUG 1: Verifica que confirmar el rol sin pregunta previa NO llame a RAG ni adjunte quick replies."""
+    """El saludo y un rol aislado no deben disparar una búsqueda documental."""
     sess_id = "sess_clean_role_welcome"
     router_logic.reset_session(sess_id)
 
     # 1. Saludo inicial
     r1 = await router_logic.procesar_mensaje("Hola, buenos días", session_id=sess_id)
-    assert r1["tipo"] == "PIDIENDO_ROL"
+    assert r1["tipo"] == "SALUDO"
     assert router_logic.get_session(sess_id).pending_query is None
 
     # 2. Selección de rol sin pregunta
     with patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
         r2 = await router_logic.procesar_mensaje("Soy estudiante", session_id=sess_id)
         assert r2["tipo"] == "DIAGNOSTICO"
-        assert router_logic.get_session(sess_id).estado == EstadoTicket.DIAGNOSTICO
-        assert "procedimiento institucional o falla técnica" in r2["mensaje"]
+        assert router_logic.get_session(sess_id).estado == EstadoTicket.IDLE
+        assert "Qué falla o qué trámite" in r2["mensaje"]
         assert r2.get("quick_replies") == []
         mock_rag.assert_not_called()  # RAG NO debe ser invocado prematuramente
 
@@ -354,29 +360,24 @@ async def test_physical_hardware_no_enciende_direct_routing():
 
 @pytest.mark.asyncio
 async def test_physical_hardware_routing_after_role_qualification():
-    """Verifica el flujo: Falla física sin rol previo -> Califica rol -> Canales oficiales + Quick Replies."""
+    """Una falla física puede recibir orientación y radicación sin pedir rol."""
     sess_id = "sess_hw_role_flow"
     router_logic.reset_session(sess_id)
 
-    # 1. Consulta inicial de hardware sin rol
-    r1 = await router_logic.procesar_mensaje("El cable de red del computador de mi oficina está roto", session_id=sess_id)
-    assert r1["tipo"] == "PIDIENDO_ROL"
+    with patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
+        response = await router_logic.procesar_mensaje(
+            "El cable de red del computador de mi oficina está roto", session_id=sess_id,
+        )
 
-    # 2. Usuario indica rol -> Debe clasificar semánticamente y ofrecer radicación con canales oficiales
-    with patch("app.services.router_logic.classify_request_intent_async", new=AsyncMock(return_value="SOPORTE_FISICO")), \
-         patch.object(rag_service, "answer_query", new=AsyncMock()) as mock_rag:
-
-        r2 = await router_logic.procesar_mensaje("Soy docente", session_id=sess_id)
-
-        assert r2["tipo"] == "OFRECIENDO_RADICACION"
-        assert r2["source"] == "UniMon_SemanticRouter_Hardware"
-        assert router_logic.get_session(sess_id).estado == EstadoTicket.OFRECIENDO_RADICACION
-        assert "solicitudcomputo@unisimon.edu.co" in r2["mensaje"]
-        assert "Nombre Completo" not in r2["mensaje"]
-        assert len(r2.get("quick_replies", [])) == 2
-        assert "GLPI" not in r2["mensaje"]
-        assert "GLPI" not in r2["quick_replies"][0]["label"]
-        mock_rag.assert_not_called()
+    assert response["tipo"] == "OFRECIENDO_RADICACION"
+    assert response["source"] == "UniMon_SemanticRouter_Hardware"
+    assert router_logic.get_session(sess_id).estado == EstadoTicket.OFRECIENDO_RADICACION
+    assert "solicitudcomputo@unisimon.edu.co" in response["mensaje"]
+    assert "Nombre Completo" not in response["mensaje"]
+    assert len(response.get("quick_replies", [])) == 2
+    assert "GLPI" not in response["mensaje"]
+    assert "GLPI" not in response["quick_replies"][0]["label"]
+    mock_rag.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -419,7 +420,7 @@ async def test_role_persistence_across_resolved_and_cancel_and_tickets():
 
     # Paso 1: Usuario declara que es estudiante
     r1 = await router_logic.procesar_mensaje("Hola, soy estudiante", session_id=sess_id)
-    assert r1["tipo"] == "DIAGNOSTICO"
+    assert r1["tipo"] == "SALUDO"
     session = router_logic.get_session(sess_id)
     assert session.user_role == "estudiante"
 

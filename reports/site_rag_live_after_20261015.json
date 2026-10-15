@@ -1,0 +1,886 @@
+{
+  "phase": "after",
+  "collection_count": 7406,
+  "provider": "openai",
+  "model_configured": "gpt-6-luna",
+  "cases": [
+    {
+      "id": "portal_estudiantes",
+      "query": "¿Cómo llego al Portal Estudiantes desde la página principal de Unisimón?",
+      "expected_url": "https://unisimon.edu.co/portales/estudiantes",
+      "answer": "Desde la página principal de Unisimón, selecciona **Portales** en el menú principal y luego **Portal Estudiantes**. También puedes abrir directamente: https://unisimon.edu.co/portales/estudiantes.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 3879,
+      "prompt_tokens": 5097,
+      "cached_tokens": 1986,
+      "output_tokens": 48,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Web_Unisimon_Portal_Estudiantes.md",
+        "instructivo portales estudiantes.pdf",
+        "instructivo portales estudiantes.pptx",
+        "Web_Unisimon_Portales.md",
+        "Certificados estudiantes_v2.pptx",
+        "Web_Unisimon_Portal_Profesores_y_Administrativos.md",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Gestión Prácticas - Estudiantes.pdf"
+      ],
+      "source_refs": [
+        {
+          "source": "Web_Unisimon_Portal_Estudiantes.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 4
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 5
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 31
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 33
+        },
+        {
+          "source": "Web_Unisimon_Portales.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page_field": "slide_number",
+          "page": 2
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page_field": "slide_number",
+          "page": 3
+        },
+        {
+          "source": "Web_Unisimon_Portal_Profesores_y_Administrativos.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 3
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Web_Unisimon_Portal_Estudiantes.md",
+          "page": 1,
+          "score": 0.8424429049625282
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 4,
+          "score": 0.8373091467078434
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 5,
+          "score": 0.8332351108705622
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 31,
+          "score": 0.8334095851436576
+        },
+        {
+          "source": "Web_Unisimon_Portales.md",
+          "page": 1,
+          "score": 0.8326764602776604
+        },
+        {
+          "source": "Web_Unisimon_Portal_Estudiantes.md",
+          "page": 1,
+          "score": 0.8411066920898773
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 9,
+          "score": 0.8227385155120327
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 9,
+          "score": 0.8227385155120327
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 3,
+          "score": 0.872560510937337
+        },
+        {
+          "source": "Web_Unisimon_Portal_Profesores_y_Administrativos.md",
+          "page": 1,
+          "score": 0.8241285318688003
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Web_Unisimon_Portal_Estudiantes.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Portal_Estudiantes.md",
+          "page": 1
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 4
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 5
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 31
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 33
+        },
+        {
+          "source": "Web_Unisimon_Portales.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Portales.md",
+          "page": 1
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 2
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 3
+        },
+        {
+          "source": "Web_Unisimon_Portal_Profesores_y_Administrativos.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Portal_Profesores_y_Administrativos.md",
+          "page": 1
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 3
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 4
+        },
+        {
+          "source": "Gestión Prácticas - Estudiantes.pdf",
+          "page": 1
+        },
+        {
+          "source": "Gestión Prácticas - Estudiantes.pdf",
+          "page": 2
+        }
+      ],
+      "expected_route_mentioned": true
+    },
+    {
+      "id": "admisiones_pregrado",
+      "query": "Soy aspirante a pregrado, ¿dónde empiezo el proceso de admisión e inscripción?",
+      "expected_url": "https://unisimon.edu.co/aspirantes/admisionespregrado",
+      "answer": "Empieza en la página oficial de Admisiones de pregrado. Allí encontrarás **«Inscríbete Ahora»** y la **guía paso a paso** del proceso.\n\nPara oficializar la inscripción, la Universidad indica que debes subir a la plataforma **Gestión de Ingreso** los documentos requeridos: resultados de las Pruebas Saber 11, documento de identificación y, cuando corresponda, comprobante de pago de inscripción; también diploma o acta de grado y una foto tamaño documento. Según la información publicada, no es necesario acudir a las oficinas de Admisiones para entregar esos documentos.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 4664,
+      "prompt_tokens": 3141,
+      "cached_tokens": 1986,
+      "output_tokens": 244,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Web_Unisimon_Admisiones_Pregrado.md",
+        "Gestión de Ingreso -  Funcionarios.pdf",
+        "Gestión de inscripciones.pdf"
+      ],
+      "source_refs": [
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page_field": "page_number",
+          "page": 3
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page_field": "page_number",
+          "page": 4
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page_field": "page_number",
+          "page": 10
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page_field": "page_number",
+          "page": 11
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1,
+          "score": 0.8542614233810566
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1,
+          "score": 0.8404897983061627
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1,
+          "score": 0.837785424331543
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1,
+          "score": 0.829016165106713
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 10,
+          "score": 0.819067434297028
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 4,
+          "score": 0.8450158091653601
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 13,
+          "score": 0.8365866599452969
+        },
+        {
+          "source": "Web_Unisimon_Inscripciones.md",
+          "page": 1,
+          "score": 0.7899635895762595
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 7,
+          "score": 0.8375139214905085
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page": 10,
+          "score": 0.8216083691778222
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 3
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 4
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 10
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 11
+        }
+      ],
+      "expected_route_mentioned": false
+    },
+    {
+      "id": "apoyo_financiero",
+      "query": "¿Dónde consulto apoyo financiero, becas o ICETEX para estudiar?",
+      "expected_url": "https://unisimon.edu.co/aspirantes/apoyofinanciero",
+      "answer": "Puedes consultar **Apoyo Financiero y Becas** en la página oficial para aspirantes: https://unisimon.edu.co/aspirantes/apoyofinanciero. Allí encontrarás información sobre crédito institucional, ICETEX, becas y otras opciones de financiación.\n\nPara ICETEX, también puedes consultar **www.icetex.gov.co** o solicitar asesoría al área de crédito en **solicitudcomputo@unisimon.edu.co**.\n\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 2667,
+      "prompt_tokens": 3202,
+      "cached_tokens": 1986,
+      "output_tokens": 96,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Web_Unisimon_Apoyo_Financiero.md",
+        "Web_Unisimon_Inscripciones.md",
+        "Instructivo Programas y Preparatorios.pdf"
+      ],
+      "source_refs": [
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Inscripciones.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page_field": "page_number",
+          "page": 23
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1,
+          "score": 0.8684178947422334
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1,
+          "score": 0.8445310993133147
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1,
+          "score": 0.844451325257639
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1,
+          "score": 0.8429885397723011
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1,
+          "score": 0.8478677903693262
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1,
+          "score": 0.8385324328150948
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page": 43,
+          "score": 0.7937234610251331
+        },
+        {
+          "source": "Web_Unisimon_Inscripciones.md",
+          "page": 1,
+          "score": 0.7747806520573328
+        },
+        {
+          "source": "Reporte - Estudiantes autorizados en proceso de créditos_v2.pdf",
+          "page": 7,
+          "score": 0.7951225256614523
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page": 23,
+          "score": 0.8254061146054872
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Inscripciones.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Inscripciones.md",
+          "page": 1
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page": 23
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page": 23
+        }
+      ],
+      "expected_route_mentioned": true
+    },
+    {
+      "id": "matricula",
+      "query": "¿Dónde reviso los valores de matrícula y los conceptos pecuniarios?",
+      "expected_url": "https://unisimon.edu.co/aspirantes/matriculas",
+      "answer": "Puedes consultar los valores de matrícula y los conceptos pecuniarios en la página oficial de la Universidad: https://unisimon.edu.co/aspirantes/matriculas. Allí encontrarás las secciones de Pecuniarios, Técnicos y Tecnológicos, Pregrados y Posgrados, además de los enlaces para descargar los valores vigentes y el reglamento de derechos pecuniarios.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 2395,
+      "prompt_tokens": 5175,
+      "cached_tokens": 1986,
+      "output_tokens": 81,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Web_Unisimon_Matriculas_y_Valores.md",
+        "7. Valor matrícula.pptx",
+        "Web_Unisimon_Apoyo_Financiero.md",
+        "Matricula (2).pptx",
+        "Matricula.pptx",
+        "Volantes.pdf",
+        "Web_Unisimon_Inicio.md",
+        "Web_Unisimon_Admisiones_Pregrado.md",
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "Volantes de pagos - Funcionarios.pptx",
+        "Web_Unisimon_Aspirantes.md"
+      ],
+      "source_refs": [
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page_field": "slide_number",
+          "page": 6
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page_field": "slide_number",
+          "page": 8
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 16
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 17
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 18
+        },
+        {
+          "source": "Matricula.pptx",
+          "page_field": "slide_number",
+          "page": 9
+        },
+        {
+          "source": "Volantes.pdf",
+          "page_field": "page_number",
+          "page": 6
+        },
+        {
+          "source": "Volantes.pdf",
+          "page_field": "page_number",
+          "page": 7
+        },
+        {
+          "source": "Web_Unisimon_Inicio.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page_field": "slide_number",
+          "page": 12
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page_field": "slide_number",
+          "page": 13
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page_field": "slide_number",
+          "page": 23
+        },
+        {
+          "source": "Web_Unisimon_Aspirantes.md",
+          "page_field": "page_number",
+          "page": 1
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1,
+          "score": 0.8586693516252383
+        },
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1,
+          "score": 0.8303354919989903
+        },
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1,
+          "score": 0.8280293770588181
+        },
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1,
+          "score": 0.8368351523279556
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 17,
+          "score": 0.786795909975943
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 9,
+          "score": 0.7839220849633791
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page": 6,
+          "score": 0.775008679779477
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1,
+          "score": 0.8213861443867443
+        },
+        {
+          "source": "Volantes.pdf",
+          "page": 7,
+          "score": 0.7795581581217127
+        },
+        {
+          "source": "Web_Unisimon_Inicio.md",
+          "page": 1,
+          "score": 0.8060493243391644
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Matriculas_y_Valores.md",
+          "page": 1
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page": 6
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page": 8
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Apoyo_Financiero.md",
+          "page": 1
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 16
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 17
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 18
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 9
+        },
+        {
+          "source": "Volantes.pdf",
+          "page": 6
+        },
+        {
+          "source": "Volantes.pdf",
+          "page": 7
+        },
+        {
+          "source": "Web_Unisimon_Inicio.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Inicio.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Admisiones_Pregrado.md",
+          "page": 1
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 12
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 13
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 23
+        },
+        {
+          "source": "Web_Unisimon_Aspirantes.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Aspirantes.md",
+          "page": 1
+        }
+      ],
+      "expected_route_mentioned": true
+    },
+    {
+      "id": "centro_ayuda",
+      "query": "¿Dónde encuentro el Centro de Ayuda de la universidad?",
+      "expected_url": "https://unisimon.edu.co/servicios/centrodeayuda",
+      "answer": "Puedes encontrarlo en el **Centro de Ayuda de la Universidad Simón Bolívar**: https://unisimon.edu.co/servicios/centrodeayuda. La página incluye información de atención para las sedes de Barranquilla y Cúcuta.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 2530,
+      "prompt_tokens": 3051,
+      "cached_tokens": 1986,
+      "output_tokens": 56,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Web_Unisimon_Centro_de_Ayuda.md",
+        "Aprobación de Requisitos.pptx"
+      ],
+      "source_refs": [
+        {
+          "source": "Web_Unisimon_Centro_de_Ayuda.md",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page_field": "slide_number",
+          "page": 3
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page_field": "slide_number",
+          "page": 4
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page_field": "slide_number",
+          "page": 5
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Web_Unisimon_Centro_de_Ayuda.md",
+          "page": 1,
+          "score": 0.7960891769665561
+        },
+        {
+          "source": "Web_Unisimon_Centro_de_Ayuda.md",
+          "page": 1,
+          "score": 0.8047648590106875
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 4,
+          "score": 0.7546865943852787
+        },
+        {
+          "source": "Web_Unisimon_Centro_de_Ayuda.md",
+          "page": 1,
+          "score": 0.8072441656145705
+        },
+        {
+          "source": "Consulta de Hoja de Vida.pdf",
+          "page": 1,
+          "score": 0.7531163617313477
+        },
+        {
+          "source": "Web_Unisimon_Bienestar_Universitario.md",
+          "page": 1,
+          "score": 0.7789813855328569
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page": 2,
+          "score": 0.7577630207009419
+        },
+        {
+          "source": "Instructivo Aprobación de Requisitos.pdf",
+          "page": 1,
+          "score": 0.755904063620865
+        },
+        {
+          "source": "Instructivo Reportes Consolidados.pdf",
+          "page": 1,
+          "score": 0.7531163617313477
+        },
+        {
+          "source": "Web_Unisimon_Bienestar_Universitario.md",
+          "page": 1,
+          "score": 0.7662854846395204
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Web_Unisimon_Centro_de_Ayuda.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Centro_de_Ayuda.md",
+          "page": 1
+        },
+        {
+          "source": "Web_Unisimon_Centro_de_Ayuda.md",
+          "page": 1
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 3
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 4
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 4
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 4
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 5
+        }
+      ],
+      "expected_route_mentioned": true
+    }
+  ]
+}

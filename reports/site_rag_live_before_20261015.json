@@ -1,0 +1,893 @@
+{
+  "phase": "before",
+  "collection_count": 7307,
+  "provider": "openai",
+  "model_configured": "gpt-6-luna",
+  "cases": [
+    {
+      "id": "portal_estudiantes",
+      "query": "¿Cómo llego al Portal Estudiantes desde la página principal de Unisimón?",
+      "expected_url": "https://unisimon.edu.co/portales/estudiantes",
+      "answer": "Desde la página principal de Unisimón, selecciona **«Portales»** en el menú principal y luego elige **«Portal de estudiantes»**. También puedes ir directamente a: http://www.unisimon.edu.co/portales/estudiantes.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 4986,
+      "prompt_tokens": 4989,
+      "cached_tokens": 0,
+      "output_tokens": 57,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "instructivo portales estudiantes.pdf",
+        "instructivo portales estudiantes.pptx",
+        "Movilidad Académica - Estudiantes.pdf",
+        "Certificados estudiantes_v2.pptx",
+        "Gestión Prácticas - Estudiantes.pdf",
+        "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+        "1. Estudiantes Nuevos Pregrado.pptx",
+        "Pagos en linea - Estudiantes.pdf"
+      ],
+      "source_refs": [
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 4
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 5
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 31
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page_field": "slide_number",
+          "page": 33
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 3
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 4
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page_field": "slide_number",
+          "page": 3
+        },
+        {
+          "source": "Gestión Prácticas - Estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Gestión Prácticas - Estudiantes.pdf",
+          "page_field": "page_number",
+          "page": 2
+        }
+      ],
+      "reranked": [
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 4,
+          "score": 0.8383567552050423
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 5,
+          "score": 0.8331328371703676
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 31,
+          "score": 0.8333085167030518
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 9,
+          "score": 0.8243888364044469
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 9,
+          "score": 0.8243888364044469
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 3,
+          "score": 0.872560510937337
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 14,
+          "score": 0.8238222838803518
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 14,
+          "score": 0.8238222838803518
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 4
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 5
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pdf",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 9
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 14
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 15
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 31
+        },
+        {
+          "source": "instructivo portales estudiantes.pptx",
+          "page": 33
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 1
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 3
+        },
+        {
+          "source": "Movilidad Académica - Estudiantes.pdf",
+          "page": 4
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 3
+        },
+        {
+          "source": "Certificados estudiantes_v2.pptx",
+          "page": 3
+        },
+        {
+          "source": "Gestión Prácticas - Estudiantes.pdf",
+          "page": 1
+        },
+        {
+          "source": "Gestión Prácticas - Estudiantes.pdf",
+          "page": 2
+        },
+        {
+          "source": "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+          "page": 3
+        },
+        {
+          "source": "Instructivo Atencion a Estudiantes (Tutorías).pdf",
+          "page": 3
+        },
+        {
+          "source": "1. Estudiantes Nuevos Pregrado.pptx",
+          "page": 2
+        },
+        {
+          "source": "Pagos en linea - Estudiantes.pdf",
+          "page": 2
+        },
+        {
+          "source": "Pagos en linea - Estudiantes.pdf",
+          "page": 3
+        }
+      ],
+      "expected_route_mentioned": false
+    },
+    {
+      "id": "admisiones_pregrado",
+      "query": "Soy aspirante a pregrado, ¿dónde empiezo el proceso de admisión e inscripción?",
+      "expected_url": "https://unisimon.edu.co/aspirantes/admisionespregrado",
+      "answer": "Los fragmentos disponibles no indican en qué portal ni por qué ruta un aspirante de pregrado inicia una inscripción nueva, así que no puedo confirmar dónde empezar. Solo documentan la reactivación de una inscripción previa y opciones de gestión para funcionarios; esos pasos no corresponden al inicio de una solicitud nueva.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 4221,
+      "prompt_tokens": 2700,
+      "cached_tokens": 1986,
+      "output_tokens": 139,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Gestión de inscripciones.pdf",
+        "Gestión de Ingreso -  Funcionarios.pdf",
+        "Aspirantes - Reactivación de Inscripción.pdf"
+      ],
+      "source_refs": [
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page_field": "page_number",
+          "page": 10
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page_field": "page_number",
+          "page": 11
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page_field": "page_number",
+          "page": 4
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page_field": "page_number",
+          "page": 12
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page_field": "page_number",
+          "page": 13
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page_field": "page_number",
+          "page": 14
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page_field": "page_number",
+          "page": 9
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page_field": "page_number",
+          "page": 10
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 10,
+          "score": 0.8194135619908797
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 4,
+          "score": 0.8451381421609916
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 13,
+          "score": 0.8367108208634981
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 7,
+          "score": 0.8376926646704057
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page": 10,
+          "score": 0.8214781106122839
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page": 3,
+          "score": 0.8194794212235647
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page": 9,
+          "score": 0.8224565556282211
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 17,
+          "score": 0.815662933478645
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 10
+        },
+        {
+          "source": "Gestión de inscripciones.pdf",
+          "page": 11
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 4
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 12
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 13
+        },
+        {
+          "source": "Gestión de Ingreso -  Funcionarios.pdf",
+          "page": 14
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page": 9
+        },
+        {
+          "source": "Aspirantes - Reactivación de Inscripción.pdf",
+          "page": 10
+        }
+      ],
+      "expected_route_mentioned": false
+    },
+    {
+      "id": "apoyo_financiero",
+      "query": "¿Dónde consulto apoyo financiero, becas o ICETEX para estudiar?",
+      "expected_url": "https://unisimon.edu.co/aspirantes/apoyofinanciero",
+      "answer": "Para consultar **convenios o ayudas educativas**, el instructivo del **Módulo Atención Estudiantes** indica seleccionar todos los campos del filtro y presionar **«Buscar»**. También permite exportar los resultados a Excel.\n\nEn el menú principal descrito en el instructivo de **Programas y Preparatorios** aparece la opción **«Sistema de Apoyo Financiero»**. Los fragmentos disponibles no confirman si allí se consultan específicamente becas o información de ICETEX, ni indican la ruta dentro de esa opción.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 6836,
+      "prompt_tokens": 2943,
+      "cached_tokens": 1986,
+      "output_tokens": 314,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Instructivo Programas y Preparatorios.pdf",
+        "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+        "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+        "Reporte - Estudiantes autorizados en proceso de créditos_v2.pdf"
+      ],
+      "source_refs": [
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page_field": "page_number",
+          "page": 23
+        },
+        {
+          "source": "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+          "page_field": "page_number",
+          "page": 6
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page_field": "page_number",
+          "page": 43
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page_field": "page_number",
+          "page": 44
+        },
+        {
+          "source": "Reporte - Estudiantes autorizados en proceso de créditos_v2.pdf",
+          "page_field": "page_number",
+          "page": 6
+        },
+        {
+          "source": "Reporte - Estudiantes autorizados en proceso de créditos_v2.pdf",
+          "page_field": "page_number",
+          "page": 7
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page": 43,
+          "score": 0.7937234610251331
+        },
+        {
+          "source": "Reporte - Estudiantes autorizados en proceso de créditos_v2.pdf",
+          "page": 7,
+          "score": 0.7951225256614523
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page": 23,
+          "score": 0.8320318457070306
+        },
+        {
+          "source": "Gestión de Ayudas Educativas.pdf",
+          "page": 5,
+          "score": 0.7937023033071806
+        },
+        {
+          "source": "Autorización estudiantes en proceso de créditos_v2.pdf",
+          "page": 5,
+          "score": 0.8065553219353658
+        },
+        {
+          "source": "Reporte - Estudiantes autorizados en proceso de créditos.pdf",
+          "page": 6,
+          "score": 0.7989804163664727
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 8,
+          "score": 0.7963246380746799
+        },
+        {
+          "source": "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+          "page": 6,
+          "score": 0.7556537694979106
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page": 23
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page": 23
+        },
+        {
+          "source": "Instructivo Programas y Preparatorios.pdf",
+          "page": 23
+        },
+        {
+          "source": "P-GT-12_Procedimiento_para_la_gestion_de_cuentas_de_usuario_en_KACTUS_o_SEVEN.pdf",
+          "page": 6
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page": 43
+        },
+        {
+          "source": "Instructivo Módulo Atención Estudiantes (Completo).pdf",
+          "page": 44
+        },
+        {
+          "source": "Reporte - Estudiantes autorizados en proceso de créditos_v2.pdf",
+          "page": 6
+        },
+        {
+          "source": "Reporte - Estudiantes autorizados en proceso de créditos_v2.pdf",
+          "page": 7
+        }
+      ],
+      "expected_route_mentioned": false
+    },
+    {
+      "id": "matricula",
+      "query": "¿Dónde reviso los valores de matrícula y los conceptos pecuniarios?",
+      "expected_url": "https://unisimon.edu.co/aspirantes/matriculas",
+      "answer": "- **Valores de matrícula:** dentro del módulo correspondiente, selecciona el informe **«Valor Matrícula»**. El instructivo disponible no especifica la ruta para llegar a ese módulo.\n- **Conceptos pecuniarios:** no encuentro una ruta documentada para consultar los conceptos. La guía de funcionarios solo indica cómo generar volantes pecuniarios y ver, editar o imprimir los volantes creados; eso no confirma dónde revisar sus conceptos.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 5530,
+      "prompt_tokens": 3125,
+      "cached_tokens": 1986,
+      "output_tokens": 238,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "7. Valor matrícula.pptx",
+        "Matricula (2).pptx",
+        "Matricula.pptx",
+        "Volantes.pdf",
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "Volantes de pagos - Funcionarios.pptx",
+        "Instructivo Verificación pagos V2.pdf",
+        "Proyección (agregar, eliminar, habilitar).pptx"
+      ],
+      "source_refs": [
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page_field": "slide_number",
+          "page": 6
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page_field": "slide_number",
+          "page": 8
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 14
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 15
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 16
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 17
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 18
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page_field": "slide_number",
+          "page": 19
+        },
+        {
+          "source": "Matricula.pptx",
+          "page_field": "slide_number",
+          "page": 6
+        },
+        {
+          "source": "Matricula.pptx",
+          "page_field": "slide_number",
+          "page": 7
+        },
+        {
+          "source": "Matricula.pptx",
+          "page_field": "slide_number",
+          "page": 9
+        },
+        {
+          "source": "Matricula.pptx",
+          "page_field": "slide_number",
+          "page": 11
+        },
+        {
+          "source": "Volantes.pdf",
+          "page_field": "page_number",
+          "page": 6
+        },
+        {
+          "source": "Volantes.pdf",
+          "page_field": "page_number",
+          "page": 7
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page_field": "slide_number",
+          "page": 12
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page_field": "slide_number",
+          "page": 13
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Matricula (2).pptx",
+          "page": 17,
+          "score": 0.786795909975943
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 9,
+          "score": 0.7839220849633791
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page": 6,
+          "score": 0.775008679779477
+        },
+        {
+          "source": "Volantes.pdf",
+          "page": 7,
+          "score": 0.7795581581217127
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 13,
+          "score": 0.7760528890247587
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 23,
+          "score": 0.8039407911999117
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 12,
+          "score": 0.7766110397395884
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 17,
+          "score": 0.8127571308151034
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page": 6
+        },
+        {
+          "source": "7. Valor matrícula.pptx",
+          "page": 8
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 14
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 15
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 16
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 17
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 18
+        },
+        {
+          "source": "Matricula (2).pptx",
+          "page": 19
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 6
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 7
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 9
+        },
+        {
+          "source": "Matricula.pptx",
+          "page": 11
+        },
+        {
+          "source": "Volantes.pdf",
+          "page": 6
+        },
+        {
+          "source": "Volantes.pdf",
+          "page": 7
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 12
+        },
+        {
+          "source": "GIE - ASPIRANTES NOV.2021.pptx",
+          "page": 13
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 14
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 15
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 17
+        },
+        {
+          "source": "Volantes de pagos - Funcionarios.pptx",
+          "page": 23
+        },
+        {
+          "source": "Instructivo Verificación pagos V2.pdf",
+          "page": 4
+        },
+        {
+          "source": "Instructivo Verificación pagos V2.pdf",
+          "page": 5
+        },
+        {
+          "source": "Proyección (agregar, eliminar, habilitar).pptx",
+          "page": 3
+        },
+        {
+          "source": "Proyección (agregar, eliminar, habilitar).pptx",
+          "page": 4
+        }
+      ],
+      "expected_route_mentioned": false
+    },
+    {
+      "id": "centro_ayuda",
+      "query": "¿Dónde encuentro el Centro de Ayuda de la universidad?",
+      "expected_url": "https://unisimon.edu.co/servicios/centrodeayuda",
+      "answer": "No puedo confirmar en la información disponible dónde está el Centro de Ayuda de la universidad. Puedes revisar el sitio oficial de la Universidad, pero los fragmentos solo documentan las opciones «Contacto» y «Portales»; no indican que ninguna de ellas lleve al Centro de Ayuda.\n\n---\n📌 **Canales Oficiales de Soporte TI:**\n📧 **Sede Barranquilla:** `solicitudcomputo@unisimon.edu.co` | WhatsApp: `3172683922` | PBX: (605) 3444333 Ext. 8003/8004\n📧 **Sede Cúcuta:** `helpdesk@unisimon.edu.co` | PBX: (607) 5827070 Ext. 129\n\n\n¿Pudiste resolver tu problema con estos pasos?\n- Selecciona o escribe **Sí** si te funcionó.\n- Selecciona o escribe **No** para indicarme qué error tienes o generar un reporte.",
+      "latency_ms": 2768,
+      "prompt_tokens": 2614,
+      "cached_tokens": 1986,
+      "output_tokens": 62,
+      "model": "gpt-6-luna",
+      "source": "openai_gpt-6-luna",
+      "sources": [
+        "Aprobación de Requisitos.pptx",
+        "Consulta de Hoja de Vida.pdf",
+        "Inscripcion - Educacion Continuada.pptx",
+        "Instructivo Aprobación de Requisitos.pdf"
+      ],
+      "source_refs": [
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page_field": "slide_number",
+          "page": 3
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page_field": "slide_number",
+          "page": 4
+        },
+        {
+          "source": "Consulta de Hoja de Vida.pdf",
+          "page_field": "page_number",
+          "page": 2
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page_field": "slide_number",
+          "page": 2
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page_field": "slide_number",
+          "page": 3
+        },
+        {
+          "source": "Instructivo Aprobación de Requisitos.pdf",
+          "page_field": "page_number",
+          "page": 1
+        },
+        {
+          "source": "Instructivo Aprobación de Requisitos.pdf",
+          "page_field": "page_number",
+          "page": 2
+        }
+      ],
+      "reranked": [
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 4,
+          "score": 0.7578652788139728
+        },
+        {
+          "source": "Consulta de Hoja de Vida.pdf",
+          "page": 1,
+          "score": 0.7562896443513273
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page": 2,
+          "score": 0.7609349489267468
+        },
+        {
+          "source": "Instructivo Aprobación de Requisitos.pdf",
+          "page": 1,
+          "score": 0.7590668908990994
+        },
+        {
+          "source": "Instructivo Reportes Consolidados.pdf",
+          "page": 1,
+          "score": 0.7562896443513273
+        },
+        {
+          "source": "Selección de horarios - Idiomas.pdf",
+          "page": 1,
+          "score": 0.7590814562691515
+        },
+        {
+          "source": "Manual Evaluación CAQ - Funcionarios.pdf",
+          "page": 4,
+          "score": 0.7750292661575584
+        },
+        {
+          "source": "Instructivo autorizaciones grados.pdf",
+          "page": 1,
+          "score": 0.7595788462180669
+        }
+      ],
+      "final_sources": [
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 3
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 4
+        },
+        {
+          "source": "Aprobación de Requisitos.pptx",
+          "page": 4
+        },
+        {
+          "source": "Consulta de Hoja de Vida.pdf",
+          "page": 2
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page": 2
+        },
+        {
+          "source": "Inscripcion - Educacion Continuada.pptx",
+          "page": 3
+        },
+        {
+          "source": "Instructivo Aprobación de Requisitos.pdf",
+          "page": 1
+        },
+        {
+          "source": "Instructivo Aprobación de Requisitos.pdf",
+          "page": 2
+        }
+      ],
+      "expected_route_mentioned": false
+    }
+  ]
+}

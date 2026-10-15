@@ -23,7 +23,7 @@ Abre / para el chat, /docs para el esquema de API y /admin para el panel con HTT
 
 ## Arquitectura en una frase
 
-Chat web/WhatsApp → FastAPI → router conversacional → reglas de dominio o RAG (expansión, búsqueda vectorial y léxica, reranking, expansión secuencial de vecinos, presupuesto adaptativo) → LLM configurado → telemetría; las acciones de ticket usan GLPI si está configurado.
+Chat web/WhatsApp → FastAPI → router conversacional → reglas de dominio o RAG (expansión, búsqueda vectorial y léxica, reranking, expansión secuencial de vecinos y tope de chunks) → LLM configurado → telemetría; las acciones de ticket usan GLPI si está configurado.
 
 ## Hechos operativos que debes conocer
 

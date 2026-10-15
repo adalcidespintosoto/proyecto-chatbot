@@ -104,6 +104,21 @@ def _is_teams_access_query(question: str) -> bool:
     return not meeting_only
 
 
+def _is_ui_navigation_query(question: str) -> bool:
+    """Detecta preguntas que necesitan orientación sobre una interfaz o página."""
+    q = _fold_accents(strip_query_header_noise(question or ""))
+    asks_how_or_where = bool(re.search(
+        r"\b(?:donde|como|cual|que\s+(?:boton|opcion|campo|menu)|por\s+donde)\b",
+        q,
+    ))
+    mentions_ui = bool(re.search(
+        r"\b(?:portal(?:es)?|pagina|sitio|pantalla|menu|campo|boton|credenciales?|"
+        r"usuario|contrasena|iniciar\s+sesion|login|interfaz)\b",
+        q,
+    ))
+    return asks_how_or_where and mentions_ui
+
+
 def _is_election_management_query(text: str) -> bool:
     """Distingue la administración de elecciones de la votación del usuario."""
     if not _is_election_query(text):
@@ -265,14 +280,31 @@ def is_suspicious_email_query(question: str) -> bool:
         "phishing", "sospechoso", "sospechosa", "rarísimo", "rarisimo", "raro",
         "extraño", "extrano", "fraudulento", "falso", "falsa", "suplantación", "suplantacion",
     ))
+    credential_request = mentions_link and bool(re.search(
+        r"\b(?:validar|verificar|confirmar|actualizar|ingresar|introducir)\b"
+        r".{0,55}\b(?:contrasena|contraseña|clave|credenciales|usuario)\b|"
+        r"\b(?:contrasena|contraseña|clave|credenciales)\b"
+        r".{0,55}\b(?:validar|verificar|confirmar|actualizar|ingresar|introducir)\b",
+        q,
+    )) and not bool(re.search(
+        r"\b(?:yo|que|acabo de)\s+(?:solicite|solicité|pedi|pedí)\b"
+        r".{0,45}\b(?:restablecer|recuperar|cambiar)\b",
+        q,
+    ))
     urgent_link = mentions_link and mentions_threat and any(term in q for term in ("urgente", "amenaza", "sospechoso", "rarísimo", "rarisimo", "raro"))
-    return mentions_email and ("phishing" in q or "suplantación" in q or "suplantacion" in q or urgent_link or suspicious_signal)
+    return mentions_email and ("phishing" in q or "suplantación" in q or "suplantacion" in q or urgent_link or suspicious_signal or credential_request)
 
 
 def is_account_identifier_query(question: str) -> bool:
     """Detecta consultas para identificar/activar la cuenta institucional, no fallas de red."""
     q = _fold_accents(strip_query_header_noise(question or ""))
     if is_suspicious_email_query(q):
+        return False
+    if re.search(r"\b(?:instal\w*|descarg\w*|bajar|bajo)\b", q) and re.search(
+        r"\b(?:office|microsoft|software|programa|aplicacion|aplicativo)\b", q
+    ):
+        # Mencionar la cuenta usada para instalar un programa no convierte la
+        # consulta en una petición de identificar o recuperar credenciales.
         return False
     asks_for_identity = any(term in q for term in (
         "usuario", "correo", "email", "e-mail", "cuenta institucional",
@@ -795,6 +827,17 @@ def rerank_chunks(
             "calificaciones de una maestría", "calificaciones de maestria", "calificaciones de posgrado",
             "calificaciones de posgrados", "casillas de primer", "primer y segundo parcial"
         ])
+        grade_query_text = _fold_accents(full_q)
+        is_academic_grade_query = bool(re.search(r"\b(?:notas?|calificaciones?)\b", grade_query_text)) and (
+            any(term in grade_query_text for term in (
+                "profesor", "docente", "asignatura", "materia", "curso", "parcial", "portal",
+            ))
+            or is_teacher_grading_query
+        ) and not bool(re.search(r"\b(?:credito|cartera|factura)\b", grade_query_text))
+        is_grade_view_query = is_academic_grade_query and not is_teacher_grading_query and bool(re.search(
+            r"\b(?:ver|veo|mirar|miro|consultar|consulto|revisar|reviso|mostrar|muestra|encuentro|aparecen)\b",
+            grade_query_text,
+        ))
         is_procedural_query = any(w in q_lower for w in [
             "cómo", "como", "pasos", "votar", "radicar", "ingresar", "activar", "descargar", 
             "hago para", "solicitar", "consultar", "inscribir"
@@ -821,6 +864,19 @@ def rerank_chunks(
             content_lower = doc.page_content.lower()
             source_lower = doc.metadata.get("source", "").lower()
             category_lower = str(doc.metadata.get("category", "")).lower()
+
+            if is_academic_grade_query:
+                normalized_source = _fold_accents(source_lower)
+                if "nota credito" in normalized_source or "notas credito" in normalized_source:
+                    continue
+                if "calificacion" in normalized_source:
+                    final_score += 3.0
+                    if is_grade_view_query:
+                        content_folded = _fold_accents(content_lower)
+                        if "portal de estudiantes" in content_folded or "portal estudiantes" in content_folded:
+                            final_score += 4.0
+                        elif "portal profesores" in content_folded or "portal de profesores" in content_folded:
+                            final_score -= 2.0
 
             # El cross-encoder solo recibe el texto del fragmento; algunas
             # páginas tienen poco texto y un título de documento descriptivo.
@@ -1961,6 +2017,16 @@ def _select_teams_access_context_chunks(
     return selected
 
 
+def _asks_for_contact_channel(question: str) -> bool:
+    q = _fold_accents(question or "")
+    return bool(re.search(
+        r"\b(?:solicit\w*|radic\w*|report\w*|pedir|pido)\b|"
+        r"\b(?:a\s+que|cual|que)\s+(?:correo|email|canal)\b|"
+        r"\b(?:donde|a\s+donde)\s+(?:lo\s+)?(?:envio|mando|escribo)\b",
+        q,
+    ))
+
+
 def _select_context_chunks(
     reranked: list,
     max_chunks: int,
@@ -1982,10 +2048,7 @@ def _select_context_chunks(
     selected: list[tuple[Document, str]] = []
     selected_source_counts: Counter[str] = Counter()
     seen_contents: set[tuple[str, str]] = set()
-    asks_for_request_channel = bool(re.search(
-        r"\b(?:solicit\w*|radic\w*|report\w*|pedir|pido)\b",
-        _fold_accents(question),
-    ))
+    asks_for_request_channel = _asks_for_contact_channel(question)
     generic_title_terms = {
         "universidad", "unisimon", "estudiante", "estudiantes", "alumno", "alumnos",
         "docente", "docentes", "profesor", "profesores", "funcionario", "funcionarios",
@@ -2009,6 +2072,17 @@ def _select_context_chunks(
     requested_actor_terms = set(_lexical_terms(question)) & actor_terms
 
     def normalize_title_term(term: str) -> str:
+        # El usuario suele decir "meter al equipo" donde el manual dice
+        # "agregar miembros al grupo". Equiparar esas acciones al comparar
+        # títulos conserva guías exactas sin limitar la búsqueda por rol.
+        if re.fullmatch(r"(?:agreg\w*|anad\w*|inclu\w*|invit\w*|meter|meto|mete|meten|meti)", term):
+            return "agregar"
+        if term in {"equipo", "equipos", "grupo", "grupos"}:
+            return "grupo"
+        if term in {"nota", "notas"} or term.startswith("calificac"):
+            return "calificacion"
+        if re.fullmatch(r"(?:baj\w*|descarg\w*)", term):
+            return "descarga"
         if len(term) > 5 and term.endswith("es"):
             return term[:-2]
         if len(term) > 4 and term.endswith("s"):
@@ -2016,6 +2090,7 @@ def _select_context_chunks(
         return term
 
     ranked_preferred_sources: dict[str, tuple[float, int, Document, float]] = {}
+    ranked_title_sources: dict[str, tuple[float, int, Document, float]] = {}
     for position, (doc, score) in enumerate(reranked):
         source = str((doc.metadata or {}).get("source") or "")
         source_key = Path(source).name.casefold()
@@ -2028,7 +2103,7 @@ def _select_context_chunks(
             )
         }
         if len(matched) < 2 and not any(
-            len(term) >= 7 or normalize_title_term(term) in {"causa", "desercion", "ausencia"}
+            len(normalize_title_term(term)) >= 7 or normalize_title_term(term) in {"causa", "desercion", "ausencia"}
             for term in matched
         ):
             continue
@@ -2039,10 +2114,16 @@ def _select_context_chunks(
                 for title_term in source_terms
             )
         }
-        title_score = sum(min(len(term), 12) / 8 for term in matched) + 0.45 * len(actor_match)
+        title_score = 2 * sum(min(len(term), 12) / 8 for term in matched) + 0.45 * len(actor_match)
         previous = ranked_preferred_sources.get(source_key)
         if previous is None or title_score > previous[0] or (title_score == previous[0] and position < previous[1]):
             ranked_preferred_sources[source_key] = (title_score, position, doc, score)
+        if len(matched) >= 2 or any(len(normalize_title_term(term)) >= 8 for term in matched):
+            previous_title = ranked_title_sources.get(source_key)
+            if previous_title is None or title_score > previous_title[0] or (
+                title_score == previous_title[0] and position < previous_title[1]
+            ):
+                ranked_title_sources[source_key] = (title_score, position, doc, score)
 
     # El título del manual puede ser institucional/genérico y no contener el
     # nombre coloquial del flujo. También damos preferencia a una fuente cuyo
@@ -2061,11 +2142,23 @@ def _select_context_chunks(
         ):
             ranked_preferred_sources[source_key] = (content_score, position, doc, score)
 
-    preferred_sources = {
-        source_key
-        for source_key, _details in sorted(
-            ranked_preferred_sources.items(), key=lambda item: (-item[1][0], item[1][1])
-        )[:min(3, max_chunks)]
+    ranked_source_order = sorted(
+        ranked_preferred_sources.items(), key=lambda item: (-item[1][0], item[1][1])
+    )
+    if ranked_title_sources:
+        best_title_source = min(
+            ranked_title_sources.items(), key=lambda item: (-item[1][0], item[1][1])
+        )
+        ranked_source_order = [best_title_source] + [
+            item for item in ranked_source_order if item[0] != best_title_source[0]
+        ]
+    else:
+        best_title_source = None
+    ranked_source_order = ranked_source_order[:min(3, max_chunks)]
+    preferred_sources = {source_key for source_key, _details in ranked_source_order}
+    title_span_sources = {
+        source_key for source_key, _details in ranked_source_order
+        if source_key in ranked_title_sources
     }
 
     preferred_source_limit = max_per_preferred_source
@@ -2090,6 +2183,29 @@ def _select_context_chunks(
         if source_key in preferred_sources:
             metadata["_rag_preferred_source"] = True
         return Document(page_content=doc.page_content, metadata=metadata)
+
+    # Las siglas concretas del usuario (VPN, SIAAF, etc.) son una evidencia
+    # fuerte cuando aparecen literalmente en un fragmento. Reservar esa página
+    # impide que procedimientos genéricos la desplacen antes del presupuesto.
+    named_entities = {
+        token for token in re.findall(r"\b[A-Z]{2,8}\b", question or "")
+        if token not in {"TI", "PDF", "WEB", "HTTP", "HTTPS", "USB"}
+    }
+    for entity in sorted(named_entities):
+        exact_doc = next((
+            doc for doc, _score in reranked
+            if re.search(rf"\b{re.escape(entity)}\b", doc.page_content or "", re.IGNORECASE)
+        ), None)
+        if exact_doc is None:
+            continue
+        source_key = Path(str((exact_doc.metadata or {}).get("source") or "")).name.casefold()
+        cleaned = strip_chunk_boilerplate(exact_doc.page_content)
+        if cleaned and content_key(source_key, cleaned) not in seen_contents:
+            selected.append((mark_selected_anchor(exact_doc, source_key), cleaned))
+            seen_contents.add(content_key(source_key, cleaned))
+            selected_source_counts[source_key] += 1
+        if len(selected) >= max_chunks:
+            return selected
 
     # Una pregunta sobre cómo solicitar o reportar necesita la página que
     # indica el canal aunque esté lejos de la introducción del procedimiento.
@@ -2117,17 +2233,34 @@ def _select_context_chunks(
     # Reserva espacio para documentos cuyo título o contenido nombra la intención exacta.
     # Esto evita que un resultado genérico del top-4 expulse el instructivo
     # pertinente, incluso cuando el cross-encoder lo dejó más abajo.
-    for _source, (_source_score, _position, doc, _score) in sorted(
-        ranked_preferred_sources.items(), key=lambda item: (-item[1][0], item[1][1])
-    )[:min(3, max_chunks)]:
+    for _source, (_source_score, _position, doc, _score) in ranked_source_order:
         source_key = Path(str((doc.metadata or {}).get("source") or "")).name.casefold()
         limit = source_limit(source_key)
         if limit is not None and selected_source_counts[source_key] >= limit:
             continue
-        cleaned = strip_chunk_boilerplate(doc.page_content)
-        dedupe_key = content_key(source_key, cleaned)
-        if cleaned and dedupe_key not in seen_contents:
-            selected.append((mark_selected_anchor(doc, source_key), cleaned))
+        source_docs = [doc]
+        if source_key in title_span_sources and _is_step_by_step_query(question):
+            # Un procedimiento puede empezar y terminar varias páginas aparte.
+            # Dos anclas textuales de la misma guía permiten verificar la
+            # secuencia mediante la expansión contigua de cada una.
+            source_pages = [
+                candidate for candidate, _candidate_score in reranked
+                if Path(str((candidate.metadata or {}).get("source") or "")).name.casefold() == source_key
+                and len(strip_chunk_boilerplate(candidate.page_content or "")) >= 55
+                and not strip_chunk_boilerplate(candidate.page_content or "").startswith("[Imagen")
+            ]
+            if source_pages:
+                source_pages.sort(key=lambda candidate: (
+                    (candidate.metadata or {}).get("page_number", (candidate.metadata or {}).get("slide_number", float("inf"))),
+                    (candidate.metadata or {}).get("chunk_index", 0),
+                ))
+                source_docs = [source_pages[0], source_pages[-1]]
+        for source_doc in source_docs:
+            cleaned = strip_chunk_boilerplate(source_doc.page_content)
+            dedupe_key = content_key(source_key, cleaned)
+            if not cleaned or dedupe_key in seen_contents:
+                continue
+            selected.append((mark_selected_anchor(source_doc, source_key), cleaned))
             seen_contents.add(dedupe_key)
             selected_source_counts[source_key] += 1
             if len(selected) >= max_chunks:
@@ -2223,15 +2356,15 @@ def _is_step_by_step_query(question: str) -> bool:
     """Detecta solicitudes que necesitan una secuencia de varios pasos."""
     q = _fold_accents(question or "")
     action = (
-        r"hacer|realizar|completar|oficializ\w*|gener\w*|obten\w*|consult\w*|sacar|descarg\w*|"
+        r"hacer|realizar|completar|oficializ\w*|gener\w*|obten\w*|consult\w*|sac\w*|baj\w*|descarg\w*|"
         r"llevar\s+a\s+cabo|ingres\w*|entr\w*|activ\w*|restablec\w*|recuper\w*|"
         r"modific\w*|export\w*|lleg\w*|inclu\w*|hag\w*|"
         r"registr\w*|solicit\w*|pedir|pido|radic\w*|inscrib\w*|matricul\w*|"
         r"configur\w*|acced\w*|vot\w*|guard\w*|finaliz\w*|unir\w*|pag\w*|"
-        r"inici\w*|conect\w*|cre\w*|agreg\w*|quit\w*|diligenci\w*|autoriz\w*|"
+        r"inici\w*|conect\w*|cre\w*|agreg\w*|met\w*|quit\w*|diligenci\w*|autoriz\w*|"
         r"aprob\w*|reconoc\w*|homolog\w*|actualiz\w*|instal\w*|verific\w*|"
         r"encontr\w*|subir|compart\w*|grabar|seleccion\w*|comprobar\w*|descargar|"
-        r"revis\w*|mirar|unir|uno|unirme"
+        r"revis\w*|mir\w*|ver|veo|unir|uno|unirme"
     )
     explicit_sequence = bool(re.search(
         r"\b(?:paso\s+a\s+paso|pasos|procedimiento|instructivo|guia|"
@@ -2242,17 +2375,20 @@ def _is_step_by_step_query(question: str) -> bool:
         rf"\b(?:quiero|necesito|debo|tengo\s+que|me\s+toca|voy\s+a)\b.{{0,70}}\b(?:{action})\b", q
     ))
     asks_operational_choice = bool(re.search(
-        r"\b(?:que|cual)\s+(?:opcion|boton|ruta|modulo|informe)\b.{0,70}\b(?:seleccion|uso|presion|abro|ingreso|saco|gener|envia|envio|escojo|elijo)\w*\b", q
+        r"\b(?:que|cual)\s+(?:opciones|botones|opcion|boton|ruta|modulo|informe)\b.{0,70}\b(?:seleccion|uso|presion|abro|ingreso|saco|gener|envia|envio|escojo|elijo|toco)\w*\b", q
     ))
     multi_step_actions = (
-        r"hacer|realizar|completar|oficializ\w*|gener\w*|sacar|descarg\w*|llevar\s+a\s+cabo|"
+        r"hacer|realizar|completar|oficializ\w*|gener\w*|sac\w*|baj\w*|descarg\w*|llevar\s+a\s+cabo|"
         r"ingres\w*|entr\w*|activ\w*|restablec\w*|recuper\w*|registr\w*|solicit\w*|"
         r"pedir|pido|radic\w*|inscrib\w*|matricul\w*|configur\w*|acced\w*|vot\w*|"
-        r"unir|uno|unirme|pag\w*|inici\w*|conect\w*|cre\w*|agreg\w*|quit\w*|"
+        r"unir|uno|unirme|pag\w*|inici\w*|conect\w*|cre\w*|agreg\w*|met\w*|quit\w*|"
         r"diligenci\w*|autoriz\w*|aprob\w*|reconoc\w*|homolog\w*|actualiz\w*|"
-        r"instal\w*|subir|compart\w*|grabar|seleccion\w*|comprobar\w*|envia\w*"
+        r"instal\w*|subir|compart\w*|grabar|seleccion\w*|comprobar\w*|envia\w*|mir\w*|ver|veo"
     )
-    asks_where_to_act = bool(re.search(rf"\b(?:donde|por\s+donde)\b.{{0,50}}\b(?:{multi_step_actions})\b", q))
+    asks_where_to_act = bool(re.search(
+        rf"\b(?:donde|por\s+donde|en\s+que\s+parte|en\s+cual\s+seccion)\b"
+        rf".{{0,70}}\b(?:{multi_step_actions})\b", q,
+    ))
     asks_what_is_next = bool(re.search(r"\bque\s+me\s+falta\b.{0,80}\b(?:tramite|matricula|registro|oficializ|completar|hacer)\w*\b", q))
     asks_module_capabilities = bool(re.search(
         r"\b(?:que|cuales)\s+opciones\b.{0,80}\b(?:modulo|sistema|plataforma|reunion|reuni[oó]n)\b|"
@@ -2318,78 +2454,6 @@ def _is_safe_first_line_self_help_query(question: str) -> bool:
 def _estimated_context_tokens(text: str) -> int:
     """Estimación conservadora sin agregar dependencias de tokenizer."""
     return (len(text or "") + 2) // 3
-
-
-def _fit_context_budget(
-    chunks: list[tuple[Document, str]],
-    question: str,
-    *,
-    budget: Optional[int] = None,
-    max_chunks: Optional[int] = None,
-) -> list[tuple[Document, str]]:
-    """Reserva primero los anchors rerankeados y usa el saldo para sus vecinos."""
-    if budget is None:
-        budget = 2400
-    fitted = []
-    used = 0
-    indexed_chunks = list(enumerate(chunks))
-    asks_for_request_channel = bool(re.search(
-        r"\b(?:solicit\w*|radic\w*|report\w*|pedir|pido)\b",
-        _fold_accents(question),
-    ))
-    def priority(item: tuple[int, tuple[Document, str]]) -> int:
-        metadata = item[1][0].metadata or {}
-        if asks_for_request_channel and metadata.get("_rag_anchor") and re.search(
-            r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
-            item[1][1],
-            re.IGNORECASE,
-        ):
-            return -1
-        if metadata.get("_rag_preferred_source") and metadata.get("_rag_anchor"):
-            return 0
-        if metadata.get("_rag_preferred_source"):
-            return 1
-        if metadata.get("_rag_anchor"):
-            return 2
-        return 3
-
-    ordered_candidates = sorted(indexed_chunks, key=lambda item: (priority(item), item[0]))
-    chosen_indices = set()
-    for original_index, (doc, text) in ordered_candidates:
-        if max_chunks is not None and len(fitted) >= max_chunks:
-            break
-        source = Path(str((doc.metadata or {}).get("source") or "Procedimiento Unisimon")).name
-        labeled = f"[{source}{_format_page_info(doc.metadata or {})}]\n{text}"
-        cost = _estimated_context_tokens(labeled)
-        if used + cost > budget:
-            continue
-        fitted.append((doc, text))
-        chosen_indices.add(original_index)
-        used += cost
-
-    source_order: dict[str, int] = {}
-    for index, (doc, _text) in enumerate(chunks):
-        source = str((doc.metadata or {}).get("source") or "")
-        source_order.setdefault(source, index)
-
-    def context_order_key(indexed: tuple[int, tuple[Document, str]]) -> tuple:
-        original_index, (doc, _text) = indexed
-        metadata = doc.metadata or {}
-        sequence = metadata.get("_rag_sequence")
-        if isinstance(sequence, tuple) and len(sequence) == 2:
-            page, chunk_index = sequence
-        else:
-            page = metadata.get("page_number", metadata.get("slide_number", metadata.get("page")))
-            chunk_index = float("inf")
-        page = page if isinstance(page, (int, float)) else float("inf")
-        chunk_index = chunk_index if isinstance(chunk_index, (int, float)) else float("inf")
-        source = str(metadata.get("source") or "")
-        return source_order.get(source, 0), page, chunk_index, original_index
-
-    return [item for _index, item in sorted(
-        ((index, chunks[index]) for index in chosen_indices),
-        key=context_order_key,
-    )]
 
 
 def _select_forgotten_email_context_chunks(
@@ -2493,6 +2557,7 @@ def _expand_chunks_with_neighbors(
     collection: Any,
     *,
     neighbors_each_side: int = 1,
+    preferred_neighbors_each_side: Optional[int] = None,
     strip_visual_captions: bool = True,
     metadata_filter: Optional[dict] = None,
     preserve_document_order: bool = True,
@@ -2574,14 +2639,19 @@ def _expand_chunks_with_neighbors(
         source = str(metadata.get("source") or "").strip()
         page_field = "page_number" if metadata.get("page_number") is not None else "slide_number"
         page_value = metadata.get(page_field)
-        if not source or not isinstance(page_value, int) or neighbors_each_side <= 0:
+        radius = (
+            preferred_neighbors_each_side
+            if metadata.get("_rag_preferred_source") and preferred_neighbors_each_side is not None
+            else neighbors_each_side
+        )
+        if not source or not isinstance(page_value, int) or radius <= 0:
             append_once(anchor_doc, anchor_text)
             continue
 
-        # Solo consulta la página ancla y las adyacentes. Cada ID valida página
-        # y posición del chunk; los metadatos solos no establecen el orden.
+        # Consulta la página ancla y el radio de páginas elegido. Cada ID
+        # valida página y posición; los metadatos solos no establecen el orden.
         page_rows = []
-        for adjacent_page in range(max(1, page_value - 1), page_value + 2):
+        for adjacent_page in range(max(1, page_value - radius), page_value + radius + 1):
             page_rows.extend(load_page(source, page_field, adjacent_page))
         page_rows.sort(key=lambda item: (item[0], item[1]))
         anchor_key = re.sub(r"\s+", " ", anchor_doc.page_content or "").strip().casefold()
@@ -2596,8 +2666,8 @@ def _expand_chunks_with_neighbors(
             append_once(anchor_doc, anchor_text)
             continue
 
-        first_page = max(1, page_value - neighbors_each_side)
-        last_page = page_value + neighbors_each_side
+        first_page = max(1, page_value - radius)
+        last_page = page_value + radius
         for row_page, _chunk_index, text, chunk_metadata in page_rows:
             if not first_page <= row_page <= last_page:
                 continue
@@ -2749,6 +2819,16 @@ def extract_queried_platform_or_system(query: str) -> Optional[str]:
     )
     if match:
         candidate = match.group(1).strip().lower()
+        following = q_lower[match.end():]
+        # "En el portal miro las notas" describe una acción, no una
+        # plataforma llamada Miro. Rechazar verbos seguidos de un objeto
+        # directo evita vaciar toda la recuperación por un falso nombre.
+        looks_like_verb = candidate in {
+            "miro", "veo", "consulto", "encuentro", "saco", "descargo",
+            "reviso", "abro", "entro", "ingreso", "busco", "hago",
+        } and bool(re.match(r"\s+(?:el|la|los|las|un|una|mis|mi|sus|su)\b", following))
+        if looks_like_verb:
+            return None
         if candidate not in GENERIC_SYSTEM_TERMS and len(candidate) > 2:
             return candidate
 
@@ -3077,6 +3157,13 @@ class RAGService:
             )
             if security_query not in query_variants:
                 query_variants.insert(0, security_query)
+        if re.search(r"\b(?:vpn|acceso remoto|conexion remota|conexión remota)\b", _fold_accents(question)):
+            remote_access_query = (
+                "acceso remoto VPN a infraestructura institucional; solicitar apoyo a Dirección de TI "
+                "indicando necesidad del acceso y duración; aseguramiento de servicios en la red"
+            )
+            if remote_access_query not in query_variants:
+                query_variants.insert(0, remote_access_query)
         if _is_onboarding_query(contextual_search_query):
             onboarding_query = (
                 "Activar usuario y correo institucional para estudiantes nuevos de primer semestre. "
@@ -3103,6 +3190,7 @@ class RAGService:
         # 2. Búsqueda por similitud con puntuación de relevancia en ChromaDB combinando variantes
         candidate_docs_map: Dict[str, tuple] = {}
         valid_docs_with_scores: list[tuple[Document, float]] = []
+        ui_map_candidates: list[tuple[Document, float]] = []
 
         def append_supplemental_candidate(doc: Document, score: Optional[float], allow_low_score: bool = False) -> None:
             """Añade resultados auxiliares aplicando los mismos filtros y deduplicación."""
@@ -3160,6 +3248,40 @@ class RAGService:
                     chunk_key = strip_chunk_boilerplate(doc.page_content)
                     if chunk_key not in candidate_docs_map:
                         candidate_docs_map[chunk_key] = (doc, score)
+
+                # Las preguntas sobre ubicación de campos, botones o rutas de
+                # navegación también consultan los mapas visuales verificados.
+                # El filtro por tipo evita sumar estos documentos a preguntas
+                # generales y no depende de una página o rol específico.
+                if _is_ui_navigation_query(question):
+                    try:
+                        ui_docs = self.vector_store.similarity_search_with_relevance_scores(
+                            format_e5_query(question),
+                            k=3,
+                            filter={"source_type": "public_web_ui"},
+                        )
+                        for ui_doc, ui_score in ui_docs:
+                            metadata = ui_doc.metadata or {}
+                            if metadata.get("ui_verified") is not True:
+                                continue
+                            if ui_score is None or ui_score < self.min_relevance_score:
+                                continue
+                            ui_key = strip_chunk_boilerplate(ui_doc.page_content)
+                            if ui_key and (
+                                ui_key not in candidate_docs_map
+                                or ui_score > candidate_docs_map[ui_key][1]
+                            ):
+                                candidate_docs_map[ui_key] = (ui_doc, ui_score)
+                            if ui_key:
+                                ui_map_candidates.append((ui_doc, ui_score))
+                        logger.info(
+                            "[RAGTrace] Mapa(s) visual(es) verificado(s): %d hit(s) para pregunta de navegación.",
+                            len(ui_docs),
+                        )
+                    except Exception as ui_exc:
+                        # Un fallo del índice visual no debe interrumpir la
+                        # recuperación documental que ya produjo candidatos.
+                        logger.warning("No se pudo consultar el índice de mapas visuales: %s", ui_exc)
 
                 logger.info(
                     "[RAGTrace] collection=%d dense_raw=%d dense_above_threshold=%d bm25=%d fused_unique=%d",
@@ -3385,8 +3507,6 @@ class RAGService:
         # en varias páginas y documentos complementarios. Las consultas directas
         # mantienen un contexto compacto para reducir distractores y latencia.
         procedural_context = procedural_query or onboarding_context_query or new_pregrado_report_query
-        context_budget_tokens = 3800 if procedural_context else 1400
-        document_context_budget_tokens = max(400, context_budget_tokens - golden_reference_tokens)
         max_anchor_chunks = 16 if procedural_context else 4
         if valid_docs_with_scores:
             if teams_access_query:
@@ -3434,10 +3554,7 @@ class RAGService:
                 original_query=contextual_search_query,
                 score_trace_callback=emit_reranker_scores if trace_callback is not None else None,
             )
-            if reranked and re.search(
-                r"\b(?:solicit\w*|radic\w*|report\w*|pedir|pido)\b",
-                _fold_accents(question),
-            ):
+            if reranked and _asks_for_contact_channel(question):
                 # El reranker puede dejar fuera del top-k la página de contacto
                 # de su mejor procedimiento. Recuperarla del pool original evita
                 # concluir que no existe un canal cuando sí está indexado.
@@ -3527,6 +3644,7 @@ class RAGService:
                         anchor_chunks,
                         self.vector_store._collection,
                         metadata_filter=filter_condition,
+                        preferred_neighbors_each_side=3 if procedural_context else 1,
                         preserve_document_order=procedural_query or onboarding_context_query,
                     )
                     for doc, cleaned_chunk in contextual_chunks:
@@ -3591,11 +3709,43 @@ class RAGService:
                         reranked, max_chunks=max_anchor_chunks,
                         question=_strip_declared_role_prefix(question), query_variants=query_variants,
                     )
+                    if _is_ui_navigation_query(question) and ui_map_candidates:
+                        # El cross-encoder está calibrado para prosa documental
+                        # y puede relegar un mapa estructural aunque la consulta
+                        # vectorial filtrada lo encuentre pertinente. Reservar
+                        # su mejor mapa como ancla evita perder justo la ayuda
+                        # visual pedida por la persona.
+                        route_question = bool(re.search(
+                            r"\b(?:desde|hasta|llegar|llego|ruta|camino)\b",
+                            _fold_accents(question),
+                        ))
+                        ui_map_limit = 2 if route_question else 1
+                        existing_ui_sources = {
+                            str((doc.metadata or {}).get("source") or "")
+                            for doc, _text in anchor_chunks
+                        }
+                        selected_ui_map_count = sum(
+                            1 for doc, _text in anchor_chunks
+                            if (doc.metadata or {}).get("source_type") == "public_web_ui"
+                        )
+                        if selected_ui_map_count < ui_map_limit:
+                            for ui_doc, _ui_score in sorted(
+                                ui_map_candidates, key=lambda item: item[1], reverse=True
+                            ):
+                                source = str((ui_doc.metadata or {}).get("source") or "")
+                                if source in existing_ui_sources:
+                                    continue
+                                anchor_chunks.insert(0, (ui_doc, strip_chunk_boilerplate(ui_doc.page_content)))
+                                existing_ui_sources.add(source)
+                                selected_ui_map_count += 1
+                                if selected_ui_map_count >= ui_map_limit:
+                                    break
                     emit_retrieval_trace("anchors", [(doc, None, text) for doc, text in anchor_chunks])
                     contextual_chunks = _expand_chunks_with_neighbors(
                         anchor_chunks,
                         self.vector_store._collection,
                         metadata_filter=filter_condition,
+                        preferred_neighbors_each_side=3 if procedural_context else 1,
                         preserve_document_order=procedural_query or onboarding_context_query,
                     )
                     for doc, cleaned_chunk in contextual_chunks:
@@ -3615,23 +3765,71 @@ class RAGService:
                 logger.info("[RAG] El reordenador descartó todos los fragmentos recuperados por falta de relevancia semántica.")
 
 
-        # Aplica el límite sobre el contexto expandido. Cada bloque conserva su
-        # fuente y página; si un ancla queda fuera, los siguientes sí pueden caber.
+        # Añadir los mapas elegidos incluso después de selectores especializados
+        # (p. ej., activación/onboarding), que pueden excluir documentos visuales.
+        if _is_ui_navigation_query(question) and ui_map_candidates:
+            route_question = bool(re.search(
+                r"\b(?:desde|hasta|llegar|llego|ruta|camino)\b",
+                _fold_accents(question),
+            ))
+            ui_map_limit = 2 if route_question else 1
+            existing_sources = {
+                str((doc.metadata or {}).get("source") or "") for doc in retrieved_docs
+            }
+            selected_ui_map_count = sum(
+                1 for doc in retrieved_docs
+                if (doc.metadata or {}).get("source_type") == "public_web_ui"
+            )
+            maps_to_add = []
+            if selected_ui_map_count < ui_map_limit:
+                for ui_doc, ui_score in sorted(
+                    ui_map_candidates, key=lambda item: item[1], reverse=True
+                ):
+                    metadata = ui_doc.metadata or {}
+                    source = str(metadata.get("source") or "")
+                    if source in existing_sources or metadata.get("ui_verified") is not True:
+                        continue
+                    maps_to_add.append((ui_doc, strip_chunk_boilerplate(ui_doc.page_content)))
+                    existing_sources.add(source)
+                    selected_ui_map_count += 1
+                    if selected_ui_map_count >= ui_map_limit:
+                        break
+            for ui_doc, cleaned_map in reversed(maps_to_add):
+                retrieved_docs.insert(0, ui_doc)
+                source_name = Path(str((ui_doc.metadata or {}).get("source") or "Web_UI")).name
+                if source_name not in sources:
+                    sources.insert(0, source_name)
+                context_parts.insert(
+                    0,
+                    f"[{source_name}{_format_page_info(ui_doc.metadata or {})}]\n{cleaned_map}",
+                )
+
+        # Limita la cantidad de fragmentos, pero no descarta texto por una
+        # estimación aproximada de tokens. El orden ya conserva primero las
+        # anclas y los mapas visuales necesarios para responder.
         if context_parts:
             expanded_context_chunks = list(zip(
                 retrieved_docs,
                 [part.split("\n", 1)[-1] for part in context_parts],
             ))
+            if _is_ui_navigation_query(question):
+                route_question = bool(re.search(
+                    r"\b(?:desde|hasta|llegar|llego|ruta|camino)\b",
+                    _fold_accents(question),
+                ))
+                ui_maps = [
+                    item for item in expanded_context_chunks
+                    if (item[0].metadata or {}).get("source_type") == "public_web_ui"
+                    and (item[0].metadata or {}).get("ui_verified") is True
+                ]
+                other_chunks = [item for item in expanded_context_chunks if item not in ui_maps]
+                expanded_context_chunks = ui_maps[:2 if route_question else 1] + other_chunks
             emit_retrieval_trace(
                 "expanded_context",
                 [(doc, None, text) for doc, text in expanded_context_chunks],
             )
-            budgeted_chunks = _fit_context_budget(
-                expanded_context_chunks,
-                question,
-                budget=document_context_budget_tokens,
-                max_chunks=24 if procedural_context else 8,
-            )
+            max_final_chunks = 24 if procedural_context else 8
+            budgeted_chunks = expanded_context_chunks[:max_final_chunks]
             emit_retrieval_trace(
                 "budgeted_context",
                 [(doc, None, text) for doc, text in budgeted_chunks],
@@ -3646,12 +3844,11 @@ class RAGService:
                     sources.append(source_filename)
                 context_parts.append(f"[{source_filename}{_format_page_info(doc.metadata or {})}]\n{cleaned_chunk}")
             logger.info(
-                "[RAG] Presupuesto de contexto: %d tokens documentales + %d de Golden Cache / %d estimados; %d chunks finales (%s).",
+                "[RAG] Límite por cantidad: %d/%d chunks finales; ~%d tokens estimados sin recorte por tokens; Golden Cache ~%d tokens.",
+                len(context_parts),
+                max_final_chunks,
                 sum(_estimated_context_tokens(part) for part in context_parts),
                 golden_reference_tokens,
-                context_budget_tokens,
-                len(context_parts),
-                "ampliado",
             )
             emit_retrieval_trace("final_context", [
                 (doc, None, text) for doc, text in budgeted_chunks
