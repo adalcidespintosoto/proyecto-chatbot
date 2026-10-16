@@ -238,7 +238,7 @@ async def list_documents() -> Dict[str, Any]:
 @router.post(
     "/api/admin/upload-doc",
     summary="Subir Documento a la Base de Conocimiento",
-    description="Sube un archivo PDF/DOCX y lo asigna a la carpeta correspondiente según la audiencia."
+    description="Sube un documento a data/docs; la indexación automática convierte PDF/PPTX a Markdown antes de usar ChromaDB."
 )
 async def upload_document(
     file: UploadFile = File(...),
@@ -263,9 +263,14 @@ async def upload_document(
         indexing_result = None
         if auto_index:
             try:
-                ingest_multimodal(file_path=str(dest_path), incremental=True)
+                indexed = ingest_multimodal(file_path=str(dest_path), incremental=True)
+                if not indexed:
+                    raise RuntimeError(
+                        "El índice actual todavía no admite la incorporación incremental; "
+                        "revisa los logs y completa primero la reconstrucción Markdown."
+                    )
                 apply_taxonomy_to_chroma()
-                indexing_result = "Indexado inmediatamente en ChromaDB."
+                indexing_result = "Transformado a Markdown e indexado en ChromaDB."
             except Exception as e:
                 logger.warning(f"Aviso durante auto-indexación: {e}")
                 indexing_result = f"Guardado, pero la indexación falló: {e}"
@@ -510,35 +515,20 @@ async def resolve_staged_upload(
         # 2. CASO: Actualizar / Reemplazar Documento Existente
         if request.action == "replace":
             target_to_purge = request.target_to_replace or meta.get("primary_overlapping_source") or filename
-            if target_to_purge:
-                logger.info(f"🔄 Reemplazando: Purgando fragmentos previos de '{target_to_purge}'...")
-                try:
-                    vs = rag_service.vector_store
-                    if vs is not None:
-                        delete_document_chunks(vs, target_to_purge)
-                except Exception as exc:
-                    logger.warning(f"Aviso purgando chunks de '{target_to_purge}': {exc}")
-
-                # Si el archivo previo tiene otro nombre y está en data/docs, eliminarlo
-                if target_to_purge != filename:
-                    for root, _, files in os.walk(DOCS_DIR):
-                        if target_to_purge in files:
-                            try:
-                                (Path(root) / target_to_purge).unlink()
-                                logger.info(f"🗑️ Archivo físico anterior '{target_to_purge}' eliminado.")
-                            except Exception as exc:
-                                logger.warning(f"Aviso eliminando archivo físico {target_to_purge}: {exc}")
-
-            # Purgar también cualquier fragmento previo del nombre nuevo
-            try:
+            indexed = ingest_multimodal(file_path=str(dest_path), incremental=False, deduplicate=False)
+            if not indexed:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="No se indexó el documento. El índice activo puede requerir primero una reconstrucción Markdown completa.",
+                )
+            if target_to_purge and target_to_purge != filename:
                 vs = rag_service.vector_store
                 if vs is not None:
-                    delete_document_chunks(vs, filename)
-            except Exception:
-                pass
-
-            # Ingestar la nueva versión completa
-            ingest_multimodal(file_path=str(dest_path), incremental=False, deduplicate=False)
+                    delete_document_chunks(vs, target_to_purge)
+                for root, _, files in os.walk(DOCS_DIR):
+                    if target_to_purge in files:
+                        (Path(root) / target_to_purge).unlink(missing_ok=True)
+                        logger.info("Documento fuente anterior eliminado tras indexar la versión nueva: %s", target_to_purge)
             apply_taxonomy_to_chroma()
             rag_service.reload_vector_store()
 
@@ -547,16 +537,20 @@ async def resolve_staged_upload(
         # 3. CASO: Guardar como Nuevo (con Deduplicación de Fragmentos)
         elif request.action == "deduplicate":
             logger.info(f"🛡️ Deduplicación activa para '{filename}'...")
-            ingest_multimodal(file_path=str(dest_path), incremental=False, deduplicate=True, similarity_threshold=0.85)
+            indexed = ingest_multimodal(file_path=str(dest_path), incremental=False, deduplicate=True, similarity_threshold=0.85)
+            if not indexed:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se indexó el documento; completa primero la reconstrucción Markdown.")
             apply_taxonomy_to_chroma()
             rag_service.reload_vector_store()
 
-            msg = f"Documento '{filename}' indexado exitosamente conservando únicamente fragmentos novedosos."
+            msg = f"Documento '{filename}' transformado a Markdown e indexado completo; no se descartaron fragmentos por similitud."
 
         # 4. CASO: Forzar Indexación Completa (Sin Filtrado)
         elif request.action == "force":
             logger.info(f"⚡ Ingesta forzada completa para '{filename}'...")
-            ingest_multimodal(file_path=str(dest_path), incremental=False, deduplicate=False)
+            indexed = ingest_multimodal(file_path=str(dest_path), incremental=False, deduplicate=False)
+            if not indexed:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se indexó el documento; completa primero la reconstrucción Markdown.")
             apply_taxonomy_to_chroma()
             rag_service.reload_vector_store()
 
@@ -597,38 +591,42 @@ async def resolve_staged_upload(
 @router.post(
     "/api/admin/reindex",
     summary="Re-indexar Base Vectorial ChromaDB",
-    description="Ejecuta la ingesta multimodal sobre todos los documentos de data/docs y actualiza la taxonomía."
+    description="Transforma documentos nuevos o modificados a Markdown y los indexa. La reconstrucción completa se ejecuta fuera del servidor."
 )
 async def reindex_knowledge_base(
     incremental: bool = Query(default=True, description="Procesar solo documentos nuevos o modificados"),
-    wipe_db: bool = Query(default=False, description="Borrar completamente la base vectorial previa")
+    wipe_db: bool = Query(default=False, description="La reconstrucción completa requiere ejecutar el script con UniMon detenido")
 ) -> Dict[str, Any]:
-    """Dispara el pipeline de ingesta multimodal hacia ChromaDB."""
+    """Procesa incrementalmente solo documentos cuyo Markdown aún no está indexado."""
+    if wipe_db or not incremental:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "La reconstrucción limpia debe ejecutarse con UniMon detenido para liberar ChromaDB. "
+                "Ejecuta: .venv\\Scripts\\python.exe scripts\\ingest_sanitized_documents.py --rebuild"
+            ),
+        )
     try:
         start_time = datetime.now()
-        logger.info(f"🔄 Iniciando Re-indexación de ChromaDB (incremental={incremental}, wipe_db={wipe_db})...")
+        logger.info("🔄 Iniciando indexación incremental de Markdown...")
 
-        # Ejecutar ingesta
-        success = ingest_multimodal(
-            incremental=incremental,
-            wipe_db=wipe_db
-        )
+        success = ingest_multimodal(incremental=True)
 
-        # Aplicar taxonomía de metadatos (roles, categorías)
         taxonomy_updated = 0
-        try:
-            taxonomy_updated = apply_taxonomy_to_chroma()
-        except Exception as tax_err:
-            logger.warning(f"Aviso al actualizar taxonomía: {tax_err}")
+        if success:
+            try:
+                taxonomy_updated = apply_taxonomy_to_chroma()
+            except Exception as tax_err:
+                logger.warning(f"Aviso al actualizar taxonomía: {tax_err}")
 
         elapsed_sec = round((datetime.now() - start_time).total_seconds(), 2)
 
         return {
             "status": "success" if success else "warning",
-            "message": "Base vectorial ChromaDB re-indexada exitosamente." if success else "La ingesta finalizó con advertencias.",
+            "message": "Documentos nuevos o modificados transformados a Markdown e indexados." if success else "No se completó la ingesta Markdown; revisa los logs y confirma que el índice ya fue reconstruido.",
             "duration_seconds": elapsed_sec,
-            "incremental": incremental,
-            "wipe_db": wipe_db,
+            "incremental": True,
+            "wipe_db": False,
             "taxonomy_chunks_classified": taxonomy_updated
         }
 

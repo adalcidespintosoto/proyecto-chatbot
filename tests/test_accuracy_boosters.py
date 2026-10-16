@@ -497,6 +497,15 @@ class TestIntegralRestrictionsAndPrerequisites:
         assert "No le pidas contraseñas, códigos de verificación" in STRICT_SYSTEM_PROMPT_TEMPLATE
         assert "No repitas la consulta" in STRICT_SYSTEM_PROMPT_TEMPLATE
 
+    def test_system_prompt_stays_within_the_user_requested_issue(self):
+        """Evita ampliar una falla de acceso a trámites adyacentes que no se preguntaron."""
+        from app.services.rag_service import STRICT_SYSTEM_PROMPT_TEMPLATE
+
+        assert "No agregues procedimientos para causas que la persona no mencionó" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "no expliques cómo restablecer una contraseña si solo pregunta qué revisar para entrar" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "No enumeres vacíos del contexto ni expliques cómo funciona la búsqueda" in STRICT_SYSTEM_PROMPT_TEMPLATE
+        assert "Menciona que se necesita visto bueno o autorización de la jefatura solo cuando el procedimiento aplicable lo indique" in STRICT_SYSTEM_PROMPT_TEMPLATE
+
     def test_clean_llm_response_removes_internal_prompt_leaks(self):
         """Valida que clean_llm_response elimine transcripciones de directivas internas del prompt."""
         from app.services.rag_service import clean_llm_response

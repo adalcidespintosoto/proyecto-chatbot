@@ -19,7 +19,7 @@ La bitácora de integración OpenAI y las comparativas RAG de la carpeta docs so
 .\run.ps1
 ~~~
 
-Abre / para el chat, /docs para el esquema de API y /admin para el panel con HTTP Basic. Revisa /health. Para preparar la base documental desde fuentes autorizadas, consulta la guía de réplica; el ingestor principal procesa PDF y PPTX.
+Abre / para el chat, /docs para el esquema de API y /admin para el panel con HTTP Basic. Revisa /health. Para preparar la base documental desde fuentes autorizadas, consulta la guía de réplica y [la guía de ingesta Markdown](docs/INGESTA_MARKDOWN_AUTOMATICA.md): cada PDF/PPTX se transforma, valida y guarda como Markdown antes de generar embeddings.
 
 ## Arquitectura en una frase
 

@@ -1,28 +1,10 @@
-"""
-Pipeline de Ingesta Multimodal con Vision-LLM para UniMon (Universidad Simón Bolívar).
-
-Procesa documentos PDF y PowerPoint (.pptx) con interpretación visual de imágenes incrustadas
-(capturas de pantalla, diagramas de flujo, tablas visuales) mediante un Vision-LLM local
-(llama3.2-vision:11b vía Ollama).
-
-Funcionalidades:
-- Extracción de texto plano + tablas de PDFs y presentaciones PPTX.
-- Interpretación semántica de imágenes incrustadas con Vision-LLM.
-- Rasterización de páginas escaneadas (PDFs sin texto seleccionable).
-- Chunking con solapamiento y persistencia en ChromaDB con embeddings en GPU.
-- Reporte de progreso con tqdm y manejo robusto de errores por archivo.
-
-Uso:
-    python scripts/ingest_multimodal_docs.py
-"""
+"""Extract PDF/PPTX content and provide Chroma helpers used by Markdown ingestion."""
 
 import os
 import sys
 import io
-import time
 import json
 import base64
-import shutil
 import re
 import hashlib
 import logging
@@ -50,7 +32,6 @@ from pptx.util import Emu
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
@@ -974,7 +955,7 @@ def audit_chroma_database_redundancy(
 
 
 # =============================================================================
-# ORQUESTADOR PRINCIPAL DE INGESTA MULTIMODAL E INCREMENTAL
+# COMPATIBILIDAD DE INGESTA: TRANSFORMAR A MARKDOWN ANTES DE INDEXAR
 # =============================================================================
 
 def ingest_multimodal(
@@ -990,433 +971,36 @@ def ingest_multimodal(
     similarity_threshold: float = 0.88,
     audit_db: bool = False,
     vision_model_override: Optional[str] = None,
-    min_image_kb_override: Optional[int] = None
+    min_image_kb_override: Optional[int] = None,
 ) -> bool:
-    """
-    Pipeline de ingesta multimodal con soporte para:
-    - Auditoría de redundancia (--check-redundancy): evaluación previa segura (dry-run).
-    - Deduplicación activa (--deduplicate): descarta chunks redundantes antes del upsert.
-    - Auditoría global de BD (--audit-db): detecta solapamiento entre documentos cargados.
-    - Ingesta incremental (--incremental): procesa solo documentos no indexados.
-    - Ingesta de archivo único (--file <ruta>): agrega o actualiza solo ese archivo.
-    - Eliminación de documento (--delete-doc <nombre>): borra todos los chunks del archivo.
-    """
-    settings = get_settings()
-    docs_dir = Path(docs_path or settings.docs_dir)
-    chroma_dir = Path(chroma_path or settings.chroma_db_dir)
-    embedding_model_name = model_name or settings.embedding_model
-    ollama_url = settings.ollama_base_url
-    vision_model = vision_model_override or settings.vision_model
-    vision_timeout = settings.vision_timeout
-    max_image_size = settings.vision_max_image_size
-    min_image_kb = min_image_kb_override if min_image_kb_override is not None else settings.vision_min_image_kb
-
-    # Resetear contadores
-    for key in stats:
-        stats[key] = 0
-
-    logger.info("=" * 70)
-    logger.info(" INGESTA MULTIMODAL E INCREMENTAL - UNISIMON COLOMBIA")
-    logger.info("=" * 70)
-    logger.info(f"Directorio de Documentos: {docs_dir.resolve()}")
-    logger.info(f"Directorio de ChromaDB:   {chroma_dir.resolve()}")
-    logger.info(f"Modelo de Embeddings:     {embedding_model_name}")
-    logger.info(f"Modelo de Visión (LLM):   {vision_model}")
-    logger.info(f"Ollama URL:               {ollama_url}")
-
-    # Inicializar modelo de embeddings (GPU si disponible)
-    logger.info(f"Inicializando modelo de embeddings '{embedding_model_name}'...")
-    device = "cpu"
-    try:
-        import torch
-        if torch.cuda.is_available():
-            device = "cuda"
-            gpu_name = torch.cuda.get_device_name(0)
-            vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
-            logger.info(f"🖥️ GPU detectada: {gpu_name} ({vram_gb:.1f} GB VRAM) — Embeddings en CUDA")
-        else:
-            logger.info("GPU CUDA no disponible. Embeddings en CPU.")
-    except ImportError:
-        logger.info("PyTorch no instalado. Embeddings en CPU.")
-
-    embeddings = HuggingFaceEmbeddings(
-        model_name=embedding_model_name,
-        model_kwargs={"device": device, "local_files_only": True},
-        encode_kwargs={"normalize_embeddings": True}
-    )
-
-    chroma_dir.mkdir(parents=True, exist_ok=True)
-
-    # 1. CASO: Eliminación explícita de documento
-    if delete_doc:
-        logger.info(f"Eliminando documento '{delete_doc}' de ChromaDB...")
-        vector_store = Chroma(
-            persist_directory=str(chroma_dir),
-            embedding_function=embeddings
-        )
-        deleted = delete_document_chunks(vector_store, delete_doc)
-        logger.info(f"✅ Operación de borrado completada: {deleted} fragmentos eliminados.")
-        return True
-
-    # 2. CASO: Limpieza forzada de base vectorial previa si se solicita wipe
-    if wipe_db:
-        if chroma_dir.exists():
-            logger.info(f"Limpiando base vectorial completa previa en '{chroma_dir}'...")
-            try:
-                backup_dir = chroma_dir.with_name(f"{chroma_dir.name}_backup")
-                if backup_dir.exists():
-                    shutil.rmtree(backup_dir)
-                shutil.copytree(chroma_dir, backup_dir)
-                logger.info(f"🛡️ Copia de seguridad creada en '{backup_dir}'.")
-                
-                shutil.rmtree(chroma_dir)
-                logger.info("🗑️ Directorio ChromaDB activo eliminado con éxito para reindexación limpia.")
-            except Exception as exc:
-                logger.error(f"❌ ERROR CRÍTICO: No se pudo respaldar el directorio ChromaDB activo ({exc}).")
-                logger.error("🛑 La reindexación se ha detenido por seguridad para proteger tu base actual.")
-                sys.exit(1)
-            chroma_dir.mkdir(parents=True, exist_ok=True)
-
-        if VISION_CACHE_FILE.exists():
-            try:
-                VISION_CACHE_FILE.unlink()
-                global _vision_cache
-                _vision_cache = {}
-                logger.info("⚡ Caché de visión previa eliminada con éxito (--wipe).")
-            except Exception as exc:
-                logger.warning(f"No se pudo eliminar la caché de visión: {exc}")
-
-    vector_store = Chroma(
-        persist_directory=str(chroma_dir),
-        embedding_function=embeddings
-    )
-
-    # 2.1 CASO: Auditoría global de redundancia en la base de datos existente
-    if audit_db:
-        audit_chroma_database_redundancy(
-            vector_store=vector_store,
-            embeddings=embeddings,
-            threshold=similarity_threshold
-        )
-        return True
-
-    # 3. Determinar lista de archivos a procesar
-    if file_path:
-        target = Path(file_path)
-        if not target.exists():
-            logger.error(f"El archivo especificado no existe: {target.resolve()}")
-            return False
-        if target.suffix.lower() not in (".pdf", ".pptx"):
-            logger.error(f"Formato no soportado para archivo individual: {target.name}")
-            return False
-        all_files = [target]
-        logger.info(f"🎯 Modo Archivo Único: Procesando únicamente '{target.name}'")
-    else:
-        if not docs_dir.exists():
-            logger.info(f"Creando directorio de documentos: {docs_dir}")
-            docs_dir.mkdir(parents=True, exist_ok=True)
-
-        pdf_files = sorted(docs_dir.rglob("*.pdf"))
-        pptx_files = sorted(docs_dir.rglob("*.pptx"))
-        all_files = sorted(pdf_files + pptx_files)
-
-        if not all_files:
-            logger.warning(
-                f"[!] No se encontraron archivos PDF ni PPTX en '{docs_dir}' ni en sus subcarpetas.\n"
-                f"Asegúrate de colocar los documentos institucionales en '{docs_dir}'."
-            )
-            return False
-
-        logger.info(f"Archivos totales en disco: {len(pdf_files)} PDF(s) + {len(pptx_files)} PPTX = {len(all_files)} total")
-
-        if incremental and not wipe_db:
-            existing_sources = get_existing_sources(vector_store)
-            logger.info(f"🔄 Modo Incremental: {len(existing_sources)} documento(s) ya presentes en ChromaDB.")
-            all_files = [f for f in all_files if f.name not in existing_sources]
-            if not all_files:
-                logger.info("✅ Todos los documentos ya se encuentran indexados en ChromaDB. No hay archivos nuevos por procesar.")
-                return True
-            logger.info(f"Archivos pendientes a indexar ({len(all_files)} de {len(pdf_files) + len(pptx_files)}): {[f.name for f in all_files[:5]]}{'...' if len(all_files) > 5 else ''}")
-
-    # 4. Verificar disponibilidad del modelo de visión
-    use_vision, active_vision_model = check_vision_model_available(ollama_url, vision_model)
-    if use_vision:
-        if active_vision_model != vision_model:
-            logger.info(f"⚠️ Modelo primario '{vision_model}' no disponible. Usando fallback: '{active_vision_model}'")
-        logger.info(f"✅ Vision-LLM '{active_vision_model}' operativo. Se interpretarán imágenes incrustadas.")
-        vision_model = active_vision_model
-    else:
-        logger.warning(
-            f"⚠️ Ningún Vision-LLM disponible en Ollama. "
-            f"La ingesta continuará con extracción de texto plano únicamente (sin interpretación visual)."
-        )
-
-    # 5. Configurar fragmentador de texto
-    chunk_size = 800
-    chunk_overlap = 150
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=["\n\n", "\n", ". ", " ", ""]
-    )
-
-    start_time = time.time()
-    total_to_process = len(all_files)
-    logger.info(f"🚀 Iniciando indexación con persistencia continua por archivo ({total_to_process} documento(s) pendientes)...")
-    logger.info("   [Blindaje anti-cortes]: Cada documento terminado se guardará inmediatamente en ChromaDB.")
-
-    try:
-        for idx, filepath in enumerate(tqdm(all_files, desc="📂 Indexando documentos", unit="archivo"), 1):
-            try:
-                ext = filepath.suffix.lower()
-                if ext == ".pdf":
-                    docs = process_pdf(
-                        filepath,
-                        ollama_url=ollama_url,
-                        vision_model=vision_model,
-                        vision_timeout=vision_timeout,
-                        max_image_size=max_image_size,
-                        min_image_kb=min_image_kb,
-                        use_vision=use_vision
-                    )
-                elif ext == ".pptx":
-                    docs = process_pptx(
-                        filepath,
-                        ollama_url=ollama_url,
-                        vision_model=vision_model,
-                        vision_timeout=vision_timeout,
-                        max_image_size=max_image_size,
-                        min_image_kb=min_image_kb,
-                        use_vision=use_vision
-                    )
-                else:
-                    logger.warning(f"Formato no soportado: {filepath.name}")
-                    continue
-
-                if not docs:
-                    logger.warning(f"⚠️ Sin contenido extraído para '{filepath.name}'")
-                    stats["files_failed"] += 1
-                    continue
-
-                # 5.5 Limpiar el Boilerplate ANTES de fragmentar
-                for doc in docs:
-                    doc.page_content = strip_chunk_boilerplate(doc.page_content)
-
-                # 6. Fragmentar el documento
-                doc_chunks = text_splitter.split_documents(docs)
-                if not doc_chunks:
-                    logger.warning(f"⚠️ No se generaron fragmentos para '{filepath.name}'")
-                    stats["files_failed"] += 1
-                    continue
-
-                # 7. Si se solicitó auditoría previa de redundancia (Dry-Run)
-                if check_redundancy:
-                    rep = calculate_chunk_redundancy(
-                        chunks=doc_chunks,
-                        vector_store=vector_store,
-                        embeddings=embeddings,
-                        threshold=similarity_threshold,
-                        exclude_source=filepath.name
-                    )
-                    print_redundancy_report(filepath.name, rep, threshold=similarity_threshold)
-                    stats["files_processed"] += 1
-                    continue
-
-                # 8. Deduplicación activa durante la ingesta (si se solicitó --deduplicate)
-                if deduplicate:
-                    rep = calculate_chunk_redundancy(
-                        chunks=doc_chunks,
-                        vector_store=vector_store,
-                        embeddings=embeddings,
-                        threshold=similarity_threshold,
-                        exclude_source=filepath.name
-                    )
-                    novel = [c for c_idx, c in enumerate(doc_chunks) if c_idx not in rep["redundant_indices"]]
-                    dedup_count = rep["redundant_count"]
-                    stats["chunks_deduplicated"] += dedup_count
-                    if dedup_count > 0:
-                        logger.info(
-                            f"   • '{filepath.name}': {len(novel)}/{len(doc_chunks)} chunks conservados "
-                            f"({dedup_count} redundantes descartados)."
-                        )
-                    doc_chunks = novel
-
-                if not doc_chunks:
-                    logger.info(f"   • '{filepath.name}': Todos los fragmentos eran redundantes con BD existente. Omitido.")
-                    stats["files_processed"] += 1
-                    continue
-
-                # 9. Limpiar chunks anteriores de este archivo específico (evita duplicados si se re-indexa)
-                delete_document_chunks(vector_store, filepath.name)
-
-                # 10. Indexar con upsert determinista e INMEDIATO en ChromaDB
-                texts = [c.page_content for c in doc_chunks]
-                metadatas = [c.metadata for c in doc_chunks]
-                ids = generate_deterministic_chunk_ids(doc_chunks)
-
-                # Agregar prefijo requerido por E5 para documentos, SOLO para el cálculo del embedding
-                texts_for_embedding = [f"passage: {t}" for t in texts]
-                embeddings_list = embeddings.embed_documents(texts_for_embedding)
-
-                vector_store._collection.upsert(
-                    ids=ids,
-                    documents=texts,
-                    metadatas=metadatas,
-                    embeddings=embeddings_list
-                )
-
-                stats["chunks_generated"] += len(doc_chunks)
-                stats["files_processed"] += 1
-                logger.info(f"💾 [{idx}/{total_to_process}] Guardado en ChromaDB: '{filepath.name}' ({len(doc_chunks)} chunks).")
-
-            except Exception as exc:
-                logger.error(f"❌ Error procesando '{filepath.name}': {exc}")
-                stats["files_failed"] += 1
-
-    except KeyboardInterrupt:
-        logger.warning("\n⏸️ INGESTA CANCELADA O PAUSADA POR EL USUARIO (Ctrl+C).")
-        logger.info(f"✅ Los {stats['files_processed']} documento(s) procesados hasta este momento están guardados en ChromaDB.")
-        logger.info(f"⚠️ Atención: Quedaron documentos pendientes. El proceso reportará estado incompleto.")
+    """Compatibility entry point: raw PDF/PPTX input is sanitized to Markdown before indexing."""
+    del model_name, similarity_threshold
+    if check_redundancy or audit_db:
+        logger.error("La ingesta Markdown no ejecuta auditorías de redundancia; no se modificó ChromaDB.")
         return False
+    if deduplicate:
+        logger.info("Deduplicación semántica omitida para conservar evidencia documental completa.")
 
-    if check_redundancy:
-        logger.info("✅ Auditoría de redundancia completada (Dry-Run). No se modificó la base de datos ChromaDB.")
-        return True
+    from scripts.ingest_sanitized_documents import ingest_sanitized_documents
 
-    elapsed_time = time.time() - start_time
-
-    # 11. Reporte final
-    total_in_db = 0
-    try:
-        total_in_db = vector_store._collection.count()
-    except Exception:
-        pass
-
-    logger.info("=" * 70)
-    if stats["files_failed"] > 0:
-        logger.warning(" [INCOMPLETA] INGESTA FINALIZADA CON ERRORES")
-        if wipe_db:
-            logger.warning(f" ⚠️ Se borró el índice inicial pero la reconstrucción falló parcialmente.")
-            logger.warning(f" 🛡️ Puedes restaurar la versión anterior copiando '{chroma_dir.name}_backup' a '{chroma_dir.name}'")
-    else:
-        logger.info(" [ÉXITO] INGESTA COMPLETADA")
-    logger.info("=" * 70)
-    logger.info(f" • Archivos procesados en sesión: {stats['files_processed']} ({stats['files_failed']} con error)")
-    logger.info(f" • Páginas PDF extraídas:         {stats['pages_extracted']}")
-    logger.info(f" • Diapositivas PPTX extraídas:   {stats['slides_extracted']}")
-    logger.info(f" • Imágenes interpretadas:        {stats['images_described']} ({stats['images_skipped']} descartadas por tamaño)")
-    dedup_info = f" ({stats['chunks_deduplicated']} descartados por redundancia)" if stats.get("chunks_deduplicated", 0) > 0 else ""
-    logger.info(f" • Fragmentos nuevos indexados:   {stats['chunks_generated']}{dedup_info}")
-    logger.info(f" • Total acumulado en ChromaDB:   {total_in_db} fragmentos")
-    logger.info(f" • Tiempo total:                  {elapsed_time:.1f} segundos ({elapsed_time / 60:.1f} min)")
-    logger.info(f" • Base vectorial en:             {chroma_dir.resolve()}")
-    logger.info(f" • Dispositivo de embeddings:     {device.upper()}")
-    if use_vision:
-        logger.info(f" • Vision-LLM utilizado:          {vision_model}")
-    else:
-        logger.info(f" • Vision-LLM:                    NO DISPONIBLE (solo texto plano)")
-    logger.info("=" * 70)
-    
-    return stats["files_failed"] == 0
+    full_rebuild = wipe_db or (not incremental and not file_path and not delete_doc)
+    force_document = bool(file_path and not incremental)
+    return ingest_sanitized_documents(
+        docs_path=docs_path,
+        chroma_path=chroma_path,
+        file_path=file_path,
+        incremental=incremental,
+        delete_doc=delete_doc,
+        wipe_db=full_rebuild,
+        force=force_document,
+        use_vision=True,
+        vision_model_override=vision_model_override,
+        min_image_kb_override=min_image_kb_override,
+    )
 
 
 if __name__ == "__main__":
-    import argparse
+    from scripts.ingest_sanitized_documents import main
 
-    parser = argparse.ArgumentParser(
-        description="Pipeline de Ingesta Multimodal e Incremental de Documentos en ChromaDB (UniMon)"
-    )
-    parser.add_argument(
-        "--file", "-f",
-        type=str,
-        default=None,
-        help="Ruta de un archivo individual (.pdf o .pptx) para procesar e indexar"
-    )
-    parser.add_argument(
-        "--incremental", "-i",
-        action="store_true",
-        default=True,
-        help="Modo reanudable/incremental: indexa únicamente documentos que no existan en ChromaDB (por defecto: True)"
-    )
-    parser.add_argument(
-        "--no-incremental",
-        action="store_false",
-        dest="incremental",
-        help="Desactivar modo incremental y reprocesar todos los documentos"
-    )
-    parser.add_argument(
-        "--delete-doc", "-d",
-        type=str,
-        default=None,
-        help="Eliminar todos los fragmentos de un documento específico por su nombre (ej. P-GT-01_Mantenimiento.pdf)"
-    )
-    parser.add_argument(
-        "--wipe", "-w",
-        action="store_true",
-        help="Forzar eliminación completa de la base de datos ChromaDB antes de reindexar"
-    )
-    parser.add_argument(
-        "--check-redundancy", "-c",
-        action="store_true",
-        help="Auditoría previa (Dry-Run): evalúa la redundancia del/los documento(s) contra ChromaDB sin alterar la base"
-    )
-    parser.add_argument(
-        "--deduplicate",
-        action="store_true",
-        help="Filtrar y descartar fragmentos redundantes durante la ingesta, guardando solo contenido novedoso"
-    )
-    parser.add_argument(
-        "--similarity-threshold", "-t",
-        type=float,
-        default=0.88,
-        help="Umbral de similitud semántica para clasificar un fragmento como redundante (por defecto: 0.88 / 88%%)"
-    )
-    parser.add_argument(
-        "--audit-db",
-        action="store_true",
-        help="Escanear toda la base de datos ChromaDB y reportar pares de documentos existentes con alta redundancia mutua"
-    )
-    parser.add_argument(
-        "--docs-dir",
-        type=str,
-        default=None,
-        help="Ruta personalizada del directorio de documentos"
-    )
-    parser.add_argument(
-        "--chroma-dir",
-        type=str,
-        default=None,
-        help="Ruta personalizada de persistencia de ChromaDB"
-    )
-
-    parser.add_argument(
-        "--vision-model",
-        type=str,
-        default=None,
-        help="Modelo de Visión LLM en Ollama a utilizar (ej: llava:13b, llama3.2-vision:11b)"
-    )
-    parser.add_argument(
-        "--min-image-kb",
-        type=int,
-        default=0,
-        help="Tamaño mínimo en KB para procesar imágenes (por defecto: 0 = procesar el 100%% sin exclusión)"
-    )
-
-    args = parser.parse_args()
-
-    success = ingest_multimodal(
-        docs_path=args.docs_dir,
-        chroma_path=args.chroma_dir,
-        file_path=args.file,
-        incremental=args.incremental,
-        delete_doc=args.delete_doc,
-        wipe_db=args.wipe,
-        check_redundancy=args.check_redundancy,
-        deduplicate=args.deduplicate,
-        similarity_threshold=args.similarity_threshold,
-        audit_db=args.audit_db,
-        vision_model_override=args.vision_model,
-        min_image_kb_override=args.min_image_kb
-    )
-    sys.exit(0 if success else 1)
+    raise SystemExit(main())
 

@@ -266,14 +266,14 @@ from scripts.ingest_multimodal_docs import ingest_multimodal
     "/admin/upload",
     tags=["Administración RAG"],
     dependencies=[Depends(require_admin_auth), Depends(require_admin_origin)],
-    summary="Subir documento PDF o PPTX e indexar automáticamente",
-    description="Recibe un archivo PDF o PPTX, lo almacena en ./data/docs/ y ejecuta la reindexación multimodal automática inmediata en ChromaDB (con interpretación visual de imágenes si el Vision-LLM está disponible)."
+    summary="Subir documento PDF o PPTX, sanearlo a Markdown e indexarlo",
+    description="Recibe PDF/PPTX, conserva el original en data/docs, genera Markdown validado con GPT-6 Luna y usa únicamente ese Markdown como contenido vectorial."
 )
 async def upload_document(
     file: UploadFile = File(..., description="Archivo PDF o PPTX institucional a incorporar")
 ):
     """
-    Guarda el archivo subido y dispara la reindexación multimodal y recarga automática del vector store.
+    Guarda el original, lo transforma a Markdown validado y recarga el vector store al terminar.
     Soporta archivos PDF (.pdf) y PowerPoint (.pptx).
     """
     filename = validated_filename(file.filename, {".pdf", ".pptx"})
@@ -304,7 +304,7 @@ async def upload_document(
         rag_service.reload_vector_store()
         return {
             "status": "success",
-            "message": f"Documento '{file.filename}' subido e indexado exitosamente en ChromaDB (pipeline incremental multimodal).",
+            "message": f"Documento '{file.filename}' subido, transformado a Markdown e indexado en ChromaDB.",
             "filename": file.filename,
             "size_kb": round(file_size / 1024, 2)
         }
@@ -319,24 +319,24 @@ async def upload_document(
     "/admin/reindex",
     tags=["Administración RAG"],
     dependencies=[Depends(require_admin_auth), Depends(require_admin_origin)],
-    summary="Forzar reindexación multimodal completa de documentos",
-    description="Ejecuta la limpieza y reindexación multimodal de todos los PDFs y PPTX en ./data/docs/ con interpretación visual de imágenes y recarga ChromaDB en memoria."
+    summary="Indexar documentos PDF/PPTX nuevos o modificados",
+    description="Busca fuentes nuevas o modificadas, genera Markdown validado y las indexa sin borrar la base activa. La reconstrucción desde cero se ejecuta con el servidor detenido."
 )
 async def trigger_reindex():
     """
-    Dispara manualmente el pipeline de ingesta multimodal completa y actualiza la base vectorial activa.
+    Busca e indexa incrementalmente solo documentos nuevos o modificados.
     """
-    success = ingest_multimodal(wipe_db=True)
+    success = ingest_multimodal(incremental=True)
     if success:
         rag_service.reload_vector_store()
         return {
             "status": "success",
-            "message": "Base vectorial ChromaDB reindexada con pipeline multimodal y recargada exitosamente."
+            "message": "Documentos nuevos o modificados transformados a Markdown e indexados; ChromaDB fue recargado."
         }
     else:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ocurrió un error al procesar la reindexación multimodal de documentos."
+            detail="No se completó la ingesta Markdown. Revisa el log; si el RAG conserva fuentes crudas, detén UniMon y ejecuta la reconstrucción indicada en la guía."
         )
 
 

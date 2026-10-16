@@ -28,6 +28,8 @@ data/chroma_db/
 chroma_db/
 data/chroma_db_backup/
 chroma_db_backup/
+data/sanitized_docs/
+.*.previous_markdown_*/
 
 # Archivos temporales y descargas
 data/temp_uploads/

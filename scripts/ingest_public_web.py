@@ -2,13 +2,15 @@
 
 The script only fetches HTTPS pages from the exact institutional host listed in
 the manifest. It never follows cross-host redirects, runs page JavaScript, or
-submits forms. Run without ``--apply`` to preview extraction and chunk counts.
+submits forms. It saves each ordered chunk as Markdown before refreshing its
+vector. Run without ``--apply`` to preview extraction and chunk counts.
 """
 
 from __future__ import annotations
 
 import argparse
 import codecs
+import hashlib
 import json
 import logging
 import re
@@ -535,9 +537,12 @@ def build_public_documents(
 
 
 def upsert_public_documents(vector_store: Chroma, embeddings: HuggingFaceEmbeddings, documents: list[Document]) -> dict:
-    """Add/refresh web chunks, then remove only stale chunks for refreshed pages."""
+    """Persist public-web chunks as Markdown, then refresh their vectors."""
     if not documents:
         raise ValueError("No hay fragmentos web para indexar")
+    from app.config import get_settings
+
+    output_dir = Path(get_settings().sanitized_docs_dir).resolve()
     by_source: dict[str, list[tuple[str, Document]]] = defaultdict(list)
     for document in documents:
         by_source[str(document.metadata["source"])].append(("", document))
@@ -547,7 +552,52 @@ def upsert_public_documents(vector_store: Chroma, embeddings: HuggingFaceEmbeddi
     all_ids: list[str] = []
     all_documents: list[Document] = []
     for source, rows in by_source.items():
-        docs = [document for _unused, document in rows]
+        if not re.fullmatch(r"Web_(?:UI_)?Unisimon_[A-Za-z0-9_-]{1,80}\.md", source):
+            raise ValueError(f"Nombre de fuente web no permitido: {source!r}")
+        docs = sorted(
+            (document for _unused, document in rows),
+            key=lambda document: int(document.metadata.get("chunk_index", -1)),
+        )
+        indices = [int(document.metadata.get("chunk_index", -1)) for document in docs]
+        if indices != list(range(len(docs))):
+            raise ValueError(f"El orden de los fragmentos no es verificable para {source}: {indices[:20]}")
+
+        source_digest = hashlib.sha256(
+            "\n\n".join(document.page_content.strip() for document in docs).encode("utf-8")
+        ).hexdigest()
+        source_dir = output_dir / "markdown" / "public_web" / Path(source).stem
+        source_dir.mkdir(parents=True, exist_ok=True)
+        for document in docs:
+            chunk_index = int(document.metadata["chunk_index"])
+            relative_path = Path("markdown") / "public_web" / Path(source).stem / f"fragment_{chunk_index:04d}.md"
+            markdown_path = output_dir / relative_path
+            content = document.page_content.strip()
+            temporary = markdown_path.with_suffix(markdown_path.suffix + ".tmp")
+            temporary.write_text(content + "\n", encoding="utf-8")
+            temporary.replace(markdown_path)
+            markdown = markdown_path.read_text(encoding="utf-8").strip()
+            markdown_digest = hashlib.sha256(markdown_path.read_bytes()).hexdigest()
+            if markdown != content:
+                raise RuntimeError(f"La lectura del Markdown web no coincide: {markdown_path}")
+
+            original_type = str(document.metadata.get("source_type", "public_web"))
+            document.page_content = markdown
+            document.metadata.update({
+                "source_path": f"web::{source}",
+                "source_filename": source,
+                "source_type": original_type,
+                "indexed_format": "markdown",
+                "source_markdown": relative_path.as_posix(),
+                "source_sha256": source_digest,
+                "markdown_sha256": markdown_digest,
+                "prompt_sha256": "not_applicable_public_web_extraction",
+                "transform_model": (
+                    "public_web_ui_map" if original_type == "public_web_ui"
+                    else "public_web_extractor"
+                ),
+                "source_origin_type": original_type,
+            })
+
         ids = generate_deterministic_chunk_ids(docs)
         all_ids.extend(ids)
         all_documents.extend(docs)
