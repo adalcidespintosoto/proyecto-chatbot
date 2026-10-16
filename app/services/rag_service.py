@@ -2855,7 +2855,12 @@ class RAGService:
         self.llm_client = get_llm_client()
         self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
         self.model = model or self.llm_client.active_model
-        self.timeout = settings.openai_timeout if self.llm_client.provider == "openai" else settings.ollama_timeout
+        self.timeout = (
+            settings.anthropic_timeout if self.llm_client.provider == "anthropic"
+            else settings.openai_timeout if self.llm_client.provider == "openai"
+            else settings.gemini_timeout if self.llm_client.provider == "gemini"
+            else settings.ollama_timeout
+        )
         self.chroma_db_dir = Path(chroma_db_dir or settings.chroma_db_dir)
         self.embedding_model_name = embedding_model or settings.embedding_model
         self.min_relevance_score = min_relevance_score

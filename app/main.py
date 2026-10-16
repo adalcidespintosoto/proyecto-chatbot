@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Entorno: {settings.environment} | GLPI URL: {settings.glpi_base_url}")
     provider = settings.llm_provider.strip().lower()
     provider_models = {
+        "anthropic": settings.anthropic_model,
         "openai": settings.openai_model,
         "gemini": settings.gemini_model,
         "ollama": settings.llm_model,

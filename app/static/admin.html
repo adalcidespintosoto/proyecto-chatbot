@@ -1729,7 +1729,7 @@
         </div>
       </div>
 
-      <!-- Panel Detallado de Facturación y Tokens OpenAI / Gemini / Cloud -->
+      <!-- Panel Detallado de Facturación y Tokens LLM Cloud -->
       <div class="panel-card" style="margin-bottom: 2rem; border: 1px solid rgba(124, 58, 237, 0.3); background: linear-gradient(135deg, rgba(124, 58, 237, 0.07) 0%, rgba(16, 185, 129, 0.03) 100%);">
         <div class="panel-header">
           <h3 class="panel-title">⚡ Desglose de Tokens y Costo Estimado (<span id="llmProviderDisplay" style="color:#A78BFA;">Google Gemini</span>)</h3>
@@ -2683,22 +2683,22 @@
         if (document.getElementById('tokRegular')) {
           const pInfo = kpis.provider_info || {};
           const pName = (pInfo.provider || 'gemini').toLowerCase();
-          const pModel = pInfo.model || (pName === 'gemini' ? 'gemini-flash-lite-latest' : (pName === 'openai' ? 'gpt-6-luna' : 'unimon:8b'));
+          const pModel = pInfo.model || (pName === 'anthropic' ? 'claude-haiku-5-5' : (pName === 'gemini' ? 'gemini-flash-lite-latest' : (pName === 'openai' ? 'gpt-6-luna' : 'unimon:8b')));
           const isGpt6 = (pModel || '').toLowerCase().includes('gpt-6');
-          const defaultRateIn = pName === 'gemini' ? 0.075 : (pName === 'openai' ? (isGpt6 ? 0.10 : 0.20) : 0.0);
-          const defaultRateCache = pName === 'gemini' ? 0.01875 : (pName === 'openai' ? (isGpt6 ? 0.01 : 0.02) : 0.0);
-          const defaultRateOut = pName === 'gemini' ? 0.30 : (pName === 'openai' ? (isGpt6 ? 0.50 : 1.20) : 0.0);
+          const defaultRateIn = pName === 'anthropic' ? 0.10 : (pName === 'gemini' ? 0.075 : (pName === 'openai' ? (isGpt6 ? 0.10 : 0.20) : 0.0));
+          const defaultRateCache = pName === 'anthropic' ? 0.01 : (pName === 'gemini' ? 0.01875 : (pName === 'openai' ? (isGpt6 ? 0.01 : 0.02) : 0.0));
+          const defaultRateOut = pName === 'anthropic' ? 0.50 : (pName === 'gemini' ? 0.30 : (pName === 'openai' ? (isGpt6 ? 0.50 : 1.20) : 0.0));
           const rateIn = pInfo.rate_regular_1m ?? defaultRateIn;
           const rateCache = pInfo.rate_cached_1m ?? defaultRateCache;
           const rateOut = pInfo.rate_out_1m ?? defaultRateOut;
-          const pLabel = pInfo.label || (pName === 'gemini' ? 'Google Gemini' : (pName === 'openai' ? 'OpenAI' : 'Ollama Local'));
+          const pLabel = pInfo.label || (pName === 'anthropic' ? 'Anthropic' : (pName === 'gemini' ? 'Google Gemini' : (pName === 'openai' ? 'OpenAI' : 'Ollama Local')));
 
           if (document.getElementById('llmProviderDisplay')) {
             document.getElementById('llmProviderDisplay').innerText = `${pLabel} (${pModel})`;
           }
           if (document.getElementById('openaiModelBadge')) {
             document.getElementById('openaiModelBadge').innerText = pModel;
-            document.getElementById('openaiModelBadge').style.background = pName === 'gemini' ? '#0284C7' : (pName === 'openai' ? '#7C3AED' : '#10B981');
+            document.getElementById('openaiModelBadge').style.background = pName === 'anthropic' ? '#D97706' : (pName === 'gemini' ? '#0284C7' : (pName === 'openai' ? '#7C3AED' : '#10B981'));
           }
           if (document.getElementById('tokRegularLabel')) {
             document.getElementById('tokRegularLabel').innerText = `📥 Entrada Regular ($${rateIn} / 1M)`;

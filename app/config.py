@@ -30,8 +30,12 @@ class Settings(BaseSettings):
     glpi_user_token: str = ""
     glpi_timeout: float = 15.0
 
-    # Configuración de Proveedor LLM (gemini | openai | ollama)
+    # Configuración de Proveedor LLM (anthropic | gemini | openai | ollama)
     llm_provider: str = "gemini"
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-5-5"
+    anthropic_base_url: str = "https://api.anthropic.com/v1"
+    anthropic_timeout: float = 35.0
     openai_api_key: str = ""
     openai_model: str = "gpt-6-luna"
     openai_base_url: str = "https://api.openai.com/v1"

@@ -1,5 +1,5 @@
 """
-Módulo cliente unificado para LLM (OpenAI API / Ollama Local).
+Módulo cliente unificado para LLM (Anthropic, OpenAI, Gemini y Ollama Local).
 Permite alternar entre proveedores mediante la variable LLM_PROVIDER en .env,
 con soporte para GPT-5.6 Luna, GPT-4o-mini y modelos locales de Ollama con fallback automático.
 """
@@ -27,6 +27,8 @@ class LLMClient:
 
     @property
     def active_model(self) -> str:
+        if self.provider == "anthropic":
+            return self.settings.anthropic_model
         if self.provider == "gemini":
             return self.settings.gemini_model
         elif self.provider == "openai":
@@ -43,10 +45,34 @@ class LLMClient:
         """
         Ejecuta una consulta conversacional completa con el LLM activo.
         
-        En modo Cloud ('openai' o 'gemini'), si el proveedor en la nube presenta fallas
+        En modo Cloud ('anthropic', 'openai' o 'gemini'), si el proveedor en la nube presenta fallas
         (error de API, timeout de red, cuota excedida o indisponibilidad), se conmuta
         automáticamente a Ollama local (modelo unimon:8b) como contingencia de alta disponibilidad.
         """
+        if self.provider == "anthropic":
+            if not self.settings.anthropic_api_key:
+                logger.warning("[LLMClient] Sin ANTHROPIC_API_KEY. Conmutando a contingencia local Ollama (%s)...", self.settings.llm_model)
+                res = await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
+                res["contingency"] = True
+                res["fallback_from"] = "anthropic"
+                return res
+
+            try:
+                return await self._call_anthropic_chat(messages, max_tokens=max_tokens)
+            except Exception as exc:
+                logger.warning(
+                    "[LLMClient] Falla en Anthropic ('%s'): %s. Activando contingencia local Ollama ('%s')...",
+                    self.settings.anthropic_model, exc, self.settings.llm_model
+                )
+                try:
+                    res = await self._call_ollama_chat(messages, max_tokens=max_tokens, temperature=temperature or 0.0)
+                    res["contingency"] = True
+                    res["fallback_from"] = "anthropic"
+                    return res
+                except Exception as ollama_exc:
+                    logger.error("[LLMClient] Fallaron Anthropic (%s) y Ollama (%s)", exc, ollama_exc)
+                    raise RuntimeError(f"Falla total: Anthropic ({exc}) y contingencia Ollama ({ollama_exc})")
+
         if self.provider == "gemini":
             if not self.settings.gemini_api_key:
                 logger.warning("[LLMClient] Sin GEMINI_API_KEY. Conmutando a contingencia local Ollama (%s)...", self.settings.llm_model)
@@ -130,7 +156,7 @@ class LLMClient:
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            if role == "system":
+            if role in ("system", "developer"):
                 system_instruction = {"parts": [{"text": content}]}
             elif role == "assistant":
                 contents.append({"role": "model", "parts": [{"text": content}]})
@@ -272,6 +298,105 @@ class LLMClient:
             logger.error("[LLMClient] Error HTTP %s de OpenAI", response.status_code)
             raise RuntimeError(f"OpenAI API error {response.status_code}")
 
+    def _build_anthropic_payload(
+        self,
+        messages: List[Dict[str, Any]],
+        max_tokens: int,
+    ) -> Dict[str, Any]:
+        """Adapta los mensajes internos al formato Messages API de Anthropic."""
+        system_parts: List[str] = []
+        conversation: List[Dict[str, Any]] = []
+
+        for message in messages:
+            role = str(message.get("role", "user")).lower()
+            content = message.get("content", "")
+            if role == "system":
+                if content:
+                    system_parts.append(content if isinstance(content, str) else str(content))
+            elif role in ("user", "assistant") and content is not None:
+                conversation.append({"role": role, "content": content})
+            elif role == "tool" and content is not None:
+                # UniMon no usa tool-calling con Anthropic; conserva el resultado como contexto.
+                conversation.append({"role": "user", "content": f"Resultado de herramienta:\n{content}"})
+
+        if not conversation:
+            raise ValueError("Anthropic requiere al menos un mensaje user o assistant.")
+
+        payload: Dict[str, Any] = {
+            "model": self.settings.anthropic_model,
+            "max_tokens": max(1, int(max_tokens)),
+            "messages": conversation,
+        }
+        if system_parts:
+            payload["system"] = "\n\n".join(system_parts)
+        return payload
+
+    @staticmethod
+    def _anthropic_content(data: Dict[str, Any]) -> str:
+        """Une los bloques de texto devueltos por Messages API."""
+        return "\n".join(
+            block.get("text", "")
+            for block in data.get("content", [])
+            if block.get("type") == "text" and block.get("text")
+        ).strip()
+
+    @staticmethod
+    def _record_anthropic_usage(usage: Dict[str, Any]) -> Dict[str, int]:
+        """Registra tokens incluyendo lecturas/escrituras de caché si Anthropic las informa."""
+        cached = int(usage.get("cache_read_input_tokens", 0) or 0)
+        cache_created = int(usage.get("cache_creation_input_tokens", 0) or 0)
+        input_tokens = int(usage.get("input_tokens", 0) or 0) + cached + cache_created
+        output_tokens = int(usage.get("output_tokens", 0) or 0)
+        record_llm_usage(
+            prompt_tokens=input_tokens,
+            cached_tokens=cached,
+            eval_tokens=output_tokens,
+            usage_reported=bool(usage),
+        )
+        return {
+            "prompt_tokens": input_tokens,
+            "cached_tokens": cached,
+            "eval_tokens": output_tokens,
+        }
+
+    async def _call_anthropic_chat(
+        self,
+        messages: List[Dict[str, Any]],
+        max_tokens: int = 768,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Llamada asíncrona a Claude mediante Anthropic Messages API."""
+        model_name = self.settings.anthropic_model
+        url = f"{self.settings.anthropic_base_url.rstrip('/')}/messages"
+        headers = {
+            "x-api-key": self.settings.anthropic_api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        payload = self._build_anthropic_payload(messages, max_tokens)
+
+        print(f"\n[ANTHROPIC CLOUD] >>> Enviando consulta al modelo: '{model_name}'...", flush=True)
+        async with httpx.AsyncClient(timeout=timeout or self.settings.anthropic_timeout) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            if response.status_code != 200:
+                logger.error("[LLMClient] Error HTTP %s de Anthropic", response.status_code)
+                raise RuntimeError(f"Anthropic API error {response.status_code}")
+
+            data = response.json()
+            content = self._anthropic_content(data)
+            usage = self._record_anthropic_usage(data.get("usage", {}))
+            logger.info(
+                "[LLMClient] Anthropic '%s' respondió exitosamente (tokens: in=%s, cached=%s, out=%s).",
+                model_name, usage["prompt_tokens"], usage["cached_tokens"], usage["eval_tokens"],
+            )
+            return {
+                "content": content,
+                **usage,
+                "model": model_name,
+                "provider": "anthropic",
+                "source": f"anthropic_{model_name}",
+            }
+
     async def _call_ollama_chat(
         self,
         messages: List[Dict[str, Any]],
@@ -373,6 +498,13 @@ class LLMClient:
             except Exception as e:
                 logger.warning("[LLMClient] Falló generate_async con Gemini (%s). Conmutando a contingencia Ollama...", e)
 
+        if self.provider == "anthropic" and self.settings.anthropic_api_key:
+            try:
+                result = await self._call_anthropic_chat(messages, max_tokens=max_tokens, timeout=timeout)
+                return result["content"]
+            except Exception as e:
+                logger.warning("[LLMClient] Falló generate_async con Anthropic (%s). Conmutando a contingencia Ollama...", e)
+
         if self.provider == "openai" and self.settings.openai_api_key:
             try:
                 headers = {
@@ -462,6 +594,25 @@ class LLMClient:
             except Exception as e:
                 logger.warning("[LLMClient] Falló generate_sync con Gemini (%s). Conmutando a contingencia Ollama...", e)
 
+        if self.provider == "anthropic" and self.settings.anthropic_api_key:
+            try:
+                payload = self._build_anthropic_payload(messages, max_tokens)
+                headers = {
+                    "x-api-key": self.settings.anthropic_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                }
+                url = f"{self.settings.anthropic_base_url.rstrip('/')}/messages"
+                with httpx.Client(timeout=timeout or self.settings.anthropic_timeout) as client:
+                    resp = client.post(url, json=payload, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        self._record_anthropic_usage(data.get("usage", {}))
+                        return self._anthropic_content(data)
+                    logger.warning("[LLMClient] Error HTTP %s de Anthropic en generate_sync", resp.status_code)
+            except Exception as e:
+                logger.warning("[LLMClient] Falló generate_sync con Anthropic (%s). Conmutando a contingencia Ollama...", e)
+
         if self.provider == "openai" and self.settings.openai_api_key:
             try:
                 headers = {
@@ -506,6 +657,46 @@ class LLMClient:
 
     async def check_health(self) -> Dict[str, Any]:
         """Comprueba la disponibilidad del proveedor activo."""
+        if self.provider == "anthropic":
+            if not self.settings.anthropic_api_key:
+                return {
+                    "active": False,
+                    "provider": "anthropic",
+                    "model": self.settings.anthropic_model,
+                    "error": "No hay ANTHROPIC_API_KEY configurada en .env",
+                }
+            try:
+                headers = {
+                    "x-api-key": self.settings.anthropic_api_key,
+                    "anthropic-version": "2023-06-01",
+                }
+                url = f"{self.settings.anthropic_base_url.rstrip('/')}/models"
+                async with httpx.AsyncClient(timeout=4.0) as client:
+                    response = await client.get(url, params={"limit": 1000}, headers=headers)
+                if response.status_code == 200:
+                    models = response.json().get("data", [])
+                    available = any(model.get("id") == self.settings.anthropic_model for model in models)
+                    return {
+                        "active": available,
+                        "provider": "anthropic",
+                        "model": self.settings.anthropic_model,
+                        "endpoint": self.settings.anthropic_base_url,
+                        **({} if available else {"error": "La clave es válida, pero el modelo configurado no aparece disponible para esta cuenta."}),
+                    }
+                return {
+                    "active": False,
+                    "provider": "anthropic",
+                    "model": self.settings.anthropic_model,
+                    "error": f"Anthropic HTTP {response.status_code}",
+                }
+            except Exception as e:
+                return {
+                    "active": False,
+                    "provider": "anthropic",
+                    "model": self.settings.anthropic_model,
+                    "error": str(e),
+                }
+
         if self.provider == "gemini":
             if not self.settings.gemini_api_key:
                 return {

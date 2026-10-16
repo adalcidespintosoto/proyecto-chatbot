@@ -699,7 +699,7 @@ async def get_system_status() -> Dict[str, Any]:
     """Retorna información de diagnóstico y salud de la infraestructura."""
     import httpx
     
-    # Chequeo LLM activo (Gemini / OpenAI / Ollama)
+    # Chequeo LLM activo (Anthropic / Gemini / OpenAI / Ollama)
     from app.services.llm_client import get_llm_client
     llm_client = get_llm_client()
     llm_health = await llm_client.check_health()
@@ -707,6 +707,7 @@ async def get_system_status() -> Dict[str, Any]:
 
     ollama_ok = False
     models_available = []
+    cloud_providers = ("anthropic", "gemini", "openai")
     if llm_client.provider == "ollama":
         ollama_ok = llm_ok
         models_available = llm_health.get("models_in_server", [])
@@ -722,7 +723,7 @@ async def get_system_status() -> Dict[str, Any]:
             ollama_ok = False
 
     # Chequeo GPU / Aceleración
-    gpu_info = f"CPU / Cloud API ({llm_client.provider.upper()})" if llm_client.provider in ("gemini", "openai") else "CPU (Modo Fallback)"
+    gpu_info = f"CPU / Cloud API ({llm_client.provider.upper()})" if llm_client.provider in cloud_providers else "CPU (Modo Fallback)"
     try:
         import torch
         if torch.cuda.is_available():
@@ -744,6 +745,8 @@ async def get_system_status() -> Dict[str, Any]:
             active_endpoint = settings.gemini_base_url
         elif llm_client.provider == "openai":
             active_endpoint = settings.openai_base_url
+        elif llm_client.provider == "anthropic":
+            active_endpoint = settings.anthropic_base_url
         else:
             active_endpoint = settings.ollama_base_url
 
@@ -761,9 +764,9 @@ async def get_system_status() -> Dict[str, Any]:
         },
         "ollama": {
             "endpoint": active_endpoint,
-            "active": llm_ok if llm_client.provider in ("gemini", "openai") else ollama_ok,
-            "model_configured": llm_client.active_model if llm_client.provider in ("gemini", "openai") else settings.llm_model,
-            "models_in_server": [llm_client.active_model] if llm_client.provider in ("gemini", "openai") else models_available
+            "active": llm_ok if llm_client.provider in cloud_providers else ollama_ok,
+            "model_configured": llm_client.active_model if llm_client.provider in cloud_providers else settings.llm_model,
+            "models_in_server": [llm_client.active_model] if llm_client.provider in cloud_providers else models_available
         },
         "glpi": {
             "endpoint": settings.glpi_base_url,

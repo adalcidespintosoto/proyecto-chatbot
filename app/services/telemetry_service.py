@@ -427,7 +427,13 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             _cfg = get_settings()
             _prov = (_cfg.llm_provider or "gemini").lower().strip()
 
-            if _prov == "gemini":
+            if _prov == "anthropic":
+                rate_in = 0.10
+                rate_cache = 0.01
+                rate_out = 0.50
+                provider_label = "Anthropic"
+                active_model_name = _cfg.anthropic_model
+            elif _prov == "gemini":
                 rate_in = 0.075
                 rate_cache = 0.01875
                 rate_out = 0.30
