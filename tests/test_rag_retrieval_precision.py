@@ -24,6 +24,7 @@ from app.services.rag_service import (
     _explicit_account_scope,
     _is_unspecified_account_scope,
     _select_forgotten_email_context_chunks,
+    _select_onboarding_context_chunks,
     _expand_chunks_with_neighbors,
     _is_step_by_step_query,
     _asks_for_contact_channel,
@@ -172,6 +173,34 @@ def test_new_student_account_query_searches_all_categories_for_complementary_evi
     assert is_account_identifier_query(question)
     assert _is_onboarding_query(question)
     assert rag_service._build_query_filter(question) is None
+
+
+def test_colloquial_first_semester_access_location_uses_onboarding_retrieval():
+    question = "Estoy en primer semestre, ¿qué parte del recibo de matrícula tiene mis datos de acceso?"
+    credential_location = make_doc(
+        "Activar Usuario y Correo institucional.pdf",
+        "El usuario y la contraseña se encuentran al final del recibo de matrícula.",
+    )
+    registration_context = make_doc(
+        "GIE - ASPIRANTES NOV.2021.pptx",
+        "Para estudiantes de primer semestre, el recibo de matrícula contiene el usuario asignado y la clave inicial.",
+    )
+    distractor = make_doc("Guía de matrícula.pdf", "Consulte el calendario de pagos de matrícula.")
+
+    assert _is_onboarding_query(question)
+    selected = _select_onboarding_context_chunks(
+        [(distractor, 0.95), (credential_location, 0.86), (registration_context, 0.82)],
+        [(distractor, 0.95), (credential_location, 0.86), (registration_context, 0.82)],
+        max_chunks=16,
+    )
+
+    selected_sources = {doc.metadata["source"] for doc, _text in selected}
+    assert "Activar Usuario y Correo institucional.pdf" in selected_sources
+    assert "GIE - ASPIRANTES NOV.2021.pptx" in selected_sources
+
+
+def test_general_first_semester_question_does_not_expand_as_account_onboarding():
+    assert not _is_onboarding_query("Estoy en primer semestre, ¿cuándo empiezan las clases?")
 
 
 def test_colloquial_enrede_does_not_trigger_hardware_network_filter():

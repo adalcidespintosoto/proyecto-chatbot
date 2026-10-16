@@ -451,7 +451,15 @@ def _is_onboarding_query(question: str) -> bool:
         "soy nuevo", "estudiante nuevo", "nuevo ingreso", "primer ingreso", "primer semestre",
         "recien ingresado", "primiparo",
     ))
-    return is_new and is_account_identifier_query(question)
+    # Las preguntas coloquiales de primer ingreso suelen pedir dónde están los
+    # datos (“datos de acceso”, “en el recibo”) sin mencionar usuario/clave.
+    # Mantenerlas en la ruta de onboarding permite combinar evidencia de
+    # matrícula y activación, en lugar de aplicar el contexto compacto general.
+    mentions_access_details = bool(re.search(
+        r"\b(?:usuario|usuarios|clave|contrasena|password|correo|cuenta|credenciales|acceso|ingreso)\b",
+        q,
+    )) or ("recibo" in q and "matricula" in q)
+    return is_new and (is_account_identifier_query(question) or mentions_access_details)
 
 
 def _parse_golden_context(golden_context: Optional[str]) -> Dict[str, Any]:
