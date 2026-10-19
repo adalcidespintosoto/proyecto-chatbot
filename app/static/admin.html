@@ -1603,6 +1603,33 @@
       color: #FFF;
       box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
     }
+
+    .kb-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kb-summary-card { background: rgba(15, 26, 46, 0.9); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; }
+    .kb-summary-label { color: var(--text-secondary); font-size: 0.78rem; }
+    .kb-summary-value { color: var(--text-primary); font-size: 1.35rem; font-weight: 800; margin-top: 2px; }
+    .kb-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .kb-status { display: inline-flex; border-radius: 999px; padding: 4px 9px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
+    .kb-status-good { color: #6EE7B7; background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.3); }
+    .kb-status-warn { color: #FCD34D; background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); }
+    .kb-status-bad { color: #FDA4AF; background: rgba(244,63,94,.12); border-color: rgba(244,63,94,.3); }
+    .kb-status-muted { color: #CBD5E1; background: rgba(148,163,184,.1); border-color: rgba(148,163,184,.2); }
+    .kb-row-title { font-weight: 700; overflow-wrap: anywhere; }
+    .kb-row-subtitle { color: var(--text-muted); font-size: .74rem; margin-top: 3px; overflow-wrap: anywhere; }
+    .kb-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .kb-actions .btn { padding: 5px 9px; font-size: .74rem; }
+    .kb-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 12px; color: var(--text-secondary); font-size: .8rem; }
+    .kb-modal-backdrop { position: fixed; inset: 0; z-index: 120; background: rgba(2,6,23,.82); display: flex; justify-content: center; align-items: center; padding: 18px; }
+    .kb-modal-backdrop[hidden] { display: none !important; }
+    .kb-modal { width: min(1080px, 100%); max-height: 92vh; overflow: auto; background: #0B1324; border: 1px solid rgba(148,163,184,.25); border-radius: 16px; padding: 20px; box-shadow: 0 24px 80px rgba(0,0,0,.55); }
+    .kb-modal-header { position: sticky; top: -20px; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin: -2px -2px 16px; padding: 4px 2px 12px; background: #0B1324; border-bottom: 1px solid var(--border-color); }
+    .kb-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 9px; margin: 12px 0; }
+    .kb-detail-item { background: rgba(255,255,255,.035); border: 1px solid var(--border-color); border-radius: 9px; padding: 10px; min-width: 0; }
+    .kb-detail-item strong { display: block; color: var(--text-secondary); font-size: .72rem; margin-bottom: 3px; }
+    .kb-markdown-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow: auto; background: #070D18; border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; color: #D7E2F1; font: .82rem/1.6 Consolas, monospace; }
+    .kb-audit-issue { margin-top: 9px; padding: 11px; border-left: 3px solid #F59E0B; background: rgba(245,158,11,.07); border-radius: 6px; overflow-wrap: anywhere; }
+    .kb-audit-note { color: var(--text-secondary); font-size: .78rem; line-height: 1.5; }
+    @media (max-width: 700px) { .kb-modal { padding: 14px; } .kb-pagination { align-items: flex-start; flex-direction: column; } }
   </style>
 </head>
 <body>
@@ -1969,26 +1996,27 @@
         <div class="panel-card">
           <div class="panel-header">
             <h3 class="panel-title">📤 Cargar Nuevo Documento</h3>
-            <span class="badge">PDF / DOCX / PPTX</span>
+            <span class="badge">PDF / PPTX → Markdown</span>
           </div>
 
           <form id="uploadDocForm" onsubmit="event.preventDefault(); runDocumentAudit();">
             <div class="upload-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
               <div class="upload-icon">📁</div>
               <div style="font-weight: 700; margin-bottom: 4px;">Arrastra un archivo aquí o haz clic para examinar</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted);">Soporta guías, manuales y reglamentos (.pdf, .docx, .pptx, .txt)</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Admite PDF y PPTX. El original se conserva y el Markdown validado es lo que se indexa en RAG.</div>
               <div id="selectedFileName" style="margin-top: 10px; font-weight: 600; color: #60A5FA;"></div>
-              <input type="file" id="fileInput" style="display: none;" accept=".pdf,.docx,.pptx,.txt" onchange="updateSelectedFile(this)">
+              <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx" onchange="updateSelectedFile(this)">
             </div>
 
             <div class="form-group" style="margin-bottom: 0.75rem;">
-              <label class="form-label" for="audienceSelect">Audiencia Objetivo / Rol Documental</label>
+              <label class="form-label" for="audienceSelect">Carpeta para organizar el archivo</label>
               <select id="audienceSelect" class="form-select">
                 <option value="estudiante">🎓 Estudiantes (1_estudiantes)</option>
                 <option value="profesor">👨‍🏫 Profesores y Docentes (2_profesores)</option>
                 <option value="administrativo">💼 Administrativos y Funcionarios (3_funcionarios_gestion)</option>
                 <option value="general" selected>🌐 General / Normativa Institucional (4_general_normativa)</option>
               </select>
+              <div class="kb-audit-note" style="margin-top:6px;">La carpeta organiza los archivos; no limita la búsqueda del RAG por rol o perfil.</div>
             </div>
 
             <input type="checkbox" id="autoIndexCheck" style="display: none;" checked>
@@ -2017,7 +2045,7 @@
           </div>
 
           <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-            Ejecuta el pipeline multimodal para extraer texto, tabular capturas con Vision-LLM y calcular embeddings con <code>BAAI/bge-m3</code>.
+            Flujo vigente: <strong>PDF/PPTX original → extracción → Markdown revisado → fragmentos y embeddings en ChromaDB</strong>. El buscador usa el Markdown, no el archivo crudo.
           </p>
 
           <div style="display: flex; flex-direction: column; gap: 1rem;">
@@ -2025,9 +2053,9 @@
               ⚡ Re-indexar Incrementales (Solo Nuevos / Modificados)
             </button>
 
-            <button class="btn btn-danger" onclick="confirmWipeAndReindex()" id="reindexFullBtn">
-              ⚠️ Reconstruir Base Completa (Wipe & Re-index)
-            </button>
+            <div class="kb-audit-note" style="padding: 12px; border: 1px solid rgba(245,158,11,.25); border-radius: 9px; background: rgba(245,158,11,.06);">
+              La reconstrucción completa se ejecuta con el servidor detenido: <code>.venv\Scripts\python.exe scripts\ingest_sanitized_documents.py --rebuild</code>. Esta pantalla no borra ni reconstruye ChromaDB.
+            </div>
           </div>
 
           <div class="log-terminal" id="indexingTerminalLog"></div>
@@ -2128,8 +2156,8 @@
             <button type="button" class="action-card action-card-dedup" id="auditActionDedup" onclick="executeInlineResolve('deduplicate')">
               <div class="action-icon-box icon-box-dedup">NEW</div>
               <div>
-                <div class="action-title">Guardar como Nuevo (con Deduplicación de Fragmentos)</div>
-                <div class="action-desc">Indexa solo los fragmentos novedosos y descarta los repetidos para no saturar la base.</div>
+              <div class="action-title">Guardar como Nuevo</div>
+                <div class="action-desc">La transformación y el índice conservan el contenido del Markdown; la similitud detectada aquí no elimina fragmentos.</div>
               </div>
             </button>
 
@@ -2152,36 +2180,86 @@
 
       </div>
 
-      <!-- Tabla de Documentos en el Repositorio -->
+      <!-- Catálogo de documentos fuente, Markdown e índice -->
       <div class="panel-card">
         <div class="panel-header">
-          <h3 class="panel-title">📁 Documentos Indexados en <code>data/docs/</code></h3>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <input type="text" id="docSearchInput" class="form-input" placeholder="Buscar documento..." style="width: 220px; padding: 6px 10px;" oninput="filterDocTable()">
-            <span class="badge" id="docsCountBadge">0 archivos</span>
+          <div>
+            <h3 class="panel-title">📚 Base de Conocimiento RAG</h3>
+            <p class="kb-audit-note">Fuentes en <code>data/docs/</code>, Markdown de <code>data/sanitized_docs/</code> y estado real de sus fragmentos en ChromaDB.</p>
+          </div>
+          <div class="kb-toolbar">
+            <input type="search" id="docSearchInput" class="form-input" placeholder="Buscar fuente o carpeta..." style="width: 220px; padding: 6px 10px;" oninput="filterDocTable()" aria-label="Buscar en la base de conocimiento">
+            <select id="docStatusFilter" class="form-select" style="width: auto; padding: 6px 10px;" onchange="filterDocTable()" aria-label="Filtrar por estado">
+              <option value="">Todos los estados</option>
+              <option value="indexed_markdown">Markdown indexado</option>
+              <option value="pending_index">Pendiente de indexar</option>
+              <option value="source_changed">Fuente modificada</option>
+              <option value="markdown_modified">Markdown modificado</option>
+              <option value="markdown_missing">Falta Markdown</option>
+              <option value="transformation_failed">Falló transformación</option>
+              <option value="mixed_or_legacy_chunks">Índice mixto / antiguo</option>
+              <option value="index_not_confirmed">Indexación sin confirmar</option>
+              <option value="unsupported_format">Formato no compatible</option>
+              <option value="indexed_legacy_or_untracked">Fragmentos sin manifiesto</option>
+              <option value="not_processed">Sin procesar</option>
+            </select>
+            <select id="docFidelityFilter" class="form-select" style="width: auto; padding: 6px 10px;" onchange="filterDocTable()" aria-label="Filtrar por comparación de fidelidad">
+              <option value="">Todas las auditorías</option>
+              <option value="not_audited">Sin comparar</option>
+              <option value="coincide">Sin diferencias reportadas</option>
+              <option value="revisar">Diferencias por revisar</option>
+              <option value="no_verificable">No verificable</option>
+              <option value="stale">Auditoría desactualizada</option>
+              <option value="not_applicable">Markdown directo</option>
+            </select>
+            <span class="badge" id="docsCountBadge">0 documentos</span>
           </div>
         </div>
+
+        <div class="kb-summary-grid" id="docsCatalogSummary" aria-live="polite"></div>
+        <div id="docsCatalogNotice" class="kb-audit-note" hidden style="margin-bottom:12px;padding:10px;border:1px solid rgba(245,158,11,.3);border-radius:8px;"></div>
 
         <div class="table-container">
           <table class="data-table" id="docsTable">
             <thead>
               <tr>
-                <th>Archivo</th>
-                <th>Audiencia / Carpeta</th>
-                <th>Tamaño</th>
-                <th>Última Modificación</th>
+                <th>Fuente y Markdown</th>
+                <th>Estado de indexación</th>
+                <th>Fragmentos</th>
+                <th>Fidelidad fuente / Markdown</th>
+                <th>Actualización</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="docsTableBody">
               <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                   Cargando inventario documental...
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+        <div class="kb-pagination">
+          <span id="docsPageInfo">—</span>
+          <div class="kb-toolbar">
+            <button type="button" class="btn btn-secondary" id="docsPrevPage" onclick="changeDocsPage(-1)">← Anterior</button>
+            <button type="button" class="btn btn-secondary" id="docsNextPage" onclick="changeDocsPage(1)">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="kb-modal-backdrop" id="docDetailsBackdrop" hidden role="presentation">
+        <section class="kb-modal" role="dialog" aria-modal="true" aria-labelledby="docDetailsTitle">
+          <div class="kb-modal-header">
+            <div>
+              <h2 id="docDetailsTitle" style="font-size: 1.15rem; overflow-wrap: anywhere;">Detalle documental</h2>
+              <div id="docDetailsSubtitle" class="kb-audit-note"></div>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="closeDocumentDetails()" aria-label="Cerrar detalle">Cerrar ✕</button>
+          </div>
+          <div id="docDetailsContent" aria-live="polite">Cargando detalle...</div>
+        </section>
       </div>
 
     </section>
@@ -2510,6 +2588,10 @@
     }
 
     let allDocuments = [];
+    let filteredDocuments = [];
+    let currentDocsPage = 0;
+    let activeDocumentDetail = null;
+    const DOCS_PAGE_SIZE = 40;
     let currentFilterStart = 'today';
     let currentFilterEnd = 'today';
     let activePeriodLabel = 'Hoy';
@@ -3357,54 +3439,281 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         allDocuments = data.documents || [];
-        renderDocTable(allDocuments);
+        renderDocsSummary(data);
+        filterDocTable();
       } catch (err) {
         console.error('Error cargando documentos:', err);
-        showToast('Error al cargar la lista de documentos', 'error');
+        document.getElementById('docsTableBody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:#FDA4AF;padding:2rem;">No se pudo cargar el catálogo. Revisa el acceso administrativo y vuelve a actualizar.</td></tr>`;
+        showToast('Error al cargar el catálogo de la base de conocimiento', 'error');
       }
+    }
+
+    function renderDocsSummary(data) {
+      const counts = data.index_status_counts || {};
+      const fidelity = data.fidelity_status_counts || {};
+      const indexedDocs = counts.indexed_markdown || 0;
+      const totalCatalogItems = Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0);
+      const attention = Math.max(0, totalCatalogItems - indexedDocs);
+      const catalogNotice = document.getElementById('docsCatalogNotice');
+      const notices = [];
+      if (data.manifest_error) notices.push(`No se pudo leer el manifiesto Markdown: ${data.manifest_error}`);
+      if (data.index_error) notices.push(data.index_error);
+      catalogNotice.innerText = notices.join(' ');
+      catalogNotice.hidden = notices.length === 0;
+      document.getElementById('docsCatalogSummary').innerHTML = `
+        <div class="kb-summary-card"><div class="kb-summary-label">Documentos y páginas web</div><div class="kb-summary-value">${escapeChunkHtml(data.total_documents ?? allDocuments.length)}</div></div>
+        <div class="kb-summary-card"><div class="kb-summary-label">Archivos fuente</div><div class="kb-summary-value">${escapeChunkHtml(data.total_source_files ?? 0)}</div></div>
+        <div class="kb-summary-card"><div class="kb-summary-label">Fuentes web en Markdown</div><div class="kb-summary-value">${escapeChunkHtml(data.total_web_sources ?? 0)}</div></div>
+        <div class="kb-summary-card"><div class="kb-summary-label">Fragmentos en ChromaDB</div><div class="kb-summary-value">${escapeChunkHtml(data.total_indexed_chunks ?? 0)}</div></div>
+        <div class="kb-summary-card"><div class="kb-summary-label">Documentos listos / requieren atención</div><div class="kb-summary-value">${escapeChunkHtml(indexedDocs)} <span style="color:var(--text-muted);font-size:.9rem;">/ ${escapeChunkHtml(attention)}</span></div></div>
+        <div class="kb-summary-card"><div class="kb-summary-label">Auditorías con diferencias detectadas</div><div class="kb-summary-value">${escapeChunkHtml(fidelity.revisar || 0)} <span style="color:var(--text-muted);font-size:.9rem;">por revisar</span></div></div>
+      `;
+    }
+
+    function indexStatusLabel(status) {
+      const labels = {
+        indexed_markdown: ['Markdown indexado', 'good'],
+        pending_index: ['Pendiente de indexar', 'warn'],
+        source_changed: ['Fuente modificada', 'warn'],
+        markdown_modified: ['Markdown cambió', 'bad'],
+        markdown_missing: ['Falta Markdown', 'bad'],
+        transformation_failed: ['Falló transformación', 'bad'],
+        mixed_or_legacy_chunks: ['Índice mixto / antiguo', 'warn'],
+        index_not_confirmed: ['Indexación sin confirmar', 'warn'],
+        unsupported_format: ['Formato no compatible', 'muted'],
+        indexed_legacy_or_untracked: ['Fragmentos sin manifiesto', 'warn'],
+        not_processed: ['Sin procesar', 'muted']
+      };
+      return labels[status] || [status || 'Desconocido', 'muted'];
+    }
+
+    function fidelityStatusLabel(status) {
+      const labels = {
+        coincide: ['Sin diferencias reportadas', 'good'],
+        revisar: ['Diferencias por revisar', 'bad'],
+        no_verificable: ['No verificable', 'warn'],
+        stale: ['Auditoría desactualizada', 'warn'],
+        not_audited: ['Aún sin comparar', 'muted'],
+        not_applicable: ['Markdown directo', 'muted']
+      };
+      return labels[status] || [status || 'Sin estado', 'muted'];
+    }
+
+    function kbPill(label, tone) {
+      return `<span class="kb-status kb-status-${tone}">${escapeChunkHtml(label)}</span>`;
+    }
+
+    function formatKbDate(value) {
+      if (!value) return '—';
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? escapeChunkHtml(value) : escapeChunkHtml(parsed.toLocaleString('es-CO'));
     }
 
     function renderDocTable(docs) {
       const tbody = document.getElementById('docsTableBody');
       const badge = document.getElementById('docsCountBadge');
-      badge.innerText = `${docs.length} archivos`;
       tbody.innerHTML = '';
+      const pageCount = Math.max(1, Math.ceil(docs.length / DOCS_PAGE_SIZE));
+      currentDocsPage = Math.min(currentDocsPage, pageCount - 1);
+      const start = currentDocsPage * DOCS_PAGE_SIZE;
+      const pageDocs = docs.slice(start, start + DOCS_PAGE_SIZE);
+      badge.innerText = `${docs.length} documentos`;
+      document.getElementById('docsPageInfo').innerText = docs.length
+        ? `Mostrando ${start + 1}–${Math.min(start + DOCS_PAGE_SIZE, docs.length)} de ${docs.length}`
+        : 'No hay documentos que coincidan con el filtro';
+      document.getElementById('docsPrevPage').disabled = currentDocsPage <= 0;
+      document.getElementById('docsNextPage').disabled = currentDocsPage >= pageCount - 1;
 
       if (docs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:2rem;">No se encontraron documentos en data/docs/</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:2rem;">No hay fuentes para mostrar con estos filtros.</td></tr>';
         return;
       }
 
-      docs.forEach(doc => {
+      pageDocs.forEach(doc => {
         const tr = document.createElement('tr');
+        const indexState = indexStatusLabel(doc.index_status);
+        const fidelityState = fidelityStatusLabel(doc.fidelity_status);
+        const icon = doc.source_type === 'public_web' ? '🌐' : (doc.extension === 'pptx' ? '📊' : '📄');
+        const markdownLabel = doc.markdown_exists ? (doc.markdown_path || 'Markdown disponible') : 'Markdown aún no generado';
+        const mdCount = doc.indexed_chunk_count ? `${doc.indexed_chunk_count} fragmentos` : '—';
+        const updateLabel = doc.source_type === 'public_web' ? 'Captura web' : formatKbDate(doc.source_modified_at);
+        const freshnessLabel = {
+          current: 'Fuente sin cambios desde ingesta',
+          changed: 'Fuente cambió desde ingesta',
+          not_checked: 'Vigencia de fuente sin comprobar',
+          snapshot: 'Captura web'
+        }[doc.source_freshness] || 'Vigencia no indicada';
+        const duplicateFilename = doc.source_type === 'local_document' &&
+          allDocuments.filter(item => item.source_type === 'local_document' && item.filename === doc.filename).length > 1;
+        const deleteAction = doc.source_type === 'local_document' && !duplicateFilename
+          ? '<button type="button" class="btn btn-danger" data-action="delete">Eliminar</button>'
+          : '';
         tr.innerHTML = `
-          <td><strong>📄 ${escapeChunkHtml(doc.filename)}</strong></td>
-          <td><span class="badge">${escapeChunkHtml(doc.audience)}</span> <span style="font-size:0.75rem; color:var(--text-muted)">(${escapeChunkHtml(doc.folder)})</span></td>
-          <td>${escapeChunkHtml(doc.size_formatted)}</td>
-          <td>${escapeChunkHtml(doc.modified_at)}</td>
-          <td>
-            <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;">
-              🗑️ Eliminar
-            </button>
-          </td>
+          <td><div class="kb-row-title">${icon} ${escapeChunkHtml(doc.filename)}</div><div class="kb-row-subtitle">${escapeChunkHtml(doc.folder || '—')} · ${escapeChunkHtml(doc.extension || 'archivo')}</div><div class="kb-row-subtitle">Markdown: ${escapeChunkHtml(markdownLabel)}</div></td>
+          <td>${kbPill(indexState[0], indexState[1])}<div class="kb-row-subtitle">${escapeChunkHtml((doc.indexed_formats || []).join(', ') || 'Formato no confirmado')} · ${escapeChunkHtml(freshnessLabel)}</div></td>
+          <td>${escapeChunkHtml(mdCount)}</td>
+          <td>${kbPill(fidelityState[0], fidelityState[1])}${doc.fidelity_issues_count ? `<div class="kb-row-subtitle">${escapeChunkHtml(doc.fidelity_issues_count)} observaciones</div>` : ''}</td>
+          <td>${escapeChunkHtml(updateLabel)}${doc.transform_model ? `<div class="kb-row-subtitle">Modelo: ${escapeChunkHtml(doc.transform_model)}</div>` : ''}</td>
+          <td><div class="kb-actions"><button type="button" class="btn btn-secondary" data-action="detail">Ver detalle</button>${deleteAction}</div>${duplicateFilename ? '<div class="kb-row-subtitle">Nombre repetido: eliminación desactivada para evitar borrar otro archivo.</div>' : ''}</td>
         `;
-        tr.querySelector('button').addEventListener('click', () => deleteDocument(doc.filename));
+        tr.querySelector('[data-action="detail"]').addEventListener('click', () => showDocumentDetail(doc.source_path));
+        const deleteButton = tr.querySelector('[data-action="delete"]');
+        if (deleteButton) deleteButton.addEventListener('click', () => deleteDocument(doc.filename));
         tbody.appendChild(tr);
       });
     }
 
     function filterDocTable() {
       const q = document.getElementById('docSearchInput').value.toLowerCase().trim();
-      if (!q) {
-        renderDocTable(allDocuments);
-        return;
+      const indexFilter = document.getElementById('docStatusFilter').value;
+      const fidelityFilter = document.getElementById('docFidelityFilter').value;
+      filteredDocuments = allDocuments.filter(doc => {
+        const searchable = [doc.filename, doc.folder, doc.source_path, doc.source_url, doc.index_status, doc.fidelity_status]
+          .filter(Boolean).join(' ').toLowerCase();
+        return (!q || searchable.includes(q)) &&
+          (!indexFilter || doc.index_status === indexFilter) &&
+          (!fidelityFilter || doc.fidelity_status === fidelityFilter);
+      });
+      currentDocsPage = 0;
+      renderDocTable(filteredDocuments);
+    }
+
+    function changeDocsPage(delta) {
+      const pageCount = Math.max(1, Math.ceil(filteredDocuments.length / DOCS_PAGE_SIZE));
+      currentDocsPage = Math.max(0, Math.min(pageCount - 1, currentDocsPage + delta));
+      renderDocTable(filteredDocuments);
+    }
+
+    function renderFidelityAudit(audit) {
+      if (!audit) return `<div class="kb-audit-note">${activeDocumentDetail?.fidelity_audit_stale ? 'La comparación guardada corresponde a una versión anterior de la fuente o del Markdown; vuelve a comparar las versiones actuales.' : 'Aún no se ha comparado el PDF/PPTX con el Markdown.'} La revisión con IA es una ayuda y sus posibles diferencias requieren validación humana.</div>`;
+      const state = fidelityStatusLabel(audit.status);
+      const issues = Array.isArray(audit.issues) ? audit.issues : [];
+      const issueHtml = issues.length ? issues.map(issue => `
+        <article class="kb-audit-issue">
+          <strong>${escapeChunkHtml(issue.type)} · ${escapeChunkHtml(issue.severity)}</strong>
+          <div class="kb-row-subtitle">Ubicación: ${escapeChunkHtml(issue.location)}</div>
+          <p style="margin-top:7px;">${escapeChunkHtml(issue.explanation)}</p>
+          ${issue.source_evidence ? `<p style="margin-top:7px;"><strong>Fuente:</strong> “${escapeChunkHtml(issue.source_evidence)}”</p>` : ''}
+          ${issue.markdown_evidence ? `<p style="margin-top:5px;"><strong>Markdown:</strong> “${escapeChunkHtml(issue.markdown_evidence)}”</p>` : ''}
+        </article>`).join('') : '<p class="kb-audit-note" style="margin-top:8px;">La comparación no reportó diferencias concretas.</p>';
+      return `<div style="margin-top:10px;">${kbPill(state[0], state[1])}<p style="margin-top:8px;">${escapeChunkHtml(audit.summary || '')}</p><div class="kb-audit-note" style="margin-top:6px;">Auditoría asistida por IA · ${formatKbDate(audit.audited_at_utc)} · ${escapeChunkHtml(audit.provider || 'proveedor no indicado')} / ${escapeChunkHtml(audit.model || 'modelo no indicado')}${audit.cached ? ' · resultado guardado' : ''}</div>${issueHtml}</div>`;
+    }
+
+    function closeDocumentDetails() {
+      document.getElementById('docDetailsBackdrop').hidden = true;
+      activeDocumentDetail = null;
+    }
+
+    document.getElementById('docDetailsBackdrop').addEventListener('click', event => {
+      if (event.target.id === 'docDetailsBackdrop') closeDocumentDetails();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !document.getElementById('docDetailsBackdrop').hidden) closeDocumentDetails();
+    });
+
+    async function showDocumentDetail(sourcePath) {
+      const backdrop = document.getElementById('docDetailsBackdrop');
+      const content = document.getElementById('docDetailsContent');
+      backdrop.hidden = false;
+      document.getElementById('docDetailsTitle').innerText = 'Cargando detalle…';
+      document.getElementById('docDetailsSubtitle').innerText = '';
+      content.innerHTML = '<p class="kb-audit-note">Leyendo el Markdown, los metadatos y el resultado de fidelidad…</p>';
+      try {
+        const query = new URLSearchParams({ source_path: sourcePath });
+        const res = await fetch(`/api/admin/docs/detail?${query}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        activeDocumentDetail = data;
+        renderDocumentDetail(data);
+      } catch (err) {
+        content.innerHTML = `<p class="kb-status kb-status-bad">${escapeChunkHtml(err.message || 'No se pudo cargar el detalle.')}</p>`;
       }
-      const filtered = allDocuments.filter(d => 
-        d.filename.toLowerCase().includes(q) || 
-        d.audience.toLowerCase().includes(q) || 
-        d.folder.toLowerCase().includes(q)
+    }
+
+    function renderDocumentDetail(data) {
+      const rec = data.record || {};
+      const doc = allDocuments.find(item => item.source_path === data.source_path) || {};
+      document.getElementById('docDetailsTitle').innerText = data.source_filename || 'Detalle documental';
+      document.getElementById('docDetailsSubtitle').innerText = `${data.source_path || ''} · ${doc.source_type === 'public_web' ? 'Contenido web indexado directamente' : 'Documento original transformado a Markdown'}`;
+      const usage = rec.usage || {};
+      const inputTokens = usage.input_tokens ?? usage.prompt_tokens ?? '—';
+      const outputTokens = usage.output_tokens ?? usage.completion_tokens ?? '—';
+      const sourceUnitCount = doc.source_type === 'public_web'
+        ? (rec.markdown_parts_count || 0)
+        : (doc.extension === 'pptx' ? (data.source_slides || rec.extracted_units || 0) : (data.source_pages || rec.extracted_units || 0));
+      const sourceUnitLabel = doc.source_type === 'public_web'
+        ? 'fragmentos web'
+        : (doc.extension === 'pptx' ? 'diapositivas' : 'páginas');
+      let sourceLink = '';
+      if (data.source_download_url) {
+        const params = new URLSearchParams({ source_path: data.source_path });
+        sourceLink = `<a class="btn btn-secondary" href="${escapeChunkHtml(`${data.source_download_url}?${params}`)}" target="_blank" rel="noopener noreferrer">Abrir original</a>`;
+      } else if (data.source_url && /^https?:\/\//i.test(data.source_url)) {
+        sourceLink = `<a class="btn btn-secondary" href="${escapeChunkHtml(data.source_url)}" target="_blank" rel="noopener noreferrer">Abrir página web</a>`;
+      }
+      const sourceOrMarkdownChanged = data.source_freshness === 'changed' || data.markdown_hash_matches === false;
+      const auditAction = doc.source_type === 'public_web' || !data.markdown_exists || sourceOrMarkdownChanged ? '' : `<button type="button" class="btn btn-primary" id="runFidelityAuditBtn">${data.fidelity_audit ? 'Repetir comparación con IA' : 'Comparar original y Markdown con IA'}</button>`;
+      const auditNote = doc.source_type === 'public_web'
+        ? '<p class="kb-audit-note">La web se guarda como Markdown directamente; no hay un PDF/PPTX local que comparar.</p>'
+        : sourceOrMarkdownChanged
+          ? '<p class="kb-status kb-status-warn">La fuente o el Markdown cambió desde la indexación. Ejecuta la ingesta incremental y luego realiza la comparación de fidelidad.</p>'
+        : '<p class="kb-audit-note">La comparación envía el contenido extraído del original y el Markdown al modelo configurado. Puede consumir tokens. No modifica ni reindexa los archivos; el resultado es una revisión asistida que conviene validar.</p>';
+      const preview = data.markdown_exists
+        ? `<pre class="kb-markdown-preview">${escapeChunkHtml(data.markdown_content || '')}</pre>${data.markdown_truncated ? '<p class="kb-audit-note" style="margin-top:6px;">Vista parcial: el Markdown supera el límite de previsualización.</p>' : ''}`
+        : '<p class="kb-audit-note">No existe un Markdown generado para esta fuente.</p>';
+      document.getElementById('docDetailsContent').innerHTML = `
+        <div class="kb-toolbar" style="margin-bottom:12px;">${sourceLink}${auditAction}</div>
+        ${auditNote}
+        <div class="kb-detail-grid">
+          <div class="kb-detail-item"><strong>Estado del pipeline</strong>${kbPill(indexStatusLabel(doc.index_status)[0], indexStatusLabel(doc.index_status)[1])}</div>
+          <div class="kb-detail-item"><strong>Archivo fuente</strong>${escapeChunkHtml(data.source_size_formatted || '—')}<div class="kb-row-subtitle">Modificado: ${formatKbDate(data.source_modified_at)} · ${escapeChunkHtml(data.source_freshness || 'vigencia no comprobada')}</div></div>
+          <div class="kb-detail-item"><strong>Fragmentos en ChromaDB</strong>${escapeChunkHtml(doc.indexed_chunk_count ?? '—')} · ${escapeChunkHtml((doc.indexed_formats || []).join(', ') || 'sin formato confirmado')}</div>
+          <div class="kb-detail-item"><strong>Transformación</strong>${escapeChunkHtml(rec.transform_model || '—')} · ${escapeChunkHtml(rec.elapsed_seconds ?? '—')} s</div>
+          <div class="kb-detail-item"><strong>Extracción</strong>${escapeChunkHtml(sourceUnitCount)} ${sourceUnitLabel} detectadas</div>
+          <div class="kb-detail-item"><strong>Tokens de transformación</strong>Entrada ${escapeChunkHtml(inputTokens)} · salida ${escapeChunkHtml(outputTokens)}</div>
+          <div class="kb-detail-item"><strong>Fechas</strong>Markdown: ${formatKbDate(rec.validated_at_utc)}<br>Indexado: ${formatKbDate(rec.indexed_at_utc)}</div>
+          <div class="kb-detail-item"><strong>Hash de fuente</strong><code>${escapeChunkHtml((rec.source_sha256 || '').slice(0, 20) || '—')}</code></div>
+          <div class="kb-detail-item"><strong>Hash del Markdown / prompt</strong><code>${escapeChunkHtml((rec.markdown_sha256 || '').slice(0, 14) || '—')} / ${escapeChunkHtml((rec.prompt_sha256 || '').slice(0, 14) || '—')}</code></div>
+          <div class="kb-detail-item"><strong>Ruta Markdown</strong><span style="overflow-wrap:anywhere;">${escapeChunkHtml(data.markdown_path || '—')}</span></div>
+        </div>
+        ${rec.error ? `<p class="kb-status kb-status-bad">${escapeChunkHtml(rec.error)}</p>` : ''}
+        <h3 style="font-size:1rem;margin:18px 0 8px;">Comparación de fidelidad</h3>
+        <div id="fidelityAuditResult">${renderFidelityAudit(data.fidelity_audit)}</div>
+        <h3 style="font-size:1rem;margin:18px 0 8px;">Markdown que se indexa</h3>
+        ${preview}
+      `;
+      const auditButton = document.getElementById('runFidelityAuditBtn');
+      if (auditButton) auditButton.addEventListener('click', () => runFidelityAudit(Boolean(data.fidelity_audit)));
+    }
+
+    async function runFidelityAudit(force) {
+      if (!activeDocumentDetail) return;
+      const confirmed = confirm(
+        'Se enviarán al modelo configurado el texto extraído del PDF/PPTX y el Markdown para buscar omisiones o contradicciones. Puede consumir tokens.\n\nLa auditoría no modifica ni indexa documentos. ¿Continuar?'
       );
-      renderDocTable(filtered);
+      if (!confirmed) return;
+      const button = document.getElementById('runFidelityAuditBtn');
+      if (button) { button.disabled = true; button.innerText = 'Comparando documento…'; }
+      try {
+        const res = await fetch('/api/admin/docs/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_path: activeDocumentDetail.source_path, force })
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || `HTTP ${res.status}`);
+        activeDocumentDetail.fidelity_audit = result;
+        renderDocumentDetail(activeDocumentDetail);
+        await loadDocuments();
+        showToast(result.cached ? 'Se mostró la comparación guardada.' : 'Comparación de fidelidad completada.', 'success');
+      } catch (err) {
+        showToast(err.message || 'No se pudo comparar el documento.', 'error');
+        const report = document.getElementById('fidelityAuditResult');
+        if (report) report.innerHTML = `<span class="kb-status kb-status-bad">${escapeChunkHtml(err.message)}</span>`;
+      } finally {
+        const currentButton = document.getElementById('runFidelityAuditBtn');
+        if (currentButton) { currentButton.disabled = false; currentButton.innerText = activeDocumentDetail?.fidelity_audit ? 'Repetir comparación con IA' : 'Comparar original y Markdown con IA'; }
+      }
     }
 
     // ==========================================
@@ -3464,7 +3773,7 @@
     async function runDocumentAudit() {
       const fileInput = document.getElementById('fileInput');
       if (!fileInput.files || !fileInput.files[0]) {
-        showToast('Por favor selecciona un archivo PDF o documento para auditar', 'error');
+        showToast('Selecciona un archivo PDF o PPTX para analizar', 'error');
         return;
       }
 

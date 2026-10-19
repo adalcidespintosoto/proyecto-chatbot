@@ -127,12 +127,12 @@ def _display_sources(paths: list[Path], docs_dir: Path) -> dict[str, str]:
 
 def _load_manifest(path: Path) -> dict[str, Any]:
     if not path.is_file():
-        return {"schema_version": 1, "records": {}}
+        return {"schema_version": 2, "records": {}}
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(manifest, dict) or not isinstance(manifest.get("records", {}), dict):
             raise ValueError("estructura inesperada")
-        manifest.setdefault("schema_version", 1)
+        manifest.setdefault("schema_version", 2)
         manifest.setdefault("records", {})
         return manifest
     except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -167,7 +167,7 @@ def _prepare_markdown(
     displays = _display_sources(paths, docs_dir)
 
     manifest.update({
-        "schema_version": 1,
+        "schema_version": 2,
         "transform_model": "gpt-6-luna",
         "embedding_model": settings.embedding_model,
         "prompt_path": str(PROMPT_PATH),
@@ -176,17 +176,22 @@ def _prepare_markdown(
         "last_scan_started_utc": datetime.now(timezone.utc).isoformat(),
     })
 
-    pending: dict[Future, tuple[int, str, str, str, int, float]] = {}
+    pending: dict[Future, tuple[int, str, str, str, Path, int, int, int, float]] = {}
 
     def persist_finished(done: set[Future]) -> None:
         for future in done:
-            index, key, display, source_hash, extracted_units, started = pending.pop(future)
+            index, key, display, source_hash, source_file, source_size, source_mtime_ns, extracted_units, started = pending.pop(future)
             record: dict[str, Any] | None = None
             try:
                 record = future.result()
+                current_stat = source_file.stat()
+                if current_stat.st_size != source_size or current_stat.st_mtime_ns != source_mtime_ns:
+                    raise RuntimeError("El documento fuente cambió mientras se transformaba; vuelve a ejecutar la ingesta.")
                 record.update({"source_path": key, "source": display, "source_filename": Path(key).name})
                 if record.get("status") != "success":
                     raise RuntimeError(record.get("error", "El Markdown no superó la validación."))
+                record["source_size_bytes"] = source_size
+                record["source_mtime_ns"] = source_mtime_ns
                 record["extracted_units"] = extracted_units
                 manifest["records"][key] = record
                 current_records[key] = record
@@ -206,6 +211,8 @@ def _prepare_markdown(
                     "source": display,
                     "source_filename": Path(key).name,
                     "source_sha256": source_hash,
+                    "source_size_bytes": source_size,
+                    "source_mtime_ns": source_mtime_ns,
                     "prompt_sha256": prompt_hash,
                     "error": str((record or {}).get("error") or exc)[:1000],
                     "failed_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -219,6 +226,7 @@ def _prepare_markdown(
         for index, path in enumerate(paths, start=1):
             key = _source_key(path, docs_dir)
             display = displays[key]
+            source_stat = path.stat()
             source_hash = _file_sha256(path)
             existing = manifest["records"].get(key, {})
             try:
@@ -226,7 +234,13 @@ def _prepare_markdown(
             except ValueError:
                 markdown_path = output_dir / "__missing__"
             if not force and sanitizer.validate_manifest_record(existing, source_hash, prompt_hash, markdown_path):
-                existing.update({"source_path": key, "source": display, "source_filename": path.name})
+                existing.update({
+                    "source_path": key,
+                    "source": display,
+                    "source_filename": path.name,
+                    "source_size_bytes": source_stat.st_size,
+                    "source_mtime_ns": source_stat.st_mtime_ns,
+                })
                 current_records[key] = existing
                 LOGGER.info("[%d/%d] Markdown vigente; sin llamada al LLM: %s", index, len(paths), key)
                 continue
@@ -274,7 +288,10 @@ def _prepare_markdown(
                     output_dir,
                     rejected_draft,
                 )
-                pending[future] = (index, key, display, source_hash, len(extracted), started)
+                pending[future] = (
+                    index, key, display, source_hash, path.resolve(), source_stat.st_size,
+                    source_stat.st_mtime_ns, len(extracted), started,
+                )
             except Exception as exc:
                 failures.append(key)
                 manifest["records"][key] = {
@@ -283,6 +300,8 @@ def _prepare_markdown(
                     "source": display,
                     "source_filename": path.name,
                     "source_sha256": source_hash,
+                    "source_size_bytes": source_stat.st_size,
+                    "source_mtime_ns": source_stat.st_mtime_ns,
                     "prompt_sha256": prompt_hash,
                     "error": str(exc)[:1000],
                     "elapsed_seconds": round(time.perf_counter() - started, 3),
@@ -546,6 +565,7 @@ def _build_markdown_index(
                     embeddings=vectors,
                 )
             chunks_added += len(chunks)
+        record["indexed_chunk_count"] = source_chunk_index
         LOGGER.info("Markdown indexado en staging: %s (%d chunks)", key, source_chunk_index)
 
     count = collection.count()
@@ -696,6 +716,7 @@ def _index_incremental(
             for meta in current_metas
         ):
             record["indexed_sha256"] = record["source_sha256"]
+            record["indexed_chunk_count"] = len(current_metas)
             continue
 
         markdown_path = _safe_markdown_path(output_dir, record)
@@ -739,6 +760,7 @@ def _index_incremental(
         if obsolete_ids:
             collection.delete(ids=obsolete_ids)
         record["indexed_sha256"] = record["source_sha256"]
+        record["indexed_chunk_count"] = len(chunks)
         record["indexed_at_utc"] = datetime.now(timezone.utc).isoformat()
         indexed += len(chunks)
         LOGGER.info("Markdown indexado: %s (%d chunks)", key, len(chunks))

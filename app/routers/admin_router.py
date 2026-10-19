@@ -4,16 +4,19 @@ Provee endpoints para el panel de administración (/admin), subida de documentos
 re-indexación en ChromaDB y consulta de estado del sistema.
 """
 
+import asyncio
 import os
 import shutil
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, BackgroundTasks, Query, Depends
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 import uuid
 import json
@@ -24,6 +27,12 @@ from app.security import require_admin_auth, require_admin_origin
 from app.upload_security import save_upload, validated_filename
 from app.services.rag_service import rag_service
 from app.services.telemetry_service import get_kpis_summary
+from app.services.knowledge_base_service import (
+    audit_source_against_markdown,
+    build_knowledge_catalog,
+    get_document_detail,
+    resolve_source_file,
+)
 from scripts.ingest_multimodal_docs import (
     ingest_multimodal,
     calculate_chunk_redundancy,
@@ -45,12 +54,18 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 DOCS_DIR = Path(settings.docs_dir)
 STAGED_DIR = Path("data/scratch/staged_uploads")
 STAGED_DIR.mkdir(parents=True, exist_ok=True)
+FIDELITY_AUDIT_SLOTS = asyncio.Semaphore(2)
 
 
 class ResolveUploadRequest(BaseModel):
     staged_id: str = Field(..., pattern=r"^(?:[0-9a-f]{10}|[0-9a-f]{32})$", description="ID de sesión temporal de subida")
     action: str = Field(..., pattern=r"^(replace|deduplicate|force|cancel)$", description="Acción de resolución: 'replace', 'deduplicate', 'force' o 'cancel'")
     target_to_replace: Optional[str] = Field(default=None, description="Documento previo a purgar (opcional)")
+
+
+class FidelityAuditRequest(BaseModel):
+    source_path: str = Field(..., min_length=1, max_length=1024)
+    force: bool = False
 
 
 def extract_chunks_from_staged_file(file_path: Path) -> List[Document]:
@@ -184,51 +199,86 @@ async def get_admin_dashboard():
 @router.get(
     "/api/admin/docs",
     summary="Listar Documentos de la Base de Conocimiento",
-    description="Retorna el listado de documentos PDF/DOCX disponibles en data/docs con metadatos de tamaño y fecha."
+    description="Relaciona fuentes PDF/PPTX con su Markdown validado, estado de indexación y auditorías de fidelidad."
 )
 async def list_documents() -> Dict[str, Any]:
-    """Retorna todos los documentos almacenados en data/docs/."""
-    docs_list = []
+    """Lista fuentes, Markdown generado, estado Chroma y auditorías de fidelidad."""
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir = Path(settings.sanitized_docs_dir)
+    try:
+        return await run_in_threadpool(
+            lambda: build_knowledge_catalog(DOCS_DIR, output_dir, rag_service.vector_store),
+        )
+    except Exception as exc:
+        logger.exception("No se pudo construir el catálogo de la base de conocimiento")
+        raise HTTPException(status_code=500, detail="No se pudo cargar el catálogo de conocimiento") from exc
 
-    allowed_exts = {".pdf", ".docx", ".pptx", ".txt", ".xlsx", ".csv", ".md"}
 
-    for root, _, files in os.walk(DOCS_DIR):
-        for file in sorted(files):
-            file_path = Path(root) / file
-            if file_path.suffix.lower() in allowed_exts:
-                stat = file_path.stat()
-                rel_path = file_path.relative_to(DOCS_DIR).as_posix()
-                
-                # Determinar categoría o carpeta contenedora
-                folder = file_path.parent.name if file_path.parent != DOCS_DIR else "Raíz"
-                audience_label = "General"
-                if "estudiante" in folder.lower():
-                    audience_label = "Estudiante"
-                elif "profesor" in folder.lower() or "docente" in folder.lower():
-                    audience_label = "Profesor / Docente"
-                elif "funcionario" in folder.lower() or "gestion" in folder.lower() or "admin" in folder.lower():
-                    audience_label = "Administrativo"
-                elif "general" in folder.lower() or "normativa" in folder.lower():
-                    audience_label = "General / Normativa"
+@router.get(
+    "/api/admin/docs/detail",
+    summary="Ver detalle de una fuente y su Markdown",
+)
+async def document_detail(source_path: str = Query(..., min_length=1, max_length=1024)) -> Dict[str, Any]:
+    try:
+        return await run_in_threadpool(
+            get_document_detail, DOCS_DIR, Path(settings.sanitized_docs_dir), source_path
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-                docs_list.append({
-                    "filename": file,
-                    "relative_path": rel_path,
-                    "folder": folder,
-                    "audience": audience_label,
-                    "size_bytes": stat.st_size,
-                    "size_kb": round(stat.st_size / 1024, 1),
-                    "size_formatted": f"{round(stat.st_size / 1024, 1)} KB" if stat.st_size < 1024*1024 else f"{round(stat.st_size / (1024*1024), 2)} MB",
-                    "modified_at": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                    "extension": file_path.suffix.lower().replace(".", "")
-                })
 
-    return {
-        "status": "success",
-        "total_documents": len(docs_list),
-        "documents": docs_list
-    }
+@router.get(
+    "/api/admin/docs/source",
+    summary="Abrir el archivo fuente original",
+)
+async def document_source(source_path: str = Query(..., min_length=1, max_length=1024)):
+    try:
+        path = await run_in_threadpool(resolve_source_file, DOCS_DIR, source_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    media_type = "application/pdf" if path.suffix.lower() == ".pdf" else (
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    )
+    content_disposition = f"inline; filename*=UTF-8''{quote(path.name)}"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": content_disposition,
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.post(
+    "/api/admin/docs/audit",
+    summary="Comparar el Markdown validado con su PDF o PPTX fuente",
+)
+async def audit_document_fidelity(request: FidelityAuditRequest) -> Dict[str, Any]:
+    try:
+        async with FIDELITY_AUDIT_SLOTS:
+            return await audit_source_against_markdown(
+                DOCS_DIR,
+                Path(settings.sanitized_docs_dir),
+                request.source_path,
+                force=request.force,
+            )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Falló la auditoría de fidelidad de %s", request.source_path)
+        raise HTTPException(status_code=502, detail="La comparación con el modelo no se pudo completar") from exc
 
 
 # =============================================================================
@@ -247,6 +297,8 @@ async def upload_document(
 ) -> Dict[str, Any]:
     """Recibe un archivo y lo almacena en la estructura de data/docs/."""
     filename = validated_filename(file.filename)
+    if Path(filename).suffix.lower() not in {".pdf", ".pptx"}:
+        raise HTTPException(status_code=415, detail="La ingesta Markdown admite únicamente archivos PDF y PPTX.")
 
     # Determinar subdirectorio según audiencia
     subfolder_name = AUDIENCE_FOLDER_MAP.get(audience.lower().strip(), "4_general_normativa")
@@ -309,6 +361,8 @@ async def audit_document(
 ) -> Dict[str, Any]:
     """Analiza en memoria/staging un documento para calcular solapamiento semántico y ambigüedad contra ChromaDB."""
     filename = validated_filename(file.filename)
+    if Path(filename).suffix.lower() not in {".pdf", ".pptx"}:
+        raise HTTPException(status_code=415, detail="La ingesta Markdown admite únicamente archivos PDF y PPTX.")
 
     staged_id = uuid.uuid4().hex
     staged_filename = f"{staged_id}_{filename}"
