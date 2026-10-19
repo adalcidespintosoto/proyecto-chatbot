@@ -5,6 +5,20 @@ from typing import Any, Dict, Optional
 
 
 _request_usage: ContextVar[Optional[Dict[str, Any]]] = ContextVar("unimon_request_llm_usage", default=None)
+_route_usage: ContextVar[Optional[Dict[str, Any]]] = ContextVar("unimon_router_llm_usage", default=None)
+
+
+def set_route_usage(usage: Dict[str, Any]) -> Token:
+    """Temporarily attach router-classification usage to the delegated chat turn."""
+    return _route_usage.set(dict(usage))
+
+
+def reset_route_usage(token: Token) -> None:
+    _route_usage.reset(token)
+
+
+def get_route_usage() -> Dict[str, Any]:
+    return dict(_route_usage.get() or {})
 
 
 def begin_llm_usage_capture() -> Token:

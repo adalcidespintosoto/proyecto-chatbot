@@ -29,7 +29,10 @@ chroma_db/
 data/chroma_db_backup/
 chroma_db_backup/
 data/sanitized_docs/
+data/chatbots/
 .*.previous_markdown_*/
+/reports/*
+!/reports/README.md
 
 # Archivos temporales y descargas
 data/temp_uploads/

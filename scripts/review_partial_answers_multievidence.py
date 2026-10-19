@@ -319,6 +319,12 @@ async def main() -> int:
     settings = get_settings()
     if settings.llm_provider.casefold() != "openai" or not settings.openai_api_key:
         raise RuntimeError("La revisión multi-evidencia necesita el proveedor OpenAI configurado.")
+    if not args.input.is_file():
+        parser.error(
+            f"No se encontró el informe base histórico: {args.input}. "
+            "Los reportes anteriores se archivaron fuera del repositorio; restaura el ZIP de respaldo "
+            "o indica otro archivo con --input."
+        )
     baseline = json.loads(args.input.read_text(encoding="utf-8"))
     selected_verdicts = sorted(set(args.verdict or ["partial"]))
     rows = [

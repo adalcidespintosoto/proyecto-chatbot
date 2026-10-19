@@ -208,6 +208,15 @@ Consulta /docs para el esquema FastAPI que corre en esa revisión.
 | GET / | Sirve app/static/index.html. |
 | GET /health | Estado resumido de configuración; no sustituye diagnóstico end-to-end de cada dependencia. |
 | POST /api/chat | Mensaje conversacional. Campos: mensaje/message y session_id. |
+| GET /api/chatbots/{bot_id}/config | Nombre y saludo público de una instancia adicional habilitada. |
+| POST /api/chatbots/{bot_id}/chat | Consulta RAG aislada para una dependencia. No usa la sesión ni Golden Cache de UniMon. |
+| GET /api/chatbot-router/config, POST /api/chatbot-router/chat | Modo opcional `/?router=1`: clasifica contra perfiles activos, delega a un RAG aislado y usa UniMon como fallback. |
+| GET /api/admin/chatbot-instances | Lista instancias, perfiles de especialidad y métricas filtradas; requiere autenticación administrativa. |
+| POST /api/admin/chatbot-instances | Crea una instancia y sus directorios aislados; requiere autenticación administrativa. |
+| PATCH /api/admin/chatbot-instances/{bot_id} | Edita nombre, dependencia, alcance y contactos sin cambiar el identificador. |
+| DELETE /api/admin/chatbot-instances/{bot_id}, POST /api/admin/chatbot-instances/{bot_id}/reactivate | Desactiva/reactiva una instancia conservando sus documentos e índice. |
+| GET /api/admin/chatbot-instances/{bot_id}/metrics | Devuelve consultas, sesiones, tokens y latencia por instancia y período. |
+| POST /api/admin/chatbot-instances/{bot_id}/documents | Carga PDF/PPTX y los convierte a Markdown para el índice de esa instancia; requiere autenticación administrativa. |
 | GET /admin, GET /admin.html | Panel administrativo; protegido por HTTP Basic desde admin_router. |
 | GET /api/admin/docs | Lista fuentes en el directorio documental. |
 | POST /api/admin/upload-doc | Sube a subcarpeta/audiencia; puede auditar/indexar según banderas. Verifica formato e indexación antes de darlo por disponible. |
@@ -247,7 +256,7 @@ Hay rutas repetidas de administración heredadas en routers distintos. No asumir
 | data/.vision_cache.json | Descripciones cacheadas de imágenes calculadas durante ingesta. | Índice final de búsqueda. |
 | data/chroma_db_backup, chroma_db_backup | Respaldos de Chroma de distintas ubicaciones/revisiones. | Copia garantizada de configuración y corpus sincronizados; verifica cuál corresponde al entorno. |
 | data/scratch/staged_uploads | Subidas en espera de revisión/resolución administrativa. | Fuentes activas hasta que se acepten e indexen. |
-| reports | Informes de calidad, trazas y pruebas. Pueden contener consultas y salidas reales. | Esquema contractual estable de API. |
+| reports | Carpeta local para los resultados nuevos de evaluaciones y pruebas; solo se versiona su README. | Dependencia del runtime o conservación de informes históricos. |
 | scratch | Archivos temporales, scripts de trabajo y logs locales. | Artefactos necesarios para arrancar. |
 
 No borres ni sobrescribas un índice o analytics.db activo sin validar respaldo, ruta en .env y proceso detenido.
@@ -292,4 +301,10 @@ El procesamiento de imágenes puede necesitar un Ollama local y modelo de visió
 - Las sesiones están en RAM y hay una protección periódica TTL. Persistencia distribuida, balanceo multiinstancia y tareas largas escalables requieren diseño adicional.
 - No considerar el reranker, Golden Cache o la respuesta positiva como validador de verdad. Usar documentos y evaluación etiquetada.
 - Los documentos pueden contradecirse o estar obsoletos. La aplicación extrae y recupera texto; no comprueba vigencia institucional automáticamente.
+
+## 12. Asistentes adicionales por dependencia
+
+El administrador puede crear instancias desde **Diagnóstico de Servidor** en `/admin`. Cada instancia tiene un identificador, nombre, alcance, canales de soporte y rutas propias para documentos originales, Markdown y ChromaDB. La ingesta usa el mismo pipeline PDF/PPTX → Markdown validado → chunks e índice.
+
+Las nuevas instancias consultan sólo su índice y guardan proveedor/modelo LLM de forma independiente. Las credenciales de proveedores cloud permanecen en `.env`; embeddings y reranker se comparten por el servidor. No usan GLPI ni la Golden Cache de UniMon. El chat se abre con `/?bot=<identificador>`. Configuración, límites y respaldo están en [CHATBOTS_POR_DEPENDENCIA.md](CHATBOTS_POR_DEPENDENCIA.md).
 

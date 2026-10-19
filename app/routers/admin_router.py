@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status, BackgroundTasks, Query, Depends
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from starlette.concurrency import run_in_threadpool
 
 import uuid
@@ -26,13 +26,18 @@ from app.config import get_settings
 from app.security import require_admin_auth, require_admin_origin
 from app.upload_security import save_upload, validated_filename
 from app.services.rag_service import rag_service
-from app.services.telemetry_service import get_kpis_summary
+from app.services.telemetry_service import get_chatbot_instance_kpis, get_kpis_summary
 from app.services.knowledge_base_service import (
     audit_source_against_markdown,
     build_knowledge_catalog,
     get_document_detail,
     resolve_source_file,
 )
+from app.services.bot_instance_service import (
+    BotInstanceError,
+    bot_instance_manager,
+)
+from app.services.llm_endpoint_security import validate_custom_llm_base_url
 from scripts.ingest_multimodal_docs import (
     ingest_multimodal,
     calculate_chunk_redundancy,
@@ -66,6 +71,41 @@ class ResolveUploadRequest(BaseModel):
 class FidelityAuditRequest(BaseModel):
     source_path: str = Field(..., min_length=1, max_length=1024)
     force: bool = False
+
+
+class CreateBotInstanceRequest(BaseModel):
+    display_name: str = Field(..., min_length=2, max_length=80)
+    dependency_name: str = Field(..., min_length=2, max_length=120)
+    scope_description: str = Field(..., min_length=10, max_length=600)
+    support_email: str = Field(default="", max_length=120)
+    support_phone: str = Field(default="", max_length=32)
+    bot_id: str = Field(default="", max_length=40)
+    llm_provider: str = Field(..., min_length=1, max_length=32)
+    llm_model: str = Field(..., min_length=1, max_length=160)
+    llm_custom_provider: str = Field(default="", max_length=80)
+    llm_protocol: str = Field(default="", max_length=32)
+    llm_base_url: str = Field(default="", max_length=512)
+    llm_timeout: float = Field(default=35.0, ge=2.0, le=180.0)
+    llm_api_key: Optional[SecretStr] = None
+
+
+class UpdateBotInstanceRequest(BaseModel):
+    display_name: str = Field(..., min_length=2, max_length=80)
+    dependency_name: str = Field(..., min_length=2, max_length=120)
+    scope_description: str = Field(..., min_length=10, max_length=600)
+    support_email: str = Field(default="", max_length=120)
+    support_phone: str = Field(default="", max_length=32)
+    llm_provider: str = Field(..., min_length=1, max_length=32)
+    llm_model: str = Field(..., min_length=1, max_length=160)
+    llm_custom_provider: str = Field(default="", max_length=80)
+    llm_protocol: str = Field(default="", max_length=32)
+    llm_base_url: str = Field(default="", max_length=512)
+    llm_timeout: float = Field(default=35.0, ge=2.0, le=180.0)
+    llm_api_key: Optional[SecretStr] = None
+
+
+class SetBotInstanceEnabledRequest(BaseModel):
+    enabled: bool
 
 
 def extract_chunks_from_staged_file(file_path: Path) -> List[Document]:
@@ -736,6 +776,391 @@ async def delete_document(filename: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error eliminando documento '{clean_filename}': {e}")
         raise HTTPException(status_code=500, detail=f"No se pudo eliminar el documento: {str(e)}")
+
+
+# =============================================================================
+# 5.1 INSTANCIAS DE CHATBOT POR DEPENDENCIA
+# =============================================================================
+
+@router.get(
+    "/api/admin/llm-models",
+    summary="Listar proveedores y modelos LLM configurados",
+    description="Devuelve modelos cloud configurados y modelos locales instalados en Ollama, sin exponer credenciales.",
+)
+async def list_llm_models() -> Dict[str, Any]:
+    import httpx
+
+    current = get_settings()
+    default_provider = (current.llm_provider or "openai").strip().casefold()
+    provider_settings = {
+        "openai": ("OpenAI", current.openai_api_key, current.openai_model),
+        "anthropic": ("Anthropic", current.anthropic_api_key, current.anthropic_model),
+        "gemini": ("Google Gemini", current.gemini_api_key, current.gemini_model),
+    }
+    async def discover_cloud_models(provider: str) -> tuple[str, List[str], set[str]]:
+        _, api_key, configured_model = provider_settings[provider]
+        if not api_key:
+            return provider, [], set()
+        if provider == "anthropic":
+            url = f"{current.anthropic_base_url.rstrip('/')}/models"
+            headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
+            params = {"limit": 1000}
+        elif provider == "gemini":
+            url = f"{current.gemini_base_url.rstrip('/')}/models"
+            headers = {"Authorization": f"Bearer {api_key}"}
+            params = None
+        else:
+            url = f"{current.openai_base_url.rstrip('/')}/models"
+            headers = {"Authorization": f"Bearer {api_key}"}
+            params = None
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                response = await client.get(url, headers=headers, params=params)
+            if response.status_code != 200:
+                return provider, ([configured_model] if configured_model else []), set()
+            payload = response.json()
+            rows = payload.get("data") or payload.get("models") or []
+            model_ids = set()
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                model_id = str(row.get("id") or row.get("name") or "").strip()
+                if model_id.startswith("models/"):
+                    model_id = model_id.removeprefix("models/")
+                if not model_id:
+                    continue
+                # El selector ofrece familias conversacionales compatibles con este cliente.
+                if provider == "anthropic" and not model_id.casefold().startswith("claude"):
+                    continue
+                if provider == "gemini" and "gemini" not in model_id.casefold():
+                    continue
+                if provider == "openai" and not re.match(r"^(?:gpt|o[1-9]|chatgpt)", model_id, re.IGNORECASE):
+                    continue
+                model_ids.add(model_id)
+            verified_ids = sorted(model_ids, key=str.casefold)
+            if configured_model and configured_model not in model_ids:
+                model_ids.add(configured_model)
+            return provider, sorted(model_ids, key=str.casefold), set(verified_ids)
+        except Exception:
+            return provider, ([configured_model] if configured_model else []), set()
+
+    cloud_results = await asyncio.gather(*(
+        discover_cloud_models(provider) for provider in provider_settings
+    ))
+    cloud_catalogs = {
+        provider: {"models": models, "verified_ids": verified_ids}
+        for provider, models, verified_ids in cloud_results
+    }
+    providers: List[Dict[str, Any]] = []
+    for provider, (label, api_key, configured_model) in provider_settings.items():
+        cloud_catalog = cloud_catalogs.get(provider, {})
+        available_models = cloud_catalog.get("models", [])
+        confirmed_ids = set(cloud_catalog.get("verified_ids", set()))
+        # El último modelo configurado siempre se puede revisar o editar aunque el endpoint
+        # de catálogo del proveedor no responda durante esta carga del panel.
+        if configured_model and configured_model not in available_models and api_key:
+            available_models = [*available_models, configured_model]
+        providers.append({
+            "id": provider,
+            "label": label,
+            "configured": bool(api_key),
+            "models": [
+                {
+                    "id": model,
+                    "label": f"{model} ({'disponible en el proveedor' if model in confirmed_ids else 'configurado; disponibilidad no confirmada'})",
+                    "available": model in confirmed_ids,
+                }
+                for model in available_models
+            ] if api_key else [],
+        })
+
+    local_models: List[str] = []
+    running_models: set[str] = set()
+    ollama_online = False
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(f"{current.ollama_base_url.rstrip('/')}/api/tags")
+        if response.status_code == 200:
+            ollama_online = True
+            local_models = [
+                str(item.get("name"))
+                for item in response.json().get("models", [])
+                if isinstance(item, dict) and item.get("name")
+            ]
+            try:
+                async with httpx.AsyncClient(timeout=1.5) as client:
+                    running_response = await client.get(f"{current.ollama_base_url.rstrip('/')}/api/ps")
+                if running_response.status_code == 200:
+                    running_models = {
+                        str(item.get("name"))
+                        for item in running_response.json().get("models", [])
+                        if isinstance(item, dict) and item.get("name")
+                    }
+            except Exception:
+                running_models = set()
+    except Exception:
+        # La indisponibilidad de Ollama no debe impedir la administración cloud.
+        pass
+    providers.append({
+        "id": "ollama",
+        "label": "Ollama local",
+        "configured": True,
+        "online": ollama_online,
+        "models": [
+            {
+                "id": model,
+                "label": f"{model} ({'activo en memoria' if model in running_models else 'local instalado'})",
+                "available": True,
+                "running": model in running_models,
+            }
+            for model in local_models
+        ],
+    })
+    providers.append({
+        "id": "custom",
+        "label": "Otro proveedor / API compatible",
+        "configured": True,
+        "models": [],
+    })
+    return {
+        "status": "success",
+        "default": {
+            "provider": default_provider,
+            "model": {
+                "openai": current.openai_model,
+                "anthropic": current.anthropic_model,
+                "gemini": current.gemini_model,
+                "ollama": current.llm_model,
+            }.get(default_provider, current.openai_model),
+        },
+        "providers": providers,
+    }
+
+
+async def validate_instance_llm_model(provider: str, model: str, *, allow_unchanged_local: bool = False) -> None:
+    """Do not let an instance select an Ollama model that the local server cannot load."""
+    provider = str(provider or "").strip().casefold()
+    if provider != "ollama":
+        return
+    import httpx
+
+    current = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(f"{current.ollama_base_url.rstrip('/')}/api/tags")
+        if response.status_code == 200:
+            installed = {
+                str(item.get("name", "")).casefold()
+                for item in response.json().get("models", [])
+                if isinstance(item, dict)
+            }
+            if model.casefold() in installed:
+                return
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Ese modelo local no está instalado en Ollama. Instálalo en el servidor y vuelve a seleccionarlo.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        if allow_unchanged_local:
+            return
+    if allow_unchanged_local:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Ollama no está disponible para comprobar el modelo local. Inicia Ollama y vuelve a intentarlo.",
+    )
+
+
+@router.get(
+    "/api/admin/chatbot-instances",
+    summary="Listar chatbots configurados",
+    description="Lista las instancias adicionales y sus bases documentales independientes.",
+)
+async def list_chatbot_instances(
+    start_date: Optional[str] = Query(default=None, description="Fecha inicio (YYYY-MM-DD o hoy)"),
+    end_date: Optional[str] = Query(default=None, description="Fecha fin (YYYY-MM-DD o hoy)"),
+) -> Dict[str, Any]:
+    instances = []
+    for profile in bot_instance_manager.list(include_disabled=True):
+        paths = bot_instance_manager.paths(profile.bot_id)
+        instances.append({
+            **profile.admin_config(paths),
+            "metrics": get_chatbot_instance_kpis(profile.bot_id, start_date, end_date),
+        })
+    return {"status": "success", "instances": instances}
+
+
+@router.post(
+    "/api/admin/chatbot-instances",
+    summary="Crear chatbot para una dependencia",
+    description="Registra una instancia independiente sin editar variables de entorno ni código.",
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_chatbot_instance(request: CreateBotInstanceRequest) -> Dict[str, Any]:
+    if request.llm_provider == "custom":
+        try:
+            await run_in_threadpool(
+                validate_custom_llm_base_url, request.llm_base_url, resolve_dns=True
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    await validate_instance_llm_model(request.llm_provider, request.llm_model)
+    try:
+        payload = request.model_dump(exclude={"llm_api_key"})
+        payload["llm_api_key"] = request.llm_api_key.get_secret_value() if request.llm_api_key else ""
+        profile = bot_instance_manager.create(**payload)
+    except BotInstanceError as exc:
+        code = status.HTTP_409_CONFLICT if "Ya existe" in str(exc) else status.HTTP_422_UNPROCESSABLE_ENTITY
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    return {
+        "status": "success",
+        "message": f"Se creó la instancia {profile.display_name} para {profile.dependency_name}.",
+        "instance": profile.admin_config(bot_instance_manager.paths(profile.bot_id)),
+    }
+
+
+@router.patch(
+    "/api/admin/chatbot-instances/{bot_id}",
+    summary="Editar una instancia de chatbot",
+)
+async def update_chatbot_instance(bot_id: str, request: UpdateBotInstanceRequest) -> Dict[str, Any]:
+    existing = bot_instance_manager.get_any(bot_id)
+    if existing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe una instancia con ese identificador.")
+    if request.llm_provider == "custom":
+        try:
+            await run_in_threadpool(
+                validate_custom_llm_base_url, request.llm_base_url, resolve_dns=True
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    same_local_selection = (
+        str(request.llm_provider).casefold(), request.llm_model
+    ) == (existing.llm_provider, existing.llm_model)
+    await validate_instance_llm_model(
+        request.llm_provider,
+        request.llm_model,
+        allow_unchanged_local=same_local_selection,
+    )
+    try:
+        payload = request.model_dump(exclude={"llm_api_key"})
+        payload["llm_api_key"] = request.llm_api_key.get_secret_value() if request.llm_api_key else ""
+        profile = bot_instance_manager.update(bot_id, **payload)
+    except BotInstanceError as exc:
+        code = status.HTTP_404_NOT_FOUND if "No existe" in str(exc) else status.HTTP_422_UNPROCESSABLE_ENTITY
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    paths = bot_instance_manager.paths(bot_id)
+    return {
+        "status": "success",
+        "message": f"Se actualizaron los datos de {profile.display_name}.",
+        "instance": {**profile.admin_config(paths), "metrics": get_chatbot_instance_kpis(bot_id)},
+    }
+
+
+@router.delete(
+    "/api/admin/chatbot-instances/{bot_id}",
+    summary="Desactivar una instancia conservando sus datos",
+    description="Retira la instancia del enrutador y del acceso público. Conserva documentos, Markdown, índice y métricas para permitir reactivarla.",
+)
+async def deactivate_chatbot_instance(bot_id: str) -> Dict[str, Any]:
+    try:
+        profile = bot_instance_manager.set_enabled(bot_id, False)
+    except BotInstanceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {
+        "status": "success",
+        "message": f"{profile.display_name} se desactivó. Sus documentos e índice se conservaron y puede reactivarse.",
+        "data_retained": True,
+    }
+
+
+@router.post(
+    "/api/admin/chatbot-instances/{bot_id}/reactivate",
+    summary="Reactivar una instancia desactivada",
+)
+async def reactivate_chatbot_instance(bot_id: str) -> Dict[str, Any]:
+    try:
+        profile = bot_instance_manager.set_enabled(bot_id, True)
+    except BotInstanceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    paths = bot_instance_manager.paths(bot_id)
+    return {
+        "status": "success",
+        "message": f"{profile.display_name} quedó activo nuevamente.",
+        "instance": {**profile.admin_config(paths), "metrics": get_chatbot_instance_kpis(bot_id)},
+    }
+
+
+@router.get(
+    "/api/admin/chatbot-instances/{bot_id}/metrics",
+    summary="Consultar métricas de una instancia",
+)
+async def get_chatbot_instance_metrics(
+    bot_id: str,
+    start_date: Optional[str] = Query(default=None, description="Fecha inicio (YYYY-MM-DD o hoy)"),
+    end_date: Optional[str] = Query(default=None, description="Fecha fin (YYYY-MM-DD o hoy)"),
+) -> Dict[str, Any]:
+    profile = bot_instance_manager.get_any(bot_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe una instancia con ese identificador.")
+    return {"status": "success", "bot_id": bot_id, "metrics": get_chatbot_instance_kpis(bot_id, start_date, end_date)}
+
+
+@router.post(
+    "/api/admin/chatbot-instances/{bot_id}/documents",
+    summary="Cargar e indexar documentos de un chatbot",
+    description="Conserva el PDF/PPTX y genera Markdown e índice vectorial aislados para la dependencia.",
+)
+async def upload_chatbot_instance_document(
+    bot_id: str,
+    file: UploadFile = File(...),
+) -> Dict[str, Any]:
+    profile = bot_instance_manager.get(bot_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="No existe una instancia activa con ese identificador.")
+    filename = validated_filename(file.filename)
+    if Path(filename).suffix.casefold() not in {".pdf", ".pptx"}:
+        raise HTTPException(status_code=415, detail="Solo se admiten documentos PDF y PPTX.")
+
+    async with bot_instance_manager.get_ingestion_lock(bot_id):
+        paths = bot_instance_manager.paths(bot_id)
+        paths.docs.mkdir(parents=True, exist_ok=True)
+        destination = paths.docs / filename
+        if destination.exists():
+            raise HTTPException(
+                status_code=409,
+                detail="Ya existe un documento con ese nombre en esta instancia. Cambia el nombre del archivo antes de cargarlo.",
+            )
+
+        await save_upload(file, destination, settings.max_upload_size_mb * 1024 * 1024)
+        try:
+            runtime = bot_instance_manager.get_runtime(bot_id)
+            indexed = await run_in_threadpool(runtime.ingest_document, paths, str(destination))
+            if not indexed:
+                raise RuntimeError("La transformación o indexación Markdown no terminó correctamente.")
+        except Exception as exc:
+            logger.error("No se indexó '%s' para el chatbot '%s': %s", filename, bot_id, exc, exc_info=True)
+            raise HTTPException(
+                status_code=422,
+                detail="El archivo se conservó en la instancia, pero no se pudo convertir e indexar. Revisa el estado de la ingesta en la terminal.",
+            ) from exc
+
+        specialization_path = None
+        specialization_warning = None
+        try:
+            specialization_path = await run_in_threadpool(bot_instance_manager.refresh_specialization_profile, bot_id)
+        except Exception as exc:
+            logger.warning("El documento se indexó, pero no se pudo actualizar el perfil de '%s': %s", bot_id, type(exc).__name__)
+            specialization_warning = "El documento y el índice se actualizaron, pero el perfil de especialidad no pudo actualizarse. Revisa la carpeta de datos antes de probar el router."
+
+        return {
+            "status": "success",
+            "message": specialization_warning or f"'{filename}' quedó convertido a Markdown e indexado para {profile.dependency_name}; el perfil de especialidad también se actualizó.",
+            "specialization_profile": str(specialization_path) if specialization_path else None,
+            "instance": profile.admin_config(paths),
+        }
 
 
 # =============================================================================

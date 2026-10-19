@@ -961,6 +961,7 @@ def audit_chroma_database_redundancy(
 def ingest_multimodal(
     docs_path: Optional[str] = None,
     chroma_path: Optional[str] = None,
+    sanitized_docs_path: Optional[str] = None,
     model_name: Optional[str] = None,
     file_path: Optional[str] = None,
     incremental: bool = True,
@@ -988,6 +989,7 @@ def ingest_multimodal(
     return ingest_sanitized_documents(
         docs_path=docs_path,
         chroma_path=chroma_path,
+        sanitized_docs_path=sanitized_docs_path,
         file_path=file_path,
         incremental=incremental,
         delete_doc=delete_doc,

@@ -312,6 +312,43 @@
       flex-direction: column;
     }
 
+    .bot-instance-panel { grid-column: 1 / -1; min-width: 0; }
+    .bot-instance-note { color: var(--text-secondary); margin: 0 0 1.25rem; line-height: 1.6; }
+    .bot-instance-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 1rem; }
+    .bot-instance-llm-fields { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 1rem; min-width: 0; }
+    .bot-instance-llm-fields[hidden], .bot-instance-field[hidden] { display: none !important; }
+    .bot-instance-custom-title { grid-column: 1 / -1; margin: 0; color: var(--text-primary); font-size: 1rem; }
+    .bot-instance-field { display: grid; gap: .4rem; color: var(--text-secondary); font-size: .9rem; }
+    .bot-instance-field-wide { grid-column: 1 / -1; }
+    .bot-instance-scope { resize: vertical; min-height: 5rem; }
+    .bot-instance-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .bot-instance-help { color: var(--text-secondary); font-size: .85rem; }
+    .bot-instance-status { min-height: 1.5rem; margin-top: 1rem; }
+    .bot-instance-status[data-state="error"] { color: #FCA5A5; }
+    .bot-instance-status[data-state="success"] { color: #6EE7B7; }
+    .bot-instance-list { display: grid; gap: 1rem; margin-top: 1.25rem; }
+    .bot-instance-card { display: grid; gap: .65rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: rgba(0,0,0,.16); }
+    .bot-instance-card-header { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: center; }
+    .bot-instance-card-title { font-size: 1rem; overflow-wrap: anywhere; }
+    .bot-instance-card-scope, .bot-instance-card-summary { margin: 0; }
+    .bot-instance-card-scope, .bot-instance-card-contacts { color: var(--text-secondary); }
+    .bot-instance-card-summary, .bot-instance-card-contacts { font-size: .85rem; }
+    .bot-instance-card-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+    .bot-instance-card-contacts { overflow-wrap: anywhere; }
+    .bot-instance-card[data-disabled="true"] { opacity: .72; border-style: dashed; }
+    .bot-instance-edit { display: grid; gap: .75rem; padding: .9rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
+    .bot-instance-edit[hidden] { display: none; }
+    .bot-instance-profile { color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; font-size: .82rem; }
+    .bot-instance-metrics { color: var(--text-secondary); font-size: .85rem; line-height: 1.6; }
+    .bot-instance-empty, .bot-instance-error { color: var(--text-secondary); }
+    .bot-instance-error { color: #FCA5A5; }
+
+    @media (max-width: 600px) {
+      .panel-grid { grid-template-columns: minmax(0, 1fr); }
+      .bot-instance-panel { padding: 1rem; }
+      .bot-instance-field-wide, .bot-instance-actions { grid-column: auto; }
+    }
+
     .panel-header {
       display: flex;
       justify-content: space-between;
@@ -2286,6 +2323,45 @@
             Verificando configuración de GLPI API...
           </div>
         </div>
+
+        <div class="panel-card bot-instance-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">🤖 Chatbots por dependencia</h3>
+            <a class="btn btn-secondary" href="/?router=1" target="_blank" rel="noopener noreferrer">🧭 Abrir chatbot jefe</a>
+          </div>
+          <p class="bot-instance-note">
+            Crea asistentes sin cambiar código. Cada uno mantiene sus documentos e índice; el chatbot jefe consulta un perfil de especialidad actualizado desde el alcance y los títulos del Markdown. La baja conserva los datos y permite reactivar la instancia.
+          </p>
+          <form id="botInstanceForm" class="bot-instance-form" onsubmit="createBotInstance(event)">
+            <label class="bot-instance-field">Nombre visible del asistente
+              <input class="form-input" name="display_name" maxlength="80" minlength="2" required placeholder="Ej. BienestarBot">
+            </label>
+            <label class="bot-instance-field">Dependencia
+              <input class="form-input" name="dependency_name" maxlength="120" minlength="2" required placeholder="Ej. Bienestar Universitario">
+            </label>
+            <label class="bot-instance-field">Identificador para el enlace (opcional)
+              <input class="form-input" name="bot_id" maxlength="40" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="Ej. bienestar">
+            </label>
+            <label class="bot-instance-field">Correo de soporte
+              <input class="form-input" name="support_email" type="email" maxlength="120" placeholder="soporte@universidad.edu">
+            </label>
+            <label class="bot-instance-field">Teléfono o WhatsApp
+              <input class="form-input" name="support_phone" maxlength="32" placeholder="+57 300 000 0000">
+            </label>
+            <label class="bot-instance-field bot-instance-field-wide">¿Sobre qué temas debe orientar?
+              <textarea class="form-input bot-instance-scope" name="scope_description" maxlength="600" minlength="10" required rows="3" placeholder="Describe el alcance y los límites del asistente."></textarea>
+            </label>
+            <div id="botCreateLlmFields" class="bot-instance-llm-fields bot-instance-field-wide" aria-live="polite"></div>
+            <div class="bot-instance-actions">
+              <button class="btn btn-primary" id="createBotInstanceBtn" type="submit">➕ Crear asistente</button>
+              <span class="bot-instance-help">Los documentos se cargan después de crear el asistente.</span>
+            </div>
+          </form>
+          <div id="botInstanceStatus" class="bot-instance-status" role="status" aria-live="polite"></div>
+          <div id="botInstanceList" class="bot-instance-list" role="list" aria-label="Instancias de chatbot" aria-busy="true">
+            <div role="status">Cargando asistentes...</div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -2728,13 +2804,13 @@
         document.getElementById('kpiTotalConsultas').innerText = (kpis.total_queries ?? 0).toLocaleString();
         document.getElementById('kpiTotalSesiones').innerText = (kpis.total_sessions ?? 0).toLocaleString();
         const interactions = kpis.total_interactions ?? kpis.total_queries ?? 0;
-        document.getElementById('kpiTotalSesionesSubtext').innerText = `${interactions.toLocaleString()} interacciones registradas (incluye seguimientos) · ${kpis.total_sessions ?? 0} sesiones en ${activePeriodLabel}`;
+        document.getElementById('kpiTotalSesionesSubtext').innerText = `${interactions.toLocaleString()} interacciones · ${kpis.total_sessions ?? 0} sesiones en ${activePeriodLabel} · ${Number(kpis.additional_chatbot_queries || 0).toLocaleString()} consultas de asistentes por dependencia incluidas`;
 
         document.getElementById('kpiTasaResolucion').innerText = `${kpis.resolution_rate ?? 0}%`;
-        document.getElementById('kpiResolucionSubtext').innerText = `${kpis.resolved_count ?? 0} resueltas en Nivel 1`;
+        document.getElementById('kpiResolucionSubtext').innerText = `${kpis.resolved_count ?? 0} resueltas en UniMon · ${kpis.resolution_evaluable_sessions ?? kpis.total_sessions ?? 0} sesiones evaluables`;
 
         document.getElementById('kpiTasaEscalado').innerText = `${kpis.escalation_rate ?? 0}%`;
-        document.getElementById('kpiEscaladoSubtext').innerText = `${kpis.escalated_count ?? 0} radicadas en GLPI`;
+        document.getElementById('kpiEscaladoSubtext').innerText = `${kpis.escalated_count ?? 0} radicadas en GLPI · % calculado sobre sesiones UniMon evaluables`;
 
         document.getElementById('kpiLatencia').innerText = `${kpis.avg_latency_ms ?? 0} ms`;
 
@@ -4313,12 +4389,557 @@
       }
     }
 
+    let llmModelCatalog = null;
+    let llmModelCatalogPromise = null;
+
+    async function ensureLlmModelCatalog() {
+      if (llmModelCatalog) return llmModelCatalog;
+      if (!llmModelCatalogPromise) {
+        llmModelCatalogPromise = fetch('/api/admin/llm-models')
+          .then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+            llmModelCatalog = data;
+            return data;
+          })
+          .catch(error => {
+            llmModelCatalogPromise = null;
+            throw error;
+          });
+      }
+      return llmModelCatalogPromise;
+    }
+
+    function createLlmModelFields(providerValue = '', modelValue = '', customConfig = {}) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'bot-instance-llm-fields';
+      const providers = Array.isArray(llmModelCatalog?.providers) ? llmModelCatalog.providers : [];
+      const selectable = providers.filter(provider => provider.configured || provider.id === providerValue || provider.id === 'custom');
+      if (providerValue && !selectable.some(provider => provider.id === providerValue)) {
+        selectable.push({ id: providerValue, label: customConfig.llm_custom_provider || providerValue, configured: true, models: [] });
+      }
+
+      const providerLabel = document.createElement('label');
+      providerLabel.className = 'bot-instance-field';
+      providerLabel.textContent = 'Proveedor LLM';
+      const providerSelect = document.createElement('select');
+      providerSelect.className = 'form-input';
+      providerSelect.name = 'llm_provider';
+      providerSelect.required = true;
+      selectable.forEach(provider => {
+        const option = document.createElement('option');
+        option.value = provider.id;
+        option.textContent = provider.id === 'ollama' && !provider.online
+          ? `${provider.label} (sin conexión ahora)`
+          : provider.label;
+        providerSelect.appendChild(option);
+      });
+      providerLabel.appendChild(providerSelect);
+
+      const modelLabel = document.createElement('label');
+      modelLabel.className = 'bot-instance-field';
+      modelLabel.textContent = 'Modelo';
+      const modelSelect = document.createElement('select');
+      modelSelect.className = 'form-input';
+      modelSelect.name = 'llm_model_choice';
+      modelSelect.required = true;
+      modelLabel.appendChild(modelSelect);
+
+      const customLabel = document.createElement('label');
+      customLabel.className = 'bot-instance-field bot-instance-field-wide';
+      customLabel.textContent = 'Identificador del modelo nuevo';
+      const customInput = document.createElement('input');
+      customInput.className = 'form-input';
+      customInput.name = 'llm_model_custom';
+      customInput.maxLength = 160;
+      customInput.placeholder = 'Ej. nombre-del-modelo o proveedor/modelo';
+      customLabel.appendChild(customInput);
+
+      const help = document.createElement('small');
+      help.className = 'bot-instance-help bot-instance-field-wide';
+      help.textContent = 'Selecciona el proveedor y el modelo de este asistente.';
+
+      const customGroup = document.createElement('div');
+      customGroup.className = 'bot-instance-llm-fields bot-instance-field-wide';
+      customGroup.setAttribute('role', 'group');
+      customGroup.setAttribute('aria-label', 'Configuración de otro proveedor');
+      const customTitle = document.createElement('h4');
+      customTitle.className = 'bot-instance-custom-title';
+      customTitle.textContent = 'Configuración del proveedor';
+      const customProviderLabel = document.createElement('label');
+      customProviderLabel.className = 'bot-instance-field';
+      customProviderLabel.textContent = 'Nombre del proveedor';
+      const customProviderInput = document.createElement('input');
+      customProviderInput.className = 'form-input';
+      customProviderInput.name = 'llm_custom_provider';
+      customProviderInput.maxLength = 80;
+      customProviderInput.placeholder = 'Ej. Anthropic, OpenRouter, Groq';
+      customProviderInput.value = customConfig.llm_custom_provider || '';
+      customProviderLabel.appendChild(customProviderInput);
+
+      const protocolLabel = document.createElement('label');
+      protocolLabel.className = 'bot-instance-field';
+      protocolLabel.textContent = 'Formato de API';
+      const protocolSelect = document.createElement('select');
+      protocolSelect.className = 'form-input';
+      protocolSelect.name = 'llm_protocol';
+      [
+        ['openai-compatible', 'Compatible con OpenAI'],
+        ['anthropic', 'Anthropic Messages API'],
+      ].forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        protocolSelect.appendChild(option);
+      });
+      protocolSelect.value = customConfig.llm_protocol || 'openai-compatible';
+      protocolLabel.appendChild(protocolSelect);
+
+      const apiKeyLabel = document.createElement('label');
+      apiKeyLabel.className = 'bot-instance-field bot-instance-field-wide';
+      const apiKeyWasConfigured = Boolean(customConfig.llm_api_key_configured);
+      const apiKeyText = document.createElement('span');
+      apiKeyText.textContent = apiKeyWasConfigured ? 'Clave API nueva (opcional)' : 'Clave API';
+      const apiKeyInput = document.createElement('input');
+      apiKeyInput.className = 'form-input';
+      apiKeyInput.name = 'llm_api_key';
+      apiKeyInput.type = 'password';
+      apiKeyInput.autocomplete = 'new-password';
+      apiKeyInput.maxLength = 4096;
+      apiKeyInput.placeholder = apiKeyWasConfigured
+        ? 'Vacío conserva la configuración actual'
+        : 'Pega aquí la clave entregada por el proveedor';
+      apiKeyLabel.append(apiKeyText, apiKeyInput);
+
+      const baseUrlLabel = document.createElement('label');
+      baseUrlLabel.className = 'bot-instance-field bot-instance-field-wide';
+      baseUrlLabel.textContent = 'URL base HTTPS';
+      const baseUrlInput = document.createElement('input');
+      baseUrlInput.className = 'form-input';
+      baseUrlInput.name = 'llm_base_url';
+      baseUrlInput.type = 'url';
+      baseUrlInput.maxLength = 512;
+      baseUrlInput.required = true;
+      baseUrlInput.placeholder = 'Ej. https://api.anthropic.com/v1';
+      baseUrlInput.value = customConfig.llm_base_url || '';
+      baseUrlLabel.appendChild(baseUrlInput);
+
+      const timeoutLabel = document.createElement('label');
+      timeoutLabel.className = 'bot-instance-field';
+      timeoutLabel.textContent = 'Tiempo máximo de espera (segundos)';
+      const timeoutInput = document.createElement('input');
+      timeoutInput.className = 'form-input';
+      timeoutInput.name = 'llm_timeout';
+      timeoutInput.type = 'number';
+      timeoutInput.min = '2';
+      timeoutInput.max = '180';
+      timeoutInput.step = '0.5';
+      timeoutInput.required = true;
+      timeoutInput.value = String(customConfig.llm_timeout || 35);
+      timeoutLabel.appendChild(timeoutInput);
+
+      const customHelp = document.createElement('small');
+      customHelp.className = 'bot-instance-help bot-instance-field-wide';
+      customHelp.textContent = 'La clave no se mostrará después de guardarla. El endpoint debe usar HTTPS público.';
+      customGroup.append(customTitle, customProviderLabel, protocolLabel, apiKeyLabel, baseUrlLabel, timeoutLabel, customHelp);
+
+      function syncCustomProviderFields() {
+        const isCustom = providerSelect.value === 'custom';
+        const normalizeEndpoint = value => String(value || '').trim().replace(/\/+$/, '');
+        const endpointChanged = apiKeyWasConfigured && (
+          protocolSelect.value !== customConfig.llm_protocol
+          || normalizeEndpoint(baseUrlInput.value) !== normalizeEndpoint(customConfig.llm_base_url)
+        );
+        customGroup.hidden = !isCustom;
+        customProviderInput.required = isCustom;
+        protocolSelect.required = isCustom;
+        apiKeyInput.required = isCustom && (!apiKeyWasConfigured || endpointChanged);
+        apiKeyText.textContent = endpointChanged
+          ? 'Clave API para el nuevo destino'
+          : apiKeyWasConfigured ? 'Clave API nueva (opcional)' : 'Clave API';
+        apiKeyInput.placeholder = endpointChanged
+          ? 'Obligatoria al cambiar el destino'
+          : apiKeyWasConfigured ? 'Vacío conserva la configuración actual' : 'Pega aquí la clave entregada por el proveedor';
+        baseUrlInput.required = isCustom;
+        timeoutInput.required = isCustom;
+        if (isCustom && !baseUrlInput.value) {
+          baseUrlInput.value = protocolSelect.value === 'anthropic'
+            ? 'https://api.anthropic.com/v1'
+            : 'https://api.openai.com/v1';
+        }
+      }
+
+      function populateModels(preferredModel = '') {
+        const provider = selectable.find(item => item.id === providerSelect.value);
+        const models = Array.isArray(provider?.models) ? provider.models : [];
+        modelSelect.replaceChildren();
+        models.forEach(model => {
+          const option = document.createElement('option');
+          option.value = model.id;
+          option.textContent = model.label || model.id;
+          modelSelect.appendChild(option);
+        });
+        const customOption = document.createElement('option');
+        customOption.value = '__custom__';
+        customOption.textContent = providerSelect.value === 'custom'
+          ? 'Escribir el identificador del modelo…'
+          : 'Agregar otro modelo…';
+        modelSelect.appendChild(customOption);
+        const knownModel = models.some(model => model.id === preferredModel);
+        if (preferredModel && !knownModel) {
+          modelSelect.value = '__custom__';
+          customInput.value = preferredModel;
+        } else if (preferredModel) {
+          modelSelect.value = preferredModel;
+          customInput.value = '';
+        } else if (models.length) {
+          modelSelect.value = models[0].id;
+          customInput.value = '';
+        } else {
+          modelSelect.value = '__custom__';
+          customInput.value = '';
+        }
+        syncCustomField();
+      }
+
+      function syncCustomField() {
+        const isCustom = modelSelect.value === '__custom__';
+        customLabel.hidden = !isCustom;
+        customInput.required = isCustom;
+      }
+
+      providerSelect.addEventListener('change', () => populateModels());
+      providerSelect.addEventListener('change', syncCustomProviderFields);
+      modelSelect.addEventListener('change', syncCustomField);
+      protocolSelect.addEventListener('change', () => {
+        if (!baseUrlInput.value || baseUrlInput.value === 'https://api.anthropic.com/v1' || baseUrlInput.value === 'https://api.openai.com/v1') {
+          baseUrlInput.value = protocolSelect.value === 'anthropic'
+            ? 'https://api.anthropic.com/v1'
+            : 'https://api.openai.com/v1';
+        }
+        syncCustomProviderFields();
+      });
+      baseUrlInput.addEventListener('input', syncCustomProviderFields);
+      providerSelect.value = selectable.some(item => item.id === providerValue)
+        ? providerValue
+        : (selectable[0]?.id || '');
+      populateModels(modelValue);
+      syncCustomProviderFields();
+      wrapper.append(providerLabel, modelLabel, customLabel, help, customGroup);
+      return wrapper;
+    }
+
+    function botInstanceFormPayload(form) {
+      const payload = Object.fromEntries(new FormData(form).entries());
+      payload.llm_model = payload.llm_model_choice === '__custom__'
+        ? String(payload.llm_model_custom || '').trim()
+        : payload.llm_model_choice;
+      delete payload.llm_model_choice;
+      delete payload.llm_model_custom;
+      return payload;
+    }
+
+    function setBotInstanceStatus(message, isError = false) {
+      const status = document.getElementById('botInstanceStatus');
+      if (!status) return;
+      status.textContent = message;
+      status.dataset.state = isError ? 'error' : 'success';
+    }
+
+    async function loadChatbotInstances() {
+      const container = document.getElementById('botInstanceList');
+      if (!container) return;
+      container.setAttribute('aria-busy', 'true');
+      try {
+        await ensureLlmModelCatalog();
+        const createLlmFields = document.getElementById('botCreateLlmFields');
+        if (createLlmFields && !createLlmFields.dataset.ready) {
+          const providers = Array.isArray(llmModelCatalog.providers) ? llmModelCatalog.providers : [];
+          const configuredDefault = providers.find(provider =>
+            provider.id === llmModelCatalog.default?.provider && provider.configured
+          );
+          const firstUsable = providers.find(provider =>
+            provider.configured && (provider.models || []).length
+          ) || providers.find(provider => provider.id === 'ollama');
+          const initialProvider = configuredDefault || firstUsable;
+          const initialModel = initialProvider?.id === llmModelCatalog.default?.provider
+            ? llmModelCatalog.default?.model
+            : initialProvider?.models?.[0]?.id;
+          createLlmFields.appendChild(createLlmModelFields(initialProvider?.id, initialModel));
+          createLlmFields.dataset.ready = 'true';
+        }
+        const response = await fetch(`/api/admin/chatbot-instances${buildTelemetryQueryParams()}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+
+        container.replaceChildren();
+        const instances = Array.isArray(data.instances) ? data.instances : [];
+        if (instances.length === 0) {
+          const empty = document.createElement('div');
+          empty.textContent = 'Todavía no hay asistentes adicionales. UniMon sigue funcionando como el asistente principal.';
+          empty.className = 'bot-instance-empty';
+          container.appendChild(empty);
+          container.setAttribute('aria-busy', 'false');
+          return;
+        }
+
+        instances.forEach(instance => {
+          const card = document.createElement('article');
+          card.className = 'bot-instance-card';
+          card.dataset.disabled = String(!instance.enabled);
+          card.setAttribute('role', 'listitem');
+
+          const heading = document.createElement('div');
+          heading.className = 'bot-instance-card-header';
+          const title = document.createElement('h4');
+          title.className = 'bot-instance-card-title';
+          title.textContent = `${instance.display_name || 'Asistente'} · ${instance.dependency_name || ''}${instance.enabled ? '' : ' · DESACTIVADO'}`;
+          const identifier = document.createElement('code');
+          identifier.textContent = instance.bot_id || '';
+          heading.append(title, identifier);
+
+          const scope = document.createElement('p');
+          scope.className = 'bot-instance-card-scope';
+          scope.textContent = instance.scope_description || '';
+
+          const summary = document.createElement('p');
+          summary.className = 'bot-instance-card-summary';
+          summary.textContent = `LLM: ${instance.llm_provider_label || instance.llm_provider || 'sin proveedor'} / ${instance.llm_model || 'sin modelo'} · Documentos fuente: ${Number(instance.source_document_count) || 0} · Markdown: ${Number(instance.markdown_document_count) || 0} · Fragmentos indexados: ${Number(instance.indexed_chunk_count) || 0}`;
+
+          const metrics = instance.metrics || {};
+          const metricsSummary = document.createElement('p');
+          metricsSummary.className = 'bot-instance-metrics';
+          metricsSummary.textContent = `Métricas del período seleccionado: ${Number(metrics.queries) || 0} consultas · ${Number(metrics.sessions) || 0} sesiones · latencia media ${Math.round(Number(metrics.avg_latency_ms) || 0)} ms · ${(Number(metrics.tokens_in) || 0) + (Number(metrics.tokens_out) || 0)} tokens`;
+
+          const actions = document.createElement('div');
+          actions.className = 'bot-instance-card-actions';
+          const openChat = document.createElement('a');
+          openChat.className = 'btn btn-secondary';
+          openChat.href = `/?bot=${encodeURIComponent(instance.bot_id || '')}`;
+          openChat.target = '_blank';
+          openChat.rel = 'noopener noreferrer';
+          openChat.textContent = 'Abrir chat';
+
+          const uploadButton = document.createElement('button');
+          uploadButton.type = 'button';
+          uploadButton.className = 'btn btn-primary';
+          uploadButton.textContent = '📄 Cargar PDF o PPTX';
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = '.pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          fileInput.hidden = true;
+          fileInput.addEventListener('change', () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (file) uploadBotDocument(instance.bot_id, file, uploadButton);
+            fileInput.remove();
+          }, { once: true });
+          uploadButton.addEventListener('click', () => fileInput.click());
+          if (instance.enabled) {
+            const openRouter = document.createElement('a');
+            openRouter.className = 'btn btn-secondary';
+            openRouter.href = '/?router=1';
+            openRouter.target = '_blank';
+            openRouter.rel = 'noopener noreferrer';
+            openRouter.textContent = 'Probar en el router';
+            actions.append(openChat, openRouter, uploadButton, fileInput);
+          }
+
+          const editButton = document.createElement('button');
+          editButton.type = 'button';
+          editButton.className = 'btn btn-secondary';
+          editButton.textContent = 'Editar';
+          const editForm = document.createElement('form');
+          editForm.className = 'bot-instance-edit';
+          editForm.hidden = true;
+          const editFields = [
+            ['display_name', 'Nombre visible', instance.display_name, 80],
+            ['dependency_name', 'Dependencia', instance.dependency_name, 120],
+            ['support_email', 'Correo de soporte', instance.support_email, 120],
+            ['support_phone', 'Teléfono o WhatsApp', instance.support_phone, 32]
+          ];
+          editFields.forEach(([name, label, value, maxLength]) => {
+            const fieldLabel = document.createElement('label');
+            fieldLabel.className = 'bot-instance-field';
+            fieldLabel.textContent = label;
+            const input = document.createElement('input');
+            input.className = 'form-input';
+            input.name = name;
+            input.value = value || '';
+            input.maxLength = maxLength;
+            if (name === 'support_email') input.type = 'email';
+            if (name !== 'support_email' && name !== 'support_phone') input.required = true;
+            fieldLabel.appendChild(input);
+            editForm.appendChild(fieldLabel);
+          });
+          const scopeLabel = document.createElement('label');
+          scopeLabel.className = 'bot-instance-field';
+          scopeLabel.textContent = 'Alcance de atención';
+          const scopeInput = document.createElement('textarea');
+          scopeInput.className = 'form-input bot-instance-scope';
+          scopeInput.name = 'scope_description';
+          scopeInput.value = instance.scope_description || '';
+          scopeInput.minLength = 10;
+          scopeInput.maxLength = 600;
+          scopeInput.required = true;
+          scopeLabel.appendChild(scopeInput);
+          editForm.appendChild(scopeLabel);
+          editForm.appendChild(createLlmModelFields(instance.llm_provider, instance.llm_model, instance));
+          const saveEdit = document.createElement('button');
+          saveEdit.type = 'submit';
+          saveEdit.className = 'btn btn-primary';
+          saveEdit.textContent = 'Guardar cambios';
+          editForm.appendChild(saveEdit);
+          editButton.addEventListener('click', () => { editForm.hidden = !editForm.hidden; });
+          editForm.addEventListener('submit', event => updateBotInstance(event, instance.bot_id, editForm, saveEdit));
+          actions.append(editButton);
+
+          if (instance.enabled) {
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'btn btn-secondary';
+            deleteButton.textContent = 'Desactivar';
+            deleteButton.addEventListener('click', () => deactivateBotInstance(instance.bot_id, instance.display_name));
+            actions.appendChild(deleteButton);
+          } else {
+            const restoreButton = document.createElement('button');
+            restoreButton.type = 'button';
+            restoreButton.className = 'btn btn-primary';
+            restoreButton.textContent = 'Reactivar';
+            restoreButton.addEventListener('click', () => reactivateBotInstance(instance.bot_id));
+            actions.appendChild(restoreButton);
+          }
+
+          const contacts = document.createElement('small');
+          contacts.className = 'bot-instance-card-contacts';
+          contacts.textContent = [instance.support_email, instance.support_phone].filter(Boolean).join(' · ');
+
+          const profileDetails = document.createElement('details');
+          const profileSummary = document.createElement('summary');
+          profileSummary.textContent = instance.specialization_profile_exists ? 'Ver perfil de especialidad generado' : 'Perfil de especialidad pendiente';
+          const profileText = document.createElement('pre');
+          profileText.className = 'bot-instance-profile';
+          profileText.textContent = instance.specialization_profile || 'Se generará al cargar el primer documento saneado.';
+          profileDetails.append(profileSummary, profileText);
+
+          card.append(heading, scope, summary, metricsSummary, actions, editForm, contacts, profileDetails);
+          container.appendChild(card);
+        });
+        container.setAttribute('aria-busy', 'false');
+      } catch (error) {
+        container.replaceChildren();
+        const message = document.createElement('div');
+        message.textContent = `No se pudieron cargar las instancias: ${error.message}`;
+        message.className = 'bot-instance-error';
+        container.appendChild(message);
+        container.setAttribute('aria-busy', 'false');
+      }
+    }
+
+    async function updateBotInstance(event, botId, form, button) {
+      event.preventDefault();
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/admin/chatbot-instances/${encodeURIComponent(botId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(botInstanceFormPayload(form))
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+        setBotInstanceStatus(data.message || 'Cambios guardados.');
+        await loadChatbotInstances();
+      } catch (error) {
+        setBotInstanceStatus(`No se pudieron guardar los cambios: ${error.message}`, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function deactivateBotInstance(botId, displayName) {
+      if (!window.confirm(`¿Desactivar ${displayName}? El enlace público dejará de responder y la instancia saldrá del router. Los documentos y el índice se conservarán para reactivarla.`)) return;
+      try {
+        const response = await fetch(`/api/admin/chatbot-instances/${encodeURIComponent(botId)}`, { method: 'DELETE' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+        setBotInstanceStatus(data.message || 'Instancia desactivada.');
+        await loadChatbotInstances();
+      } catch (error) {
+        setBotInstanceStatus(`No se pudo desactivar la instancia: ${error.message}`, true);
+      }
+    }
+
+    async function reactivateBotInstance(botId) {
+      try {
+        const response = await fetch(`/api/admin/chatbot-instances/${encodeURIComponent(botId)}/reactivate`, { method: 'POST' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+        setBotInstanceStatus(data.message || 'Instancia reactivada.');
+        await loadChatbotInstances();
+      } catch (error) {
+        setBotInstanceStatus(`No se pudo reactivar la instancia: ${error.message}`, true);
+      }
+    }
+
+    async function createBotInstance(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = document.getElementById('createBotInstanceBtn');
+      const payload = botInstanceFormPayload(form);
+      button.disabled = true;
+      setBotInstanceStatus('Creando asistente y preparando sus carpetas…');
+      try {
+        const response = await fetch('/api/admin/chatbot-instances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+        form.reset();
+        const providerSelect = form.querySelector('select[name="llm_provider"]');
+        if (providerSelect) providerSelect.dispatchEvent(new Event('change'));
+        setBotInstanceStatus(data.message || 'Asistente creado. Ya puedes cargar sus documentos.');
+        await loadChatbotInstances();
+      } catch (error) {
+        setBotInstanceStatus(`No se pudo crear el asistente: ${error.message}`, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function uploadBotDocument(botId, file, button) {
+      const extension = String(file.name || '').split('.').pop().toLowerCase();
+      if (!['pdf', 'pptx'].includes(extension)) {
+        setBotInstanceStatus('Selecciona un archivo PDF o PPTX.', true);
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      button.disabled = true;
+      setBotInstanceStatus(`Convirtiendo e indexando “${file.name}”…`);
+      try {
+        const response = await fetch(`/api/admin/chatbot-instances/${encodeURIComponent(botId)}/documents`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+        setBotInstanceStatus(data.message || 'Documento convertido e indexado.');
+        await loadChatbotInstances();
+      } catch (error) {
+        setBotInstanceStatus(`No se pudo indexar el documento: ${error.message}`, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     // ==========================================
     // 5. ESTADO DEL SISTEMA
     // ==========================================
     async function loadSystemStatus() {
       const diag = document.getElementById('systemDiagnosticsInfo');
       const glpiDiag = document.getElementById('glpiDiagnosticsInfo');
+      void loadChatbotInstances();
 
       try {
         const res = await fetch('/api/admin/system-status');

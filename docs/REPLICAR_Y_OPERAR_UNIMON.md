@@ -5,12 +5,15 @@
 
 Empieza por [Manual de usuario](MANUAL_DE_USUARIO.md) para el comportamiento visible y [Manual técnico integral](MANUAL_TECNICO_INTEGRAL.md) para arquitectura y límites. El [flujo de procesamiento](flujo_procesamiento_sistema.md) resume el recorrido por capas.
 
+Para crear un segundo asistente desde el panel, sin modificar código, consulta [Chatbots por dependencia](CHATBOTS_POR_DEPENDENCIA.md). Al crearlo se escoge el proveedor y modelo LLM. Los proveedores incorporados usan `.env`; los personalizados se configuran en el formulario con Anthropic Messages API o un endpoint compatible con OpenAI. Para estos últimos, configura una sola vez `LLM_CREDENTIALS_ENCRYPTION_KEY` en el entorno del servidor para cifrar las claves almacenadas por instancia. Un proveedor con protocolo propietario distinto requiere un adaptador de backend.
+
 ## 1. Antes de replicar
 
 ### Qué necesitas pedir a quien entrega el proyecto
 
 - Acceso autorizado al repositorio y a una versión estable del corpus documental.
 - Credenciales propias de prueba para un proveedor LLM (OpenAI, Gemini u Ollama) si se harán respuestas reales.
+- `LLM_CREDENTIALS_ENCRYPTION_KEY` solo si se registrarán endpoints LLM personalizados desde el panel; guarda esa llave maestra separada y consérvala junto con los respaldos protegidos de la base de instancias.
 - Acceso de prueba separado para GLPI si se probará radicación; no uses tickets reales de usuarios.
 - Configuración de Meta WhatsApp solo si se desplegará ese canal.
 - Claves nuevas para el panel admin y webhook verify token.
@@ -177,14 +180,18 @@ La última corrida de 50 sesiones todas simultáneas registró 50/50 respuestas 
 | app/config.py | Declara Settings y carga variables de .env con Pydantic; get_settings usa caché singleton. | No almacena secretos por sí solo ni prueba todas las conexiones al cargar. |
 | app/main.py | Crea FastAPI, middlewares CORS/headers/rate limit, inicia SQLite, modelos/index/cache y limpiador TTL; monta rutas y HTML. | No persiste sesiones distribuidas ni convierte la app en servicio productivo multiworker. |
 | app/security.py | Valida HTTP Basic del admin con comparación resistente a timing y falla cerrado si faltan credenciales. | No gestiona usuarios/roles institucionales ni sesiones SSO. |
-| app/routers/chat.py | Esquemas de request/response, sanitización, endpoint POST /api/chat, telemetría y rutas heredadas de upload/reindex. | No contiene el reranking ni aprueba la respuesta RAG. |
-| app/routers/admin_router.py | Panel protegido, lista/audita/sube/resuelve/elimina documentos, reindexa y reporta estado. | Aceptar/guardar una extensión no significa que el parser principal la indexe. |
+| app/routers/chat.py | Esquemas de request/response, sanitización, chat de UniMon, router de dependencias y ruta RAG por instancia. | No contiene el reranking ni aprueba la respuesta RAG. |
+| app/routers/admin_router.py | Panel protegido, documentos UniMon, ciclo de vida de instancias, métricas, ingesta PDF/PPTX aislada y diagnóstico. | Guardar una fuente no significa que el parser haya logrado indexarla. |
 | app/routers/analytics.py | API de KPIs, consulta no resuelta, reportes, borradores y reset. | No todas las rutas tienen la misma dependencia de autenticación; revisar decorators. |
 | app/routers/whatsapp.py | GET handshake, POST eventos y GET status Meta. | No envía la respuesta al usuario; delega a whatsapp_service. |
 | app/services/router_logic.py | Estados por sesión, historial, reglas de diálogo, límites de dominio, ticket y conexión de RAG/cache/GLPI. | No usa memoria durable o compartida entre procesos. |
 | app/services/router_service.py | Clasificación de intención, detección de hardware, respuestas rápidas, transiciones de feedback. | No busca en Chroma ni valida documentalmente una salida generativa. |
 | app/services/rag_service.py | Expansión, filtros temáticos, retrieval vectorial/léxico, reranker, vecinos/presupuesto, prompt y salida RAG. | El score no demuestra verdad; no aplica audience como filtro por rol. |
-| app/services/llm_client.py | Cliente unificado para OpenAI/Gemini/Ollama, tokens, timeouts y fallback local. | No elige si el trámite es autorizado; no asegura que cada respuesta sea correcta. |
+| app/services/bot_instance_service.py | Registro SQLite, rutas aisladas, perfiles Markdown de especialidad, sesiones y RAG por asistente. | No comparte Golden Cache/GLPI de UniMon; la baja es reversible y conserva los datos. |
+| app/services/bot_router_service.py | Prefiltra especialidades y pide al LLM elegir un destino permitido; mantiene la dependencia para seguimientos breves. | No responde preguntas documentales ni comparte los índices de las dependencias. |
+| app/services/llm_client.py | Cliente para OpenAI/Gemini/Anthropic/Ollama y APIs personalizadas compatibles, con uso de tokens y contingencia local. | No elige si el trámite es autorizado; no asegura que cada respuesta sea correcta ni soporta protocolos propietarios sin adaptador. |
+| app/services/secret_store.py | Cifra y descifra en el servidor las claves de API personalizadas de cada instancia. | No permite recuperar claves si se pierde `LLM_CREDENTIALS_ENCRYPTION_KEY`; el panel nunca devuelve el secreto. |
+| app/services/llm_endpoint_security.py | Restringe endpoints LLM personalizados a HTTPS público y comprueba DNS antes de conectar. | No sustituye la protección del panel admin ni admite destinos privados/locales. |
 | app/services/golden_cache_service.py | Valida pares, persiste/consulta/invalida la colección golden_resolved_qa. | Feedback del usuario no es verificación factual/humana. |
 | app/services/normalizer_service.py | Normaliza jerga, cabeceras y sinónimos de consultas. | No corrige el contenido institucional original. |
 | app/services/glpi_service.py | Cliente HTTP para autenticación, tickets, actores, estado y seguimiento. | Sin tokens válidos no puede operar GLPI; una respuesta del bot no prueba creación remota. |
@@ -195,8 +202,8 @@ La última corrida de 50 sesiones todas simultáneas registró 50/50 respuestas 
 | app/routers/__init__.py | Marca el paquete de routers. | No registra rutas por sí solo; main.py los incluye. |
 | app/__init__.py | Marca el paquete Python de UniMon. | No arranca el servidor. |
 | app/utils/__init__.py | Marca el paquete de utilidades reservado. | Actualmente no contiene utilidades funcionales adicionales. |
-| app/static/index.html | SPA web del usuario; chat, estado, quick replies y botón Nueva conversación con sessionStorage por pestaña. | No implementa recuperación, secretos ni lógica GLPI del backend. |
-| app/static/admin.html | Panel de conocimiento, métricas y estado administrativo. | No reemplaza validación de autenticación del servidor. |
+| app/static/index.html | Chat web; soporta UniMon y enlaces `/?bot=<id>` para instancias adicionales. | No implementa recuperación, secretos ni lógica GLPI del backend. |
+| app/static/admin.html | Panel de conocimiento, métricas, estado y creación/carga de asistentes por dependencia. | No reemplaza validación de autenticación del servidor. |
 
 ### Scripts ejecutables: scripts
 
@@ -218,6 +225,7 @@ La última corrida de 50 sesiones todas simultáneas registró 50/50 respuestas 
 | promote_quality_to_golden.py | Promueve solo resultados correctos/grounded desde un reporte y su traza. |
 | report_reranker_calibration.py | Cruza etiquetas de calidad con scores del reranker para estudiar umbrales. |
 | reset_metrics.py | Reinicia los datos de telemetría; destructivo para analytics.db y requiere control del ambiente. |
+| generate_llm_encryption_key.py | Imprime una llave maestra aleatoria para `LLM_CREDENTIALS_ENCRYPTION_KEY`; copiarla a un gestor de secretos y al `.env` del servidor. |
 | generate_docx_report.py | Produce informe comparativo RAG local/cloud en DOCX. |
 | generate_request_docx.py | Genera solicitud formal de infraestructura/WhatsApp en DOCX. |
 
@@ -249,6 +257,7 @@ Las pruebas son evidencia sobre el alcance implementado en ese momento, no susti
 | MANUAL_DE_USUARIO.md | Instrucciones para personas usuarias, límites, conversación y ticket. |
 | MANUAL_TECNICO_INTEGRAL.md | Arquitectura, RAG, modelos, configuración, API, persistencia y riesgos. |
 | REPLICAR_Y_OPERAR_UNIMON.md | Esta guía de instalación, operación y mapa de archivos. |
+| CHATBOTS_POR_DEPENDENCIA.md | Alta, carga de documentos, enlace de chat, separación de datos y respaldo de nuevas instancias. |
 | flujo_procesamiento_sistema.md | Secuencia técnica resumida en diagrama. |
 | COMPARATIVA_RAG_LOCAL_VS_CLOUD_GPT5.6.md | Comparativa de una evaluación anterior; los modelos, precios y resultado no son catálogo vigente. |
 | PROMPT_TRANSFORMACION_DOCUMENTOS_RAG.md | Instrucción editorial para convertir procedimientos a texto útil de RAG; no se ejecuta al atender consultas. |
@@ -268,7 +277,7 @@ Las pruebas son evidencia sobre el alcance implementado en ese momento, no susti
 - data/chroma_db y data/chroma_db_backup: instancia y copias de Golden Cache.
 - data/scratch/staged_uploads: subidas sin resolver en el panel; verificar y limpiar en forma controlada.
 - scratch: logs, código de experimentación y fragmentos locales; puede contener consultas reales; no se usa como fuente normal.
-- reports: ejecuciones de calidad, carga, trazas y calibración. Pueden contener prompts/respuestas/sources y resultados de usuario; no publicar sin revisión.
+- reports: salidas locales de evaluación y carga, ignoradas por Git; pueden incluir preguntas, respuestas y contexto recuperado.
 - .agents, .vscode, bases, caches, staging, logs y reports no son dependencias de ejecución indistintamente: cada uno tiene retención/seguridad propia.
 
 ### Archivos de la raíz
@@ -303,6 +312,7 @@ Las pruebas son evidencia sobre el alcance implementado en ese momento, no susti
 | pypdf, pymupdf | Extracción PDF y lectura/renderizado de páginas. |
 | python-pptx | Texto, tablas, notas e imágenes de presentaciones PPTX. |
 | Pillow | Normalización y lectura de imágenes incrustadas. |
+| cryptography | Cifrado Fernet de claves de proveedores LLM personalizadas guardadas en SQLite. |
 | tqdm | Progreso visual de ingesta por lotes. |
 | scikit-learn | Algoritmos de clustering/analítica semántica. |
 | python-docx | Lectura de DOCX en la utilidad de staging/auditoría; no vuelve DOCX compatible con la ingesta RAG principal. |
@@ -319,7 +329,7 @@ No se declaran CrewAI ni LangGraph. No instales una librería por su popularidad
 | data/rag_overlap_calibration_latest.json | Resumen de medición de redundancia. | Reproducible ejecutando auditoría. |
 | chroma_db/ | Índice y embeddings derivados del corpus. | Usar backup/restore soportado, nunca editar binary files. |
 | data/chroma_db/ | Vector store Golden Cache. | Eliminar o modificar cambia aprendizaje/ejemplos persistidos. |
-| scratch/ y reports/ | Logs, trazas, casos y respuestas. | Revisar datos sensibles y limpiar según política. |
+| scratch/ y reports/ | Archivos locales de ejecución y evaluación; no son dependencias del runtime. | Pueden contener datos de usuario; están ignorados por Git y se respaldan según la política local. |
 | .env | Tokens API y secretos. | Nunca adjuntar, publicar ni guardar en documentos. |
 
 ## 10. Criterios para entregar el proyecto
@@ -590,76 +600,13 @@ La tabla enumera todos los archivos presentes bajo data/docs en esta revisión (
 | data/docs/Volantes de pagos - Funcionarios.pptx | PPTX | Fuente documental cuyo tema/título registrado es “Volantes de pagos - Funcionarios”. La ingesta RAG conserva página/diapositiva cuando el parser la extrae. | Sí, sujeto a extracción |
 | data/docs/Volantes.pdf | PDF | Fuente documental cuyo tema/título registrado es “Volantes”. La ingesta RAG conserva página/diapositiva cuando el parser la extrae. | Sí, sujeto a extracción |
 
-## 12. Inventario de reportes y trazas existentes
+## 12. Resultados de evaluación y trazas
 
-Cada archivo de reports conserva una corrida o artefacto distinto. Los sufijos distinguen variantes de configuración y fases antes/después; no mezclar sus denominadores al comparar exactitud. Los resultados pueden contener preguntas reales, respuestas completas y nombres de documentos.
+`reports/` almacena resultados locales que generan los scripts de evaluación y carga. No es una dependencia del chatbot en ejecución. Los archivos pueden incluir consultas, respuestas, fragmentos recuperados y nombres de documentos; por eso Git ignora los resultados y conserva un `reports/README.md` con comandos de ejemplo. Los dos revisores históricos de respuestas parciales requieren un informe base que ya no viene en el repositorio; si se necesitan, hay que restaurar el informe desde la copia de seguridad o pasar otro archivo con `--input`.
 
-| Ruta | Qué es |
-|---|---|
-| reports/coloquial_100_20261005_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; prueba de 100 preguntas coloquiales y revisión de sus etapas. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/coloquial_100_20261005_review.md | Resumen legible de la ejecución o revisión; prueba de 100 preguntas coloquiales y revisión de sus etapas. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/coloquial_100_20261005_trace_after.json | Datos de prueba, resultados, traza de recuperación o calificación; prueba de 100 preguntas coloquiales y revisión de sus etapas. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/coloquial_100_20261005_trace_review.md | Resumen legible de la ejecución o revisión; prueba de 100 preguntas coloquiales y revisión de sus etapas. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/coloquial_100_20261005_trace.json | Datos de prueba, resultados, traza de recuperación o calificación; prueba de 100 preguntas coloquiales y revisión de sus etapas. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/coloquial_100_20261005.json | Datos de prueba, resultados, traza de recuperación o calificación; prueba de 100 preguntas coloquiales y revisión de sus etapas. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/coloquial_100_20261005.md | Resumen legible de la ejecución o revisión; prueba de 100 preguntas coloquiales y revisión de sus etapas. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/load_test_100_users_20261005_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; carga de 100 sesiones y resultados/revisión. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/load_test_100_users_20261005_review.md | Resumen legible de la ejecución o revisión; carga de 100 sesiones y resultados/revisión. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/load_test_100_users_20261005.json | Datos de prueba, resultados, traza de recuperación o calificación; carga de 100 sesiones y resultados/revisión. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/load_test_100_users_20261005.md | Resumen legible de la ejecución o revisión; carga de 100 sesiones y resultados/revisión. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/load_test_50_users_20261005.json | Datos de prueba, resultados, traza de recuperación o calificación; carga histórica de 50 sesiones. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/load_test_50_users_20261005.md | Resumen legible de la ejecución o revisión; carga histórica de 50 sesiones. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_50concurrent_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_50concurrent.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_50concurrent.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_adaptive_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_adaptive.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_adaptive.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_after_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_after.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_after.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_anchor_budget_trace.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_anchor_verified_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_anchor_verified.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_anchor_verified.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_context_fix_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_context_fix_trace.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_context_fix.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_context_fix.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_final_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_final_trace.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_final.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_final.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_golden_regression_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_golden_regression.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_golden_regression.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_grounded_trace.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_intent_guard_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_intent_guard.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_intent_guard.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_source_cap_trace.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_adaptive.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_after.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_after2.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_before.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_clean.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_final.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_golden.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_intent_guard.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_no_role_filter.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_titles.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_titles2.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_titles3.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_trace_visuals.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_verified_anchor_trace.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_visuals_judged.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_visuals.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006_visuals.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006.json | Datos de prueba, resultados, traza de recuperación o calificación; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/quality_50_20261006.md | Resumen legible de la ejecución o revisión; una corrida/variante de evaluación de 50 preguntas; sufijo identifica la intervención/etapa. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
-| reports/reranker_calibration_20261006.md | Resumen legible de la ejecución o revisión; análisis de calibración del reranker. Puede incluir preguntas, respuestas, fuentes y datos sensibles. |
+Los informes históricos que estaban en esta carpeta se respaldaron fuera del repositorio. Los scripts vuelven a generar archivos nuevos al ejecutar una evaluación; una corrida anterior no se reproduce exactamente porque depende de la versión del código, los documentos, la configuración y el modelo usados en ese momento.
 
+La evaluación no debe convertirse en Golden Cache automáticamente. Verifica la respuesta contra el documento completo y su fuente antes de promoverla.
 ## 13. Inventario de recursos locales de desarrollo
 
 Estos archivos pertenecen a .agents. Son recursos para asistentes/agentes de programación y automatizaciones del entorno de desarrollo. FastAPI, el RAG y la interfaz no los cargan.

@@ -186,16 +186,22 @@ def _metadata_matches_filter(metadata: dict, condition: Optional[dict]) -> bool:
     return True
 
 
-def _generic_lexical_candidates(collection: Any, queries: list[str], query_filter: Optional[dict]) -> list[tuple[Document, float]]:
+def _generic_lexical_candidates(
+    collection: Any,
+    queries: list[str],
+    query_filter: Optional[dict],
+    corpus_cache: Optional[dict[tuple[int, int], list[tuple[Document, list[str], int]]]] = None,
+) -> list[tuple[Document, float]]:
     """Recupera candidatos por términos exactos cuando la búsqueda vectorial omite evidencia.
 
     La búsqueda léxica solo amplía el conjunto de candidatos; el reranker y los guardas
     de dominio/plataforma siguen decidiendo qué fragmentos pasan al contexto.
     """
     try:
+        active_cache = corpus_cache if corpus_cache is not None else _LEXICAL_CORPUS_CACHE
         count = collection.count()
         cache_key = (id(collection), count)
-        corpus = _LEXICAL_CORPUS_CACHE.get(cache_key)
+        corpus = active_cache.get(cache_key)
         if corpus is None:
             raw = collection.get(include=["documents", "metadatas"])
             corpus = []
@@ -208,8 +214,8 @@ def _generic_lexical_candidates(collection: Any, queries: list[str], query_filte
                     source = str((metadata or {}).get("source") or "")
                     tokens = _lexical_terms(f"{strip_chunk_boilerplate(content)} {source}")
                     corpus.append((doc, tokens, len(tokens)))
-            _LEXICAL_CORPUS_CACHE.clear()
-            _LEXICAL_CORPUS_CACHE[cache_key] = corpus
+            active_cache.clear()
+            active_cache[cache_key] = corpus
     except Exception as exc:
         logger.warning("[LexicalFallback] No se pudo preparar índice léxico local: %s", exc)
         return []
@@ -1254,7 +1260,8 @@ def get_dictionary_query_variants(query: str) -> List[str]:
 async def async_generate_multi_query_variants(
     raw_query: str,
     user_role: str = "general",
-    max_variants: int = 3
+    max_variants: int = 3,
+    llm_client: Any = None,
 ) -> List[str]:
     """
     Genera 3 variantes de búsqueda formal/institucional a partir de una frase informal/ambigua.
@@ -1290,8 +1297,8 @@ async def async_generate_multi_query_variants(
     )
 
     try:
-        llm_client = get_llm_client()
-        raw_text = await llm_client.generate_async(
+        query_llm_client = llm_client or get_llm_client()
+        raw_text = await query_llm_client.generate_async(
             # Las variantes se determinan solo por la pregunta, nunca por el rol de sesión.
             prompt=f"Consulta informal: {cleaned_query}\nVariantes de búsqueda:",
             system_prompt=system_prompt,
@@ -1369,7 +1376,7 @@ async def async_generate_multi_query_variants(
     return final_variants
 
 
-def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -> str:
+def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general", llm_client: Any = None) -> str:
     """
     Traduce jerga informal estudiantil a términos técnicos institucionales mediante el proveedor LLM activo (síncrono).
     Depura previamente ruido de remitentes y encabezados.
@@ -1399,8 +1406,8 @@ def expand_and_normalize_query_llm(raw_query: str, user_role: str = "general") -
     )
 
     try:
-        llm_client = get_llm_client()
-        expanded = llm_client.generate_sync(
+        query_llm_client = llm_client or get_llm_client()
+        expanded = query_llm_client.generate_sync(
             prompt=f"Consulta informal: {cleaned_query}\nConsulta técnica formal:",
             system_prompt=system_prompt,
             max_tokens=80,
@@ -2858,6 +2865,7 @@ class RAGService:
         model: Optional[str] = None,
         chroma_db_dir: Optional[str] = None,
         embedding_model: Optional[str] = None,
+        embeddings: Optional[HuggingFaceEmbeddings] = None,
         min_relevance_score: float = MIN_RELEVANCE_SCORE_THRESHOLD
     ):
         settings = get_settings()
@@ -2875,7 +2883,7 @@ class RAGService:
         self.embedding_model_name = embedding_model or settings.embedding_model
         self.min_relevance_score = min_relevance_score
 
-        self._embeddings = None
+        self._embeddings = embeddings
         self._vector_store = None
 
     @property
@@ -3128,7 +3136,11 @@ class RAGService:
             )
 
         # 1. Expansión Multi-Consulta asíncrona tolerante a jerga
-        query_variants = await async_generate_multi_query_variants(question, max_variants=3)
+        query_variants = await async_generate_multi_query_variants(
+            question,
+            max_variants=3,
+            llm_client=self.llm_client,
+        )
         # Los manuales suelen llamar a la recuperación de usuario "Recordar
         # usuario con contraseña" aunque la pregunta coloquial diga "no recuerdo
         # mi usuario". Añadir esta reformulación léxica permite encontrar esa

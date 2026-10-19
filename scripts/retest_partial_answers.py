@@ -163,6 +163,12 @@ async def main() -> int:
             raise ValueError("El checkpoint no contiene respuestas generadas para revisar.")
         print(f"Reutilizando {len(rows)} respuestas generadas desde {args.output}.", flush=True)
     else:
+        if not args.input.is_file():
+            parser.error(
+                f"No se encontró el informe base histórico: {args.input}. "
+                "Los reportes anteriores se archivaron fuera del repositorio; restaura el ZIP de respaldo "
+                "o indica otro archivo con --input."
+            )
         baseline = json.loads(args.input.read_text(encoding="utf-8"))
         rows = [row for row in baseline["results"] if row["multievidence_review"]["verdict"] in {"partial", "no_verificable"}]
         if args.case_id:

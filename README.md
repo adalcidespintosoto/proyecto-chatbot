@@ -7,6 +7,7 @@ UniMon es un backend FastAPI con canales web y WhatsApp opcional, recuperación 
 - [Manual de usuario](docs/MANUAL_DE_USUARIO.md)
 - [Manual técnico integral](docs/MANUAL_TECNICO_INTEGRAL.md)
 - [Guía para replicar y operar el sistema](docs/REPLICAR_Y_OPERAR_UNIMON.md)
+- [Crear asistentes para otras dependencias](docs/CHATBOTS_POR_DEPENDENCIA.md)
 - [Flujo de una consulta](docs/flujo_procesamiento_sistema.md)
 
 La bitácora de integración OpenAI y las comparativas RAG de la carpeta docs son históricas. La configuración real se determina desde .env y el código de esta revisión.
@@ -23,13 +24,14 @@ Abre / para el chat, /docs para el esquema de API y /admin para el panel con HTT
 
 ## Arquitectura en una frase
 
-Chat web/WhatsApp → FastAPI → router conversacional → reglas de dominio o RAG (expansión, búsqueda vectorial y léxica, reranking, expansión secuencial de vecinos y tope de chunks) → LLM configurado → telemetría; las acciones de ticket usan GLPI si está configurado.
+Chat web/WhatsApp → FastAPI → router conversacional → reglas de dominio o RAG (expansión, búsqueda vectorial y léxica, reranking, expansión secuencial de vecinos y tope de chunks) → LLM configurado → telemetría; las acciones de ticket usan GLPI si está configurado. El modo opcional `/?router=1` clasifica la intención contra perfiles de especialidad y delega a un RAG aislado por dependencia.
 
 ## Hechos operativos que debes conocer
 
 - El RAG no filtra documentos por rol; aplica algunos filtros por categoría temática.
 - El corpus presente contiene formatos que el pipeline principal no indexa automáticamente; verifica la tabla completa en la guía de réplica.
 - Las sesiones conversacionales viven en memoria y se pierden al reiniciar el proceso.
+- Las instancias adicionales tienen sus propios índices y perfil `specialization.md`; la telemetría de sus consultas sí se agrega a los KPIs globales y conserva un desglose por instancia.
 - Golden Cache recibe feedback positivo sujeto a validadores, pero una respuesta cacheada no sustituye las fuentes institucionales.
 - Una corrida de 50 sesiones simultáneas completó 50 respuestas HTTP sin 429/5xx; latencia p50 fue 65,1 s y p95 70,7 s. Exactitud estricta medida: 50%. No equivale a validación de producción.
 

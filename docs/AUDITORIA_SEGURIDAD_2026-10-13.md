@@ -30,7 +30,7 @@ Esta revisión es estática. Se comprobó la sintaxis de los archivos Python y J
 1. **Reiniciar UniMon** para que la aplicación lea la contraseña y el token nuevos de `.env`. Volver a autenticar el panel con `ADMIN_PASSWORD` de ese archivo. No copiarlo a chats, tickets ni capturas.
 2. **Configurar `WHATSAPP_APP_SECRET`** con el App Secret real de Meta y actualizar en Meta el nuevo `WHATSAPP_VERIFY_TOKEN` de `.env`. Hasta entonces, los eventos entrantes de WhatsApp se rechazan intencionalmente.
 3. **Revisar el repositorio remoto y su historial.** `git rm --cached` impide nuevos commits de bases e índices, pero no borra versiones ya publicadas. Si el repositorio fue compartido, tratar la contraseña antigua y los datos anteriores como expuestos; planear limpieza de historial coordinada y rotación de cualquier otra credencial afectada.
-4. **Clasificar los reportes de evaluación** en `reports/` y los documentos en `data/docs/` antes de publicarlos. Hay reportes con preguntas y respuestas; no se retiraron porque también son evidencia de las evaluaciones del proyecto.
+4. **Proteger los resultados de evaluación.** Los 158 reportes históricos se retiraron del árbol de trabajo y se guardaron en un respaldo local fuera del repositorio; los nuevos resultados bajo `reports/` quedan ignorados por Git porque pueden contener preguntas, respuestas y contexto. Esta limpieza no borra esos archivos de commits anteriores: si el repositorio remoto es público, solo una limpieza coordinada del historial puede retirarlos de versiones ya publicadas.
 5. **Exigir HTTPS en el despliegue** del panel HTTP Basic, restringir quién puede llegar a `/admin` y realizar copias de seguridad cifradas y con acceso limitado.
 
 ## Riesgos pendientes

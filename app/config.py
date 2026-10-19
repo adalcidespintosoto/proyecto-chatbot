@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     gemini_timeout: float = 35.0
 
+    # Llave maestra para cifrar credenciales LLM configuradas por instancia desde /admin.
+    # Debe ser un secreto aleatorio estable de al menos 32 caracteres.
+    llm_credentials_encryption_key: str = ""
+
     # Configuración de Ollama (RAG / LLM Local)
     ollama_base_url: str = "http://localhost:11434"
     llm_model: str = "unimon:8b"

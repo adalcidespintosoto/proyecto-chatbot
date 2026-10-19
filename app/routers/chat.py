@@ -61,6 +61,9 @@ class ChatResponse(BaseModel):
     category: Optional[str] = Field(default=None, description="Categoría temática del problema")
     source: Optional[str] = Field(default=None, description="Fuente de la respuesta (GLPI, Ollama, Base de Conocimiento)", example="GLPI_REST_API")
     sources: Optional[List[str]] = Field(default=None, description="Fuentes documentales consultadas en RAG", example=["P-GT-01_Mantenimiento.pdf"])
+    routed_to: Optional[str] = Field(default=None, description="Identificador del asistente que atendió la consulta")
+    routed_name: Optional[str] = Field(default=None, description="Nombre visible del asistente seleccionado")
+    route_reason: Optional[str] = Field(default=None, description="Motivo breve de enrutamiento para trazabilidad")
 
 
 # ==========================================
@@ -79,7 +82,7 @@ import time
 import re
 from fastapi import Request
 from app.services.telemetry_service import log_interaction, update_session_status
-from app.services.llm_usage import begin_llm_usage_capture, finish_llm_usage_capture
+from app.services.llm_usage import begin_llm_usage_capture, finish_llm_usage_capture, get_route_usage
 
 
 INJECTION_PATTERNS = [
@@ -165,6 +168,7 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
     finally:
         llm_usage = finish_llm_usage_capture(llm_usage_token)
     latency_ms = (time.time() - t0) * 1000
+    route_usage = get_route_usage()
 
     tipo = resultado.get("tipo", "DIAGNOSTICO")
     state = resultado.get("state", tipo)
@@ -187,6 +191,12 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
         # Una respuesta servida sin llamar al modelo no debe heredar contadores
         # colocados por otra ruta o una respuesta cacheada.
         prompt_tokens = cached_tokens = eval_tokens = 0
+    prompt_tokens += int(route_usage.get("prompt_tokens", 0) or 0)
+    cached_tokens += int(route_usage.get("cached_tokens", 0) or 0)
+    eval_tokens += int(route_usage.get("eval_tokens", 0) or 0)
+    llm_calls += int(route_usage.get("llm_calls", 0) or 0)
+    usage_tracked = usage_tracked and bool(route_usage.get("complete", True))
+    latency_ms += float(route_usage.get("latency_ms", 0) or 0)
 
     # Obtener rol del usuario registrado en la sesión
     session_obj = router_logic.get_session(session_id)
@@ -250,6 +260,202 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
 
 
 
+
+
+# ==========================================
+# Asistentes adicionales por dependencia
+# ==========================================
+
+@router.get(
+    "/chatbots/{bot_id}/config",
+    summary="Obtener la configuración pública de un chatbot",
+    description="Devuelve el nombre y el saludo de una instancia habilitada, sin exponer su configuración administrativa.",
+)
+async def get_chatbot_public_config(bot_id: str) -> Dict[str, Any]:
+    from app.services.bot_instance_service import bot_instance_manager
+
+    profile = bot_instance_manager.get(bot_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontró este asistente.")
+    return profile.public_config()
+
+
+@router.post(
+    "/chatbots/{bot_id}/chat",
+    response_model=ChatResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Consultar el asistente de una dependencia",
+    description="Busca únicamente en el índice documental de la instancia indicada y responde con sus canales de atención configurados.",
+)
+async def process_chatbot_instance(bot_id: str, request: ChatRequest) -> ChatResponse:
+    from app.services.bot_instance_service import BotInstanceError, bot_instance_manager
+
+    profile = bot_instance_manager.get(bot_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontró este asistente.")
+
+    raw_text = request.get_texto()
+    if not raw_text:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Escribe una consulta para continuar.")
+
+    session_id = request.session_id or f"sess_{secrets.token_urlsafe(24)}"
+    if (
+        not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", session_id)
+        or session_id.lower().startswith("wa_")
+        or session_id == "default_session"
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identificador de sesión inválido.")
+
+    prompt_injection = is_prompt_injection_query(raw_text)
+    question = sanitize_input_text(raw_text, neutralize_injections=not prompt_injection)
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El mensaje no contiene texto válido después de la sanitización.",
+        )
+
+    started_at = time.perf_counter()
+    llm_usage_token = begin_llm_usage_capture()
+    try:
+        runtime = bot_instance_manager.get_runtime(bot_id)
+        result = await runtime.answer(profile, session_id, question)
+    except BotInstanceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Error al responder en la instancia '%s'", bot_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Este asistente no está disponible en este momento. Intenta de nuevo más tarde.",
+        ) from exc
+    finally:
+        llm_usage = finish_llm_usage_capture(llm_usage_token)
+    from app.services.llm_usage import get_route_usage
+    route_usage = get_route_usage()
+    latency_ms = (time.perf_counter() - started_at) * 1000 + float(route_usage.get("latency_ms", 0) or 0)
+    prompt_tokens = int(llm_usage.get("prompt_tokens", 0) or 0) + int(route_usage.get("prompt_tokens", 0) or 0)
+    cached_tokens = int(llm_usage.get("cached_tokens", 0) or 0) + int(route_usage.get("cached_tokens", 0) or 0)
+    eval_tokens = int(llm_usage.get("eval_tokens", 0) or 0) + int(route_usage.get("eval_tokens", 0) or 0)
+    llm_calls = int(llm_usage.get("llm_calls", 0) or 0) + int(route_usage.get("llm_calls", 0) or 0)
+    usage_tracked = bool(llm_usage.get("complete", False)) and bool(route_usage.get("complete", True))
+
+    logger.info(
+        "Consulta atendida por instancia '%s' (chunks=%d, latencia_ms=%.0f, llm_calls=%d, tokens_in=%d, cached=%d, tokens_out=%d, usage_tracked=%s)",
+        bot_id,
+        int(result.get("retrieved_chunks") or 0),
+        latency_ms,
+        llm_calls,
+        prompt_tokens,
+        cached_tokens,
+        eval_tokens,
+        usage_tracked,
+    )
+    answer = result["response"]
+    telemetry_session_id = f"bot_{bot_id}_{session_id}"
+    try:
+        log_interaction(
+            session_id=telemetry_session_id,
+            role=f"dependencia:{bot_id}",
+            query=question,
+            bot_response=answer,
+            intent="DIAGNOSTICO",
+            source=f"CHATBOT_INSTANCE:{bot_id}",
+            docs=result.get("sources") or [],
+            latency_ms=round(latency_ms, 2),
+            prompt_tokens=prompt_tokens,
+            cached_tokens=cached_tokens,
+            eval_tokens=eval_tokens,
+            llm_calls=llm_calls,
+            usage_tracked=usage_tracked,
+        )
+    except Exception as exc:
+        logger.warning("No se pudo registrar telemetría del chatbot '%s': %s", bot_id, type(exc).__name__)
+    return ChatResponse(
+        tipo="DIAGNOSTICO",
+        mensaje=answer,
+        session_id=session_id,
+        intent="DIAGNOSTICO",
+        reply=answer,
+        state="DIAGNOSTICO",
+        response=answer,
+        quick_replies=[],
+        source=f"{bot_id}_RAG",
+        sources=result.get("sources") or [],
+    )
+
+
+@router.get(
+    "/chatbot-router/config",
+    summary="Obtener configuración pública del enrutador de dependencias",
+)
+async def get_chatbot_router_config() -> Dict[str, Any]:
+    from app.services.bot_instance_service import bot_instance_manager
+
+    active_count = len(bot_instance_manager.list())
+    return {
+        "display_name": "UniMon Asistente de Dependencias",
+        "welcome_message": (
+            "¡Hola! Soy UniMon. Cuéntame qué necesitas y te conectaré con el asistente "
+            "de la dependencia que mejor pueda orientarte."
+        ),
+        "active_specialists": active_count,
+    }
+
+
+@router.post(
+    "/chatbot-router/chat",
+    response_model=ChatResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Enrutar una consulta al chatbot especializado",
+    description="Selecciona entre instancias activas por especialidad y deriva la consulta a su RAG aislado; usa UniMon como fallback.",
+)
+async def process_chatbot_router(request: ChatRequest, raw_request: Request = None) -> ChatResponse:
+    from app.services.bot_router_service import select_chatbot
+    from app.services.llm_usage import (
+        begin_llm_usage_capture,
+        finish_llm_usage_capture,
+        set_route_usage,
+        reset_route_usage,
+    )
+
+    raw_text = request.get_texto()
+    if not raw_text:
+        raise HTTPException(status_code=400, detail="Escribe una consulta para continuar.")
+    session_id = request.session_id or f"sess_{secrets.token_urlsafe(24)}"
+    if (
+        not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", session_id)
+        or session_id.lower().startswith("wa_")
+        or session_id == "default_session"
+    ):
+        raise HTTPException(status_code=400, detail="Identificador de sesión inválido.")
+
+    prompt_injection = is_prompt_injection_query(raw_text)
+    question = sanitize_input_text(raw_text, neutralize_injections=not prompt_injection)
+    if not question:
+        raise HTTPException(status_code=400, detail="El mensaje no contiene texto válido después de la sanitización.")
+
+    route_started = time.perf_counter()
+    route_usage_token = begin_llm_usage_capture()
+    try:
+        if prompt_injection:
+            target = {"bot_id": "unimon", "display_name": "UniMon", "reason": "Consulta canalizada al asistente principal."}
+        else:
+            target = await select_chatbot(question, session_id)
+    finally:
+        classification_usage = finish_llm_usage_capture(route_usage_token)
+    classification_usage["latency_ms"] = (time.perf_counter() - route_started) * 1000
+    route_token = set_route_usage(classification_usage)
+    try:
+        delegated_request = ChatRequest(mensaje=question, session_id=session_id)
+        if target["bot_id"] == "unimon":
+            response = await process_chat(delegated_request, raw_request)
+        else:
+            response = await process_chatbot_instance(target["bot_id"], delegated_request)
+        response.routed_to = target["bot_id"]
+        response.routed_name = target["display_name"]
+        response.route_reason = target["reason"]
+        return response
+    finally:
+        reset_route_usage(route_token)
 
 
 # ==========================================

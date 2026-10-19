@@ -311,6 +311,7 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
                 if "usage_tracked" in interaction_cols else total_queries
             )
             total_sessions = cursor.execute(f"SELECT COUNT(DISTINCT session_id) FROM interactions{w_int}", int_params).fetchone()[0] or 0
+            evaluable_sessions = total_sessions
 
             resolved = cursor.execute(f"SELECT COUNT(*) FROM interactions WHERE resolved = 1{and_int}", int_params).fetchone()[0] or 0
             escalated = cursor.execute(f"SELECT COUNT(*) FROM interactions WHERE escalated = 1{and_int}", int_params).fetchone()[0] or 0
@@ -378,6 +379,10 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             and_int = (" AND " + " AND ".join(int_conds)) if int_conds else ""
 
             total_sessions = cursor.execute(f"SELECT COUNT(*) FROM telemetry_sessions{w_sess}", sess_params).fetchone()[0] or 0
+            evaluable_sessions = cursor.execute(
+                f"SELECT COUNT(*) FROM telemetry_sessions WHERE COALESCE(role, '') NOT LIKE 'dependencia:%'{and_sess}",
+                sess_params,
+            ).fetchone()[0] or 0
             total_interactions = cursor.execute(f"SELECT COUNT(*) FROM telemetry_interactions{w_int}", int_params).fetchone()[0] or 0
             interaction_cols = {row[1] for row in cursor.execute("PRAGMA table_info(telemetry_interactions)").fetchall()}
             # RESOLVED/RETRY/ESCALATED son respuestas a botones del flujo conversacional,
@@ -398,17 +403,17 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             )
 
             resolved = cursor.execute(
-                f"SELECT COUNT(*) FROM telemetry_sessions WHERE final_status IN ('FINALIZADO', 'SOLUCIONADO', 'RESOLVED'){and_sess}",
+                f"SELECT COUNT(*) FROM telemetry_sessions WHERE COALESCE(role, '') NOT LIKE 'dependencia:%' AND final_status IN ('FINALIZADO', 'SOLUCIONADO', 'RESOLVED'){and_sess}",
                 sess_params
             ).fetchone()[0] or 0
 
             escalated = cursor.execute(
-                f"SELECT COUNT(*) FROM telemetry_sessions WHERE (escalated_ticket = 1 OR final_status IN ('RADICANDO_TICKET', 'TICKET_CREADO', 'ESCALADO')){and_sess}",
+                f"SELECT COUNT(*) FROM telemetry_sessions WHERE COALESCE(role, '') NOT LIKE 'dependencia:%' AND (escalated_ticket = 1 OR final_status IN ('RADICANDO_TICKET', 'TICKET_CREADO', 'ESCALADO')){and_sess}",
                 sess_params
             ).fetchone()[0] or 0
 
-            rate_resolved = round((resolved / total_sessions * 100), 1) if total_sessions > 0 else 0.0
-            rate_escalated = round((escalated / total_sessions * 100), 1) if total_sessions > 0 else 0.0
+            rate_resolved = round((resolved / evaluable_sessions * 100), 1) if evaluable_sessions > 0 else 0.0
+            rate_escalated = round((escalated / evaluable_sessions * 100), 1) if evaluable_sessions > 0 else 0.0
 
             avg_lat_row = cursor.execute(
                 f"SELECT AVG(latency_ms) FROM telemetry_interactions WHERE latency_ms > 0 AND {event_filter}{and_int}", int_params
@@ -508,6 +513,45 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
 
         total_tokens_val = (tokens_in or 0) + (tokens_out or 0)
 
+        # Los bots adicionales se registran en la misma telemetría con una fuente
+        # CHATBOT_INSTANCE:<id>; por eso sus consultas y tokens también forman
+        # parte de los totales globales anteriores. Este desglose permite verlas aparte.
+        bot_total_queries = bot_total_sessions = bot_total_tokens = 0
+        bot_instance_breakdown: list[dict[str, Any]] = []
+        if "telemetry_interactions" in tables and "source_used" in interaction_cols:
+            bot_where = "source_used LIKE ?"
+            bot_params: List[Any] = ["CHATBOT_INSTANCE:%"]
+            bot_date_conds, bot_date_params = _build_sql_date_filter("timestamp", norm_start, norm_end)
+            if bot_date_conds:
+                bot_where += " AND " + " AND ".join(bot_date_conds)
+                bot_params.extend(bot_date_params)
+            bot_total_queries = cursor.execute(
+                f"SELECT COUNT(*) FROM telemetry_interactions WHERE {bot_where} AND {event_filter}",
+                bot_params,
+            ).fetchone()[0] or 0
+            bot_total_sessions = cursor.execute(
+                f"SELECT COUNT(DISTINCT session_id) FROM telemetry_interactions WHERE {bot_where}",
+                bot_params,
+            ).fetchone()[0] or 0
+            bot_usage = cursor.execute(
+                f"""SELECT COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                           COALESCE(SUM(cached_tokens), 0) AS cached_tokens,
+                           COALESCE(SUM(eval_tokens), 0) AS eval_tokens
+                    FROM telemetry_interactions WHERE {bot_where}""",
+                bot_params,
+            ).fetchone()
+            bot_total_tokens = int((bot_usage["prompt_tokens"] or 0) + (bot_usage["eval_tokens"] or 0))
+            bot_sources = cursor.execute(
+                f"""SELECT source_used, COUNT(*) AS count FROM telemetry_interactions
+                    WHERE {bot_where} AND {event_filter}
+                    GROUP BY source_used ORDER BY count DESC""",
+                bot_params,
+            ).fetchall()
+            bot_instance_breakdown = [
+                {"bot_id": str(row["source_used"]).split(":", 1)[-1], "queries": int(row["count"])}
+                for row in bot_sources
+            ]
+
         return {
             "period_start": norm_start,
             "period_end": norm_end,
@@ -532,8 +576,13 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             "estimated_cost_usd": round(cost_usd, 4),
             "estimated_cost_cop": round(cost_cop, 0),
             "total_sessions": total_sessions,
+            "resolution_evaluable_sessions": evaluable_sessions,
             "total_queries": total_queries,
             "total_interactions": total_interactions,
+            "additional_chatbot_queries": int(bot_total_queries),
+            "additional_chatbot_sessions": int(bot_total_sessions),
+            "additional_chatbot_tokens": bot_total_tokens,
+            "additional_chatbot_breakdown": bot_instance_breakdown,
             "usage_tracking_incomplete_interactions": usage_tracking_incomplete,
             "role_distribution": role_distribution,
             "top_documents": top_documents,
@@ -554,11 +603,57 @@ def get_kpis_summary(start_date: Optional[str] = None, end_date: Optional[str] =
             "total_sesiones": total_sessions,
             "total_consultas": total_queries,
             "total_interacciones": total_interactions,
+            "consultas_chatbots_adicionales": int(bot_total_queries),
             "interacciones_con_uso_llm_incompleto": usage_tracking_incomplete,
             "distribucion_roles": role_distribution,
             "top_documentos_referenciados": top_documents,
             "top_preguntas_frecuentes": top_queries
         }
+
+
+def get_chatbot_instance_kpis(
+    bot_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Return date-filtered metrics for one additional chatbot instance."""
+    if not DB_PATH.exists():
+        init_telemetry_db()
+    conditions = ["source_used = ?"]
+    params: List[Any] = [f"CHATBOT_INSTANCE:{bot_id}"]
+    date_conditions, date_params = _build_sql_date_filter("timestamp", start_date, end_date)
+    conditions.extend(date_conditions)
+    params.extend(date_params)
+    where_clause = " AND ".join(conditions)
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(telemetry_interactions)").fetchall()}
+            if "source_used" not in columns:
+                return {"queries": 0, "sessions": 0, "avg_latency_ms": 0, "tokens_in": 0, "tokens_cached": 0, "tokens_out": 0}
+            row = conn.execute(
+                f"""SELECT COUNT(*) AS interactions,
+                           COUNT(DISTINCT session_id) AS sessions,
+                           AVG(CASE WHEN latency_ms > 0 THEN latency_ms END) AS avg_latency_ms,
+                           COALESCE(SUM(prompt_tokens), 0) AS tokens_in,
+                           COALESCE(SUM(cached_tokens), 0) AS tokens_cached,
+                           COALESCE(SUM(eval_tokens), 0) AS tokens_out
+                    FROM telemetry_interactions WHERE {where_clause}
+                      AND COALESCE(UPPER(feedback), 'NONE') NOT IN
+                          ('RESOLVED', 'RETRY', 'RETRY_DIAGNOSIS', 'ESCALATED')""",
+                params,
+            ).fetchone()
+            return {
+                "queries": int(row["interactions"] or 0),
+                "sessions": int(row["sessions"] or 0),
+                "avg_latency_ms": round(float(row["avg_latency_ms"] or 0), 1),
+                "tokens_in": int(row["tokens_in"] or 0),
+                "tokens_cached": int(row["tokens_cached"] or 0),
+                "tokens_out": int(row["tokens_out"] or 0),
+            }
+    except sqlite3.Error as exc:
+        logger.warning("No se pudieron calcular KPIs de '%s': %s", bot_id, type(exc).__name__)
+        return {"queries": 0, "sessions": 0, "avg_latency_ms": 0, "tokens_in": 0, "tokens_cached": 0, "tokens_out": 0}
 
 
 def get_unresolved_queries_ranking(

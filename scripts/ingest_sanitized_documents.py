@@ -772,6 +772,7 @@ def _index_incremental(
 def ingest_sanitized_documents(
     docs_path: str | None = None,
     chroma_path: str | None = None,
+    sanitized_docs_path: str | None = None,
     file_path: str | None = None,
     incremental: bool = True,
     delete_doc: str | None = None,
@@ -787,7 +788,7 @@ def ingest_sanitized_documents(
     settings = get_settings()
     docs_dir = Path(docs_path or settings.docs_dir).resolve()
     active_path = Path(chroma_path or settings.chroma_db_dir).resolve()
-    output_dir = Path(settings.sanitized_docs_dir).resolve()
+    output_dir = Path(sanitized_docs_path or settings.sanitized_docs_dir).resolve()
     golden_path = Path(settings.golden_cache_db_dir).resolve()
     for protected_path in (docs_dir, output_dir, golden_path):
         if _paths_overlap(active_path, protected_path):

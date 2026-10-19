@@ -6,11 +6,13 @@ con soporte para GPT-5.6 Luna, GPT-4o-mini y modelos locales de Ollama con fallb
 
 import logging
 import re
+import asyncio
 from typing import Any, Dict, List, Optional
 import httpx
 
 from app.config import get_settings
 from app.services.llm_usage import record_llm_usage
+from app.services.llm_endpoint_security import validate_custom_llm_base_url
 
 logger = logging.getLogger("unimon.llm_client")
 
@@ -18,8 +20,34 @@ logger = logging.getLogger("unimon.llm_client")
 class LLMClient:
     """Cliente unificado para comunicación con LLMs en la nube o locales."""
 
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(
+        self,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        custom_config: Optional[Dict[str, Any]] = None,
+    ):
+        base_settings = get_settings()
+        updates: Dict[str, Any] = {}
+        self.custom_config = dict(custom_config) if custom_config else None
+        if provider is not None:
+            normalized_provider = provider.lower().strip()
+            if normalized_provider == "custom":
+                if not self.custom_config:
+                    raise ValueError("Falta la configuración del proveedor LLM personalizado.")
+                updates["llm_provider"] = "custom"
+            elif normalized_provider not in {"openai", "anthropic", "gemini", "ollama"}:
+                raise ValueError("Proveedor LLM no admitido.")
+            else:
+                updates["llm_provider"] = normalized_provider
+            if model is not None and normalized_provider != "custom":
+                model_setting = {
+                    "openai": "openai_model",
+                    "anthropic": "anthropic_model",
+                    "gemini": "gemini_model",
+                    "ollama": "llm_model",
+                }[normalized_provider]
+                updates[model_setting] = model
+        self.settings = base_settings.model_copy(update=updates) if updates else base_settings
 
     @property
     def provider(self) -> str:
@@ -27,6 +55,8 @@ class LLMClient:
 
     @property
     def active_model(self) -> str:
+        if self.provider == "custom" and self.custom_config:
+            return str(self.custom_config.get("model") or "")
         if self.provider == "anthropic":
             return self.settings.anthropic_model
         if self.provider == "gemini":
@@ -49,6 +79,24 @@ class LLMClient:
         (error de API, timeout de red, cuota excedida o indisponibilidad), se conmuta
         automáticamente a Ollama local (modelo unimon:8b) como contingencia de alta disponibilidad.
         """
+        if self.provider == "custom":
+            try:
+                return await self._call_custom_chat(messages, max_tokens=max_tokens, timeout=None)
+            except Exception as exc:
+                if not fallback_to_ollama:
+                    raise
+                logger.warning(
+                    "[LLMClient] Falló el proveedor personalizado '%s' (%s); se intenta Ollama local.",
+                    self.custom_config.get("provider_name", "personalizado") if self.custom_config else "personalizado",
+                    type(exc).__name__,
+                )
+                result = await self._call_ollama_chat(
+                    messages, max_tokens=max_tokens, temperature=temperature or 0.0
+                )
+                result["contingency"] = True
+                result["fallback_from"] = "custom"
+                return result
+
         if self.provider == "anthropic":
             if not self.settings.anthropic_api_key:
                 logger.warning("[LLMClient] Sin ANTHROPIC_API_KEY. Conmutando a contingencia local Ollama (%s)...", self.settings.llm_model)
@@ -298,10 +346,125 @@ class LLMClient:
             logger.error("[LLMClient] Error HTTP %s de OpenAI", response.status_code)
             raise RuntimeError(f"OpenAI API error {response.status_code}")
 
+    def _custom_request(self, messages: List[Dict[str, Any]], max_tokens: int) -> tuple[str, Dict[str, Any], Dict[str, str], str]:
+        config = self.custom_config or {}
+        protocol = str(config.get("protocol") or "openai-compatible")
+        base_url = str(config.get("base_url") or "").rstrip("/")
+        model_name = str(config.get("model") or self.active_model)
+        api_key = str(config.get("api_key") or "")
+        if protocol == "anthropic":
+            payload = self._build_anthropic_payload(messages, max_tokens, model_name=model_name)
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            }
+            return f"{base_url}/messages", payload, headers, protocol
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "max_tokens": max(1, int(max_tokens)),
+        }
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        return f"{base_url}/chat/completions", payload, headers, protocol
+
+    @staticmethod
+    def _openai_compatible_content(data: Dict[str, Any]) -> str:
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if isinstance(content, list):
+            return "\n".join(
+                str(block.get("text", ""))
+                for block in content
+                if isinstance(block, dict) and block.get("text")
+            ).strip()
+        return str(content or "").strip()
+
+    def _custom_result(self, data: Dict[str, Any], protocol: str) -> Dict[str, Any]:
+        config = self.custom_config or {}
+        model_name = str(config.get("model") or self.active_model)
+        provider_name = str(config.get("provider_name") or "Proveedor personalizado")
+        if protocol == "anthropic":
+            usage = self._record_anthropic_usage(data.get("usage", {}))
+            content = self._anthropic_content(data)
+            prompt_tokens = usage["prompt_tokens"]
+            cached_tokens = usage["cached_tokens"]
+            completion_tokens = usage["eval_tokens"]
+        else:
+            content = self._openai_compatible_content(data)
+            usage = data.get("usage", {})
+            prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
+            completion_tokens = int(usage.get("completion_tokens", 0) or 0)
+            cached_tokens = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0)
+            record_llm_usage(
+                prompt_tokens=prompt_tokens,
+                cached_tokens=cached_tokens,
+                eval_tokens=completion_tokens,
+                usage_reported=bool(usage),
+            )
+        safe_provider = re.sub(r"[^a-z0-9]+", "_", provider_name.casefold()).strip("_")[:40] or "custom"
+        return {
+            "content": content,
+            "prompt_tokens": prompt_tokens,
+            "cached_tokens": cached_tokens,
+            "eval_tokens": completion_tokens,
+            "model": model_name,
+            "provider": "custom",
+            "provider_name": provider_name,
+            "source": f"{safe_provider}_{model_name}",
+        }
+
+    async def _call_custom_chat(
+        self,
+        messages: List[Dict[str, Any]],
+        max_tokens: int = 768,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        config = self.custom_config or {}
+        try:
+            base_url = await asyncio.to_thread(
+                validate_custom_llm_base_url, str(config.get("base_url") or ""), resolve_dns=True
+            )
+        except ValueError as exc:
+            raise RuntimeError("El endpoint LLM personalizado no pasó la validación de seguridad.") from exc
+        url, payload, headers, protocol = self._custom_request(messages, max_tokens)
+        # Reemplaza la URL validada para evitar que el valor almacenado se use sin normalizar.
+        suffix = "/messages" if protocol == "anthropic" else "/chat/completions"
+        url = f"{base_url}{suffix}"
+        request_timeout = timeout or float(config.get("timeout") or 35.0)
+        async with httpx.AsyncClient(timeout=request_timeout, follow_redirects=False) as client:
+            response = await client.post(url, json=payload, headers=headers)
+        if response.status_code != 200:
+            raise RuntimeError(f"El proveedor LLM personalizado devolvió HTTP {response.status_code}.")
+        return self._custom_result(response.json(), protocol)
+
+    def _call_custom_chat_sync(
+        self,
+        messages: List[Dict[str, Any]],
+        max_tokens: int = 300,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        config = self.custom_config or {}
+        try:
+            base_url = validate_custom_llm_base_url(
+                str(config.get("base_url") or ""), resolve_dns=True
+            )
+        except ValueError as exc:
+            raise RuntimeError("El endpoint LLM personalizado no pasó la validación de seguridad.") from exc
+        _, payload, headers, protocol = self._custom_request(messages, max_tokens)
+        suffix = "/messages" if protocol == "anthropic" else "/chat/completions"
+        url = f"{base_url}{suffix}"
+        request_timeout = timeout or float(config.get("timeout") or 35.0)
+        with httpx.Client(timeout=request_timeout, follow_redirects=False) as client:
+            response = client.post(url, json=payload, headers=headers)
+        if response.status_code != 200:
+            raise RuntimeError(f"El proveedor LLM personalizado devolvió HTTP {response.status_code}.")
+        return self._custom_result(response.json(), protocol)
+
     def _build_anthropic_payload(
         self,
         messages: List[Dict[str, Any]],
         max_tokens: int,
+        model_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Adapta los mensajes internos al formato Messages API de Anthropic."""
         system_parts: List[str] = []
@@ -323,7 +486,7 @@ class LLMClient:
             raise ValueError("Anthropic requiere al menos un mensaje user o assistant.")
 
         payload: Dict[str, Any] = {
-            "model": self.settings.anthropic_model,
+            "model": model_name or self.settings.anthropic_model,
             "max_tokens": max(1, int(max_tokens)),
             "messages": conversation,
         }
@@ -465,6 +628,16 @@ class LLMClient:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        if self.provider == "custom":
+            try:
+                result = await self._call_custom_chat(messages, max_tokens=max_tokens, timeout=timeout)
+                return str(result.get("content") or "").strip()
+            except Exception as exc:
+                logger.warning(
+                    "[LLMClient] Falló generate_async con el proveedor personalizado (%s); se usará la contingencia local.",
+                    type(exc).__name__,
+                )
+
         if self.provider == "gemini" and self.settings.gemini_api_key:
             try:
                 model_name = self.settings.gemini_model
@@ -573,6 +746,16 @@ class LLMClient:
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
+
+        if self.provider == "custom":
+            try:
+                result = self._call_custom_chat_sync(messages, max_tokens=max_tokens, timeout=timeout)
+                return str(result.get("content") or "").strip()
+            except Exception as exc:
+                logger.warning(
+                    "[LLMClient] Falló generate_sync con el proveedor personalizado (%s); se usará la contingencia local.",
+                    type(exc).__name__,
+                )
 
         if self.provider == "gemini" and self.settings.gemini_api_key:
             try:

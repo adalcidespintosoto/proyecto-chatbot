@@ -21,3 +21,4 @@ tqdm>=4.66.0
 slowapi
 scikit-learn
 python-docx
+cryptography>=42.0.0
