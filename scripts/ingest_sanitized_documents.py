@@ -1,4 +1,4 @@
-"""Sanitize source PDFs/PPTX to Markdown, then index only the Markdown output.
+"""Sanitize source PDF/PPTX/DOCX files to Markdown, then index that output.
 
 Initial clean migration (stop UniMon first):
     python scripts/ingest_sanitized_documents.py --rebuild
@@ -26,7 +26,7 @@ import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import chromadb
 
@@ -45,7 +45,7 @@ from scripts import sanitize_rag_corpus as sanitizer
 
 LOGGER = logging.getLogger("unimon.ingest_sanitized_documents")
 PROMPT_PATH = PROJECT_ROOT / "docs" / "PROMPT_TRANSFORMACION_DOCUMENTOS_RAG.md"
-SUPPORTED_EXTENSIONS = {".pdf", ".pptx"}
+SUPPORTED_EXTENSIONS = {".pdf", ".pptx", ".docx"}
 WEB_SOURCE_PREFIXES = ("Web_",)
 
 
@@ -146,6 +146,9 @@ def _prepare_markdown(
     force: bool = False,
     use_vision: bool = True,
     workers: int = 2,
+    source_texts: dict[str, str] | None = None,
+    source_unit_counts: dict[str, int] | None = None,
+    source_visual_slide_numbers: dict[str, list[int]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     if not 1 <= workers <= 4:
         raise ValueError("workers debe estar entre 1 y 4.")
@@ -155,9 +158,6 @@ def _prepare_markdown(
             "La transformación está configurada para GPT-6 Luna; "
             f"OPENAI_MODEL actual: {settings.openai_model!r}."
         )
-    if not settings.openai_api_key:
-        raise RuntimeError("Falta OPENAI_API_KEY; no se enviaron documentos al modelo.")
-
     prompt = load_document_prompt(PROMPT_PATH)
     prompt_hash = sanitizer.sha256_text(prompt)
     manifest_path = output_dir / "manifest.json"
@@ -168,6 +168,7 @@ def _prepare_markdown(
 
     manifest.update({
         "schema_version": 2,
+        "transform_provider": "openai",
         "transform_model": "gpt-6-luna",
         "embedding_model": settings.embedding_model,
         "prompt_path": str(PROMPT_PATH),
@@ -193,6 +194,8 @@ def _prepare_markdown(
                 record["source_size_bytes"] = source_size
                 record["source_mtime_ns"] = source_mtime_ns
                 record["extracted_units"] = extracted_units
+                manifest["transform_provider"] = record.get("transform_provider", "openai")
+                manifest["transform_model"] = record.get("transform_model", "gpt-6-luna")
                 manifest["records"][key] = record
                 current_records[key] = record
                 LOGGER.info(
@@ -276,6 +279,17 @@ def _prepare_markdown(
                     raise RuntimeError("La extracción no produjo páginas o diapositivas con contenido.")
                 markers = expected_source_markers(extracted)
                 source_text = format_extracted_source(display, extracted)
+                if source_texts is not None:
+                    source_texts[key] = source_text
+                if source_unit_counts is not None:
+                    source_unit_counts[key] = len(extracted)
+                if source_visual_slide_numbers is not None:
+                    source_visual_slide_numbers[key] = sorted({
+                        int(document.metadata.get("slide_number"))
+                        for document in extracted
+                        if document.metadata.get("slide_number") is not None
+                        and (document.metadata.get("has_images") or "[Imagen:" in (document.page_content or ""))
+                    })
                 future = pool.submit(
                     sanitizer.transform_prepared_source,
                     settings,
@@ -531,6 +545,7 @@ def _build_markdown_index(
                 "source_markdown": part["markdown_relative_path"],
                 "source_sha256": record["source_sha256"],
                 "prompt_sha256": record["prompt_sha256"],
+                "transform_provider": record.get("transform_provider", "openai"),
                 "transform_model": record.get("transform_model", "gpt-6-luna"),
             }
             for field in (
@@ -731,7 +746,8 @@ def _index_incremental(
             "source_markdown": record["markdown_relative_path"],
             "source_sha256": record["source_sha256"],
             "prompt_sha256": record["prompt_sha256"],
-            "transform_model": "gpt-6-luna",
+            "transform_provider": record.get("transform_provider", "openai"),
+            "transform_model": record.get("transform_model", "gpt-6-luna"),
         }
         chunks = split_markdown_for_rag(markdown_path.read_text(encoding="utf-8"), metadata)
         if not chunks:
@@ -782,8 +798,9 @@ def ingest_sanitized_documents(
     workers: int = 2,
     vision_model_override: str | None = None,
     min_image_kb_override: int | None = None,
+    pre_index_validator: Callable[[Path, Path, str, dict[str, Any]], dict[str, Any] | None] | None = None,
 ) -> bool:
-    """Scan PDFs/PPTX, transform changed sources, and index only validated Markdown."""
+    """Scan PDF/PPTX/DOCX files, transform changed sources, and index validated Markdown."""
     del incremental  # Every run is hash-based and idempotent; rebuild is explicit via wipe_db.
     settings = get_settings()
     docs_dir = Path(docs_path or settings.docs_dir).resolve()
@@ -830,7 +847,7 @@ def ingest_sanitized_documents(
 
         sources = _discover_sources(docs_dir, file_path)
         if not sources:
-            LOGGER.info("No hay documentos PDF/PPTX pendientes en %s", docs_dir)
+            LOGGER.info("No hay documentos PDF/PPTX/DOCX pendientes en %s", docs_dir)
             return True
 
         if vision_model_override:
@@ -846,6 +863,42 @@ def ingest_sanitized_documents(
             use_vision=use_vision,
             workers=workers,
         )
+        if pre_index_validator and records:
+            approved_records: dict[str, dict[str, Any]] = {}
+            manifest = _load_manifest(manifest_path)
+            for key, record in records.items():
+                existing_audit = record.get("fidelity_audit") or {}
+                if (
+                    existing_audit.get("status") == "coincide"
+                    and existing_audit.get("source_sha256") == record.get("source_sha256")
+                    and existing_audit.get("markdown_sha256") == record.get("markdown_sha256")
+                ):
+                    approved_records[key] = record
+                    continue
+                try:
+                    audit = pre_index_validator(docs_dir, output_dir, key, record)
+                    if audit:
+                        if audit.get("status") != "coincide":
+                            raise RuntimeError(str(audit.get("summary") or "El Markdown requiere revisión de fidelidad."))
+                        audit.update({
+                            "source_sha256": record.get("source_sha256"),
+                            "markdown_sha256": record.get("markdown_sha256"),
+                        })
+                        record["fidelity_audit"] = audit
+                    approved_records[key] = record
+                    manifest["records"][key] = record
+                except Exception as exc:
+                    failures.append(key)
+                    record["fidelity_audit"] = {
+                        "status": "revisar",
+                        "summary": str(exc)[:1000],
+                        "source_sha256": record.get("source_sha256"),
+                        "markdown_sha256": record.get("markdown_sha256"),
+                    }
+                    manifest["records"][key] = record
+                    LOGGER.error("No se indexó %s: falló la validación de fidelidad (%s)", key, type(exc).__name__)
+            records = approved_records
+            _write_json(manifest_path, manifest)
         if failures:
             LOGGER.error("No se indexaron documentos con Markdown fallido: %s", failures)
             if wipe_db:

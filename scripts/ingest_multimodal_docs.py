@@ -68,6 +68,7 @@ VISION_PROMPT = (
     "Si es un logotipo, fotografía decorativa, banner promocional o imagen sin información técnica útil, "
     "responde exactamente [IMAGEN_NO_RELEVANTE]. Responde en español de forma concisa y técnica."
 )
+NON_RELEVANT_IMAGE_SENTINEL = "[IMAGEN_NO_RELEVANTE]"
 
 
 # =============================================================================
@@ -167,7 +168,7 @@ def is_significant_image(image_bytes: bytes, min_kb: int = 0) -> bool:
 def is_useful_image_description(description: Optional[str]) -> bool:
     """Rechaza negativas del modelo visual y descripciones no informativas."""
     text = (description or "").strip()
-    if not text or text.casefold() == "[imagen_no_relevante]":
+    if not text or is_non_relevant_image_description(text):
         return False
     if re.search(
         r"(?i)\b(lo siento|lamento|no puedo ayudar|no puedo describir|i am sorry|i'm sorry|i cannot help)\b",
@@ -175,6 +176,11 @@ def is_useful_image_description(description: Optional[str]) -> bool:
     ):
         return False
     return True
+
+
+def is_non_relevant_image_description(description: Optional[str]) -> bool:
+    """Reconoce la respuesta válida del prompt para imágenes decorativas."""
+    return (description or "").strip().casefold() == NON_RELEVANT_IMAGE_SENTINEL.casefold()
 
 
 # =============================================================================
@@ -228,70 +234,128 @@ def describe_image_with_vllm(
     max_image_size: int = 1024
 ) -> Optional[str]:
     """
-    Envía una imagen al Vision-LLM de Ollama y retorna la descripción textual generada.
-    Normaliza la imagen antes del envío para optimizar el uso de VRAM.
-    Utiliza una caché persistente en disco (SHA-256) para jamás repetir trabajo tras reinicios.
-    Retorna None si el modelo no está disponible o falla.
+    Describe an image with GPT-6 Luna first and Ollama only as the final fallback.
+    Cache entries are separated by provider, model, prompt, and image hash.
     """
-    # 1. Chequeo de caché persistente inmediata (0 segundos si ya se procesó antes)
+    settings = get_settings()
     img_hash = hashlib.sha256(image_bytes).hexdigest()
     cache = load_vision_cache()
-    if img_hash in cache:
-        logger.debug(f"[Vision-LLM] Imagen '{filename}' recuperada de caché local ({img_hash[:8]}).")
-        description = cache[img_hash]
+    prompt_hash = hashlib.sha256(VISION_PROMPT.encode("utf-8")).hexdigest()[:12]
+    primary_cache_key = f"openai:gpt-6-luna:{prompt_hash}:{img_hash}"
+    fallback_cache_key = f"ollama:{vision_model}:{prompt_hash}:{img_hash}"
+
+    def cached_description(key: str) -> Tuple[bool, Optional[str]]:
+        description = cache.get(key)
+        if not description:
+            return False, None
+        if is_non_relevant_image_description(description):
+            stats["images_skipped"] += 1
+            logger.debug("[Vision-LLM] Imagen '%s' marcada como no relevante en caché.", filename)
+            return True, None
         if not is_useful_image_description(description):
             stats["images_skipped"] += 1
-            return None
+            return False, None
         stats["images_described"] += 1
-        return description
+        logger.debug("[Vision-LLM] Imagen '%s' recuperada de caché (%s).", filename, key.split(":", 2)[0])
+        return True, description
+
+    cache_hit, cached = cached_description(primary_cache_key)
+    if cache_hit:
+        return cached
 
     try:
-        # Normalizar imagen
+        if not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY no está configurada para la interpretación visual.")
         normalized = normalize_image(image_bytes, max_size=max_image_size)
-        img_b64 = base64.b64encode(normalized).decode("utf-8")
+        img_b64 = base64.b64encode(normalized).decode("ascii")
+        payload = {
+            "model": "gpt-6-luna",
+            "messages": [
+                {"role": "system", "content": "Describe imágenes para soporte técnico. No inventes texto ni pasos."},
+                {"role": "user", "content": [
+                    {"type": "text", "text": VISION_PROMPT},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
+                ]},
+            ],
+            "max_completion_tokens": 512,
+            "reasoning_effort": "low",
+        }
+        headers = {
+            "Authorization": f"Bearer {settings.openai_api_key}",
+            "Content-Type": "application/json",
+        }
+        url = f"{settings.openai_base_url.rstrip('/')}/chat/completions"
+        with httpx.Client(timeout=max(float(timeout), float(settings.openai_timeout or 35.0))) as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+        result = response.json()
+        choice = (result.get("choices") or [{}])[0]
+        message = (choice.get("message") or {}).get("content", "")
+        if isinstance(message, list):
+            message = "\n".join(part.get("text", "") for part in message if isinstance(part, dict))
+        description = str(message).strip()
+        if is_non_relevant_image_description(description):
+            save_vision_cache_entry(primary_cache_key, NON_RELEVANT_IMAGE_SENTINEL)
+            stats["images_skipped"] += 1
+            logger.info(
+                "[Vision-LLM] OpenAI gpt-6-luna determinó que '%s' no contiene información útil; se omite sin fallback.",
+                filename,
+            )
+            return None
+        if not is_useful_image_description(description):
+            finish_reason = choice.get("finish_reason") or "desconocido"
+            raise RuntimeError(
+                f"GPT-6 Luna devolvió una salida vacía o no utilizable "
+                f"(finish_reason={finish_reason}, caracteres={len(description)})."
+            )
+        save_vision_cache_entry(primary_cache_key, description)
+        stats["images_described"] += 1
+        logger.info("[Vision-LLM] Imagen '%s' procesada por OpenAI gpt-6-luna.", filename)
+        return description
+    except Exception as primary_error:
+        logger.warning(
+            "[Vision-LLM] OpenAI gpt-6-luna no pudo procesar '%s' (%s: %s); se intenta Ollama como último recurso.",
+            filename,
+            type(primary_error).__name__,
+            str(primary_error)[:240],
+        )
 
+    cache_hit, cached = cached_description(fallback_cache_key)
+    if cache_hit:
+        return cached
+
+    try:
+        normalized = normalize_image(image_bytes, max_size=max_image_size)
+        img_b64 = base64.b64encode(normalized).decode("ascii")
         payload = {
             "model": vision_model,
             "prompt": VISION_PROMPT,
             "images": [img_b64],
             "stream": False,
-            "options": {
-                "temperature": 0.1,
-                "num_predict": 512
-            }
+            "options": {"temperature": 0.1, "num_predict": 512},
         }
-
         with httpx.Client(timeout=timeout) as client:
-            response = client.post(f"{ollama_url}/api/generate", json=payload)
-
-        if response.status_code == 200:
-            data = response.json()
-            description = data.get("response", "").strip()
-            if description:
-                if not is_useful_image_description(description):
-                    logger.info("[Vision-LLM] Se omite una descripción no útil para '%s'.", filename)
-                    stats["images_skipped"] += 1
-                    return None
-                logger.debug(f"[Vision-LLM] Imagen '{filename}' descrita ({len(description)} chars)")
-                stats["images_described"] += 1
-                # Guardar en disco inmediatamente de forma atómica
-                save_vision_cache_entry(img_hash, description)
-                return description
-            else:
-                logger.warning(f"[Vision-LLM] Respuesta vacía para imagen '{filename}'")
-                stats["vision_errors"] += 1
-                return None
-        else:
-            logger.warning(f"[Vision-LLM] HTTP {response.status_code} al describir '{filename}': {response.text[:200]}")
-            stats["vision_errors"] += 1
+            response = client.post(f"{ollama_url.rstrip('/')}/api/generate", json=payload)
+            response.raise_for_status()
+        description = str(response.json().get("response", "")).strip()
+        if is_non_relevant_image_description(description):
+            save_vision_cache_entry(fallback_cache_key, NON_RELEVANT_IMAGE_SENTINEL)
+            stats["images_skipped"] += 1
+            logger.info("[Vision-LLM] Ollama marcó '%s' como no relevante; se omite.", filename)
             return None
-
-    except httpx.ConnectError:
-        logger.warning(f"[Vision-LLM] No se pudo conectar a Ollama en {ollama_url}. Continuando sin interpretación visual.")
-        stats["vision_errors"] += 1
-        return None
-    except Exception as exc:
-        logger.warning(f"[Vision-LLM] Error al describir imagen '{filename}': {exc}")
+        if not is_useful_image_description(description):
+            stats["images_skipped"] += 1
+            return None
+        save_vision_cache_entry(fallback_cache_key, description)
+        stats["images_described"] += 1
+        logger.info("[Vision-LLM] Imagen '%s' procesada por Ollama (%s), último recurso.", filename, vision_model)
+        return description
+    except Exception as fallback_error:
+        logger.warning(
+            "[Vision-LLM] Fallaron OpenAI y Ollama para '%s' (%s).",
+            filename,
+            type(fallback_error).__name__,
+        )
         stats["vision_errors"] += 1
         return None
 
@@ -973,6 +1037,7 @@ def ingest_multimodal(
     audit_db: bool = False,
     vision_model_override: Optional[str] = None,
     min_image_kb_override: Optional[int] = None,
+    pre_index_validator=None,
 ) -> bool:
     """Compatibility entry point: raw PDF/PPTX input is sanitized to Markdown before indexing."""
     del model_name, similarity_threshold
@@ -998,6 +1063,7 @@ def ingest_multimodal(
         use_vision=True,
         vision_model_override=vision_model_override,
         min_image_kb_override=min_image_kb_override,
+        pre_index_validator=pre_index_validator,
     )
 
 

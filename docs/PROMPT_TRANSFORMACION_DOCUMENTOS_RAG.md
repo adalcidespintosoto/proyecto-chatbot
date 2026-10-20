@@ -4,7 +4,7 @@ Esta guía reemplaza el prompt editorial anterior. Está ajustada al procesamien
 
 ## Cómo procesa documentos UniMon hoy
 
-- El indexador principal extrae texto de PDF por página y de PowerPoint por diapositiva. También intenta describir imágenes con el modelo visual local configurado.
+- El indexador extrae texto de PDF por página, de PowerPoint por diapositiva y de Word `.docx` por sección o bloque con encabezado. También intenta describir imágenes relevantes.
 - Los fragmentos se generan con un tamaño aproximado de 800 caracteres y un solapamiento de 150 caracteres.
 - El embedding configurado es `intfloat/multilingual-e5-large`; el reranker configurado es `cross-encoder/ms-marco-MiniLM-L-6-v2`.
 - La búsqueda no debe depender de una carpeta o filtro por rol. Si el documento define permisos o un usuario autorizado, esa condición sí se conserva como parte del procedimiento.
@@ -13,7 +13,7 @@ Esta guía reemplaza el prompt editorial anterior. Está ajustada al procesamien
 
 ## Prompt para convertir el texto extraído a Markdown
 
-Copia el bloque siguiente y reemplaza `[CONTENIDO EXTRAÍDO]` por el texto del documento. Conserva las marcas `[PÁGINA n]` o `[DIAPOSITIVA n]` que acompañan el texto.
+Copia el bloque siguiente y reemplaza `[CONTENIDO EXTRAÍDO]` por el texto del documento. Conserva las marcas `[PÁGINA n]`, `[DIAPOSITIVA n]` o `[SECCIÓN n]` que acompañan el texto.
 
 ```text
 Eres un editor de documentación para UniMon, un asistente de soporte de TI de primera línea de la Universidad Simón Bolívar.
@@ -37,7 +37,7 @@ ORGANIZACIÓN
 2. Separa cada trámite o tarea diferente en una sección propia. No mezcles procedimientos que solo comparten el sistema.
 3. En cada procedimiento, presenta en este orden lo que exista en la fuente: para qué sirve, quién puede hacerlo o qué permiso necesita, requisitos, pasos ordenados, resultado esperado y errores o límites documentados.
 4. Mantén juntas las instrucciones que dependen unas de otras. Usa subtítulos breves para que un fragmento recuperado siga indicando de qué trámite habla. Prefiere conservar los detalles operativos antes que acortar el documento.
-5. Añade la página o diapositiva de origen cerca de cada paso o bloque: `(Fuente: diapositiva 8)` o `(Fuente: páginas 3–4)`. No inventes ubicaciones.
+5. Añade la página, diapositiva o sección de origen cerca de cada paso o bloque: `(Fuente: diapositiva 8)`, `(Fuente: páginas 3–4)` o `(Fuente: sección 2)`. No inventes ubicaciones.
 6. Si dos documentos entregados para una misma tarea se complementan, mantén visible qué dato viene de cuál archivo. Si discrepan, muestra la diferencia y no elijas una versión sin evidencia.
 7. No clasifiques el archivo en carpetas de estudiantes, docentes o administrativos. Menciona el público o los permisos únicamente cuando la propia fuente los indique; esa información orienta la seguridad del paso, no limita la búsqueda del RAG.
 

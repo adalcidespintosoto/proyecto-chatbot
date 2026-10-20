@@ -789,9 +789,9 @@
       return `<p>${formatted}</p>`;
     }
 
-    function sendMessage(text) {
+    function sendMessage(text, visibleText = null) {
       messageInput.value = text;
-      handleChatSubmit();
+      handleChatSubmit(null, visibleText);
     }
 
     function renderWelcomeMessage() {
@@ -895,7 +895,7 @@
           button.innerText = btn.label;
           button.onclick = () => {
             quickRepliesContainer.querySelectorAll('button').forEach(b => b.disabled = true);
-            sendMessage(btn.payload);
+            sendMessage(btn.payload, btn.label);
           };
           quickRepliesContainer.appendChild(button);
         });
@@ -941,13 +941,13 @@
       }
     }
 
-    async function handleChatSubmit(event) {
+    async function handleChatSubmit(event, visibleText = null) {
       if (event) event.preventDefault();
       const text = messageInput.value.trim();
       if (!text) return;
 
       // 1. Mostrar mensaje del usuario
-      addMessage('user', text);
+      addMessage('user', visibleText || text);
       messageInput.value = '';
       sendBtn.disabled = true;
 

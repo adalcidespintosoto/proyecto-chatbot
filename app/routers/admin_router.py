@@ -5,9 +5,11 @@ re-indexación en ChromaDB y consulta de estado del sistema.
 """
 
 import asyncio
+import hashlib
 import os
 import shutil
 import logging
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -37,6 +39,7 @@ from app.services.bot_instance_service import (
     BotInstanceError,
     bot_instance_manager,
 )
+from app.services.sanitized_documents import split_markdown_for_rag
 from app.services.llm_endpoint_security import validate_custom_llm_base_url
 from scripts.ingest_multimodal_docs import (
     ingest_multimodal,
@@ -66,6 +69,12 @@ class ResolveUploadRequest(BaseModel):
     staged_id: str = Field(..., pattern=r"^(?:[0-9a-f]{10}|[0-9a-f]{32})$", description="ID de sesión temporal de subida")
     action: str = Field(..., pattern=r"^(replace|deduplicate|force|cancel)$", description="Acción de resolución: 'replace', 'deduplicate', 'force' o 'cancel'")
     target_to_replace: Optional[str] = Field(default=None, description="Documento previo a purgar (opcional)")
+
+
+class ResolveInstanceUploadRequest(BaseModel):
+    staged_id: str = Field(..., pattern=r"^[0-9a-f]{32}$", description="ID temporal de la instancia")
+    action: str = Field(..., pattern=r"^(replace|deduplicate|force|cancel)$")
+    target_to_replace: Optional[str] = Field(default=None, max_length=180)
 
 
 class FidelityAuditRequest(BaseModel):
@@ -161,7 +170,13 @@ def extract_chunks_from_staged_file(file_path: Path) -> List[Document]:
         try:
             import docx
             doc = docx.Document(str(file_path))
-            txt = "\n".join([p.text for p in doc.paragraphs if p.text.strip()]).strip()
+            parts = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            for table in doc.tables:
+                for row in table.rows:
+                    cells = [cell.text.strip().replace("\n", " / ") for cell in row.cells]
+                    if any(cells):
+                        parts.append(" | ".join(cells))
+            txt = "\n".join(parts).strip()
             if txt:
                 docs.append(Document(page_content=txt, metadata={"source": orig_name}))
         except Exception as exc:
@@ -239,7 +254,7 @@ async def get_admin_dashboard():
 @router.get(
     "/api/admin/docs",
     summary="Listar Documentos de la Base de Conocimiento",
-    description="Relaciona fuentes PDF/PPTX con su Markdown validado, estado de indexación y auditorías de fidelidad."
+    description="Relaciona fuentes PDF/PPTX/DOCX con su Markdown validado, estado de indexación y auditorías de fidelidad."
 )
 async def list_documents() -> Dict[str, Any]:
     """Lista fuentes, Markdown generado, estado Chroma y auditorías de fidelidad."""
@@ -283,9 +298,11 @@ async def document_source(source_path: str = Query(..., min_length=1, max_length
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    media_type = "application/pdf" if path.suffix.lower() == ".pdf" else (
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    )
+    media_type = {
+        ".pdf": "application/pdf",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }.get(path.suffix.lower(), "application/octet-stream")
     content_disposition = f"inline; filename*=UTF-8''{quote(path.name)}"
     return FileResponse(
         path,
@@ -328,7 +345,7 @@ async def audit_document_fidelity(request: FidelityAuditRequest) -> Dict[str, An
 @router.post(
     "/api/admin/upload-doc",
     summary="Subir Documento a la Base de Conocimiento",
-    description="Sube un documento a data/docs; la indexación automática convierte PDF/PPTX a Markdown antes de usar ChromaDB."
+    description="Sube un documento a data/docs; la indexación automática convierte PDF/PPTX/DOCX a Markdown antes de usar ChromaDB."
 )
 async def upload_document(
     file: UploadFile = File(...),
@@ -337,8 +354,8 @@ async def upload_document(
 ) -> Dict[str, Any]:
     """Recibe un archivo y lo almacena en la estructura de data/docs/."""
     filename = validated_filename(file.filename)
-    if Path(filename).suffix.lower() not in {".pdf", ".pptx"}:
-        raise HTTPException(status_code=415, detail="La ingesta Markdown admite únicamente archivos PDF y PPTX.")
+    if Path(filename).suffix.lower() not in {".pdf", ".pptx", ".docx"}:
+        raise HTTPException(status_code=415, detail="La ingesta Markdown admite archivos PDF, PPTX y DOCX.")
 
     # Determinar subdirectorio según audiencia
     subfolder_name = AUDIENCE_FOLDER_MAP.get(audience.lower().strip(), "4_general_normativa")
@@ -401,8 +418,8 @@ async def audit_document(
 ) -> Dict[str, Any]:
     """Analiza en memoria/staging un documento para calcular solapamiento semántico y ambigüedad contra ChromaDB."""
     filename = validated_filename(file.filename)
-    if Path(filename).suffix.lower() not in {".pdf", ".pptx"}:
-        raise HTTPException(status_code=415, detail="La ingesta Markdown admite únicamente archivos PDF y PPTX.")
+    if Path(filename).suffix.lower() not in {".pdf", ".pptx", ".docx"}:
+        raise HTTPException(status_code=415, detail="La ingesta Markdown admite archivos PDF, PPTX y DOCX.")
 
     staged_id = uuid.uuid4().hex
     staged_filename = f"{staged_id}_{filename}"
@@ -1108,10 +1125,400 @@ async def get_chatbot_instance_metrics(
     return {"status": "success", "bot_id": bot_id, "metrics": get_chatbot_instance_kpis(bot_id, start_date, end_date)}
 
 
+def _instance_upload_stage(paths: Any, staged_id: str) -> tuple[Path, Path, Path]:
+    """Resolve and constrain temporary upload paths to one chatbot instance."""
+    if not re.fullmatch(r"[0-9a-f]{32}", staged_id or ""):
+        raise HTTPException(status_code=422, detail="La sesión temporal no es válida.")
+    root = paths.root.resolve()
+    staging_root = (root / ".staged_uploads").resolve()
+    if root not in staging_root.parents:
+        raise HTTPException(status_code=400, detail="La carpeta temporal de la instancia no es válida.")
+    staging_root.mkdir(parents=True, exist_ok=True)
+    stage_dir = (staging_root / staged_id).resolve()
+    if staging_root not in stage_dir.parents:
+        raise HTTPException(status_code=400, detail="La ruta temporal de la instancia no es válida.")
+    return stage_dir, stage_dir / "source", stage_dir / "sanitized_docs"
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _serialize_redundancy_report(rep: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    overlapping_sources = []
+    for source, data in sorted(
+        (rep.get("overlapping_sources") or {}).items(),
+        key=lambda item: item[1].get("max_similarity", 0),
+        reverse=True,
+    ):
+        overlapping_sources.append({
+            "source": str(source),
+            "matched_chunks": int(data.get("count", 0)),
+            "redundant_count": int(data.get("redundant_count", 0)),
+            "ambiguous_count": int(data.get("ambiguous_count", 0)),
+            "max_similarity": round(float(data.get("max_similarity", 0.0)) * 100, 1),
+            "sample_snippet": str(data.get("sample_snippet") or ""),
+            "matched_sample_snippet": str(data.get("matched_sample_snippet") or ""),
+        })
+    detailed_chunks = []
+    for index, item in enumerate(rep.get("chunk_results") or [], start=1):
+        chunk = item.get("chunk")
+        detailed_chunks.append({
+            "index": index,
+            "content_snippet": chunk.page_content.strip() if chunk else "",
+            "matched_chunk_snippet": str(item.get("matched_chunk_snippet") or ""),
+            "similarity": round(float(item.get("similarity", 0.0)) * 100, 1),
+            "matched_source": item.get("matched_source") or "Ninguno",
+            "is_redundant": bool(item.get("is_redundant", False)),
+            "is_ambiguous": bool(item.get("is_ambiguous", False)),
+            "status": item.get("status", "novel"),
+        })
+    return overlapping_sources, detailed_chunks
+
+
+async def _finish_instance_document_upload(
+    bot_id: str,
+    profile: Any,
+    paths: Any,
+    filename: str,
+) -> dict[str, Any]:
+    specialization_path = None
+    warning = None
+    try:
+        specialization_path = await run_in_threadpool(bot_instance_manager.refresh_specialization_profile, bot_id)
+    except Exception as exc:
+        logger.warning("El documento se indexó, pero no se pudo actualizar el perfil de '%s': %s", bot_id, type(exc).__name__)
+        warning = "El documento y el índice se actualizaron, pero el perfil de especialidad no pudo actualizarse."
+    return {
+        "status": "success",
+        "message": warning or f"'{filename}' quedó convertido a Markdown e indexado para {profile.dependency_name}; el perfil de especialidad también se actualizó.",
+        "specialization_profile": str(specialization_path) if specialization_path else None,
+        "instance": profile.admin_config(paths),
+    }
+
+
+@router.post(
+    "/api/admin/chatbot-instances/{bot_id}/documents/audit",
+    summary="Analizar ambigüedad y redundancia antes de cargar a una instancia",
+    description="Genera Markdown validado, lo compara con el original y mide similitud únicamente contra el índice privado de la instancia.",
+)
+async def audit_chatbot_instance_document(
+    bot_id: str,
+    file: UploadFile = File(...),
+    threshold: float = Form(0.85, ge=0.0, le=1.0),
+    ambiguity_threshold: float = Form(0.65, ge=0.0, le=1.0),
+) -> Dict[str, Any]:
+    profile = bot_instance_manager.get(bot_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="No existe una instancia activa con ese identificador.")
+    filename = validated_filename(file.filename)
+    if Path(filename).suffix.casefold() not in {".pdf", ".pptx", ".docx"}:
+        raise HTTPException(status_code=415, detail="Solo se admiten documentos PDF, PPTX y DOCX.")
+
+    async with bot_instance_manager.get_ingestion_lock(bot_id):
+        paths = bot_instance_manager.paths(bot_id)
+        if (paths.docs / filename).exists():
+            raise HTTPException(status_code=409, detail="Ya existe un documento con ese nombre en esta instancia. Cambia el nombre antes de analizarlo.")
+        staged_id = uuid.uuid4().hex
+        stage_dir, source_dir, output_dir = _instance_upload_stage(paths, staged_id)
+        source_dir.mkdir(parents=True, exist_ok=False)
+        staged_source = source_dir / filename
+        try:
+            await save_upload(file, staged_source, settings.max_upload_size_mb * 1024 * 1024)
+            runtime = bot_instance_manager.get_runtime(bot_id)
+            prepared = await run_in_threadpool(runtime.prepare_document_for_audit, staged_source, output_dir)
+            record = prepared["record"]
+            relative_markdown = Path(str(record.get("markdown_relative_path") or ""))
+            markdown_path = (output_dir / relative_markdown).resolve()
+            if output_dir.resolve() not in markdown_path.parents or not markdown_path.is_file():
+                raise RuntimeError("No se encontró el Markdown validado dentro del área temporal de la instancia.")
+            if _sha256_path(staged_source) != record.get("source_sha256") or _sha256_path(markdown_path) != record.get("markdown_sha256"):
+                raise RuntimeError("El original o el Markdown cambió después de la validación de fidelidad.")
+
+            audit = prepared["fidelity_audit"]
+            if prepared.get("status") == "review_required" or audit.get("status") != "coincide":
+                meta = {
+                    "bot_id": bot_id,
+                    "staged_id": staged_id,
+                    "filename": filename,
+                    "source_sha256": record["source_sha256"],
+                    "markdown_sha256": record["markdown_sha256"],
+                    "record": record,
+                    "fidelity_audit": audit,
+                    "status": "review_required",
+                    "created_at": datetime.now().isoformat(),
+                }
+                meta_path = stage_dir / "audit.json"
+                meta_tmp = stage_dir / "audit.json.tmp"
+                meta_tmp.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+                os.replace(meta_tmp, meta_path)
+                return {
+                    "status": "review_required",
+                    "bot_id": bot_id,
+                    "staged_id": staged_id,
+                    "filename": filename,
+                    "message": "El borrador no alcanzó una coincidencia verificable después de la corrección automática. Se conservó para revisión y no se indexó.",
+                    "fidelity_audit": audit,
+                    "fidelity_repair_attempts": prepared.get("fidelity_repair_attempts", 0),
+                    "markdown_preview": markdown_path.read_text(encoding="utf-8")[:12000],
+                    "markdown_preview_truncated": markdown_path.stat().st_size > 12000,
+                }
+
+            chunks = split_markdown_for_rag(
+                markdown_path.read_text(encoding="utf-8"),
+                {
+                    "source": filename,
+                    "source_filename": filename,
+                    "source_path": filename,
+                    "indexed_format": "markdown",
+                },
+            )
+            vector_store = runtime.rag.vector_store
+            embeddings = runtime.rag.embeddings
+            if vector_store is None or embeddings is None:
+                raise RuntimeError("El índice privado o el modelo de embeddings no están disponibles para el análisis.")
+            rep = calculate_chunk_redundancy(
+                chunks=chunks,
+                vector_store=vector_store,
+                embeddings=embeddings,
+                threshold=threshold,
+                ambiguity_threshold=ambiguity_threshold,
+                exclude_source=None,
+                batch_size=32,
+            )
+            if len(rep.get("chunk_results") or []) != len(chunks):
+                raise RuntimeError("No se pudo comparar todo el Markdown con el índice privado.")
+
+            overlapping_sources, detailed_chunks = _serialize_redundancy_report(rep)
+            redundancy_ratio = round(float(rep.get("redundancy_ratio", 0.0)), 1)
+            ambiguity_ratio = round(float(rep.get("ambiguity_ratio", 0.0)), 1)
+            redundant_count = int(rep.get("redundant_count", 0))
+            ambiguous_count = int(rep.get("ambiguous_count", 0))
+            total_chunks = len(chunks)
+            overall_status = "redundant" if redundant_count or redundancy_ratio >= 20.0 else (
+                "ambiguous" if ambiguous_count or ambiguity_ratio >= 10.0 else "clean"
+            )
+            metrics = {
+                "total_chunks": total_chunks,
+                "novel_chunks": int(rep.get("novel_count", 0)),
+                "ambiguous_chunks": ambiguous_count,
+                "redundant_chunks": redundant_count,
+                "ambiguity_ratio": ambiguity_ratio,
+                "redundancy_ratio": redundancy_ratio,
+            }
+            meta = {
+                "bot_id": bot_id,
+                "staged_id": staged_id,
+                "filename": filename,
+                "source_sha256": record["source_sha256"],
+                "markdown_sha256": record["markdown_sha256"],
+                "record": record,
+                "fidelity_audit": audit,
+                "primary_overlapping_source": overlapping_sources[0]["source"] if overlapping_sources else None,
+                "overlapping_sources": [item["source"] for item in overlapping_sources],
+                "metrics": metrics,
+                "overall_status": overall_status,
+                "created_at": datetime.now().isoformat(),
+            }
+            meta_path = stage_dir / "audit.json"
+            meta_tmp = stage_dir / "audit.json.tmp"
+            meta_tmp.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(meta_tmp, meta_path)
+            return {
+                "status": "success",
+                "bot_id": bot_id,
+                "staged_id": staged_id,
+                "filename": filename,
+                "threshold": threshold,
+                "ambiguity_threshold": ambiguity_threshold,
+                "ambiguity_detected": bool(ambiguous_count or ambiguity_ratio >= 10.0),
+                "redundancy_detected": bool(redundant_count or redundancy_ratio >= 20.0),
+                "overall_status": overall_status,
+                "metrics": metrics,
+                "fidelity_audit": {
+                    "status": audit.get("status"),
+                    "summary": audit.get("summary"),
+                    "provider": audit.get("provider"),
+                    "model": audit.get("model"),
+                    "contingency": audit.get("contingency", False),
+                },
+                "primary_overlapping_source": meta["primary_overlapping_source"],
+                "overlapping_sources": overlapping_sources,
+                "detailed_chunks": detailed_chunks,
+            }
+        except HTTPException:
+            shutil.rmtree(stage_dir, ignore_errors=True)
+            raise
+        except Exception as exc:
+            shutil.rmtree(stage_dir, ignore_errors=True)
+            logger.exception("Falló la preauditoría del documento de '%s' (%s)", bot_id, filename)
+            raise HTTPException(
+                status_code=422,
+                detail="No se pudo validar y analizar el documento. No se agregó al índice de esta dependencia.",
+            ) from exc
+
+
+@router.post(
+    "/api/admin/chatbot-instances/{bot_id}/documents/resolve",
+    summary="Resolver la auditoría de un documento de instancia",
+    description="Indexa el Markdown validado solo en el Chroma privado de la instancia o descarta la carga temporal.",
+)
+async def resolve_chatbot_instance_document(
+    bot_id: str,
+    request: ResolveInstanceUploadRequest,
+) -> Dict[str, Any]:
+    profile = bot_instance_manager.get(bot_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="No existe una instancia activa con ese identificador.")
+    async with bot_instance_manager.get_ingestion_lock(bot_id):
+        paths = bot_instance_manager.paths(bot_id)
+        stage_dir, source_dir, output_dir = _instance_upload_stage(paths, request.staged_id)
+        meta_path = stage_dir / "audit.json"
+        if not meta_path.is_file() or meta_path.is_symlink():
+            raise HTTPException(status_code=404, detail="La auditoría temporal no existe o ya fue procesada.")
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=409, detail="No se pudo leer la auditoría temporal; vuelve a analizar el archivo.") from exc
+        if meta.get("bot_id") != bot_id or meta.get("staged_id") != request.staged_id:
+            raise HTTPException(status_code=403, detail="La auditoría no corresponde a esta instancia.")
+        filename = validated_filename(meta.get("filename"))
+        staged_source = source_dir / filename
+        if request.action == "cancel":
+            shutil.rmtree(stage_dir, ignore_errors=True)
+            return {"status": "cancelled", "action": "cancel", "filename": filename, "message": "Se descartó el archivo temporal; la instancia no tuvo cambios."}
+        if not staged_source.is_file() or staged_source.is_symlink():
+            raise HTTPException(status_code=404, detail="No se encontró el original temporal; vuelve a cargarlo.")
+        if _sha256_path(staged_source) != meta.get("source_sha256"):
+            raise HTTPException(status_code=409, detail="El original cambió desde la auditoría; vuelve a analizarlo.")
+
+        target_to_replace = None
+        if request.action == "replace":
+            try:
+                target_to_replace = validated_filename(request.target_to_replace)
+            except HTTPException as exc:
+                raise HTTPException(status_code=422, detail="Selecciona el documento de esta instancia que quieres reemplazar.") from exc
+            if target_to_replace not in set(meta.get("overlapping_sources") or []) or target_to_replace == filename:
+                raise HTTPException(status_code=422, detail="El documento seleccionado no pertenece a las coincidencias de esta auditoría.")
+            if not (paths.docs / target_to_replace).is_file():
+                raise HTTPException(status_code=404, detail="El documento seleccionado ya no está en esta instancia.")
+
+        record = meta.get("record")
+        if not isinstance(record, dict) or record.get("status") != "success":
+            raise HTTPException(status_code=409, detail="La auditoría no contiene un Markdown validado; analiza el archivo de nuevo.")
+        if (meta.get("fidelity_audit") or {}).get("status") != "coincide":
+            raise HTTPException(status_code=422, detail="El Markdown no coincide suficientemente con el original y no se puede indexar.")
+        relative_markdown = Path(str(record.get("markdown_relative_path") or ""))
+        staged_markdown = (output_dir / relative_markdown).resolve()
+        if output_dir.resolve() not in staged_markdown.parents or not staged_markdown.is_file() or staged_markdown.is_symlink():
+            raise HTTPException(status_code=409, detail="No se encontró el Markdown temporal validado; vuelve a analizar el archivo.")
+        if _sha256_path(staged_markdown) != meta.get("markdown_sha256"):
+            raise HTTPException(status_code=409, detail="El Markdown cambió después de su validación; vuelve a analizar el archivo.")
+
+        paths.docs.mkdir(parents=True, exist_ok=True)
+        paths.markdown.mkdir(parents=True, exist_ok=True)
+        instance_root = paths.root.resolve()
+        for storage_path in (paths.docs, paths.markdown):
+            if instance_root not in storage_path.resolve().parents:
+                raise HTTPException(status_code=400, detail="Una carpeta de datos apunta fuera de esta instancia.")
+        manifest_path = paths.markdown / "manifest.json"
+        if manifest_path.is_symlink():
+            raise HTTPException(status_code=400, detail="El manifiesto de esta instancia no tiene una ruta válida.")
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {"schema_version": 2, "records": {}}
+            if not isinstance(manifest, dict) or not isinstance(manifest.get("records", {}), dict):
+                raise ValueError("estructura inválida")
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="El manifiesto de esta instancia no se puede leer; no se indexó el documento.") from exc
+        destination = paths.docs / filename
+        if destination.is_symlink():
+            raise HTTPException(status_code=400, detail="El destino del documento no es válido.")
+        if destination.exists() and _sha256_path(destination) != meta["source_sha256"]:
+            raise HTTPException(status_code=409, detail="Ya existe otro documento con ese nombre en esta instancia.")
+        final_markdown = (paths.markdown / relative_markdown).resolve()
+        if paths.markdown.resolve() not in final_markdown.parents:
+            raise HTTPException(status_code=400, detail="La ruta del Markdown no es válida para esta instancia.")
+        final_markdown.parent.mkdir(parents=True, exist_ok=True)
+        if final_markdown.is_symlink():
+            raise HTTPException(status_code=400, detail="El destino del Markdown no es válido.")
+        if final_markdown.exists() and _sha256_path(final_markdown) != meta["markdown_sha256"]:
+            raise HTTPException(status_code=409, detail="Ya existe un Markdown distinto para este documento.")
+        created_source = False
+        created_markdown = False
+        manifest_tmp = manifest_path.with_name(f".{request.staged_id}-manifest.tmp")
+        try:
+            if not destination.exists():
+                temporary_source = paths.docs / f".upload-{request.staged_id}-{filename}"
+                try:
+                    shutil.copy2(staged_source, temporary_source)
+                    os.replace(temporary_source, destination)
+                    created_source = True
+                finally:
+                    temporary_source.unlink(missing_ok=True)
+            if not final_markdown.exists():
+                temporary_markdown = final_markdown.with_name(f".{request.staged_id}-{final_markdown.name}.tmp")
+                try:
+                    shutil.copyfile(staged_markdown, temporary_markdown)
+                    os.replace(temporary_markdown, final_markdown)
+                    created_markdown = True
+                finally:
+                    temporary_markdown.unlink(missing_ok=True)
+
+            source_stat = destination.stat()
+            record.update({
+                "source_path": filename,
+                "source": filename,
+                "source_filename": filename,
+                "source_size_bytes": source_stat.st_size,
+                "source_mtime_ns": source_stat.st_mtime_ns,
+                "fidelity_audit": meta["fidelity_audit"],
+            })
+            manifest.setdefault("records", {})[filename] = record
+            manifest["transform_provider"] = record.get("transform_provider", "openai")
+            manifest["transform_model"] = record.get("transform_model", "gpt-6-luna")
+            manifest_tmp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(manifest_tmp, manifest_path)
+        except Exception:
+            if created_source:
+                destination.unlink(missing_ok=True)
+            if created_markdown:
+                final_markdown.unlink(missing_ok=True)
+            raise
+        finally:
+            manifest_tmp.unlink(missing_ok=True)
+
+        try:
+            runtime = bot_instance_manager.get_runtime(bot_id)
+            indexed = await run_in_threadpool(runtime.ingest_document, paths, str(destination))
+            if not indexed:
+                raise RuntimeError("La transformación o indexación Markdown no terminó correctamente.")
+            if target_to_replace:
+                removed = await run_in_threadpool(runtime.delete_document, paths, target_to_replace)
+                if not removed:
+                    raise RuntimeError("El documento nuevo se indexó, pero no fue posible retirar la versión anterior.")
+        except Exception as exc:
+            logger.error("No se pudo completar la carga auditada '%s' de '%s': %s", filename, bot_id, exc, exc_info=True)
+            raise HTTPException(
+                status_code=422,
+                detail="El archivo y su Markdown validado se conservaron en la instancia, pero la indexación no terminó. Puedes reintentar la acción desde la misma auditoría.",
+            ) from exc
+
+        shutil.rmtree(stage_dir, ignore_errors=True)
+        result = await _finish_instance_document_upload(bot_id, profile, paths, filename)
+        result["action"] = request.action
+        if request.action == "deduplicate":
+            result["message"] = f"'{filename}' quedó indexado en {profile.dependency_name}. Se conservaron todos los fragmentos; el análisis solo informa similitud y no elimina evidencia automáticamente."
+        return result
+
+
 @router.post(
     "/api/admin/chatbot-instances/{bot_id}/documents",
-    summary="Cargar e indexar documentos de un chatbot",
-    description="Conserva el PDF/PPTX y genera Markdown e índice vectorial aislados para la dependencia.",
+    summary="Subir directamente e indexar un documento de un chatbot",
+    description="Conserva PDF/PPTX/DOCX, genera Markdown, verifica su fidelidad al original y lo indexa exclusivamente en el Chroma de la dependencia.",
 )
 async def upload_chatbot_instance_document(
     bot_id: str,
@@ -1121,8 +1528,8 @@ async def upload_chatbot_instance_document(
     if profile is None:
         raise HTTPException(status_code=404, detail="No existe una instancia activa con ese identificador.")
     filename = validated_filename(file.filename)
-    if Path(filename).suffix.casefold() not in {".pdf", ".pptx"}:
-        raise HTTPException(status_code=415, detail="Solo se admiten documentos PDF y PPTX.")
+    if Path(filename).suffix.casefold() not in {".pdf", ".pptx", ".docx"}:
+        raise HTTPException(status_code=415, detail="Solo se admiten documentos PDF, PPTX y DOCX.")
 
     async with bot_instance_manager.get_ingestion_lock(bot_id):
         paths = bot_instance_manager.paths(bot_id)
@@ -1133,7 +1540,6 @@ async def upload_chatbot_instance_document(
                 status_code=409,
                 detail="Ya existe un documento con ese nombre en esta instancia. Cambia el nombre del archivo antes de cargarlo.",
             )
-
         await save_upload(file, destination, settings.max_upload_size_mb * 1024 * 1024)
         try:
             runtime = bot_instance_manager.get_runtime(bot_id)
@@ -1144,23 +1550,9 @@ async def upload_chatbot_instance_document(
             logger.error("No se indexó '%s' para el chatbot '%s': %s", filename, bot_id, exc, exc_info=True)
             raise HTTPException(
                 status_code=422,
-                detail="El archivo se conservó en la instancia, pero no se pudo convertir e indexar. Revisa el estado de la ingesta en la terminal.",
+                detail="El archivo se conservó en la instancia, pero no se pudo validar o indexar. Revisa el estado de la ingesta en la terminal.",
             ) from exc
-
-        specialization_path = None
-        specialization_warning = None
-        try:
-            specialization_path = await run_in_threadpool(bot_instance_manager.refresh_specialization_profile, bot_id)
-        except Exception as exc:
-            logger.warning("El documento se indexó, pero no se pudo actualizar el perfil de '%s': %s", bot_id, type(exc).__name__)
-            specialization_warning = "El documento y el índice se actualizaron, pero el perfil de especialidad no pudo actualizarse. Revisa la carpeta de datos antes de probar el router."
-
-        return {
-            "status": "success",
-            "message": specialization_warning or f"'{filename}' quedó convertido a Markdown e indexado para {profile.dependency_name}; el perfil de especialidad también se actualizó.",
-            "specialization_profile": str(specialization_path) if specialization_path else None,
-            "instance": profile.admin_config(paths),
-        }
+        return await _finish_instance_document_upload(bot_id, profile, paths, filename)
 
 
 # =============================================================================

@@ -351,34 +351,41 @@ async def process_chatbot_instance(bot_id: str, request: ChatRequest) -> ChatRes
     )
     answer = result["response"]
     telemetry_session_id = f"bot_{bot_id}_{session_id}"
+    feedback = result.get("feedback", "NONE")
+    response_type = result.get("state") or "DIAGNOSTICO"
     try:
         log_interaction(
             session_id=telemetry_session_id,
             role=f"dependencia:{bot_id}",
-            query=question,
+            query=result.get("feedback_query") or question,
             bot_response=answer,
-            intent="DIAGNOSTICO",
-            source=f"CHATBOT_INSTANCE:{bot_id}",
+            intent=response_type,
+            source=result.get("source") or f"CHATBOT_INSTANCE:{bot_id}",
             docs=result.get("sources") or [],
             latency_ms=round(latency_ms, 2),
             prompt_tokens=prompt_tokens,
             cached_tokens=cached_tokens,
             eval_tokens=eval_tokens,
+            feedback=feedback,
+            golden_cache_used=result.get("golden_cache_used", False),
+            golden_cache_similarity=result.get("golden_cache_similarity"),
             llm_calls=llm_calls,
             usage_tracked=usage_tracked,
         )
+        if response_type == "FINALIZADO":
+            update_session_status(telemetry_session_id, "FINALIZADO", escalated=False)
     except Exception as exc:
         logger.warning("No se pudo registrar telemetría del chatbot '%s': %s", bot_id, type(exc).__name__)
     return ChatResponse(
-        tipo="DIAGNOSTICO",
+        tipo=response_type,
         mensaje=answer,
         session_id=session_id,
-        intent="DIAGNOSTICO",
+        intent=response_type,
         reply=answer,
-        state="DIAGNOSTICO",
+        state=response_type,
         response=answer,
-        quick_replies=[],
-        source=f"{bot_id}_RAG",
+        quick_replies=result.get("quick_replies", []),
+        source=result.get("source") or f"{bot_id}_RAG",
         sources=result.get("sources") or [],
     )
 

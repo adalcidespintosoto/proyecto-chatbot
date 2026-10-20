@@ -11,6 +11,7 @@ import logging
 import json
 import re
 import hashlib
+import threading
 from typing import Optional, Tuple, List, Dict, Any
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -30,11 +31,17 @@ EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-large"
 
 _embedding_model = None
 _golden_collection = None
+_instance_golden_collections: dict[str, Any] = {}
+_golden_collection_lock = threading.RLock()
 
 # Patrones de respuestas no aptas para almacenar en Golden Cache (fallbacks, rechazos o alucinaciones)
 INVALID_RESPONSE_PATTERNS = [
     r"no dispongo de un instructivo",
     r"no dispongo de un procedimiento",
+    r"no encuentro una gu[ií]a cargada",
+    r"no encuentro informaci[oó]n suficiente",
+    r"no cuento con (?:una gu[ií]a|informaci[oó]n)",
+    r"no pude generar una orientaci[oó]n confiable",
     r"fuera de (mi|nuestro) dominio",
     r"exclusivamente en soporte",
     r"ocurri[oó] un inconveniente",
@@ -137,22 +144,41 @@ def get_embedding_model() -> SentenceTransformer:
     return _embedding_model
 
 
-def get_golden_collection():
-    """Inicialización diferida (singleton) de la colección ChromaDB para casos resueltos."""
+def _golden_path_for_instance(bot_id: str | None = None) -> str:
+    if not bot_id:
+        return CHROMA_PATH
+    from app.services.bot_instance_service import bot_instance_manager
+
+    return str(bot_instance_manager.paths(bot_id).root / "golden_cache")
+
+
+def get_golden_collection(bot_id: str | None = None):
+    """Devuelve el Golden Cache de UniMon o el aislado de una dependencia."""
     global _golden_collection
-    if _golden_collection is None:
-        client = chromadb.PersistentClient(path=CHROMA_PATH)
-        _golden_collection = client.get_or_create_collection(
+    with _golden_collection_lock:
+        if bot_id and bot_id in _instance_golden_collections:
+            return _instance_golden_collections[bot_id]
+        if not bot_id and _golden_collection is not None:
+            return _golden_collection
+
+        storage_path = _golden_path_for_instance(bot_id)
+        client = chromadb.PersistentClient(path=storage_path)
+        collection = client.get_or_create_collection(
             name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"}
+            metadata={"hnsw:space": "cosine"},
         )
+        if bot_id:
+            _instance_golden_collections[bot_id] = collection
+        else:
+            _golden_collection = collection
         logger.info(
-            "[GoldenCache] Colección '%s' inicializada desde %s (%d casos).",
+            "[GoldenCache] Colección '%s' inicializada para %s desde %s (%d casos).",
             COLLECTION_NAME,
-            os.path.abspath(CHROMA_PATH),
-            _golden_collection.count(),
+            bot_id or "UniMon",
+            os.path.abspath(storage_path),
+            collection.count(),
         )
-    return _golden_collection
+        return collection
 
 
 def init_golden_cache():
@@ -161,33 +187,39 @@ def init_golden_cache():
     get_golden_collection()
 
 
-def clear_golden_cache() -> bool:
+def clear_golden_cache(bot_id: str | None = None) -> bool:
     """
-    Elimina todos los registros de la colección golden_resolved_qa para limpiar casos viciados.
+    Elimina el Golden Cache de UniMon o únicamente el de la instancia indicada.
     
     Returns:
         True si se purgó exitosamente, False en caso de error.
     """
     global _golden_collection
     try:
-        client = chromadb.PersistentClient(path=CHROMA_PATH)
-        try:
-            client.delete_collection(COLLECTION_NAME)
-        except Exception:
-            pass
-        _golden_collection = None
-        logger.info("[GoldenCache] Colección golden_resolved_qa purgada exitosamente.")
+        with _golden_collection_lock:
+            storage_path = _golden_path_for_instance(bot_id)
+            client = chromadb.PersistentClient(path=storage_path)
+            try:
+                client.delete_collection(COLLECTION_NAME)
+            except Exception:
+                pass
+            if bot_id:
+                _instance_golden_collections.pop(bot_id, None)
+            else:
+                _golden_collection = None
+        logger.info("[GoldenCache] Colección de %s purgada exitosamente.", bot_id or "UniMon")
         return True
     except Exception as e:
         logger.warning(f"[GoldenCache] Error al purgar colección: {e}")
         return False
 
 
-def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
+def is_valid_for_golden_cache(user_query: str, bot_response: str, bot_id: str | None = None) -> bool:
     """
-    Valida la calidad y confiabilidad de la interacción antes de almacenarla en Golden Cache.
+    Valida la calidad antes de guardar la interacción en Golden Cache.
     Evita envenenamiento de caché con alucinaciones, respuestas de fallback, footers aislados
-    o disculpas de LLM.
+    o disculpas de LLM. Las reglas de alcance exclusivas de UniMon TI no se aplican
+    a colecciones aisladas de otras dependencias.
     """
     if not user_query or len(user_query.strip()) < 5:
         logger.debug("[GoldenCache] Descartado: consulta vacía o demasiado corta.")
@@ -229,14 +261,15 @@ def is_valid_for_golden_cache(user_query: str, bot_response: str) -> bool:
             return False
 
     # Descartar reclamos de notas (trámites fuera de alcance TI)
-    if any(k in user_query.lower() for k in ["cambiar nota", "corregir nota", "subir nota", "reclamo calificacion", "clavaron"]):
+    if not bot_id and any(k in user_query.lower() for k in ["cambiar nota", "corregir nota", "subir nota", "reclamo calificacion", "clavaron"]):
         logger.info("[GoldenCache] Descartado: trámite académico fuera de alcance TI.")
         return False
 
-    is_anom, anom_reason = is_anomalous_golden_pair(user_query, bot_response)
-    if is_anom:
-        logger.info(f"[GoldenCache] Descartado por par anómalo/incompatible: {anom_reason}")
-        return False
+    if not bot_id:
+        is_anom, anom_reason = is_anomalous_golden_pair(user_query, bot_response)
+        if is_anom:
+            logger.info(f"[GoldenCache] Descartado por par anómalo/incompatible: {anom_reason}")
+            return False
 
     return True
 
@@ -280,6 +313,7 @@ def save_golden_case(
     bot_response: str,
     role: str = "general",
     source_refs: Optional[List[Dict[str, Any]]] = None,
+    bot_id: str | None = None,
 ) -> bool:
     """
     Guarda o actualiza una interacción validada con feedback positivo en la colección golden tras pasar control de calidad.
@@ -295,15 +329,16 @@ def save_golden_case(
         True si se guardó exitosamente, False en caso contrario.
     """
     try:
-        if not is_valid_for_golden_cache(user_query, bot_response):
+        if not is_valid_for_golden_cache(user_query, bot_response, bot_id=bot_id):
             return False
 
-        collection = get_golden_collection()
+        collection = get_golden_collection(bot_id)
         model = get_embedding_model()
 
         clean_query = normalize_text(user_query)
         role_clean = (role or "general").strip().lower()
-        doc_id = hashlib.sha256(f"{role_clean}:{clean_query}".encode("utf-8")).hexdigest()
+        id_scope = f"{bot_id}:{role_clean}" if bot_id else role_clean
+        doc_id = hashlib.sha256(f"{id_scope}:{clean_query}".encode("utf-8")).hexdigest()
 
         # Usar prefijo "query: " para consistencia con el modelo E5
         embedding = model.encode([f"query: {user_query}"])[0].tolist()
@@ -315,6 +350,7 @@ def save_golden_case(
             metadatas=[{
                 "user_query": user_query,
                 "role": role_clean,
+                "bot_id": bot_id or "unimon",
                 "session_id": session_id,
                 "source": "user_feedback_positive",
                 "source_refs_json": json.dumps(_normalize_source_refs(source_refs), ensure_ascii=False),
@@ -327,7 +363,7 @@ def save_golden_case(
         return False
 
 
-def invalidate_golden_cache_entry(query: str, role: str = "general") -> bool:
+def invalidate_golden_cache_entry(query: str, role: str = "general", bot_id: str | None = None) -> bool:
     """
     Elimina una entrada específica del Golden Cache ante feedback negativo o reintento fallido.
     
@@ -343,8 +379,9 @@ def invalidate_golden_cache_entry(query: str, role: str = "general") -> bool:
             return False
         clean_query = normalize_text(query)
         role_clean = (role or "general").strip().lower()
-        doc_id = hashlib.sha256(f"{role_clean}:{clean_query}".encode("utf-8")).hexdigest()
-        collection = get_golden_collection()
+        id_scope = f"{bot_id}:{role_clean}" if bot_id else role_clean
+        doc_id = hashlib.sha256(f"{id_scope}:{clean_query}".encode("utf-8")).hexdigest()
+        collection = get_golden_collection(bot_id)
         collection.delete(ids=[doc_id])
         logger.info("[GoldenCache] Entrada invalidada por feedback negativo (ID: %s...)", doc_id[:8])
         return True
@@ -358,6 +395,7 @@ def search_golden_case(
     threshold: float = 0.90,
     role: Optional[str] = None,
     include_source_refs: bool = False,
+    bot_id: str | None = None,
 ) -> Optional[tuple]:
     """
     Busca si existe una consulta similar previamente resuelta con éxito.
@@ -371,7 +409,7 @@ def search_golden_case(
         Tupla (pregunta_previa, respuesta_validada, similitud) si supera el umbral, None si no.
     """
     try:
-        collection = get_golden_collection()
+        collection = get_golden_collection(bot_id)
         if collection.count() == 0:
             return None
 
@@ -405,12 +443,13 @@ def search_golden_case(
                     return None
 
                 # Descartar si el par (consulta actual, respuesta guardada) o (consulta guardada, respuesta guardada) es anómalo
-                is_anom, anom_reason = is_anomalous_golden_pair(user_query, matched_response)
-                if not is_anom:
-                    is_anom, anom_reason = is_anomalous_golden_pair(matched_query, matched_response)
-                if is_anom:
-                    logger.warning(f"[GoldenCache] Coincidencia descartada por incompatibilidad semántica: {anom_reason}")
-                    return None
+                if not bot_id:
+                    is_anom, anom_reason = is_anomalous_golden_pair(user_query, matched_response)
+                    if not is_anom:
+                        is_anom, anom_reason = is_anomalous_golden_pair(matched_query, matched_response)
+                    if is_anom:
+                        logger.warning(f"[GoldenCache] Coincidencia descartada por incompatibilidad semántica: {anom_reason}")
+                        return None
 
                 # Descartar si la consulta es electoral y la respuesta carece de la URL canónica
                 if _requires_canonical_voting_url(user_query):

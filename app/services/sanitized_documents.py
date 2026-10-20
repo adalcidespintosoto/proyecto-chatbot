@@ -1,4 +1,4 @@
-"""Helpers for turning extracted source pages into traceable RAG Markdown."""
+"""Helpers for turning extracted source units into traceable RAG Markdown."""
 
 from __future__ import annotations
 
@@ -12,14 +12,14 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 _PROMPT_BLOCK = re.compile(r"```text\s*(.*?)\s*```", flags=re.DOTALL | re.IGNORECASE)
 _CITATION = re.compile(
-    r"(?P<label>p[aá]ginas?|p[aá]g\.?|pp?\.?|pages?|diapositivas?)\s*"
+    r"(?P<label>p[aá]ginas?|p[aá]g\.?|pp?\.?|pages?|diapositivas?|secciones?|sections?)\s*"
     r"(?P<sequence>\d+(?:\s*(?:[-–—]\s*\d+|[,;]\s*\d+|\by\b\s*\d+))*)",
     flags=re.IGNORECASE,
 )
 _IMAGE_DESCRIPTION = re.compile(r"\[Imagen:\s*(.*?)\]", flags=re.DOTALL | re.IGNORECASE)
 _SOURCE_CITATION_LABEL = re.compile(
     r"(?P<prefix>\bfuentes?\s*:\s*)"
-    r"(?P<label>p[aá]ginas?|p[aá]g\.?|pp?\.?|pages?|diapositivas?)",
+    r"(?P<label>p[aá]ginas?|p[aá]g\.?|pp?\.?|pages?|diapositivas?|secciones?|sections?)",
     flags=re.IGNORECASE,
 )
 _PROCEDURAL_VERB = re.compile(
@@ -57,7 +57,12 @@ def _iter_citation_refs(text: str):
     """Yield citation spans and all page/slide numbers in ranges or lists."""
     for match in _CITATION.finditer(text):
         label = match.group("label").casefold()
-        kind = "DIAPOSITIVA" if "diapositiva" in label else "PÁGINA"
+        if "diapositiva" in label:
+            kind = "DIAPOSITIVA"
+        elif "secci" in label or "section" in label:
+            kind = "SECCIÓN"
+        else:
+            kind = "PÁGINA"
         numbers: set[int] = set()
         sequence = match.group("sequence")
         for item in re.split(r"\s*(?:,|;|\by\b)\s*", sequence, flags=re.IGNORECASE):
@@ -95,6 +100,9 @@ def expected_source_markers(documents: Sequence[Document]) -> list[tuple[str, in
         elif "page_number" in document.metadata:
             kind = "PÁGINA"
             number = document.metadata["page_number"]
+        elif "section_number" in document.metadata:
+            kind = "SECCIÓN"
+            number = document.metadata["section_number"]
         else:
             continue
         if _is_title_only_unit(document.page_content or ""):
@@ -143,11 +151,15 @@ def normalize_source_citations(markdown: str, markers: Iterable[tuple[str, int]]
     if len(kinds) != 1:
         return markdown
     kind = next(iter(kinds))
-    singular, plural = ("página", "páginas") if kind == "PÁGINA" else ("diapositiva", "diapositivas")
+    singular, plural = {
+        "PÁGINA": ("página", "páginas"),
+        "DIAPOSITIVA": ("diapositiva", "diapositivas"),
+        "SECCIÓN": ("sección", "secciones"),
+    }[kind]
 
     def replace(match: re.Match[str]) -> str:
         old_label = match.group("label").casefold().rstrip(".")
-        is_plural = old_label in {"páginas", "pages", "diapositivas", "pp"}
+        is_plural = old_label in {"páginas", "pages", "diapositivas", "secciones", "sections", "pp"}
         return match.group("prefix") + (plural if is_plural else singular)
 
     return _SOURCE_CITATION_LABEL.sub(replace, markdown)
@@ -158,7 +170,10 @@ def format_extracted_source(source_name: str, documents: Sequence[Document]) -> 
     ordered = sorted(
         documents,
         key=lambda document: int(
-            document.metadata.get("page_number", document.metadata.get("slide_number", 0))
+            document.metadata.get(
+                "page_number",
+                document.metadata.get("slide_number", document.metadata.get("section_number", 0)),
+            )
         ),
     )
     sections = [f"Archivo fuente: {source_name}"]
@@ -167,6 +182,10 @@ def format_extracted_source(source_name: str, documents: Sequence[Document]) -> 
             marker = f"[DIAPOSITIVA {int(document.metadata['slide_number'])}]"
         elif "page_number" in document.metadata:
             marker = f"[PÁGINA {int(document.metadata['page_number'])}]"
+        elif "section_number" in document.metadata:
+            heading = str(document.metadata.get("heading") or "").strip()
+            suffix = f": {heading}" if heading else ""
+            marker = f"[SECCIÓN {int(document.metadata['section_number'])}{suffix}]"
         else:
             marker = "[SECCIÓN SIN PÁGINA IDENTIFICADA]"
 
@@ -191,7 +210,7 @@ def validate_sanitized_markdown(
     if not re.search(r"(?m)^#\s+\S", output):
         errors.append("Falta un título Markdown de nivel principal.")
 
-    cited: dict[str, set[int]] = {"PÁGINA": set(), "DIAPOSITIVA": set()}
+    cited: dict[str, set[int]] = {"PÁGINA": set(), "DIAPOSITIVA": set(), "SECCIÓN": set()}
     for _, _, kind, numbers in _iter_citation_refs(output):
         cited[kind].update(numbers)
 
@@ -229,15 +248,18 @@ def split_markdown_for_rag(
             previous = [citation for citation in citations if citation[1] <= start_index]
             nearby = [previous[-1] if previous else citations[0]]
 
-        for kind in ("PÁGINA", "DIAPOSITIVA"):
+        for kind in ("PÁGINA", "DIAPOSITIVA", "SECCIÓN"):
             numbers = sorted({number for _, _, citation_kind, values in nearby if citation_kind == kind for number in values})
             if not numbers:
                 continue
             if kind == "PÁGINA":
                 chunk.metadata["page_number"] = numbers[0]
                 chunk.metadata["source_pages"] = ",".join(map(str, numbers))
-            else:
+            elif kind == "DIAPOSITIVA":
                 chunk.metadata["slide_number"] = numbers[0]
                 chunk.metadata["source_slides"] = ",".join(map(str, numbers))
+            else:
+                chunk.metadata["section_number"] = numbers[0]
+                chunk.metadata["source_sections"] = ",".join(map(str, numbers))
         chunk.metadata["chunk_index"] = index
     return chunks

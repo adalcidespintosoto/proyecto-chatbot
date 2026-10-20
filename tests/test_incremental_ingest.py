@@ -57,6 +57,141 @@ def test_vision_refusals_and_decorative_images_are_not_indexed_as_content():
     assert is_useful_image_description("La captura muestra el botón Guardar y el campo de usuario.")
 
 
+def test_openai_non_relevant_image_does_not_trigger_ollama_fallback(monkeypatch):
+    from types import SimpleNamespace
+    from PIL import Image
+    import io
+    import scripts.ingest_multimodal_docs as ingestion
+
+    calls = []
+    saved_cache = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, url, **kwargs):
+            calls.append(url)
+            if url.endswith("/chat/completions"):
+                return FakeResponse({"choices": [{"message": {"content": "[IMAGEN_NO_RELEVANTE]"}}]})
+            return FakeResponse({"response": "Descripción decorativa generada por Ollama."})
+
+    image_buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), color="white").save(image_buffer, format="PNG")
+    monkeypatch.setattr(ingestion, "get_settings", lambda: SimpleNamespace(
+        openai_api_key="test-key",
+        openai_base_url="https://api.openai.com/v1",
+        openai_timeout=35.0,
+    ))
+    monkeypatch.setattr(ingestion, "load_vision_cache", lambda: saved_cache)
+    monkeypatch.setattr(ingestion, "save_vision_cache_entry", lambda key, value: saved_cache.setdefault(key, value))
+    monkeypatch.setattr(ingestion.httpx, "Client", FakeClient)
+    monkeypatch.setattr(ingestion, "stats", {key: 0 for key in ingestion.stats})
+
+    result = ingestion.describe_image_with_vllm(
+        image_buffer.getvalue(),
+        filename="decorative_slide_image",
+        ollama_url="http://ollama.test",
+        vision_model="llava:13b",
+    )
+
+    assert result is None
+    assert calls == ["https://api.openai.com/v1/chat/completions"]
+    assert ingestion.stats["images_skipped"] == 1
+    assert any(value == "[IMAGEN_NO_RELEVANTE]" for value in saved_cache.values())
+
+    cached_result = ingestion.describe_image_with_vllm(
+        image_buffer.getvalue(),
+        filename="decorative_slide_image",
+        ollama_url="http://ollama.test",
+        vision_model="llava:13b",
+    )
+
+    assert cached_result is None
+    assert calls == ["https://api.openai.com/v1/chat/completions"]
+    assert ingestion.stats["images_skipped"] == 2
+
+
+def test_ollama_remains_fallback_after_a_real_openai_error(monkeypatch):
+    from types import SimpleNamespace
+    from PIL import Image
+    import io
+    import scripts.ingest_multimodal_docs as ingestion
+
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, payload, error=None):
+            self.payload = payload
+            self.error = error
+
+        def raise_for_status(self):
+            if self.error:
+                raise self.error
+
+        def json(self):
+            return self.payload
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, url, **kwargs):
+            calls.append(url)
+            if url.endswith("/chat/completions"):
+                return FakeResponse({}, RuntimeError("OpenAI HTTP 500"))
+            return FakeResponse({"response": "La captura muestra el botón Guardar."})
+
+    image_buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), color="white").save(image_buffer, format="PNG")
+    monkeypatch.setattr(ingestion, "get_settings", lambda: SimpleNamespace(
+        openai_api_key="test-key",
+        openai_base_url="https://api.openai.com/v1",
+        openai_timeout=35.0,
+    ))
+    monkeypatch.setattr(ingestion, "load_vision_cache", lambda: {})
+    monkeypatch.setattr(ingestion, "save_vision_cache_entry", lambda key, value: None)
+    monkeypatch.setattr(ingestion.httpx, "Client", FakeClient)
+    monkeypatch.setattr(ingestion, "stats", {key: 0 for key in ingestion.stats})
+
+    result = ingestion.describe_image_with_vllm(
+        image_buffer.getvalue(),
+        filename="technical_screenshot",
+        ollama_url="http://ollama.test",
+        vision_model="llava:13b",
+    )
+
+    assert result == "La captura muestra el botón Guardar."
+    assert calls == [
+        "https://api.openai.com/v1/chat/completions",
+        "http://ollama.test/api/generate",
+    ]
+
+
 def test_ingestion_cleaner_preserves_document_instructions():
     text = (
         "UNIVERSIDAD SIMÓN BOLÍVAR\n"

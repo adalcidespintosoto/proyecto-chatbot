@@ -3,6 +3,7 @@
 import os
 import re
 import tempfile
+import unicodedata
 import zipfile
 from pathlib import Path
 
@@ -19,7 +20,14 @@ WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL"} | {f"COM{i}" for i in range(1, 1
 
 
 def validated_filename(name: str | None, allowed_extensions=ALLOWED_EXTENSIONS) -> str:
-    if not name or len(name) > 180 or name != Path(name).name:
+    if not name:
+        raise HTTPException(status_code=400, detail="Nombre de archivo inválido")
+
+    # Windows/OneDrive may supply accented characters as a base letter plus a
+    # combining mark. Normalize canonically so visually identical filenames
+    # pass the same safe-character validation.
+    name = unicodedata.normalize("NFC", name)
+    if len(name) > 180 or name != Path(name).name:
         raise HTTPException(status_code=400, detail="Nombre de archivo inválido")
     if (name in {".", ".."} or name.rstrip(" .") != name
             or not re.fullmatch(r"[\w .(),&\-]+", name, flags=re.UNICODE)
