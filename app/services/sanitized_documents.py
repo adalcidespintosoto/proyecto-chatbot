@@ -33,12 +33,6 @@ _PROCEDURAL_VERB = re.compile(
     r"aparece|corresponde|consiste)\b",
     flags=re.IGNORECASE,
 )
-_IMAGE_UI_CUE = re.compile(
-    r"\b(bot[oó]n|men[uú]|campo|pestaña|formulario|clic|seleccion[ae]|"
-    r"ingres[ae]|pantalla|ventana|iniciar sesi[oó]n|guardar|continuar|"
-    r"opci[oó]n|interfaz|casilla|desplegable|usuario|contrase[nñ]a)\b",
-    flags=re.IGNORECASE,
-)
 _FACTUAL_CUE = re.compile(
     r"\b(usuario|contrase[nñ]a|clave|correo|cuenta|credenciales|recibo|"
     r"matr[ií]cula|pago|fecha|plazo|valor|costo|requisito|permiso|"
@@ -117,9 +111,9 @@ def _is_title_only_unit(content: str) -> bool:
     image_descriptions = _IMAGE_DESCRIPTION.findall(raw)
     text = _IMAGE_DESCRIPTION.sub("", raw).strip()
     if not text:
-        # Vision-only pages with UI controls can contain steps; logo/artwork
-        # descriptions cannot, so they do not need to be cited by the guide.
-        return not any(_IMAGE_UI_CUE.search(description) for description in image_descriptions)
+        # Every image description is source content and must be traceable, even
+        # when the model says the image contains no readable procedure.
+        return not bool(image_descriptions)
     if _COVER_METADATA.search(text) and not _PROCEDURAL_VERB.search(text):
         return True
     if len(text) > 160 or re.search(r"\d|https?://|\b\S+@\S+\b", text, re.IGNORECASE):

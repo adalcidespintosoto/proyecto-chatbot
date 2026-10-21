@@ -1,6 +1,7 @@
 # Manual técnico integral de UniMon
 
-**Versión documental:** 6 de octubre de 2026  
+**Revisión documental:** 21 de octubre de 2026 (árbol de trabajo local; validar las funciones recientes en el entorno de entrega)
+
 **Audiencia:** practicante de TI, desarrollador, administrador del servicio y responsable de conocimiento.  
 **Fuente de verdad:** código y configuración presentes en el repositorio. Este manual corrige descripciones históricas que ya no coinciden con el flujo actual.
 
@@ -20,7 +21,8 @@ No es un agente general que pueda operar los sistemas institucionales, aprobar t
 | ChromaDB | Índice persistente de chunks del corpus y, en otra ruta, memoria Golden Cache. |
 | Cross-Encoder | Vuelve a ordenar candidatos; su score no se trata como una probabilidad calibrada de verdad. |
 | Cliente LLM | Envía generación al proveedor configurado y tiene fallback a Ollama en los flujos conversacionales. |
-| Ingesta multimodal | Extrae páginas PDF/diapositivas PPTX, textos, tablas e imágenes y produce chunks. |
+| Ingesta multimodal | Transforma PDF, PPTX y DOCX compatibles a Markdown, valida la estructura y genera chunks; las cargas de instancias agregan cotejo de fidelidad antes de indexar. |
+| Catálogo de enrutamiento | Resume metadatos de Markdown elegibles para comparar UniMon y las dependencias sin copiar procedimientos completos al clasificador. |
 | GLPI | Crea o consulta tickets cuando la integración externa está configurada. |
 | SQLite | Guarda telemetría y eventos consultados por el panel de analítica. |
 | Interfaz web/WhatsApp | Presenta mensajes, botones y continuidad de la conversación. |
@@ -56,7 +58,7 @@ flowchart TD
 
 ### Paso a paso del endpoint de chat
 
-1. POST /api/chat admite mensaje/mensaje alternativo en inglés y un session_id. Si el cliente no lo envía, el esquema usa default_session; los clientes deben generar un ID diferente por conversación.
+1. POST /api/chat admite mensaje/message y un session_id. Si el cliente no lo envía, el servidor genera uno; para continuar una conversación, reutiliza el ID recibido. El valor literal `default_session` se rechaza.
 2. La capa HTTP rechaza contenido vacío, limita el texto a 600 caracteres, quita etiquetas HTML y aplica el detector de instrucciones maliciosas.
 3. RouterLogic carga o crea una TicketSession en memoria, agrega historial y detecta saludos, cancelaciones, feedback, preguntas fuera de dominio, solicitudes físicas y acciones GLPI antes de llamar RAG.
 4. Si es una pregunta institucional, el rol puede mantenerse/inferirse para el tono y reglas conversacionales. En el índice RAG no se excluyen documentos porque su metadato audience sea estudiante, docente o administrativo. Sí hay filtros **temáticos** de category para reducir colisiones en ciertos tipos de consulta.
@@ -69,17 +71,17 @@ flowchart TD
 
 ### 3.1 Indexación
 
-El procesador primario es scripts/ingest_multimodal_docs.py:
+La entrada de compatibilidad `scripts/ingest_multimodal_docs.py` delega la transformación e indexación actual a `scripts/ingest_sanitized_documents.py`:
 
-- Recorre el directorio configurado DOCS_DIR y subdirectorios; actualmente encuentra archivos PDF y PPTX.
+- Recorre el directorio configurado DOCS_DIR y subdirectorios; procesa PDF, PPTX y DOCX compatibles.
 - PDF: extrae texto por página y metadatos de página. Páginas escaneadas pueden depender de extracción visual configurada.
 - PPTX: extrae texto por diapositiva, tablas, notas e imágenes incrustadas.
-- Interpretación visual llama al servidor local Ollama configurado para visión. Si este no está disponible, el procesamiento continúa con texto visible, pero sin el contenido que solo aparece en capturas o diagramas.
+- La interpretación visual de imágenes intenta OpenAI `gpt-6-luna` cuando hay clave configurada y usa el modelo de visión de Ollama como último recurso. Si ambos intentos fallan, la extracción se detiene para evitar indexar un documento incompleto. Esto no demuestra por sí solo que toda imagen haya quedado descrita correctamente.
 - Limpia boilerplate y divide con RecursiveCharacterTextSplitter: chunk_size 800 y chunk_overlap 150. Son **caracteres aproximados**, no tokens.
 - Añade prefijo passage: al generar embeddings E5 normalizados y guarda en Chroma con metadatos y IDs deterministas que contienen origen/página/chunk cuando ese origen permite verificar el orden.
-- El modo incremental evita volver a procesar documentos que ya aparecen por nombre. Si se reemplaza un archivo, hay que purgar la versión anterior o usar el flujo de reemplazo del panel.
+- El modo incremental usa hashes de fuente y Markdown del manifiesto para evitar reconvertir y reindexar archivos vigentes; vuelve a procesar fuentes modificadas. El flujo administrativo de reemplazo sigue requiriendo revisión antes de retirar otra fuente.
 
-La carpeta actual incluye 247 fuentes: 128 PDF, 115 PPTX, dos DOCX y dos XLSX. La ingesta completa indexa solo PDF/PPTX (243 archivos). Los DOCX/XLSX no se vuelven buscables por estar en data/docs. El antiguo endpoint /api/admin/upload-doc incluso acepta extensiones adicionales al guardarlas, pero la ingesta principal no extrae/indexa todas esas extensiones. La aceptación de una subida no equivale a incorporación al RAG.
+El corpus puede cambiar entre revisiones: consulta el manifiesto, el catálogo administrativo y la colección activa para contar las fuentes realmente indexadas. Los XLSX presentes no forman parte de este pipeline. La presencia de un archivo en `data/docs` o la aceptación de una subida no equivalen a su incorporación al RAG; comprueba el estado de transformación, la auditoría aplicable y los chunks indexados.
 
 ### 3.2 Búsqueda y selección
 
@@ -157,20 +159,21 @@ PIDIENDO_ROL permanece como estado de compatibilidad/transición, pero IDLE norm
 
 ### Golden Cache
 
-La colección golden_resolved_qa vive por defecto bajo data/chroma_db y usa embeddings para buscar preguntas semánticamente similares. La interacción puede guardarse después de feedback positivo si pasa validaciones sintácticas/anomalías. El usuario que pulsa “Sí” no certifica documentalmente la respuesta. Las búsquedas recuperan una pregunta anterior para ampliar sinónimos y formulaciones; el flujo actual descarta la respuesta guardada al componer los hechos de RAG. Hay scripts de evaluación/promoción para registrar solo respuestas juzgadas y respaldadas. Revisa y purga entradas anómalas con scripts/clean_golden_cache.py.
+La colección `golden_resolved_qa` de UniMon vive por defecto bajo `data/chroma_db`; cada asistente adicional guarda otra colección bajo su carpeta `golden_cache`. Las interacciones pueden guardarse después de feedback positivo si pasan validaciones sintácticas y de anomalías; la valoración no certifica documentalmente la respuesta. En UniMon, la referencia previa amplía la búsqueda, pero los hechos oficiales deben provenir de los documentos recuperados. Las instancias registran feedback y consultan solo su propia memoria; una coincidencia puede añadirse como referencia secundaria al generador incluso si no hubo chunks documentales. Por ello, una respuesta con caché no acredita fundamentación documental. Hay scripts de evaluación/promoción para registrar respuestas juzgadas y respaldadas. Revisa y purga entradas anómalas con `scripts/clean_golden_cache.py`.
 
 La búsqueda predeterminada pide una coincidencia de similitud coseno de al menos 0.90 y valida compatibilidad de intención/anomalías antes de devolverla. La escritura usa hash de rol+pregunta para upsert, pero la llamada actual de búsqueda no pasa rol como filtro; no usar el rol del índice Golden como control de autorización.
 
 ## 5. Proveedores LLM y modelos
 
-LLM_PROVIDER selecciona gemini, openai u ollama. La opción activa, claves, endpoint y timeouts vienen de Settings/.env; .env.example no es la configuración real. El valor por defecto del código y el archivo de ejemplo no coinciden en todos los campos, por lo que el practicante debe verificar .env y /health o /api/admin/system-status.
+LLM_PROVIDER selecciona anthropic, gemini, openai u ollama para UniMon. Las instancias pueden configurar además un endpoint personalizado compatible con Anthropic Messages API o el formato de chat de OpenAI. La opción activa, claves, endpoint y timeouts vienen de Settings/.env; .env.example no es la configuración real. El valor por defecto del código y el archivo de ejemplo no coinciden en todos los campos, por lo que el practicante debe verificar .env y /api/admin/system-status. `/health` solo confirma que responde la aplicación.
 
 - OpenAI: OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL, OPENAI_TIMEOUT.
+- Anthropic: ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_BASE_URL, ANTHROPIC_TIMEOUT.
 - Gemini: GEMINI_API_KEY, GEMINI_MODEL, GEMINI_BASE_URL, GEMINI_TIMEOUT.
 - Ollama: OLLAMA_BASE_URL, LLM_MODEL, OLLAMA_TIMEOUT.
 - La generación de conversación intenta el proveedor cloud y el código actual puede hacer fallback a Ollama si falla o falta la clave. Los métodos auxiliares de generación también tienen contingencia local. No asumas modo cloud exclusivo solo porque LLM_PROVIDER diga openai o gemini.
 - OpenAI para modelos GPT-5/6 envía max_completion_tokens y reasoning_effort low; la interfaz oculta el manejo de los proveedores.
-- Visión de documentos utiliza Ollama, incluso cuando la generación del chat es cloud. Fallback de visión y nombre de modelo dependen de lo configurado.
+- Visión documental intenta primero OpenAI `gpt-6-luna`, independientemente del proveedor del chat, y solo después prueba Ollama con `VISION_MODEL`. Necesita que al menos uno de esos servicios esté disponible para procesar imágenes sin omitirlas.
 - Modelos de embeddings y Cross-Encoder se cargan localmente con archivos del cache de Hugging Face. En equipos nuevos hay que descargar esos modelos previamente; el primer inicio no necesariamente puede obtenerlos por sí solo.
 
 Modelfile define un modelo Ollama local heredado basado en llama3.1:8b. No controla la instrucción central del prompt escrita en rag_service.py. Revísalo antes de asumir que sus reglas son la fuente efectiva o que coinciden con el proveedor cloud.
@@ -184,11 +187,12 @@ No copies ni publiques secretos. En un entorno nuevo copia .env.example a .env y
 | ENVIRONMENT, PORT, HOST, DEBUG | Ambiente y servidor. El run.ps1 admite parámetros propios de host y puerto. |
 | ADMIN_USERNAME, ADMIN_PASSWORD | HTTP Basic para panel y endpoints protegidos. El password vacío hace que el admin falle cerrado. Usa uno único y fuerte. |
 | GLPI_BASE_URL, GLPI_APP_TOKEN, GLPI_USER_TOKEN, GLPI_TIMEOUT | API de GLPI. |
-| LLM_PROVIDER | gemini, openai u ollama. |
+| LLM_PROVIDER | anthropic, gemini, openai u ollama. |
+| ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_BASE_URL, ANTHROPIC_TIMEOUT | Proveedor Anthropic. |
 | OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL, OPENAI_TIMEOUT | Proveedor OpenAI. |
 | GEMINI_API_KEY, GEMINI_MODEL, GEMINI_BASE_URL, GEMINI_TIMEOUT | Proveedor Gemini. |
 | OLLAMA_BASE_URL, LLM_MODEL, OLLAMA_TIMEOUT | Generación/fallback local. |
-| VISION_MODEL, VISION_TIMEOUT | Interpretación visual de ingesta; consume Ollama local. |
+| VISION_MODEL, VISION_TIMEOUT, VISION_MAX_IMAGE_SIZE | Modelo de contingencia Ollama, espera y resolución máxima de imágenes durante la ingesta; la ruta primaria de visión usa OpenAI `gpt-6-luna` si existe `OPENAI_API_KEY`. |
 | CHROMA_DB_DIR | Índice de documentos RAG, por defecto ./chroma_db. |
 | GOLDEN_CACHE_DB_DIR | Índice separado de Golden Cache, por defecto ./data/chroma_db. |
 | DOCS_DIR | Corpus fuente, por defecto ./data/docs. |
@@ -201,22 +205,24 @@ La API pública tiene rate limit global predeterminado de 30 solicitudes/minuto 
 
 ## 7. Mapa de API
 
-Consulta /docs para el esquema FastAPI que corre en esa revisión.
+Consulta `/docs` para el esquema FastAPI en desarrollo; en `ENVIRONMENT=production` se deshabilitan `/docs`, `/redoc` y `/openapi.json`.
 
 | Método y ruta | Función |
 |---|---|
 | GET / | Sirve app/static/index.html. |
-| GET /health | Estado resumido de configuración; no sustituye diagnóstico end-to-end de cada dependencia. |
+| GET /health | Indica que la aplicación responde; no comprueba GLPI, proveedores LLM ni el índice de cada dependencia. |
 | POST /api/chat | Mensaje conversacional. Campos: mensaje/message y session_id. |
 | GET /api/chatbots/{bot_id}/config | Nombre y saludo público de una instancia adicional habilitada. |
-| POST /api/chatbots/{bot_id}/chat | Consulta RAG aislada para una dependencia. No usa la sesión ni Golden Cache de UniMon. |
-| GET /api/chatbot-router/config, POST /api/chatbot-router/chat | Modo opcional `/?router=1`: clasifica contra perfiles activos, delega a un RAG aislado y usa UniMon como fallback. |
+| POST /api/chatbots/{bot_id}/chat | Consulta RAG aislada para una dependencia. Conserva sesión y Golden Cache propias, sin utilizar las de UniMon. |
+| GET /api/chatbot-router/config, POST /api/chatbot-router/chat | Modo opcional `/?router=1`: clasifica con alcances y catálogos de documentos elegibles; delega a una instancia o usa UniMon como fallback. |
 | GET /api/admin/chatbot-instances | Lista instancias, perfiles de especialidad y métricas filtradas; requiere autenticación administrativa. |
 | POST /api/admin/chatbot-instances | Crea una instancia y sus directorios aislados; requiere autenticación administrativa. |
 | PATCH /api/admin/chatbot-instances/{bot_id} | Edita nombre, dependencia, alcance y contactos sin cambiar el identificador. |
 | DELETE /api/admin/chatbot-instances/{bot_id}, POST /api/admin/chatbot-instances/{bot_id}/reactivate | Desactiva/reactiva una instancia conservando sus documentos e índice. |
 | GET /api/admin/chatbot-instances/{bot_id}/metrics | Devuelve consultas, sesiones, tokens y latencia por instancia y período. |
-| POST /api/admin/chatbot-instances/{bot_id}/documents | Carga PDF/PPTX y los convierte a Markdown para el índice de esa instancia; requiere autenticación administrativa. |
+| POST /api/admin/chatbot-instances/{bot_id}/documents/audit | Convierte PDF/PPTX/DOCX, comprueba fidelidad con el original y compara los chunks con el índice privado; deja el resultado en staging sin indexar. |
+| POST /api/admin/chatbot-instances/{bot_id}/documents/resolve | Acepta, reemplaza o descarta la carga auditada; solo indexa un Markdown con fidelidad confirmada. |
+| POST /api/admin/chatbot-instances/{bot_id}/documents | Ruta directa compatible para PDF/PPTX/DOCX; conserva el original aunque falle la indexación. El panel vigente usa `audit` y `resolve` incluso al pulsar «Convertir e indexar». |
 | GET /admin, GET /admin.html | Panel administrativo; protegido por HTTP Basic desde admin_router. |
 | GET /api/admin/docs | Lista fuentes en el directorio documental. |
 | POST /api/admin/upload-doc | Sube a subcarpeta/audiencia; puede auditar/indexar según banderas. Verifica formato e indexación antes de darlo por disponible. |
@@ -225,17 +231,17 @@ Consulta /docs para el esquema FastAPI que corre en esa revisión.
 | POST /api/admin/reindex | Recorre el corpus compatible e intenta taxonomía; wipe_db borra el índice activo después de intentar backup. |
 | DELETE /api/admin/docs/{filename} | Elimina fuente y trata de purgar sus chunks. |
 | GET /api/admin/system-status | Diagnóstico de proveedor, Chroma, telemetría y servicios disponibles. |
-| GET /api/analytics/kpis | Resumen de métricas con fecha opcional. Sin Depends de admin en esta ruta. |
-| GET /api/analytics/unresolved-queries | Ranking de preguntas no resueltas. Sin Depends de admin en esta ruta. |
+| GET /api/analytics/kpis | Resumen de métricas con fecha opcional; HTTP Basic requerido por el router. |
+| GET /api/analytics/unresolved-queries | Ranking de preguntas no resueltas; HTTP Basic requerido por el router. |
 | POST /api/analytics/unresolved-queries/dismiss | Descarta una consulta; HTTP Basic requerido. |
 | GET /api/analytics/unresolved-queries/dismissed | Lista consultas descartadas; HTTP Basic requerido. |
 | POST /api/analytics/unresolved-queries/restore | Restaura consulta al ranking; HTTP Basic requerido. |
-| GET /api/analytics/compare | Compara períodos de KPIs. Sin Depends de admin en esta ruta. |
-| GET /api/analytics/ai-insights | Genera resumen/insights; sin Depends de admin en esta ruta. |
-| POST /api/analytics/draft-procedure | Genera un borrador; sin Depends de admin en esta ruta. No lo indexa por sí solo. |
+| GET /api/analytics/compare | Compara períodos de KPIs; HTTP Basic requerido por el router. |
+| GET /api/analytics/ai-insights | Genera resumen/insights; HTTP Basic requerido por el router. |
+| POST /api/analytics/draft-procedure | Genera un borrador sin indexarlo; HTTP Basic requerido por el router. |
 | POST /api/analytics/save-procedure | Guarda e indexa un procedimiento; HTTP Basic requerido. |
 | GET /api/analytics/export-unresolved-csv | Exporta preguntas sin resolver; HTTP Basic requerido. |
-| GET /api/analytics/clusters | Devuelve clusters/temas; sin Depends de admin en esta ruta. |
+| GET /api/analytics/clusters | Devuelve clusters/temas; HTTP Basic requerido por el router. |
 | GET /api/analytics/export-dpo-dataset | Exporta JSONL DPO; HTTP Basic requerido. |
 | POST /api/analytics/reset-metrics | Destructivo para telemetría; HTTP Basic requerido. Puede solicitar también limpiar Golden Cache. |
 | POST /api/admin/upload y POST /api/admin/reindex | Rutas compatibles heredadas definidas también en chat.py; tienen auth y sus propios límites/formatos. |
@@ -243,7 +249,7 @@ Consulta /docs para el esquema FastAPI que corre en esa revisión.
 | GET /api/whatsapp/status | Resumen de credenciales/estado; trata su salida como dato operativo. |
 | /static/* | Assets estáticos si el directorio existe. |
 
-Hay rutas repetidas de administración heredadas en routers distintos. No asumir que todas aceptan el mismo formato, límite, staging o comportamiento. Las rutas GET de consulta analítica descritas como “sin Depends” no heredan la autenticación del router administrativo; no expongas datos si no es intencional y agrega protección de acceso en una revisión de seguridad. Swagger muestra el contrato activo; esta tabla describe su propósito, no reemplaza revisión de autenticación de cada endpoint.
+Hay rutas repetidas de administración heredadas en routers distintos. No asumas que todas aceptan el mismo formato, límite, staging o comportamiento. El router de analítica aplica HTTP Basic a todas sus rutas; el control de origen también se ejecuta en operaciones mutantes. Swagger muestra el contrato activo; esta tabla describe su propósito, no reemplaza la revisión de autenticación de cada endpoint.
 
 ## 8. Persistencia y carpetas de datos
 
@@ -252,6 +258,8 @@ Hay rutas repetidas de administración heredadas en routers distintos. No asumir
 | data/docs | Archivos fuente que deben gobernarse, corregirse y reindexarse. | Garantía de que todos los formatos presentes sean indexables. |
 | chroma_db | Índice vectorial del RAG. | Fuente autoritativa de procedimientos; puede reconstruirse desde las fuentes compatibles. |
 | data/chroma_db | Índice separado de Golden Cache por defecto. | Corpus de documentos institucionales. |
+| data/chatbots/unimon/specialization.json y .md | Catálogo de metadatos documentales para elegir UniMon en el router; se reconstruye desde los Markdown elegibles. | Cuerpo íntegro de procedimientos o índice RAG. |
+| data/chatbots/instances/<identificador> | Originales, Markdown, manifiesto, índice RAG, Golden Cache y catálogo aislados de cada dependencia; `instances.sqlite3` conserva su configuración. | Sesiones persistentes entre reinicios. |
 | data/analytics.db | Historial de telemetría, consultas, etiquetas, métricas y datos de tickets. | Estado persistente de TicketSession. |
 | data/.vision_cache.json | Descripciones cacheadas de imágenes calculadas durante ingesta. | Índice final de búsqueda. |
 | data/chroma_db_backup, chroma_db_backup | Respaldos de Chroma de distintas ubicaciones/revisiones. | Copia garantizada de configuración y corpus sincronizados; verifica cuál corresponde al entorno. |
@@ -280,13 +288,13 @@ Carga de corpus:
 .\.venv\Scripts\python.exe scripts\apply_document_taxonomy.py
 ~~~
 
-El procesamiento de imágenes puede necesitar un Ollama local y modelo de visión disponible. La ingestión PDF/PPTX no procesa DOCX/XLSX. En una base existente, consulta los argumentos del script antes de elegir incremento, reemplazo o wipe. No uses wipe en un entorno con datos que no puedas regenerar.
+El procesamiento de imágenes usa primero OpenAI `gpt-6-luna` cuando está configurado y Ollama como último recurso. La ingesta admite PDF/PPTX/DOCX, pero no XLSX; si una imagen no puede interpretarse por ninguno de los dos servicios, se detiene la extracción de ese documento. En una base existente, consulta los argumentos del script antes de elegir incremento, reemplazo o wipe. No uses wipe en un entorno con datos que no puedas regenerar.
 
 ## 10. Observabilidad, pruebas y mantenimiento
 
 - Logs: consola; opcionalmente run.ps1 -CaptureLogs escribe scratch/unimon-runtime.log. Trátalo como dato sensible.
 - KPIs y errores de recuperación: /admin y /api/analytics según autenticación de cada ruta.
-- Pruebas automatizadas: pytest.ini señala tests. Ejecuta tests sólo en un entorno dedicado; algunos fixtures sustituyen servicios externos, pero no uses bases de producción.
+- Pruebas automatizadas: `pytest.ini` señala `tests`. Ejecuta pruebas solo en un entorno dedicado; las pruebas de reglas GLPI sustituyen la API externa y no demuestran un ticket creado en el servidor institucional. Valida la contingencia cloud→Ollama y la carga de documentos con pruebas controladas del entorno antes de declarar disponibilidad operativa.
 - Revisión documental real: conserva query, candidates, reranked, final_context y documento esperado; evalúa contenido además de HTTP 200.
 - Carga: scripts/load_test_quality_50.py ofrece --concurrency 1..50; cada consulta usa sesión independiente.
 - Solapamiento: primero scripts/audit_overlap_rates.py y consulta su reporte. No activar deduplicación global sin medir precisión/recobrado.
@@ -304,7 +312,7 @@ El procesamiento de imágenes puede necesitar un Ollama local y modelo de visió
 
 ## 12. Asistentes adicionales por dependencia
 
-El administrador puede crear instancias desde **Diagnóstico de Servidor** en `/admin`. Cada instancia tiene un identificador, nombre, alcance, canales de soporte y rutas propias para documentos originales, Markdown y ChromaDB. La ingesta usa el mismo pipeline PDF/PPTX → Markdown validado → chunks e índice.
+El administrador puede crear instancias desde **Diagnóstico de Servidor** en `/admin`. Cada instancia tiene un identificador, nombre, alcance, canales de soporte y rutas propias para originales, Markdown, ChromaDB y Golden Cache. La carga del panel sigue PDF/PPTX/DOCX → Markdown → cotejo de fidelidad y posible corrección → análisis de similitud en su índice → confirmación → chunks e índice. Si la auditoría queda en `revisar` o `no_verificable`, no se indexa. El resultado automatizado orienta la revisión humana; no prueba que cada dato del Markdown sea correcto.
 
-Las nuevas instancias consultan sólo su índice y guardan proveedor/modelo LLM de forma independiente. Las credenciales de proveedores cloud permanecen en `.env`; embeddings y reranker se comparten por el servidor. No usan GLPI ni la Golden Cache de UniMon. El chat se abre con `/?bot=<identificador>`. Configuración, límites y respaldo están en [CHATBOTS_POR_DEPENDENCIA.md](CHATBOTS_POR_DEPENDENCIA.md).
+Las nuevas instancias consultan solo su índice y guardan proveedor/modelo LLM de forma independiente. Las credenciales de proveedores incorporados permanecen en `.env`; las claves de endpoints personalizados se cifran en el registro de la instancia con una clave maestra configurada. Embeddings y reranker se comparten por el servidor. No usan GLPI ni la Golden Cache de UniMon: guardan sus propios casos valorados. Su catálogo `specialization.json`/`.md` contiene metadatos de Markdown elegibles; el router usa fichas pertinentes y el alcance declarado para elegir entre dependencias y UniMon. El chat se abre con `/?bot=<identificador>`, y el router opcional en `/?router=1`. Configuración, límites y respaldo están en [CHATBOTS_POR_DEPENDENCIA.md](CHATBOTS_POR_DEPENDENCIA.md).
 

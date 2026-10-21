@@ -20,20 +20,21 @@ La bitácora de integración OpenAI y las comparativas RAG de la carpeta docs so
 .\run.ps1
 ~~~
 
-Abre / para el chat, /docs para el esquema de API y /admin para el panel con HTTP Basic. Revisa /health. Para preparar la base documental desde fuentes autorizadas, consulta la guía de réplica y [la guía de ingesta Markdown](docs/INGESTA_MARKDOWN_AUTOMATICA.md): cada PDF/PPTX se transforma, valida y guarda como Markdown antes de generar embeddings.
+Abre / para el chat, /docs para el esquema de API en desarrollo y /admin para el panel con HTTP Basic. Revisa /health. Para preparar la base documental desde fuentes autorizadas, consulta la guía de réplica y [la guía de ingesta Markdown](docs/INGESTA_MARKDOWN_AUTOMATICA.md): las fuentes PDF, PPTX y DOCX compatibles se transforman a Markdown antes de generar embeddings. La carga desde el panel de una instancia compara el Markdown con el original antes de indexarlo.
 
 ## Arquitectura en una frase
 
-Chat web/WhatsApp → FastAPI → router conversacional → reglas de dominio o RAG (expansión, búsqueda vectorial y léxica, reranking, expansión secuencial de vecinos y tope de chunks) → LLM configurado → telemetría; las acciones de ticket usan GLPI si está configurado. El modo opcional `/?router=1` clasifica la intención contra perfiles de especialidad y delega a un RAG aislado por dependencia.
+Chat web/WhatsApp → FastAPI → router conversacional → reglas de dominio o RAG (expansión, búsqueda vectorial y léxica, reranking, expansión secuencial de vecinos y tope de chunks) → LLM configurado → telemetría; las acciones de ticket usan GLPI si está configurado. El modo opcional `/?router=1` clasifica la intención con los alcances declarados y catálogos de metadatos documentales; delega a un RAG aislado por dependencia cuando corresponde.
 
 ## Hechos operativos que debes conocer
 
 - El RAG no filtra documentos por rol; aplica algunos filtros por categoría temática.
 - El corpus presente contiene formatos que el pipeline principal no indexa automáticamente; verifica la tabla completa en la guía de réplica.
 - Las sesiones conversacionales viven en memoria y se pierden al reiniciar el proceso.
-- Las instancias adicionales tienen sus propios índices y perfil `specialization.md`; la telemetría de sus consultas sí se agrega a los KPIs globales y conserva un desglose por instancia.
-- Golden Cache recibe feedback positivo sujeto a validadores, pero una respuesta cacheada no sustituye las fuentes institucionales.
-- Una corrida de 50 sesiones simultáneas completó 50 respuestas HTTP sin 429/5xx; latencia p50 fue 65,1 s y p95 70,7 s. Exactitud estricta medida: 50%. No equivale a validación de producción.
+- Las instancias adicionales tienen índices, Golden Cache y catálogos de especialidad separados; su telemetría se agrega a los KPIs globales y conserva un desglose por instancia.
+- Golden Cache recibe feedback positivo sujeto a validadores, pero una respuesta cacheada no sustituye las fuentes institucionales ni acredita exactitud.
+- En la medición local del 6 de octubre de 2026, 50 sesiones simultáneas completaron 50 respuestas HTTP sin 429/5xx; la latencia p50 fue 65,1 s y p95 70,7 s. La exactitud estricta juzgada fue 25/50 (50%). Es una línea base histórica, no una validación del código actual ni de producción.
+- El árbol de trabajo local incluye cambios recientes de ingesta, auditoría documental y enrutamiento. Verifica las pruebas y el flujo completo en el entorno de entrega antes de declarar esos cambios desplegados.
 
 ## Dependencias funcionales
 

@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # Configuración de Vision-LLM (Ingesta Multimodal)
     vision_model: str = "llava:13b"
     vision_timeout: float = 120.0
-    vision_max_image_size: int = 1024
+    vision_max_image_size: int = 2048
     vision_min_image_kb: int = 0  # 0 = Sin restricciones de tamaño (interpreta el 100% de imágenes)
 
     # Configuración de ChromaDB y Embeddings

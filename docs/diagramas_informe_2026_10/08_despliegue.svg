@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="835" viewBox="0 0 1100 835">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
+<rect width="1100" height="835" fill="#FFFFFF"/>
+<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Despliegue de referencia</text>
+<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Topología de piloto; requiere validar infraestructura y configuración efectivas</text>
+<rect x="45" y="125" width="250" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="170.0" y="167.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Navegador del usuario</text>
+<rect x="45" y="230" width="250" height="70" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="170.0" y="272.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Meta WhatsApp Cloud</text>
+<rect x="350" y="115" width="465" height="575" rx="13" fill="#FFFFFF" stroke="#62809A" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="370" y="150" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="bold" text-anchor="start">Entorno autorizado para UniMon</text>
+<rect x="395" y="180" width="375" height="100" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="411" y="209" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Aplicación FastAPI</text>
+<text x="411" y="237" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">routers, FSM, instancias</text>
+<text x="411" y="260" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">seguridad y cliente LLM</text>
+<rect x="395" y="335" width="375" height="100" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="411" y="364" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Procesamiento local</text>
+<text x="411" y="392" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">embeddings, reranking</text>
+<text x="411" y="415" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Ollama si está disponible</text>
+<rect x="395" y="485" width="375" height="145" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="411" y="514" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Persistencia local</text>
+<text x="411" y="542" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">manuales y Markdown saneados</text>
+<text x="411" y="565" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">ChromaDB, Golden Cache</text>
+<text x="411" y="588" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">SQLite de telemetría e instancias</text>
+<line x1="295" y1="160" x2="395" y2="220" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="340" y="178" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">HTTPS</text>
+<line x1="295" y1="265" x2="395" y2="235" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="340" y="274" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">webhook</text>
+<line x1="580" y1="280" x2="580" y2="335" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="580" y1="435" x2="580" y2="485" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="865" y="185" width="200" height="80" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="965.0" y="220.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Proveedor LLM</text>
+<text x="965.0" y="244.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">configurado</text>
+<rect x="865" y="370" width="200" height="80" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="965.0" y="417.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">GLPI Cloud</text>
+<line x1="770" y1="225" x2="865" y2="225" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="820" y="207" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">API</text>
+<line x1="770" y1="245" x2="865" y2="410" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="842" y="330" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">REST</text>
+<rect x="112" y="728" width="875" height="67" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="126" y="755" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">La estación de desarrollo no demuestra despliegue en producción.</text>
+<text x="126" y="778" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Verificar en el entorno final TLS, accesos, respaldo y disponibilidad de Ollama.</text>
+</svg>

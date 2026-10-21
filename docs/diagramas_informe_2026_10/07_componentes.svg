@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="795" viewBox="0 0 1100 795">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
+<rect width="1100" height="795" fill="#FFFFFF"/>
+<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Componentes de UniMon</text>
+<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Arquitectura implementada y servicios configurables</text>
+<rect x="55" y="120" width="255" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="182.5" y="162.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Web chat / panel admin</text>
+<rect x="55" y="235" width="255" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="182.5" y="277.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">WhatsApp Cloud API</text>
+<rect x="405" y="165" width="275" height="90" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="421" y="194" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">FastAPI</text>
+<text x="421" y="222" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">routers, seguridad</text>
+<text x="421" y="245" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">validación y telemetría</text>
+<line x1="310" y1="155" x2="405" y2="195" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="310" y1="270" x2="405" y2="225" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="90" y="360" width="250" height="105" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="106" y="389" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Enrutamiento</text>
+<text x="106" y="417" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">UniMon TI o instancia</text>
+<text x="106" y="440" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">por dependencia</text>
+<rect x="425" y="360" width="250" height="105" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="441" y="389" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">RAG local</text>
+<text x="441" y="417" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">ingesta, recuperación</text>
+<text x="441" y="440" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">reranking y fuentes</text>
+<rect x="760" y="360" width="250" height="105" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="776" y="389" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Servicios de soporte</text>
+<text x="776" y="417" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">GLPI, Golden Cache</text>
+<text x="776" y="440" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">analítica y catálogos</text>
+<line x1="490" y1="255" x2="215" y2="360" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="490" y1="255" x2="550" y2="360" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="590" y1="255" x2="885" y2="360" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="85" y="580" width="250" height="70" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="210.0" y="622.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Documentos + ChromaDB</text>
+<rect x="425" y="580" width="250" height="70" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="550.0" y="622.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Cliente LLM</text>
+<rect x="765" y="580" width="250" height="70" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="890.0" y="622.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">SQLite / GLPI Cloud</text>
+<line x1="490" y1="465" x2="210" y2="580" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="550" y1="465" x2="550" y2="580" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="885" y1="465" x2="890" y2="580" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="107" y="690" width="885" height="65" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="121" y="717" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">El cliente LLM puede usar proveedor remoto configurado o Ollama local.</text>
+<text x="121" y="740" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">GLPI y WhatsApp requieren credenciales y configuración externas.</text>
+</svg>

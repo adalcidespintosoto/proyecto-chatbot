@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 from app.services import bot_router_service
+from app.services.document_catalog_service import write_document_catalog
 
 
 def test_clear_it_request_is_sent_to_router_with_unimon_as_explicit_destination(monkeypatch):
@@ -157,4 +159,63 @@ def test_financial_question_remains_eligible_for_financial_specialist(monkeypatc
     ))
 
     assert result["bot_id"] == "bienestar"
+
+
+def test_router_builds_relevant_catalog_cards_for_default_and_dependency_instances(tmp_path: Path, monkeypatch):
+    default_markdown = tmp_path / "unimon-md"
+    dependency_markdown = tmp_path / "dependency-md"
+    default_markdown.mkdir()
+    dependency_markdown.mkdir()
+    (default_markdown / "teams.md").write_text(
+        "# Iniciar sesión en Microsoft Teams\n- Temas incluidos: acceso con cuenta institucional y reuniones.\n",
+        encoding="utf-8",
+    )
+    (default_markdown / "network.md").write_text(
+        "# Revisar conexión de red\n- Temas incluidos: wifi y conectividad del computador.\n",
+        encoding="utf-8",
+    )
+    (dependency_markdown / "credit.md").write_text(
+        "# Renovación de crédito ICETEX\n- Temas incluidos: renovar financiación educativa.\n"
+        "## Palabras y formas de búsqueda\n- seguir financiando mis estudios\n",
+        encoding="utf-8",
+    )
+    (dependency_markdown / "matricula.md").write_text(
+        "# Pago de matrícula\n- Temas incluidos: recibos y pagos de matrícula.\n",
+        encoding="utf-8",
+    )
+
+    default_json = tmp_path / "unimon" / "specialization.json"
+    default_md = tmp_path / "unimon" / "specialization.md"
+    dependency_json = tmp_path / "bienestar" / "specialization.json"
+    dependency_md = tmp_path / "bienestar" / "specialization.md"
+    write_document_catalog(
+        default_markdown, default_json, default_md, bot_id="unimon", display_name="UniMon Soporte TI",
+        dependency_name="Mesa de Ayuda TI", scope_description="Soporte de TI.",
+    )
+    write_document_catalog(
+        dependency_markdown, dependency_json, dependency_md, bot_id="bienestar", display_name="Casa Blanca",
+        dependency_name="Admisiones", scope_description="Crédito y matrícula.",
+    )
+    profile = SimpleNamespace(bot_id="bienestar")
+    monkeypatch.setattr(
+        bot_router_service.bot_instance_manager,
+        "paths",
+        lambda _bot_id: SimpleNamespace(root=tmp_path / "bienestar"),
+    )
+    monkeypatch.setattr(
+        bot_router_service,
+        "unimon_catalog_paths",
+        lambda: (default_markdown, tmp_path / "manifest.json", default_json, default_md),
+    )
+
+    default_text = bot_router_service._unimon_routing_specialization_text("Teams no me deja iniciar sesión")
+    dependency_text = bot_router_service._routing_specialization_text(
+        profile, "quiero seguir financiando mis estudios con ICETEX",
+    )
+
+    assert "Iniciar sesión en Microsoft Teams" in default_text
+    assert "Revisar conexión de red" not in default_text
+    assert "Renovación de crédito ICETEX" in dependency_text
+    assert "Pago de matrícula" not in dependency_text
+    assert "financiando mis estudios" in dependency_text
 

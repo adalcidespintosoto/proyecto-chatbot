@@ -57,7 +57,7 @@ def test_vision_refusals_and_decorative_images_are_not_indexed_as_content():
     assert is_useful_image_description("La captura muestra el botón Guardar y el campo de usuario.")
 
 
-def test_openai_non_relevant_image_does_not_trigger_ollama_fallback(monkeypatch):
+def test_openai_non_relevant_marker_falls_back_instead_of_dropping_image(monkeypatch):
     from types import SimpleNamespace
     from PIL import Image
     import io
@@ -113,10 +113,13 @@ def test_openai_non_relevant_image_does_not_trigger_ollama_fallback(monkeypatch)
         vision_model="llava:13b",
     )
 
-    assert result is None
-    assert calls == ["https://api.openai.com/v1/chat/completions"]
-    assert ingestion.stats["images_skipped"] == 1
-    assert any(value == "[IMAGEN_NO_RELEVANTE]" for value in saved_cache.values())
+    assert result == "Descripción decorativa generada por Ollama."
+    assert calls == [
+        "https://api.openai.com/v1/chat/completions",
+        "http://ollama.test/api/generate",
+    ]
+    assert ingestion.stats["images_skipped"] == 0
+    assert "[IMAGEN_NO_RELEVANTE]" not in saved_cache.values()
 
     cached_result = ingestion.describe_image_with_vllm(
         image_buffer.getvalue(),
@@ -125,9 +128,13 @@ def test_openai_non_relevant_image_does_not_trigger_ollama_fallback(monkeypatch)
         vision_model="llava:13b",
     )
 
-    assert cached_result is None
-    assert calls == ["https://api.openai.com/v1/chat/completions"]
-    assert ingestion.stats["images_skipped"] == 2
+    assert cached_result == "Descripción decorativa generada por Ollama."
+    assert calls == [
+        "https://api.openai.com/v1/chat/completions",
+        "http://ollama.test/api/generate",
+        "https://api.openai.com/v1/chat/completions",
+    ]
+    assert ingestion.stats["images_skipped"] == 0
 
 
 def test_ollama_remains_fallback_after_a_real_openai_error(monkeypatch):

@@ -260,7 +260,9 @@ def _prepare_markdown(
                     if not isinstance(rejected_relative, str) or not rejected_relative.strip():
                         # Older manifests did not retain this pointer. The deterministic
                         # filename lets us safely resume from that same source's draft.
-                        rejected_relative = str(Path("rejected") / sanitizer.markdown_filename(display))
+                        rejected_relative = sanitizer.markdown_output_path(
+                            output_dir, display, "rejected"
+                        ).relative_to(output_dir).as_posix()
                     output_root = output_dir.resolve()
                     rejected_path = (output_root / rejected_relative).resolve()
                     if output_root in rejected_path.parents and rejected_path.is_file():
@@ -785,6 +787,20 @@ def _index_incremental(
     return indexed
 
 
+def _refresh_default_routing_catalog(output_dir: Path, settings: Any) -> None:
+    """Keep the default UniMon router catalog in sync without touching instance corpora."""
+    if output_dir.resolve() != Path(settings.sanitized_docs_dir).resolve():
+        return
+    try:
+        from app.services.document_catalog_service import refresh_unimon_document_catalog
+
+        catalog = refresh_unimon_document_catalog()
+        LOGGER.info("Catálogo de enrutamiento UniMon actualizado (%d documentos).", catalog["document_count"])
+    except Exception as exc:
+        # Catalog refresh is auxiliary; a valid RAG ingestion must not be rolled back for it.
+        LOGGER.warning("No se pudo actualizar el catálogo de enrutamiento UniMon (%s).", type(exc).__name__)
+
+
 def ingest_sanitized_documents(
     docs_path: str | None = None,
     chroma_path: str | None = None,
@@ -843,6 +859,7 @@ def ingest_sanitized_documents(
             LOGGER.info("Eliminados %d chunks Markdown de %s", deleted, delete_doc)
             client.close()
             del collection, client
+            _refresh_default_routing_catalog(output_dir, settings)
             return True
 
         sources = _discover_sources(docs_dir, file_path)
@@ -958,6 +975,7 @@ def ingest_sanitized_documents(
                 "Reconstrucción Markdown terminada: %d documentos, %d chunks. Golden Cache preservado.",
                 len(indexed_records), chunks,
             )
+            _refresh_default_routing_catalog(output_dir, settings)
             return True
 
         indexed_sources, raw_sources = _existing_index_state(active_path)
@@ -977,6 +995,8 @@ def ingest_sanitized_documents(
         }
         if not pending_records:
             LOGGER.info("No hay documentos nuevos o modificados; todos los Markdown están indexados.")
+            if not failures:
+                _refresh_default_routing_catalog(output_dir, settings)
             return not failures
         indexed_chunks = _index_incremental(active_path, output_dir, pending_records)
         manifest = _load_manifest(manifest_path)
@@ -986,6 +1006,7 @@ def ingest_sanitized_documents(
         manifest["incremental_chunks_added"] = indexed_chunks
         manifest["last_incremental_index_utc"] = datetime.now(timezone.utc).isoformat()
         _write_json(manifest_path, manifest)
+        _refresh_default_routing_catalog(output_dir, settings)
         return not failures
     except Exception:
         LOGGER.exception("Falló la ingesta de documentos Markdown.")
@@ -1000,7 +1021,7 @@ def main() -> int:
     parser.add_argument("--docs-dir", type=Path, help="Directorio de documentos fuente; por defecto, DOCS_DIR.")
     parser.add_argument("--chroma-dir", type=Path, help="Base RAG activa; por defecto, CHROMA_DB_DIR.")
     parser.add_argument("--force", action="store_true", help="Vuelve a transformar con GPT-6 Luna aunque el Markdown vigente pase la validación.")
-    parser.add_argument("--no-vision", action="store_true", help="No interpreta imágenes mediante el modelo visual local.")
+    parser.add_argument("--no-vision", action="store_true", help="Obsoleto: las imágenes siempre se interpretan para evitar omisiones.")
     parser.add_argument("--workers", type=int, default=2, help="Transformaciones LLM concurrentes, entre 1 y 4 (por defecto: 2).")
     args = parser.parse_args()
 

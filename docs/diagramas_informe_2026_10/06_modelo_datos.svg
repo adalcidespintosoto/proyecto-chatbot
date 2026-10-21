@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="840" viewBox="0 0 1100 840">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
+<rect width="1100" height="840" fill="#FFFFFF"/>
+<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Persistencia actual del proyecto</text>
+<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Esquema relacional local y almacenes documentales separados</text>
+<rect x="35" y="105" width="670" height="470" rx="13" fill="#FFFFFF" stroke="#62809A" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="55" y="138" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="bold" text-anchor="start">data/analytics.db  SQLite</text>
+<rect x="60" y="166" width="285" height="118" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="76" y="195" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">telemetry_sessions</text>
+<text x="76" y="223" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">PK session_id</text>
+<text x="76" y="246" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">role, final_status</text>
+<text x="76" y="269" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">start_time, end_time</text>
+<rect x="385" y="166" width="285" height="164" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="401" y="195" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">telemetry_interactions</text>
+<text x="401" y="223" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">PK id; FK session_id</text>
+<text x="401" y="246" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">query, response, source</text>
+<text x="401" y="269" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">latency, tokens, feedback</text>
+<text x="401" y="292" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">documentos de referencia</text>
+<line x1="345" y1="227" x2="385" y2="227" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="365" y="207" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">FK</text>
+<rect x="60" y="363" width="285" height="128" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="76" y="392" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">telemetry_tickets</text>
+<text x="76" y="420" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">PK id; session_id (texto)</text>
+<text x="76" y="443" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">email, ticket_id</text>
+<text x="76" y="466" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">action, created_at</text>
+<rect x="385" y="363" width="285" height="128" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="401" y="392" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">telemetry_ignored_queries</text>
+<text x="401" y="420" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">PK id; query_text</text>
+<text x="401" y="443" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">normalized_query UNIQUE</text>
+<text x="401" y="466" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">reason, dismissed_at</text>
+<rect x="745" y="105" width="320" height="470" rx="13" fill="#FFFFFF" stroke="#62809A" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="762" y="138" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="bold" text-anchor="start">Otros almacenes locales</text>
+<rect x="765" y="170" width="280" height="120" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="781" y="199" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="start">instances.sqlite3</text>
+<text x="781" y="227" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="start">chatbot_instances</text>
+<text x="781" y="250" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="start">proveedor y modelo</text>
+<text x="781" y="273" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="start">configuración por instancia</text>
+<rect x="765" y="320" width="280" height="95" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="781" y="349" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="start">ChromaDB</text>
+<text x="781" y="377" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="start">índice UniMon TI</text>
+<text x="781" y="400" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="start">índices por instancia</text>
+<rect x="765" y="440" width="280" height="95" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="781" y="469" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="start">Golden Cache</text>
+<text x="781" y="497" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="start">colección de casos validados</text>
+<text x="781" y="520" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="start">en ChromaDB</text>
+<rect x="90" y="628" width="920" height="95" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="106" y="657" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="start">GLPI Cloud  Sistema externo</text>
+<text x="106" y="685" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="start">Conserva los tickets oficiales. UniMon registra actividad local de tickets,</text>
+<text x="106" y="708" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="start">pero no sustituye el almacenamiento ni el estado oficial de GLPI.</text>
+<rect x="90" y="755" width="920" height="56" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="104" y="782" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">No existe una única tabla local interactions como esquema principal.</text>
+<text x="104" y="805" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Las colecciones vectoriales no forman parte del modelo relacional SQLite.</text>
+</svg>

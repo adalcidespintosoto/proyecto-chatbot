@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="795" viewBox="0 0 1100 795">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
+<rect width="1100" height="795" fill="#FFFFFF"/>
+<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Casos de uso de UniMon</text>
+<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Canales y funciones presentes en la versión revisada</text>
+<rect x="230" y="105" width="625" height="630" rx="13" fill="#FFFFFF" stroke="#62809A" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="250" y="137" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="bold" text-anchor="start">Sistema UniMon</text>
+<rect x="25" y="240" width="180" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="115.0" y="282.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Solicitante</text>
+<rect x="25" y="580" width="180" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="115.0" y="622.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Administrador</text>
+<rect x="885" y="235" width="190" height="75" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="980.0" y="267.5" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Proveedor LLM</text>
+<text x="980.0" y="291.5" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">o Ollama</text>
+<rect x="885" y="475" width="190" height="75" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="980.0" y="519.5" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">GLPI Cloud</text>
+<ellipse cx="397.5" cy="204.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="397.5" y="199.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Consultar soporte</text>
+<text x="397.5" y="223.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">y documentos</text>
+<ellipse cx="672.5" cy="204.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="672.5" y="199.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Orientación de trámite</text>
+<text x="672.5" y="223.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">institucional</text>
+<ellipse cx="397.5" cy="329.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="397.5" y="324.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Enrutar consulta</text>
+<text x="397.5" y="348.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">por especialidad</text>
+<ellipse cx="672.5" cy="329.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="672.5" y="324.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Confirmar resultado</text>
+<text x="672.5" y="348.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">o pedir ayuda</text>
+<ellipse cx="397.5" cy="454.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="397.5" y="449.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Radicar incidencia</text>
+<text x="397.5" y="473.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">técnica</text>
+<ellipse cx="672.5" cy="454.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="672.5" y="449.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Consultar estado</text>
+<text x="672.5" y="473.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">de ticket</text>
+<ellipse cx="397.5" cy="599.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="397.5" y="594.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Administrar fuentes</text>
+<text x="397.5" y="618.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">e instancias</text>
+<ellipse cx="672.5" cy="599.0" rx="117.5" ry="39.0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="672.5" y="594.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">Ver analítica</text>
+<text x="672.5" y="618.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="normal" text-anchor="middle">y auditorías</text>
+<line x1="205" y1="275" x2="280" y2="205" stroke="#62809A" stroke-width="2"/>
+<line x1="205" y1="275" x2="280" y2="330" stroke="#62809A" stroke-width="2"/>
+<line x1="205" y1="275" x2="280" y2="455" stroke="#62809A" stroke-width="2"/>
+<line x1="205" y1="615" x2="280" y2="600" stroke="#62809A" stroke-width="2"/>
+<line x1="790" y1="205" x2="885" y2="272" stroke="#62809A" stroke-width="2"/>
+<line x1="515" y1="455" x2="885" y2="510" stroke="#62809A" stroke-width="2"/>
+<line x1="790" y1="455" x2="885" y2="510" stroke="#62809A" stroke-width="2"/>
+<rect x="250" y="682" width="580" height="42" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="264" y="709" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">El canal web y el webhook WhatsApp comparten capacidades de consulta.</text>
+</svg>

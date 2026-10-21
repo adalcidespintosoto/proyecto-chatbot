@@ -38,6 +38,7 @@ from app.services.knowledge_base_service import (
 from app.services.bot_instance_service import (
     BotInstanceError,
     bot_instance_manager,
+    is_retryable_unindexed_record,
 )
 from app.services.sanitized_documents import split_markdown_for_rag
 from app.services.llm_endpoint_security import validate_custom_llm_base_url
@@ -1148,6 +1149,33 @@ def _sha256_path(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _is_same_audit_pending_index(
+    record: Any,
+    source_sha256: str,
+    markdown_sha256: str,
+) -> bool:
+    """Recognize a prior resolve attempt that committed its audit but not its index."""
+    if not isinstance(record, dict):
+        return False
+    audit = record.get("fidelity_audit")
+    try:
+        indexed_chunk_count = int(record.get("indexed_chunk_count") or 0)
+    except (TypeError, ValueError):
+        return False
+    return bool(
+        record.get("source_sha256") == source_sha256
+        and record.get("markdown_sha256") == markdown_sha256
+        and isinstance(audit, dict)
+        and audit.get("status") == "coincide"
+        and audit.get("source_sha256") == source_sha256
+        and audit.get("markdown_sha256") == markdown_sha256
+        and indexed_chunk_count == 0
+        and not record.get("indexed_sha256")
+        and not record.get("indexed_at_utc")
+        and str(record.get("index_status") or "").casefold() != "indexed"
+    )
+
+
 def _serialize_redundancy_report(rep: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     overlapping_sources = []
     for source, data in sorted(
@@ -1221,14 +1249,42 @@ async def audit_chatbot_instance_document(
 
     async with bot_instance_manager.get_ingestion_lock(bot_id):
         paths = bot_instance_manager.paths(bot_id)
-        if (paths.docs / filename).exists():
-            raise HTTPException(status_code=409, detail="Ya existe un documento con ese nombre en esta instancia. Cambia el nombre antes de analizarlo.")
         staged_id = uuid.uuid4().hex
         stage_dir, source_dir, output_dir = _instance_upload_stage(paths, staged_id)
         source_dir.mkdir(parents=True, exist_ok=False)
+        retry_existing = False
         staged_source = source_dir / filename
         try:
             await save_upload(file, staged_source, settings.max_upload_size_mb * 1024 * 1024)
+            destination = paths.docs / filename
+            if destination.is_symlink():
+                raise HTTPException(status_code=400, detail="El documento existente tiene una ruta no válida.")
+            if destination.exists():
+                if not destination.is_file() or _sha256_path(destination) != _sha256_path(staged_source):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Ya existe otro archivo con ese nombre en esta instancia. No se reemplazó el documento guardado.",
+                    )
+                manifest_path = paths.markdown / "manifest.json"
+                if manifest_path.is_symlink():
+                    raise HTTPException(status_code=400, detail="El manifiesto de esta instancia no tiene una ruta válida.")
+                try:
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
+                    records = manifest.get("records", {}) if isinstance(manifest, dict) else {}
+                    existing_record = records.get(filename) if isinstance(records, dict) else None
+                except (OSError, json.JSONDecodeError):
+                    existing_record = None
+                source_hash = _sha256_path(staged_source)
+                if not is_retryable_unindexed_record(existing_record, source_hash):
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Este archivo ya está registrado. Solo se permite volver a analizar el mismo archivo "
+                            "si la validación anterior de fidelidad lo dejó fuera del índice."
+                        ),
+                    )
+                retry_existing = True
+
             runtime = bot_instance_manager.get_runtime(bot_id)
             prepared = await run_in_threadpool(runtime.prepare_document_for_audit, staged_source, output_dir)
             record = prepared["record"]
@@ -1249,6 +1305,7 @@ async def audit_chatbot_instance_document(
                     "markdown_sha256": record["markdown_sha256"],
                     "record": record,
                     "fidelity_audit": audit,
+                    "retry_existing": retry_existing,
                     "status": "review_required",
                     "created_at": datetime.now().isoformat(),
                 }
@@ -1318,6 +1375,7 @@ async def audit_chatbot_instance_document(
                 "markdown_sha256": record["markdown_sha256"],
                 "record": record,
                 "fidelity_audit": audit,
+                "retry_existing": retry_existing,
                 "primary_overlapping_source": overlapping_sources[0]["source"] if overlapping_sources else None,
                 "overlapping_sources": [item["source"] for item in overlapping_sources],
                 "metrics": metrics,
@@ -1434,21 +1492,44 @@ async def resolve_chatbot_instance_document(
                 raise ValueError("estructura inválida")
         except (OSError, json.JSONDecodeError, ValueError) as exc:
             raise HTTPException(status_code=409, detail="El manifiesto de esta instancia no se puede leer; no se indexó el documento.") from exc
+        records = manifest.setdefault("records", {})
+        previous_record = records.get(filename)
         destination = paths.docs / filename
         if destination.is_symlink():
             raise HTTPException(status_code=400, detail="El destino del documento no es válido.")
-        if destination.exists() and _sha256_path(destination) != meta["source_sha256"]:
-            raise HTTPException(status_code=409, detail="Ya existe otro documento con ese nombre en esta instancia.")
+        retry_existing = meta.get("retry_existing") is True
+        if destination.exists():
+            if not destination.is_file() or _sha256_path(destination) != meta["source_sha256"]:
+                raise HTTPException(status_code=409, detail="Ya existe otro documento con ese nombre en esta instancia.")
+            if not retry_existing:
+                raise HTTPException(status_code=409, detail="Este documento ya existe; no se reemplazó ni se duplicó.")
+            if not (
+                is_retryable_unindexed_record(previous_record, meta["source_sha256"])
+                or _is_same_audit_pending_index(previous_record, meta["source_sha256"], meta["markdown_sha256"])
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="El documento ya no está en un estado seguro para reintentar. No se modificó el índice.",
+                )
+        elif retry_existing:
+            raise HTTPException(status_code=409, detail="El original guardado ya no está; vuelve a analizar el archivo.")
         final_markdown = (paths.markdown / relative_markdown).resolve()
         if paths.markdown.resolve() not in final_markdown.parents:
             raise HTTPException(status_code=400, detail="La ruta del Markdown no es válida para esta instancia.")
         final_markdown.parent.mkdir(parents=True, exist_ok=True)
         if final_markdown.is_symlink():
             raise HTTPException(status_code=400, detail="El destino del Markdown no es válido.")
+        replace_failed_markdown = False
         if final_markdown.exists() and _sha256_path(final_markdown) != meta["markdown_sha256"]:
-            raise HTTPException(status_code=409, detail="Ya existe un Markdown distinto para este documento.")
+            previous_relative = Path(str((previous_record or {}).get("markdown_relative_path") or ""))
+            previous_markdown = (paths.markdown / previous_relative).resolve()
+            if not retry_existing or previous_markdown != final_markdown:
+                raise HTTPException(status_code=409, detail="Ya existe un Markdown distinto para este documento.")
+            replace_failed_markdown = True
         created_source = False
         created_markdown = False
+        replaced_markdown = False
+        previous_markdown_backup = stage_dir / "previous_markdown.bak"
         manifest_tmp = manifest_path.with_name(f".{request.staged_id}-manifest.tmp")
         try:
             if not destination.exists():
@@ -1459,12 +1540,17 @@ async def resolve_chatbot_instance_document(
                     created_source = True
                 finally:
                     temporary_source.unlink(missing_ok=True)
-            if not final_markdown.exists():
+            if not final_markdown.exists() or replace_failed_markdown:
+                if replace_failed_markdown:
+                    shutil.copy2(final_markdown, previous_markdown_backup)
                 temporary_markdown = final_markdown.with_name(f".{request.staged_id}-{final_markdown.name}.tmp")
                 try:
                     shutil.copyfile(staged_markdown, temporary_markdown)
                     os.replace(temporary_markdown, final_markdown)
-                    created_markdown = True
+                    if replace_failed_markdown:
+                        replaced_markdown = True
+                    else:
+                        created_markdown = True
                 finally:
                     temporary_markdown.unlink(missing_ok=True)
 
@@ -1477,7 +1563,7 @@ async def resolve_chatbot_instance_document(
                 "source_mtime_ns": source_stat.st_mtime_ns,
                 "fidelity_audit": meta["fidelity_audit"],
             })
-            manifest.setdefault("records", {})[filename] = record
+            records[filename] = record
             manifest["transform_provider"] = record.get("transform_provider", "openai")
             manifest["transform_model"] = record.get("transform_model", "gpt-6-luna")
             manifest_tmp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1487,6 +1573,13 @@ async def resolve_chatbot_instance_document(
                 destination.unlink(missing_ok=True)
             if created_markdown:
                 final_markdown.unlink(missing_ok=True)
+            if replaced_markdown and previous_markdown_backup.is_file():
+                restore_markdown = final_markdown.with_name(f".{request.staged_id}-{final_markdown.name}.restore")
+                try:
+                    shutil.copy2(previous_markdown_backup, restore_markdown)
+                    os.replace(restore_markdown, final_markdown)
+                finally:
+                    restore_markdown.unlink(missing_ok=True)
             raise
         finally:
             manifest_tmp.unlink(missing_ok=True)

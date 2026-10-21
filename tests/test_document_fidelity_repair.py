@@ -260,7 +260,7 @@ def test_visual_evidence_extracts_all_images_from_compound_slide_ranges(tmp_path
     )
 
     assert [visual["slide_number"] for visual in visuals] == [1, 1, 2]
-    assert all(visual["content_type"] == "image/jpeg" for visual in visuals)
+    assert all(visual["content_type"] == "image/png" for visual in visuals)
 
 
 def test_repair_receives_the_same_original_images_used_by_visual_audit():

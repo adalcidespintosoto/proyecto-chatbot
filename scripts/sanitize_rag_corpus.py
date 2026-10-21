@@ -11,6 +11,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import logging
+import os
 import re
 import sys
 import time
@@ -101,7 +102,7 @@ def extract_file(path: Path, use_vision: bool) -> list[Document]:
         "ollama_url": settings.ollama_base_url,
         "vision_model": settings.vision_model,
         "vision_timeout": settings.vision_timeout,
-        "max_image_size": settings.vision_max_image_size,
+        "max_image_size": max(int(settings.vision_max_image_size), 2048),
         "min_image_kb": settings.vision_min_image_kb,
         "use_vision": use_vision,
     }
@@ -122,6 +123,9 @@ def _extract_docx(path: Path, use_vision: bool, settings: Any) -> list[Document]
     from docx.text.paragraph import Paragraph
 
     word = WordDocument(str(path))
+    if not use_vision:
+        LOGGER.warning("Se ignora la opción sin visión para '%s': las imágenes no se omiten.", path.name)
+    use_vision = True
     units: list[Document] = []
     current_heading = ""
     current_parts: list[str] = []
@@ -145,14 +149,14 @@ def _extract_docx(path: Path, use_vision: bool, settings: Any) -> list[Document]
         current_parts = []
 
     def image_descriptions(element: Any) -> list[str]:
-        if not use_vision:
-            return []
         descriptions = []
         for image_index, blip in enumerate(element.iter(qn("a:blip")), start=1):
             relationship_id = blip.get(qn("r:embed"))
             image_part = word.part.related_parts.get(relationship_id) if relationship_id else None
             if image_part is None:
-                continue
+                raise extractor.ImageProcessingError(
+                    f"No se pudo resolver la imagen {image_index} de '{path.name}'."
+                )
             try:
                 description = extractor.describe_image_with_vllm(
                     image_part.blob,
@@ -160,12 +164,15 @@ def _extract_docx(path: Path, use_vision: bool, settings: Any) -> list[Document]
                     ollama_url=settings.ollama_base_url,
                     vision_model=settings.vision_model,
                     timeout=settings.vision_timeout,
-                    max_image_size=settings.vision_max_image_size,
+                    max_image_size=max(int(settings.vision_max_image_size), 2048),
                 )
-                if description:
-                    descriptions.append(f"[Imagen: {description}]")
+                descriptions.append(f"[Imagen: {description}]")
+            except extractor.ImageProcessingError:
+                raise
             except Exception as exc:
-                LOGGER.warning("No se pudo interpretar una imagen de Word en %s: %s", path.name, type(exc).__name__)
+                raise extractor.ImageProcessingError(
+                    f"No se pudo interpretar la imagen {image_index} de '{path.name}'."
+                ) from exc
         return descriptions
 
     body = word.element.body
@@ -362,6 +369,33 @@ def markdown_filename(source: str) -> str:
     return f"{safe}_{sha256_text(source)[:10]}.md"
 
 
+def markdown_output_path(output_dir: Path, source: str, folder: str = "markdown") -> Path:
+    """Build a readable Markdown path, switching to a short stable name on long paths.
+
+    Windows can reject paths near its legacy 260-character limit. Instance uploads
+    live below several nested directories, so long original filenames can exceed it.
+    Keep readable names when safe and use a source-hash name when they are not.
+    """
+    output_dir = Path(output_dir)
+    candidate = output_dir / folder / markdown_filename(source)
+
+    def path_length(path: Path) -> int:
+        value = os.path.abspath(os.fspath(path))
+        return len(value.encode("utf-16-le")) // 2 if os.name == "nt" else len(value)
+
+    # Leave headroom for the temporary suffix, atomic writes, and the rejected draft.
+    if path_length(candidate) <= 220:
+        return candidate
+
+    shortened = output_dir / folder / f"doc_{sha256_text(source)[:16]}.md"
+    if path_length(shortened) > 240:
+        raise OSError(
+            "La ruta temporal del Markdown supera el límite seguro incluso con nombre corto. "
+            "Mueve la carpeta de datos a una ruta más corta y vuelve a intentar."
+        )
+    return shortened
+
+
 def extract_markdown_content(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -390,7 +424,7 @@ def transform_prepared_source(
     initial_markdown: str | None = None,
 ) -> dict[str, Any]:
     started = time.perf_counter()
-    markdown_path = output_dir / "markdown" / markdown_filename(source)
+    markdown_path = markdown_output_path(output_dir, source, "markdown")
     rejected_path: Path | None = None
     attempt_usage: list[dict[str, Any]] = []
     providers_used: list[tuple[str, str]] = []
@@ -461,7 +495,7 @@ def transform_prepared_source(
             ),
         }
         if errors:
-            rejected_path = output_dir / "rejected" / markdown_filename(source)
+            rejected_path = markdown_output_path(output_dir, source, "rejected")
             rejected_path.parent.mkdir(parents=True, exist_ok=True)
             rejected_path.write_text(markdown.rstrip() + "\n", encoding="utf-8")
             raise RuntimeError("La salida omite referencias: " + " ".join(errors))
@@ -622,7 +656,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, help="Directorio aislado de Markdown y manifiesto.")
     parser.add_argument("--limit", type=int, help="Procesa solo N documentos para un piloto.")
     parser.add_argument("--source", help="Procesa un archivo por nombre, sin tocar los demás.")
-    parser.add_argument("--no-vision", action="store_true", help="No usa descripciones visuales locales.")
+    parser.add_argument("--no-vision", action="store_true", help="Obsoleto: las imágenes siempre se interpretan para evitar omisiones.")
     parser.add_argument("--workers", type=int, default=3, help="Llamadas paralelas a GPT-6 Luna (1–4).")
     parser.add_argument("--build-candidate", action="store_true", help="Construye el Chroma candidato al completar todos los documentos.")
     parser.add_argument("--force", action="store_true", help="Regenera Markdown aun si el manifiesto tiene una salida válida.")
@@ -717,7 +751,7 @@ def main() -> int:
                         rejected_path.read_text(encoding="utf-8"), markers
                     )
                     if not validate_sanitized_markdown(rejected_markdown, markers):
-                        accepted_path = markdown_dir / markdown_filename(source)
+                        accepted_path = markdown_output_path(output_dir, source, "markdown")
                         markdown_dir.mkdir(parents=True, exist_ok=True)
                         accepted_path.write_text(rejected_markdown.rstrip() + "\n", encoding="utf-8")
                         manifest["records"][source] = {

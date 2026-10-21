@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="790" viewBox="0 0 1100 790">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
+<rect width="1100" height="790" fill="#FFFFFF"/>
+<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Secuencia de radicación en GLPI</text>
+<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">El identificador se comunica solo tras una respuesta de creación confirmada</text>
+<rect x="6" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="90.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">Solicitante</text>
+<line x1="90" y1="168" x2="90" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="226" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="310.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">API / FSM</text>
+<line x1="310" y1="168" x2="310" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="446" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="530.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">GLPIService</text>
+<line x1="530" y1="168" x2="530" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="686" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="770.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">GLPI Cloud</text>
+<line x1="770" y1="168" x2="770" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="906" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="990.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">SQLite</text>
+<line x1="990" y1="168" x2="990" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<line x1="99" y1="192" x2="301" y2="192" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="200.0" y="183.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">1  Solicita radicación</text>
+<line x1="301" y1="248" x2="99" y2="248" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="200.0" y="239.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">2  Captura nombre, correo y descripción</text>
+<line x1="319" y1="304" x2="521" y2="304" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="420.0" y="295.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">3  create_ticket(datos)</text>
+<line x1="539" y1="360" x2="761" y2="360" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="650.0" y="351.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">4  initSession</text>
+<line x1="539" y1="416" x2="761" y2="416" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="650.0" y="407.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">5  POST /Assistance/Ticket o /Ticket</text>
+<line x1="761" y1="472" x2="539" y2="472" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="650.0" y="463.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">6  ID confirmado o error</text>
+<line x1="539" y1="528" x2="761" y2="528" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="650.0" y="519.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">7  Si hay ID, asociación opcional</text>
+<line x1="539" y1="584" x2="761" y2="584" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="650.0" y="575.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">8  killSession en finally</text>
+<line x1="319" y1="640" x2="981" y2="640" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="650.0" y="631.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">9  Registro local de actividad</text>
+<rect x="185" y="697" width="730" height="72" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="199" y="724" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Si no se confirma la creación, el flujo informa el error sin inventar radicado.</text>
+<text x="199" y="747" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">La asociación depende de un correo válido y de la respuesta de GLPI.</text>
+</svg>

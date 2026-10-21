@@ -59,16 +59,21 @@ stats = {
 
 # Prompt institucional para interpretación visual de imágenes
 VISION_PROMPT = (
-    "Describe solo la información visible que ayude a entender un procedimiento técnico institucional. "
+    "Describe toda la información visible de esta imagen; no la descartes por parecer decorativa o poco técnica. "
     "- Si es una captura de pantalla de software o interfaz web (Kactus, Seven, GLPI, Windows, Teams, etc.): "
     "transcribe los nombres legibles de ventanas, menús, botones, campos y opciones; no inventes pasos que no aparezcan. "
     "- Si es un diagrama, flujo o mapa de procesos: describe la secuencia lógica y los pasos representados de inicio a fin. "
     "- Si contiene tablas o texto legible: transcribe el texto y los datos de forma estructurada. "
+    "- Si es una fotografía, logotipo, banner u otra imagen sin texto técnico, describe objetivamente lo que se ve "
+    "y señala que no contiene instrucciones legibles. "
     "No infieras universidad, país, ciudad, identidad de personas ni significado de logotipos o fotografías. "
-    "Si es un logotipo, fotografía decorativa, banner promocional o imagen sin información técnica útil, "
-    "responde exactamente [IMAGEN_NO_RELEVANTE]. Responde en español de forma concisa y técnica."
+    "Nunca respondas que la imagen no es relevante ni devuelvas una salida vacía. Responde en español."
 )
 NON_RELEVANT_IMAGE_SENTINEL = "[IMAGEN_NO_RELEVANTE]"
+
+
+class ImageProcessingError(RuntimeError):
+    """Raised when an image cannot be represented faithfully in extracted text."""
 
 
 # =============================================================================
@@ -126,47 +131,45 @@ def strip_chunk_boilerplate(content: str) -> str:
         "",
         cleaned
     )
-    cleaned = re.sub(r"(?is)\[Imagen:\s*Lo siento\b.*?\]", "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
 
-def normalize_image(image_bytes: bytes, max_size: int = 1024, quality: int = 85) -> bytes:
+def normalize_image(image_bytes: bytes, max_size: int = 2048, quality: int = 95) -> bytes:
     """
-    Normaliza una imagen redimensionándola y comprimiéndola para no saturar VRAM.
-    Retorna bytes JPEG comprimidos.
+    Normaliza la imagen y conserva el texto pequeño con codificación PNG sin pérdida.
     """
     try:
         img = Image.open(io.BytesIO(image_bytes))
-        # Convertir a RGB si es necesario (RGBA, paleta, etc.)
+        # Preserve the visible appearance of transparent and palette images.
+        if img.mode in {"RGBA", "LA"} or "transparency" in img.info:
+            rgba = img.convert("RGBA")
+            background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+            img = Image.alpha_composite(background, rgba).convert("RGB")
+        # Convert other modes only after handling alpha/transparency.
         if img.mode not in ("RGB", "L"):
             img = img.convert("RGB")
         # Redimensionar manteniendo proporciones
         if max(img.size) > max_size:
             img.thumbnail((max_size, max_size), Image.LANCZOS)
-        # Comprimir a JPEG
+        # PNG evita artefactos de compresión sobre texto pequeño en capturas y tablas.
         buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=quality, optimize=True)
+        img.save(buffer, format="PNG", optimize=True)
         return buffer.getvalue()
     except Exception as exc:
-        logger.warning(f"Error al normalizar imagen: {exc}")
-        return image_bytes
+        logger.warning("No se pudo normalizar una imagen para visión (%s).", type(exc).__name__)
+        raise ValueError("No se pudo normalizar la imagen sin riesgo de perder su contenido.") from exc
 
 
 def is_significant_image(image_bytes: bytes, min_kb: int = 0) -> bool:
     """
-    Verifica que la imagen tenga contenido binario para procesar.
-    Si min_kb <= 0, no descarta ninguna imagen y procesa el 100% de ellas sin restricciones.
+    Acepta toda imagen con bytes, sin umbral de tamaño, para no perder contenido.
     """
-    if not image_bytes or len(image_bytes) == 0:
-        return False
-    if min_kb <= 0:
-        return True
-    return len(image_bytes) >= min_kb * 1024
+    return bool(image_bytes)
 
 
 def is_useful_image_description(description: Optional[str]) -> bool:
-    """Rechaza negativas del modelo visual y descripciones no informativas."""
+    """Reject refusals and empty descriptions so the image can be retried, never dropped."""
     text = (description or "").strip()
     if not text or is_non_relevant_image_description(text):
         return False
@@ -179,7 +182,7 @@ def is_useful_image_description(description: Optional[str]) -> bool:
 
 
 def is_non_relevant_image_description(description: Optional[str]) -> bool:
-    """Reconoce la respuesta válida del prompt para imágenes decorativas."""
+    """Recognize a legacy cache marker that must be reprocessed under the current prompt."""
     return (description or "").strip().casefold() == NON_RELEVANT_IMAGE_SENTINEL.casefold()
 
 
@@ -231,8 +234,8 @@ def describe_image_with_vllm(
     ollama_url: str = "http://localhost:11434",
     vision_model: str = "llava:13b",
     timeout: float = 120.0,
-    max_image_size: int = 1024
-) -> Optional[str]:
+    max_image_size: int = 2048
+) -> str:
     """
     Describe an image with GPT-6 Luna first and Ollama only as the final fallback.
     Cache entries are separated by provider, model, prompt, and image hash.
@@ -249,11 +252,16 @@ def describe_image_with_vllm(
         if not description:
             return False, None
         if is_non_relevant_image_description(description):
-            stats["images_skipped"] += 1
-            logger.debug("[Vision-LLM] Imagen '%s' marcada como no relevante en caché.", filename)
-            return True, None
+            logger.warning(
+                "[Vision-LLM] Se descarta una marca antigua de omisión para '%s'; se volverá a analizar.",
+                filename,
+            )
+            return False, None
         if not is_useful_image_description(description):
-            stats["images_skipped"] += 1
+            logger.warning(
+                "[Vision-LLM] La descripción en caché de '%s' no es utilizable; se volverá a analizar.",
+                filename,
+            )
             return False, None
         stats["images_described"] += 1
         logger.debug("[Vision-LLM] Imagen '%s' recuperada de caché (%s).", filename, key.split(":", 2)[0])
@@ -274,10 +282,13 @@ def describe_image_with_vllm(
                 {"role": "system", "content": "Describe imágenes para soporte técnico. No inventes texto ni pasos."},
                 {"role": "user", "content": [
                     {"type": "text", "text": VISION_PROMPT},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:image/png;base64,{img_b64}",
+                        "detail": "high",
+                    }},
                 ]},
             ],
-            "max_completion_tokens": 512,
+            "max_completion_tokens": 2048,
             "reasoning_effort": "low",
         }
         headers = {
@@ -294,19 +305,13 @@ def describe_image_with_vllm(
         if isinstance(message, list):
             message = "\n".join(part.get("text", "") for part in message if isinstance(part, dict))
         description = str(message).strip()
-        if is_non_relevant_image_description(description):
-            save_vision_cache_entry(primary_cache_key, NON_RELEVANT_IMAGE_SENTINEL)
-            stats["images_skipped"] += 1
-            logger.info(
-                "[Vision-LLM] OpenAI gpt-6-luna determinó que '%s' no contiene información útil; se omite sin fallback.",
-                filename,
-            )
-            return None
+        finish_reason = str(choice.get("finish_reason") or "").casefold()
+        if finish_reason == "length":
+            raise RuntimeError("GPT-6 Luna truncó la descripción visual por límite de salida.")
         if not is_useful_image_description(description):
-            finish_reason = choice.get("finish_reason") or "desconocido"
             raise RuntimeError(
-                f"GPT-6 Luna devolvió una salida vacía o no utilizable "
-                f"(finish_reason={finish_reason}, caracteres={len(description)})."
+                f"GPT-6 Luna devolvió una descripción vacía o no utilizable "
+                f"(finish_reason={finish_reason or 'desconocido'}, caracteres={len(description)})."
             )
         save_vision_cache_entry(primary_cache_key, description)
         stats["images_described"] += 1
@@ -332,20 +337,17 @@ def describe_image_with_vllm(
             "prompt": VISION_PROMPT,
             "images": [img_b64],
             "stream": False,
-            "options": {"temperature": 0.1, "num_predict": 512},
+            "options": {"temperature": 0.1, "num_predict": 2048},
         }
         with httpx.Client(timeout=timeout) as client:
             response = client.post(f"{ollama_url.rstrip('/')}/api/generate", json=payload)
             response.raise_for_status()
-        description = str(response.json().get("response", "")).strip()
-        if is_non_relevant_image_description(description):
-            save_vision_cache_entry(fallback_cache_key, NON_RELEVANT_IMAGE_SENTINEL)
-            stats["images_skipped"] += 1
-            logger.info("[Vision-LLM] Ollama marcó '%s' como no relevante; se omite.", filename)
-            return None
+        response_payload = response.json()
+        description = str(response_payload.get("response", "")).strip()
+        if str(response_payload.get("done_reason") or "").casefold() == "length":
+            raise RuntimeError("Ollama truncó la descripción visual por límite de salida.")
         if not is_useful_image_description(description):
-            stats["images_skipped"] += 1
-            return None
+            raise RuntimeError("Ollama devolvió una descripción vacía o no utilizable.")
         save_vision_cache_entry(fallback_cache_key, description)
         stats["images_described"] += 1
         logger.info("[Vision-LLM] Imagen '%s' procesada por Ollama (%s), último recurso.", filename, vision_model)
@@ -357,7 +359,10 @@ def describe_image_with_vllm(
             type(fallback_error).__name__,
         )
         stats["vision_errors"] += 1
-        return None
+        raise ImageProcessingError(
+            f"No se pudo describir la imagen '{filename}' con GPT-6 Luna ni con Ollama; "
+            "se detuvo la extracción para evitar indexar el documento incompleto."
+        ) from fallback_error
 
 
 def check_vision_model_available(ollama_url: str, vision_model: str) -> Tuple[bool, str]:
@@ -410,6 +415,13 @@ def check_vision_model_available(ollama_url: str, vision_model: str) -> Tuple[bo
 # PARSER DE POWERPOINT (.pptx)
 # =============================================================================
 
+def _iter_nested_shapes(shapes):
+    """Yield slide shapes recursively so pictures inside groups are not missed."""
+    for shape in shapes:
+        yield shape
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            yield from _iter_nested_shapes(shape.shapes)
+
 def process_pptx(
     filepath: Path,
     ollama_url: str,
@@ -425,6 +437,9 @@ def process_pptx(
     """
     documents = []
     source_name = filepath.name
+    if not use_vision:
+        logger.warning("Se ignora la opción sin visión para '%s': las imágenes no se omiten.", source_name)
+    use_vision = True
 
     try:
         prs = Presentation(str(filepath))
@@ -441,7 +456,7 @@ def process_pptx(
         slide_images_descriptions = []
 
         # --- Extraer texto de formas ---
-        for shape in slide.shapes:
+        for shape in _iter_nested_shapes(slide.shapes):
             # Texto de formas con text_frame
             if shape.has_text_frame:
                 text = shape.text_frame.text.strip()
@@ -459,24 +474,28 @@ def process_pptx(
                     parts.append("[Tabla]\n" + "\n".join(table_text))
 
             # Imágenes incrustadas
-            if use_vision and hasattr(shape, "image") and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+            if hasattr(shape, "image") and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                 try:
                     img_bytes = shape.image.blob
-                    if is_significant_image(img_bytes, min_kb=min_image_kb):
-                        img_name = f"{source_name}_slide{slide_idx}_img"
-                        description = describe_image_with_vllm(
-                            img_bytes, img_name,
-                            ollama_url=ollama_url,
-                            vision_model=vision_model,
-                            timeout=vision_timeout,
-                            max_image_size=max_image_size
+                    if not is_significant_image(img_bytes, min_kb=min_image_kb):
+                        raise ImageProcessingError(
+                            f"La imagen de la diapositiva {slide_idx} de '{source_name}' está vacía."
                         )
-                        if description:
-                            slide_images_descriptions.append(f"[Imagen: {description}]")
-                    else:
-                        stats["images_skipped"] += 1
+                    img_name = f"{source_name}_slide{slide_idx}_img"
+                    description = describe_image_with_vllm(
+                        img_bytes, img_name,
+                        ollama_url=ollama_url,
+                        vision_model=vision_model,
+                        timeout=vision_timeout,
+                        max_image_size=max_image_size
+                    )
+                    slide_images_descriptions.append(f"[Imagen: {description}]")
+                except ImageProcessingError:
+                    raise
                 except Exception as exc:
-                    logger.debug(f"[PPTX] No se pudo extraer imagen de slide {slide_idx}: {exc}")
+                    raise ImageProcessingError(
+                        f"No se pudo extraer una imagen de la diapositiva {slide_idx} de '{source_name}'."
+                    ) from exc
 
         # --- Extraer notas del orador ---
         if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
@@ -527,6 +546,9 @@ def process_pdf(
     """
     documents = []
     source_name = filepath.name
+    if not use_vision:
+        logger.warning("Se ignora la opción sin visión para '%s': las imágenes no se omiten.", source_name)
+    use_vision = True
 
     try:
         pdf_doc = fitz.open(str(filepath))
@@ -555,23 +577,30 @@ def process_pdf(
                 xref = img_info[0]
                 try:
                     base_image = pdf_doc.extract_image(xref)
-                    if base_image:
-                        img_bytes = base_image.get("image", b"")
-                        if is_significant_image(img_bytes, min_kb=min_image_kb):
-                            img_name = f"{source_name}_page{page_idx + 1}_xref{xref}"
-                            description = describe_image_with_vllm(
-                                img_bytes, img_name,
-                                ollama_url=ollama_url,
-                                vision_model=vision_model,
-                                timeout=vision_timeout,
-                                max_image_size=max_image_size
-                            )
-                            if description:
-                                page_images_descriptions.append(f"[Imagen: {description}]")
-                        else:
-                            stats["images_skipped"] += 1
+                    if not base_image:
+                        raise ImageProcessingError(
+                            f"No se pudo extraer la imagen xref={xref} de la página {page_idx + 1} de '{source_name}'."
+                        )
+                    img_bytes = base_image.get("image", b"")
+                    if not is_significant_image(img_bytes, min_kb=min_image_kb):
+                        raise ImageProcessingError(
+                            f"La imagen xref={xref} de la página {page_idx + 1} de '{source_name}' está vacía."
+                        )
+                    img_name = f"{source_name}_page{page_idx + 1}_xref{xref}"
+                    description = describe_image_with_vllm(
+                        img_bytes, img_name,
+                        ollama_url=ollama_url,
+                        vision_model=vision_model,
+                        timeout=vision_timeout,
+                        max_image_size=max_image_size
+                    )
+                    page_images_descriptions.append(f"[Imagen: {description}]")
+                except ImageProcessingError:
+                    raise
                 except Exception as exc:
-                    logger.debug(f"[PDF] No se pudo extraer imagen xref={xref} en página {page_idx + 1}: {exc}")
+                    raise ImageProcessingError(
+                        f"No se pudo extraer una imagen xref={xref} de la página {page_idx + 1} de '{source_name}'."
+                    ) from exc
 
             # --- Rasterizar página completa si no hay texto nativo (escaneada) ---
             if not text and not page_images_descriptions:
@@ -586,10 +615,15 @@ def process_pdf(
                         timeout=vision_timeout,
                         max_image_size=max_image_size
                     )
-                    if description:
-                        page_images_descriptions.append(f"[Página Escaneada: {description}]")
+                    if not description:
+                        raise ImageProcessingError(
+                            f"La página escaneada {page_idx + 1} de '{source_name}' quedó sin descripción."
+                        )
+                    page_images_descriptions.append(f"[Página Escaneada: {description}]")
                 except Exception as exc:
-                    logger.debug(f"[PDF] No se pudo rasterizar página {page_idx + 1}: {exc}")
+                    raise ImageProcessingError(
+                        f"No se pudo interpretar la página escaneada {page_idx + 1} de '{source_name}'."
+                    ) from exc
 
         # --- Ensamblar contenido de la página ---
         if page_images_descriptions:

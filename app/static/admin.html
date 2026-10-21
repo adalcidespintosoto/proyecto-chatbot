@@ -316,6 +316,8 @@
     .bot-instance-note { color: var(--text-secondary); margin: 0 0 1.25rem; line-height: 1.6; }
     .bot-instance-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 1rem; }
     .bot-instance-llm-fields { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 1rem; min-width: 0; }
+    .bot-instance-model-recommendation { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: .65rem; padding: .7rem .85rem; border: 1px solid rgba(59,130,246,.28); border-radius: var(--radius-sm); background: rgba(10,88,202,.1); color: #BFDBFE; font-size: .82rem; line-height: 1.5; }
+    .bot-instance-model-recommendation strong { color: #DBEAFE; }
     .bot-instance-llm-fields[hidden], .bot-instance-field[hidden] { display: none !important; }
     .bot-instance-custom-title { grid-column: 1 / -1; margin: 0; color: var(--text-primary); font-size: 1rem; }
     .bot-instance-field { display: grid; gap: .4rem; color: var(--text-secondary); font-size: .9rem; }
@@ -336,25 +338,52 @@
     .bot-instance-card-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
     .bot-instance-card-contacts { overflow-wrap: anywhere; }
     .bot-instance-upload { display: grid; gap: .65rem; padding: .9rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: rgba(0,0,0,.12); }
+    .bot-instance-upload[aria-busy="true"] { border-color: rgba(59,130,246,.55); }
     .bot-instance-upload-title { margin: 0; font-size: .95rem; }
     .bot-instance-upload-help, .bot-instance-upload-status { margin: 0; color: var(--text-secondary); font-size: .84rem; line-height: 1.5; }
     .bot-instance-upload-status[data-state="error"] { color: #FCA5A5; }
     .bot-instance-upload-status[data-state="success"] { color: #6EE7B7; }
+    .bot-instance-upload-progress { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(148,163,184,.18); }
+    .bot-instance-upload-progress[hidden] { display: none; }
+    .bot-instance-upload-progress-bar { width: 38%; height: 100%; border-radius: inherit; background: #60A5FA; animation: bot-upload-progress 1.15s ease-in-out infinite alternate; }
+    @keyframes bot-upload-progress { from { transform: translateX(-12%); } to { transform: translateX(180%); } }
+    @media (prefers-reduced-motion: reduce) { .bot-instance-upload-progress-bar { animation: none; width: 100%; } }
     .bot-instance-dropzone { padding: .8rem; border: 1px dashed rgba(148,163,184,.45); border-radius: 9px; cursor: pointer; color: var(--text-secondary); overflow-wrap: anywhere; }
     .bot-instance-dropzone:focus-visible { outline: 2px solid #60A5FA; outline-offset: 2px; }
     .bot-instance-dropzone.is-dragging { border-color: #60A5FA; background: rgba(59,130,246,.12); }
+    .bot-instance-dropzone[aria-disabled="true"] { opacity: .6; cursor: wait; }
     .bot-instance-upload-buttons, .bot-instance-audit-actions { display: flex; gap: .55rem; flex-wrap: wrap; }
     .bot-instance-upload-buttons .btn, .bot-instance-audit-actions .btn { justify-content: center; }
-    .bot-instance-audit { display: grid; gap: .65rem; padding: .8rem; border-radius: 9px; background: rgba(15,23,42,.72); border: 1px solid rgba(148,163,184,.2); }
+    .bot-instance-audit { display: grid; gap: .8rem; padding: 1rem; border-radius: var(--radius-md); background: rgba(15,23,42,.72); border: 1px solid rgba(148,163,184,.2); }
     .bot-instance-audit[hidden] { display: none; }
     .bot-instance-audit-summary, .bot-instance-overlaps { margin: 0; font-size: .84rem; line-height: 1.5; }
-    .bot-instance-overlaps { display: grid; gap: .35rem; }
+    .bot-instance-audit-intro { color: var(--text-secondary); font-size: .84rem; line-height: 1.55; }
+    .bot-instance-audit-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: .55rem; }
+    .bot-instance-audit-metric { padding: .65rem .75rem; border: 1px solid rgba(148,163,184,.18); border-radius: var(--radius-sm); background: rgba(2,6,23,.32); }
+    .bot-instance-audit-metric strong { display: block; color: var(--text-primary); font-size: 1.1rem; }
+    .bot-instance-audit-metric span { color: var(--text-secondary); font-size: .74rem; }
+    .bot-instance-overlaps { display: grid; gap: .55rem; }
+    .bot-instance-overlap-card { display: grid; gap: .25rem; padding: .7rem .8rem; border: 1px solid rgba(148,163,184,.18); border-radius: var(--radius-sm); background: rgba(2,6,23,.25); overflow-wrap: anywhere; }
+    .bot-instance-overlap-title { color: var(--text-primary); font-size: .84rem; font-weight: 700; }
+    .bot-instance-overlap-meta { color: var(--text-secondary); font-size: .78rem; }
+    .bot-instance-audit-explainer { padding: .7rem .8rem; border-left: 3px solid #60A5FA; background: rgba(59,130,246,.08); color: #CBD5E1; font-size: .8rem; line-height: 1.55; }
     .bot-instance-audit-chunks { max-height: 17rem; overflow: auto; display: grid; gap: .5rem; }
     .bot-instance-audit-chunk { padding: .55rem; border: 1px solid rgba(148,163,184,.2); border-radius: 7px; color: var(--text-secondary); font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
     .bot-instance-card[data-disabled="true"] { opacity: .72; border-style: dashed; }
     .bot-instance-edit { display: grid; gap: .75rem; padding: .9rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
     .bot-instance-edit[hidden] { display: none; }
-    .bot-instance-profile { color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; font-size: .82rem; }
+    .bot-instance-profile-details { margin-top: .25rem; border: 1px solid rgba(148,163,184,.2); border-radius: var(--radius-md); background: rgba(2,6,23,.24); overflow: hidden; }
+    .bot-instance-profile-details > summary { display: flex; align-items: center; gap: .55rem; padding: .8rem .95rem; cursor: pointer; color: #DBEAFE; font-weight: 700; list-style-position: inside; }
+    .bot-instance-profile-details[open] > summary { border-bottom: 1px solid var(--border-color); }
+    .bot-instance-profile-note { padding: .75rem .95rem 0; color: var(--text-secondary); font-size: .8rem; line-height: 1.5; }
+    .bot-instance-profile { display: grid; gap: .85rem; padding: .85rem .95rem 1rem; }
+    .bot-instance-profile-title { color: var(--text-primary); font-size: 1rem; }
+    .bot-instance-profile-section { display: grid; gap: .4rem; min-width: 0; }
+    .bot-instance-profile-section h6 { color: #93C5FD; font-size: .82rem; }
+    .bot-instance-profile-list { margin: 0; padding-left: 1.2rem; color: #CBD5E1; font-size: .82rem; line-height: 1.55; }
+    .bot-instance-profile-list li + li { margin-top: .3rem; }
+    .bot-instance-profile-list ul { margin: .25rem 0 .2rem; padding-left: 1.2rem; color: var(--text-secondary); }
+    .bot-instance-profile-paragraph { color: var(--text-secondary); font-size: .82rem; line-height: 1.55; overflow-wrap: anywhere; }
     .bot-instance-metrics { color: var(--text-secondary); font-size: .85rem; line-height: 1.6; }
     .bot-instance-empty, .bot-instance-error { color: var(--text-secondary); }
     .bot-instance-error { color: #FCA5A5; }
@@ -4408,6 +4437,16 @@
     let llmModelCatalog = null;
     let llmModelCatalogPromise = null;
 
+    const RECOMMENDED_INSTANCE_MODELS = Object.freeze({
+      ollama: 'unimon:8b',
+      openai: 'gpt-6-luna',
+      anthropic: 'claude-haiku-5-5'
+    });
+
+    function recommendedModelFor(providerId) {
+      return RECOMMENDED_INSTANCE_MODELS[String(providerId || '').toLowerCase()] || '';
+    }
+
     async function ensureLlmModelCatalog() {
       if (llmModelCatalog) return llmModelCatalog;
       if (!llmModelCatalogPromise) {
@@ -4473,7 +4512,11 @@
 
       const help = document.createElement('small');
       help.className = 'bot-instance-help bot-instance-field-wide';
-      help.textContent = 'Selecciona el proveedor y el modelo de este asistente.';
+      help.textContent = 'Selecciona el proveedor y el modelo que utilizará este asistente.';
+      const recommendation = document.createElement('div');
+      recommendation.className = 'bot-instance-model-recommendation';
+      recommendation.setAttribute('role', 'status');
+      recommendation.setAttribute('aria-live', 'polite');
 
       const customGroup = document.createElement('div');
       customGroup.className = 'bot-instance-llm-fields bot-instance-field-wide';
@@ -4587,12 +4630,26 @@
 
       function populateModels(preferredModel = '') {
         const provider = selectable.find(item => item.id === providerSelect.value);
-        const models = Array.isArray(provider?.models) ? provider.models : [];
+        const models = [...(Array.isArray(provider?.models) ? provider.models : [])];
+        const recommendedModel = recommendedModelFor(providerSelect.value);
+        if (recommendedModel && !models.some(model => model.id === recommendedModel)) {
+          if (providerSelect.value === 'openai' || providerSelect.value === 'anthropic') {
+            models.push({
+              id: recommendedModel,
+              label: `${recommendedModel} (recomendado; disponibilidad por confirmar)`,
+              available: false
+            });
+          }
+        }
         modelSelect.replaceChildren();
         models.forEach(model => {
           const option = document.createElement('option');
           option.value = model.id;
-          option.textContent = model.label || model.id;
+          const label = model.label || model.id;
+          option.textContent = model.id === recommendedModel && !/recomendad/i.test(label)
+            ? `${label} · recomendado`
+            : label;
+          option.dataset.recommended = String(model.id === recommendedModel);
           modelSelect.appendChild(option);
         });
         const customOption = document.createElement('option');
@@ -4601,12 +4658,13 @@
           ? 'Escribir el identificador del modelo…'
           : 'Agregar otro modelo…';
         modelSelect.appendChild(customOption);
-        const knownModel = models.some(model => model.id === preferredModel);
-        if (preferredModel && !knownModel) {
+        const defaultModel = preferredModel || recommendedModel;
+        const knownModel = models.some(model => model.id === defaultModel);
+        if (defaultModel && !knownModel) {
           modelSelect.value = '__custom__';
-          customInput.value = preferredModel;
-        } else if (preferredModel) {
-          modelSelect.value = preferredModel;
+          customInput.value = defaultModel;
+        } else if (defaultModel) {
+          modelSelect.value = defaultModel;
           customInput.value = '';
         } else if (models.length) {
           modelSelect.value = models[0].id;
@@ -4616,6 +4674,27 @@
           customInput.value = '';
         }
         syncCustomField();
+        const providerName = provider?.label || providerSelect.value || 'este proveedor';
+        recommendation.replaceChildren();
+        const icon = document.createElement('span');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '★';
+        const note = document.createElement('span');
+        if (recommendedModel) {
+          const isListed = Array.isArray(provider?.models) && provider.models.some(model => model.id === recommendedModel);
+          note.textContent = isListed
+            ? `${providerName}: `
+            : `${providerName}: modelo sugerido; `;
+          const strong = document.createElement('strong');
+          strong.textContent = recommendedModel;
+          note.appendChild(strong);
+          note.appendChild(document.createTextNode(isListed
+            ? ' es el modelo recomendado para crear esta instancia. Puedes cambiarlo si lo necesitas.'
+            : ' no aparece confirmado en el catálogo actual. Comprueba que tu cuenta o servidor lo tenga disponible antes de guardar.'));
+        } else {
+          note.textContent = 'Este proveedor no tiene un modelo predeterminado. Elige uno disponible para esta instancia.';
+        }
+        recommendation.append(icon, note);
       }
 
       function syncCustomField() {
@@ -4624,7 +4703,7 @@
         customInput.required = isCustom;
       }
 
-      providerSelect.addEventListener('change', () => populateModels());
+      providerSelect.addEventListener('change', () => populateModels(recommendedModelFor(providerSelect.value)));
       providerSelect.addEventListener('change', syncCustomProviderFields);
       modelSelect.addEventListener('change', syncCustomField);
       protocolSelect.addEventListener('change', () => {
@@ -4641,8 +4720,84 @@
         : (selectable[0]?.id || '');
       populateModels(modelValue);
       syncCustomProviderFields();
-      wrapper.append(providerLabel, modelLabel, customLabel, help, customGroup);
+      wrapper.append(providerLabel, modelLabel, customLabel, recommendation, help, customGroup);
       return wrapper;
+    }
+
+    function renderSpecializationProfile(markdown) {
+      const profile = document.createElement('div');
+      profile.className = 'bot-instance-profile';
+      const clean = value => String(value || '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/`([^`]*)`/g, '$1')
+        .replace(/\s+/g, ' ')
+        .trim();
+      let currentSection = null;
+      let topList = null;
+      let lastTopItem = null;
+      let nestedList = null;
+      const resetList = () => { topList = null; lastTopItem = null; nestedList = null; };
+      String(markdown || '').split(/\r?\n/).forEach(rawLine => {
+        const line = rawLine.trimEnd();
+        if (!line.trim()) { resetList(); return; }
+        const heading = line.match(/^(#{1,3})\s+(.+)$/);
+        if (heading) {
+          resetList();
+          const title = clean(heading[2]);
+          if (heading[1].length === 1) {
+            const element = document.createElement('h5');
+            element.className = 'bot-instance-profile-title';
+            element.textContent = title;
+            profile.appendChild(element);
+          } else {
+            currentSection = document.createElement('section');
+            currentSection.className = 'bot-instance-profile-section';
+            const sectionTitle = document.createElement('h6');
+            sectionTitle.textContent = title;
+            currentSection.appendChild(sectionTitle);
+            profile.appendChild(currentSection);
+          }
+          return;
+        }
+        const bullet = line.match(/^(\s*)-\s+(.+)$/);
+        if (bullet) {
+          const host = currentSection || profile;
+          const depth = bullet[1].length >= 2 ? 1 : 0;
+          if (!depth) {
+            if (!topList || topList.parentElement !== host) {
+              topList = document.createElement('ul');
+              topList.className = 'bot-instance-profile-list';
+              host.appendChild(topList);
+            }
+            const item = document.createElement('li');
+            item.textContent = clean(bullet[2]);
+            topList.appendChild(item);
+            lastTopItem = item;
+            nestedList = null;
+          } else if (lastTopItem) {
+            if (!nestedList) {
+              nestedList = document.createElement('ul');
+              lastTopItem.appendChild(nestedList);
+            }
+            const item = document.createElement('li');
+            item.textContent = clean(bullet[2]);
+            nestedList.appendChild(item);
+          }
+          return;
+        }
+        resetList();
+        const paragraph = document.createElement('p');
+        paragraph.className = 'bot-instance-profile-paragraph';
+        paragraph.textContent = clean(line.replace(/^\s+/, ''));
+        (currentSection || profile).appendChild(paragraph);
+      });
+      if (!profile.childElementCount) {
+        const empty = document.createElement('p');
+        empty.className = 'bot-instance-profile-paragraph';
+        empty.textContent = 'El catálogo se generará cuando haya documentos saneados en esta instancia.';
+        profile.appendChild(empty);
+      }
+      return profile;
     }
 
     function botInstanceFormPayload(form) {
@@ -4657,6 +4812,15 @@
 
     function setBotInstanceStatus(message, isError = false) {
       const status = document.getElementById('botInstanceStatus');
+      if (!status) return;
+      status.textContent = message;
+      status.dataset.state = isError ? 'error' : 'success';
+    }
+
+    function setInstanceUploadStatus(botId, message, isError = false) {
+      const card = [...document.querySelectorAll('.bot-instance-card')]
+        .find(item => item.dataset.botId === botId);
+      const status = card?.querySelector('.bot-instance-upload-status');
       if (!status) return;
       status.textContent = message;
       status.dataset.state = isError ? 'error' : 'success';
@@ -4678,9 +4842,11 @@
             provider.configured && (provider.models || []).length
           ) || providers.find(provider => provider.id === 'ollama');
           const initialProvider = configuredDefault || firstUsable;
-          const initialModel = initialProvider?.id === llmModelCatalog.default?.provider
-            ? llmModelCatalog.default?.model
-            : initialProvider?.models?.[0]?.id;
+          const recommended = recommendedModelFor(initialProvider?.id);
+          const recommendedIsListed = (initialProvider?.models || []).some(model => model.id === recommended);
+          const initialModel = recommended && (recommendedIsListed || initialProvider?.id !== 'ollama')
+            ? recommended
+            : (initialProvider?.models?.[0]?.id || '');
           createLlmFields.appendChild(createLlmModelFields(initialProvider?.id, initialModel));
           createLlmFields.dataset.ready = 'true';
         }
@@ -4702,6 +4868,7 @@
         instances.forEach(instance => {
           const card = document.createElement('article');
           card.className = 'bot-instance-card';
+          card.dataset.botId = instance.bot_id || '';
           card.dataset.disabled = String(!instance.enabled);
           card.setAttribute('role', 'listitem');
 
@@ -4736,7 +4903,7 @@
           openChat.rel = 'noopener noreferrer';
           openChat.textContent = 'Abrir chat';
 
-          const uploadPanel = instance.enabled ? createBotDocumentUploadPanel(instance.bot_id) : null;
+          const uploadPanel = instance.enabled ? createBotDocumentUploadPanel(instance.bot_id, instance.dependency_name) : null;
           if (instance.enabled) {
             const openRouter = document.createElement('a');
             openRouter.className = 'btn btn-secondary';
@@ -4817,12 +4984,15 @@
           contacts.textContent = [instance.support_email, instance.support_phone].filter(Boolean).join(' · ');
 
           const profileDetails = document.createElement('details');
+          profileDetails.className = 'bot-instance-profile-details';
           const profileSummary = document.createElement('summary');
-          profileSummary.textContent = instance.specialization_profile_exists ? 'Ver perfil de especialidad generado' : 'Perfil de especialidad pendiente';
-          const profileText = document.createElement('pre');
-          profileText.className = 'bot-instance-profile';
-          profileText.textContent = instance.specialization_profile || 'Se generará al cargar el primer documento saneado.';
-          profileDetails.append(profileSummary, profileText);
+          profileSummary.textContent = instance.specialization_profile_exists
+            ? `📚 Catálogo de documentos y temas · ${Number(instance.markdown_document_count) || 0} documentos`
+            : '📚 Catálogo de especialidad pendiente';
+          const profileNote = document.createElement('p');
+          profileNote.className = 'bot-instance-profile-note';
+          profileNote.textContent = 'Este resumen muestra de qué tratan los Markdown de esta instancia. Sirve para que el router elija el asistente; las respuestas se buscan en los documentos completos.';
+          profileDetails.append(profileSummary, profileNote, renderSpecializationProfile(instance.specialization_profile));
 
           card.append(heading, scope, summary, metricsSummary, actions);
           if (uploadPanel) card.appendChild(uploadPanel);
@@ -4912,7 +5082,7 @@
       }
     }
 
-    function createBotDocumentUploadPanel(botId) {
+      function createBotDocumentUploadPanel(botId, dependencyName = '') {
       const panel = document.createElement('section');
       panel.className = 'bot-instance-upload';
       panel.setAttribute('aria-label', 'Carga de documentos de la instancia');
@@ -4921,7 +5091,10 @@
       title.textContent = '📤 PDF / PPTX / DOCX → Markdown';
       const help = document.createElement('p');
       help.className = 'bot-instance-upload-help';
-      help.textContent = 'El original se conserva. El Markdown se compara con el documento antes de indexarlo en el Chroma privado de esta dependencia.';
+      help.textContent = 'El original se conserva. El asistente de esta dependencia genera y valida el Markdown antes de indexarlo en su propia base.';
+      const comparisonNote = document.createElement('p');
+      comparisonNote.className = 'bot-instance-upload-help';
+      comparisonNote.textContent = 'La comparación coteja los fragmentos del nuevo documento con los ya indexados solo en esta instancia. “Parecido” indica tema compartido; “redundante”, contenido muy similar. El informe no borra nada automáticamente.';
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.pdf,.pptx,.docx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -4935,17 +5108,25 @@
       const status = document.createElement('p');
       status.className = 'bot-instance-upload-status';
       status.setAttribute('aria-live', 'polite');
+      const progress = document.createElement('div');
+      progress.className = 'bot-instance-upload-progress';
+      progress.hidden = true;
+      progress.setAttribute('role', 'progressbar');
+      progress.setAttribute('aria-label', 'Documento en procesamiento');
+      const progressBar = document.createElement('div');
+      progressBar.className = 'bot-instance-upload-progress-bar';
+      progress.appendChild(progressBar);
       const actions = document.createElement('div');
       actions.className = 'bot-instance-upload-buttons';
       const analyze = document.createElement('button');
       analyze.type = 'button';
       analyze.className = 'btn btn-primary';
-      analyze.textContent = '🔍 Analizar ambigüedad y redundancia';
+      analyze.textContent = '🔍 Comparar con documentos de esta instancia';
       analyze.disabled = true;
       const direct = document.createElement('button');
       direct.type = 'button';
       direct.className = 'btn btn-secondary';
-      direct.textContent = '⚡ Subir directo';
+      direct.textContent = '⚡ Convertir e indexar';
       direct.disabled = true;
       actions.append(analyze, direct);
       const audit = document.createElement('div');
@@ -4956,6 +5137,26 @@
       const setStatus = (message, isError = false, isSuccess = false) => {
         status.textContent = message;
         status.dataset.state = isError ? 'error' : (isSuccess ? 'success' : '');
+      };
+      const setBusy = (busy, message = '') => {
+        panel.setAttribute('aria-busy', String(busy));
+        progress.hidden = !busy;
+        input.disabled = busy;
+        dropzone.setAttribute('aria-disabled', String(busy));
+        dropzone.tabIndex = busy ? -1 : 0;
+        if (message) setStatus(message);
+        if (busy) analyze.disabled = direct.disabled = true;
+      };
+      const indexedResultMessage = data => {
+        const instance = data.instance || {};
+        const docs = Number(instance.source_document_count);
+        const markdown = Number(instance.markdown_document_count);
+        const chunks = Number(instance.indexed_chunk_count);
+        const totalsAvailable = Number.isFinite(docs) && Number.isFinite(markdown) && Number.isFinite(chunks);
+        const name = state.file?.name || data.filename || 'El documento';
+        return totalsAvailable
+          ? `✅ “${name}” quedó indexado. Esta instancia registra ${docs} documento(s) fuente, ${markdown} Markdown y ${chunks} fragmentos disponibles en su RAG.`
+          : (data.message || `✅ “${name}” quedó convertido a Markdown e indexado en esta instancia.`);
       };
       const selectFile = file => {
         state.file = file || null;
@@ -4977,15 +5178,16 @@
         direct.disabled = !file;
         setStatus('');
       };
-      dropzone.addEventListener('click', () => input.click());
+      dropzone.addEventListener('click', () => { if (!state.busy) input.click(); });
       dropzone.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); input.click(); }
+        if (!state.busy && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); input.click(); }
       });
-      dropzone.addEventListener('dragover', event => { event.preventDefault(); dropzone.classList.add('is-dragging'); });
+      dropzone.addEventListener('dragover', event => { if (!state.busy) { event.preventDefault(); dropzone.classList.add('is-dragging'); } });
       dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
       dropzone.addEventListener('drop', event => {
         event.preventDefault();
         dropzone.classList.remove('is-dragging');
+        if (state.busy) return;
         const file = event.dataTransfer?.files?.[0];
         if (file) selectFile(file);
       });
@@ -5005,6 +5207,9 @@
       const resolveUpload = async (action, targetToReplace = null) => {
         if (!state.result?.staged_id || state.busy) return;
         state.busy = true;
+        setBusy(true, action === 'cancel'
+          ? 'Descartando el archivo temporal…'
+          : 'Validando el Markdown y agregando sus fragmentos a la base de esta instancia…');
         audit.querySelectorAll('button,select').forEach(element => { element.disabled = true; });
         try {
           const response = await fetch(`/api/admin/chatbot-instances/${encodeURIComponent(botId)}/documents/resolve`, {
@@ -5014,58 +5219,100 @@
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
-          const resultMessage = data.message || (action === 'cancel' ? 'Se descartó la carga temporal.' : 'Documento indexado en esta instancia.');
-          setStatus(resultMessage, false, action !== 'cancel');
-          setBotInstanceStatus(resultMessage);
+          const resultMessage = action === 'cancel'
+            ? (data.message || 'Se descartó la carga temporal; no hubo cambios en la instancia.')
+            : indexedResultMessage(data);
           audit.hidden = true;
           state.result = null;
           clearFile();
           await loadChatbotInstances();
+          setStatus(resultMessage, false, action !== 'cancel');
+          setBotInstanceStatus(resultMessage, false);
+          setInstanceUploadStatus(botId, resultMessage, false);
         } catch (error) {
           setStatus(`No se pudo completar la acción: ${error.message}`, true);
+          setBotInstanceStatus(`No se pudo completar la acción: ${error.message}`, true);
+          setInstanceUploadStatus(botId, `No se pudo completar la acción: ${error.message}`, true);
           audit.querySelectorAll('button,select').forEach(element => { element.disabled = false; });
         } finally {
           state.busy = false;
+          setBusy(false);
+          analyze.disabled = !state.file;
+          direct.disabled = !state.file;
         }
       };
 
       const renderAudit = data => {
         state.result = data;
         audit.replaceChildren();
-        const heading = document.createElement('strong');
         const metrics = data.metrics || {};
-        heading.textContent = data.overall_status === 'clean' ? '✨ Documento sin solapamientos relevantes' :
-          (data.overall_status === 'redundant' ? '♻️ Se detectó contenido redundante' : '⚠️ Se detectó contenido parecido');
+        const heading = document.createElement('h5');
+        heading.className = 'bot-instance-upload-title';
+        heading.textContent = data.overall_status === 'clean' ? '✅ No se encontraron coincidencias importantes' :
+          (data.overall_status === 'redundant' ? '♻️ Hay fragmentos muy similares' : '🔎 Hay documentos sobre temas parecidos');
         const fidelity = data.fidelity_audit || {};
         const summary = document.createElement('p');
         summary.className = 'bot-instance-audit-summary';
-        summary.textContent = `Fidelidad con el original: ${fidelity.status || 'sin estado'} · ${fidelity.summary || 'Markdown comparado antes de medir coincidencias.'} · ${metrics.total_chunks || 0} fragmentos; ${metrics.redundant_chunks || 0} redundantes (${metrics.redundancy_ratio || 0}%) y ${metrics.ambiguous_chunks || 0} ambiguos (${metrics.ambiguity_ratio || 0}%).`;
-        audit.append(heading, summary);
+        const fidelityLabel = fidelity.status === 'coincide' ? 'verificada' : (fidelity.status || 'pendiente');
+        summary.textContent = `Fidelidad con el original: ${fidelityLabel}. ${fidelity.summary || 'El Markdown se cotejó antes de revisar similitudes.'}`;
+        const intro = document.createElement('p');
+        intro.className = 'bot-instance-audit-intro';
+        intro.textContent = `Comparación dentro de ${dependencyName || 'esta dependencia'}: se revisaron ${Number(metrics.total_chunks) || 0} fragmentos del archivo frente al índice privado de este asistente.`;
+        const metricGrid = document.createElement('div');
+        metricGrid.className = 'bot-instance-audit-metrics';
+        [
+          [`${Number(metrics.total_chunks) || 0}`, 'fragmentos nuevos'],
+          [`${Number(metrics.novel_chunks) || 0}`, 'sin coincidencia cercana'],
+          [`${Number(metrics.ambiguous_chunks) || 0}`, `parecidos · ${Number(metrics.ambiguity_ratio) || 0}%`],
+          [`${Number(metrics.redundant_chunks) || 0}`, `muy similares · ${Number(metrics.redundancy_ratio) || 0}%`]
+        ].forEach(([value, label]) => {
+          const item = document.createElement('div');
+          item.className = 'bot-instance-audit-metric';
+          const number = document.createElement('strong');
+          number.textContent = value;
+          const caption = document.createElement('span');
+          caption.textContent = label;
+          item.append(number, caption);
+          metricGrid.appendChild(item);
+        });
+        audit.append(heading, summary, intro, metricGrid);
         const overlaps = document.createElement('div');
         overlaps.className = 'bot-instance-overlaps';
         const sources = data.overlapping_sources || [];
         if (!sources.length) {
-          overlaps.textContent = 'No se encontraron documentos parecidos en el índice privado de esta dependencia.';
+          overlaps.textContent = 'No hay documentos similares en el índice de esta instancia. Puedes continuar con la indexación.';
         } else {
           const label = document.createElement('strong');
-          label.textContent = 'Coincidencias dentro de esta instancia:';
+          label.textContent = 'Documentos que comparten fragmentos con el nuevo archivo:';
           overlaps.appendChild(label);
           sources.forEach(source => {
-            const line = document.createElement('span');
-            line.textContent = `• ${source.source} — ${source.matched_chunks} fragmentos, similitud máxima ${source.max_similarity}%`;
-            overlaps.appendChild(line);
+            const match = document.createElement('div');
+            match.className = 'bot-instance-overlap-card';
+            const title = document.createElement('span');
+            title.className = 'bot-instance-overlap-title';
+            title.textContent = source.source;
+            const meta = document.createElement('span');
+            meta.className = 'bot-instance-overlap-meta';
+            meta.textContent = `${source.matched_chunks} fragmento(s) relacionado(s) · ${source.redundant_count || 0} muy similares · ${source.ambiguous_count || 0} parecidos · similitud máxima ${source.max_similarity}%`;
+            match.append(title, meta);
+            overlaps.appendChild(match);
           });
         }
         audit.appendChild(overlaps);
+        const explainer = document.createElement('p');
+        explainer.className = 'bot-instance-audit-explainer';
+        explainer.textContent = '“Parecido” significa que el análisis encontró relación semántica; puede haber un tema común sin que la información esté repetida. “Muy similar” señala posible contenido duplicado. Revisa los ejemplos antes de decidir: este análisis no elimina documentos ni fragmentos.';
+        audit.appendChild(explainer);
         const details = document.createElement('details');
         const detailsSummary = document.createElement('summary');
-        detailsSummary.textContent = 'Ver fragmentos comparados';
+        detailsSummary.textContent = 'Ver ejemplos: fragmento nuevo y coincidencia encontrada';
         const chunks = document.createElement('div');
         chunks.className = 'bot-instance-audit-chunks';
         (data.detailed_chunks || []).slice(0, 20).forEach(chunk => {
           const item = document.createElement('div');
           item.className = 'bot-instance-audit-chunk';
-          item.textContent = `#${chunk.index} · ${chunk.status} · ${chunk.similarity}% · ${chunk.matched_source}\n${chunk.content_snippet}`;
+          const statusLabel = chunk.is_redundant ? 'Muy similar' : (chunk.is_ambiguous ? 'Tema parecido' : 'Sin coincidencia cercana');
+          item.textContent = `Fragmento nuevo #${chunk.index} · ${statusLabel} · ${chunk.similarity}% · ${chunk.matched_source}\n${chunk.content_snippet || ''}${chunk.matched_chunk_snippet ? `\n\nFragmento encontrado:\n${chunk.matched_chunk_snippet}` : ''}`;
           chunks.appendChild(item);
         });
         details.append(detailsSummary, chunks);
@@ -5104,12 +5351,11 @@
           replace.addEventListener('click', () => resolveUpload('replace', replaceSelect.value));
           auditActions.append(replaceSelect, replace);
         }
-        addAction('🛡️ Indexar sin eliminar fragmentos similares', 'deduplicate');
-        addAction('⚡ Indexar y conservar todo', 'force', 'btn btn-primary');
+        addAction('⚡ Indexar y conservar los documentos existentes', 'force', 'btn btn-primary');
         addAction('Cancelar', 'cancel');
         audit.appendChild(auditActions);
         audit.hidden = false;
-        setStatus('Análisis completo. Revisa el resultado y elige qué hacer con el documento.', false, true);
+        setStatus('Comparación lista. El archivo todavía no está indexado; revisa el resultado y elige qué hacer.', false, true);
       };
 
       const renderReviewRequired = data => {
@@ -5175,8 +5421,7 @@
       analyze.addEventListener('click', async () => {
         if (!state.file || state.busy) return;
         state.busy = true;
-        analyze.disabled = direct.disabled = true;
-        setStatus('Generando Markdown, comparándolo con el original y revisando similitud en el índice privado…');
+        setBusy(true, `Analizando “${state.file.name}”: generando y validando Markdown, y comparándolo con los documentos de esta instancia…`);
         try {
           const data = await postFile(`/api/admin/chatbot-instances/${encodeURIComponent(botId)}/documents/audit`, state.file, { threshold: 0.85, ambiguity_threshold: 0.65 });
           if (data.status === 'review_required') renderReviewRequired(data);
@@ -5185,6 +5430,7 @@
           setStatus(`No se pudo analizar: ${error.message}`, true);
         } finally {
           state.busy = false;
+          setBusy(false);
           analyze.disabled = !state.file;
           direct.disabled = !state.file;
         }
@@ -5192,24 +5438,38 @@
       direct.addEventListener('click', async () => {
         if (!state.file || state.busy) return;
         state.busy = true;
-        analyze.disabled = direct.disabled = true;
-        setStatus(`Convirtiendo, validando e indexando “${state.file.name}”…`);
+        const uploadFilename = state.file.name;
+        setBusy(true, `Procesando “${uploadFilename}”: generando y comparando el Markdown con el original…`);
         try {
-          const data = await postFile(`/api/admin/chatbot-instances/${encodeURIComponent(botId)}/documents`, state.file);
-          setStatus(data.message || 'Documento validado e indexado en esta instancia.', false, true);
-          setBotInstanceStatus(data.message || 'Documento validado e indexado en esta instancia.');
-          clearFile();
-          await loadChatbotInstances();
+          const data = await postFile(
+            `/api/admin/chatbot-instances/${encodeURIComponent(botId)}/documents/audit`,
+            state.file,
+            { threshold: 0.85, ambiguity_threshold: 0.65 }
+          );
+          if (data.status === 'review_required') {
+            renderReviewRequired(data);
+            return;
+          }
+
+          // Use the same correction, fidelity check, and staged commit as the explicit
+          // analysis flow. Keep its report visible if committing the approved draft fails.
+          renderAudit(data);
+          state.busy = false;
+          setBusy(false);
+          await resolveUpload('force');
         } catch (error) {
           setStatus(`No se pudo indexar: ${error.message}`, true);
+          setBotInstanceStatus(`No se pudo indexar: ${error.message}`, true);
+          setInstanceUploadStatus(botId, `No se pudo indexar: ${error.message}`, true);
         } finally {
           state.busy = false;
+          setBusy(false);
           analyze.disabled = !state.file;
           direct.disabled = !state.file;
         }
       });
 
-      panel.append(title, help, dropzone, input, actions, status, audit);
+      panel.append(title, help, comparisonNote, dropzone, input, actions, progress, status, audit);
       return panel;
     }
 

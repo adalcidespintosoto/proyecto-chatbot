@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="790" viewBox="0 0 1100 790">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
+<rect width="1100" height="790" fill="#FFFFFF"/>
+<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Estados principales de la conversación</text>
+<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Vista condensada de router_logic.py; omite subreglas de intención</text>
+<rect x="425" y="104" width="250" height="64" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="550.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">IDLE</text>
+<rect x="80" y="222" width="245" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="202.5" y="264.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">PIDIENDO_ROL</text>
+<rect x="425" y="222" width="250" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="550.0" y="264.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">DIAGNOSTICO</text>
+<rect x="780" y="222" width="245" height="70" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="902.5" y="252.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">SOLUCIONADO /</text>
+<text x="902.5" y="276.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">FINALIZADO</text>
+<line x1="425" y1="134" x2="325" y2="253" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="315" y="183" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">sin rol</text>
+<line x1="550" y1="168" x2="550" y2="222" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="615" y="203" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">con rol</text>
+<line x1="325" y1="253" x2="425" y2="253" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="375" y="240" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">rol válido</text>
+<line x1="675" y1="253" x2="780" y2="253" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="727" y="238" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">resuelto</text>
+<rect x="425" y="355" width="250" height="70" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="550.0" y="385.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">OFRECIENDO_</text>
+<text x="550.0" y="409.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">RADICACION</text>
+<line x1="550" y1="292" x2="550" y2="355" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="730" y="331" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">sin respuesta o pide soporte</text>
+<rect x="62" y="485" width="205" height="66" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="164.5" y="513.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">PIDIENDO_</text>
+<text x="164.5" y="537.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">NOMBRE</text>
+<rect x="312" y="485" width="205" height="66" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="414.5" y="513.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">PIDIENDO_</text>
+<text x="414.5" y="537.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">CORREO</text>
+<rect x="562" y="485" width="205" height="66" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="664.5" y="513.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">PIDIENDO_</text>
+<text x="664.5" y="537.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">DESCRIPCION</text>
+<rect x="812" y="485" width="215" height="66" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="919.5" y="513.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Crear ticket</text>
+<text x="919.5" y="537.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">en GLPI</text>
+<line x1="425" y1="390" x2="164" y2="485" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="282" y="420" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">acepta radicar</text>
+<line x1="267" y1="518" x2="312" y2="518" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="517" y1="518" x2="562" y2="518" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<line x1="767" y1="518" x2="812" y2="518" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<rect x="672" y="645" width="200" height="66" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
+<text x="772.0" y="685.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">TICKET_CREADO</text>
+<rect x="227" y="645" width="200" height="66" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
+<text x="327.0" y="673.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Error informado</text>
+<text x="327.0" y="697.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">o CANCELADO</text>
+<line x1="920" y1="551" x2="770" y2="645" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="873" y="608" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">confirmado</text>
+<line x1="920" y1="551" x2="327" y2="645" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="525" y="609" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">fallo o cancelación</text>
+<rect x="85" y="723" width="925" height="54" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="99" y="750" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">La cancelación también puede ocurrir durante la captura; sesiones inactivas se limpian por TTL.</text>
+</svg>

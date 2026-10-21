@@ -62,6 +62,15 @@ async def lifespan(app: FastAPI):
     # Inicializar Base de Datos de Telemetría
     init_telemetry_db()
 
+    # El catálogo de UniMon se deriva de todos sus Markdown saneados y no realiza llamadas LLM.
+    try:
+        from app.services.document_catalog_service import refresh_unimon_document_catalog
+
+        catalog = refresh_unimon_document_catalog()
+        logger.info("Catálogo de enrutamiento UniMon listo (%d documentos).", catalog["document_count"])
+    except Exception as e:
+        logger.warning("No se pudo preparar el catálogo de documentos de UniMon: %s", type(e).__name__)
+
     # Precalienta los componentes locales de recuperación y la Golden Cache.
     try:
         logger.info("Pre-cargando modelos RAG y Golden Cache en RAM (Warmup)...")
