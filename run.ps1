@@ -4,7 +4,7 @@ param(
     [switch]$CaptureLogs,
     [switch]$DevReload,
     [int]$Port = 8000,
-    [string]$HostIP = "127.0.0.1"
+    [string]$HostIP = "0.0.0.0"
 )
 
 <#
@@ -15,7 +15,7 @@ param(
     2. Comprueba y levanta el servicio local de Ollama e inspecciona el modelo institucional unimon:8b.
     3. Detecta la direccion IP local (LAN) y GPU activa (NVIDIA RTX 2000 Ada / CUDA).
     4. Opcionalmente inicia un tunel publico seguro con Cloudflare (cloudflared).
-    5. Ejecuta Uvicorn en localhost:8000. La recarga en caliente requiere -DevReload.
+    5. Ejecuta Uvicorn en la red local y publica enlaces directos al chatbot jefe.
     6. Maneja senales de interrupcion (Ctrl+C) limpiando subprocesos asociados.
 .PARAMETER Tunnel
     Activa un tunel Cloudflare para generar una URL publica temporal hacia el asistente.
@@ -24,7 +24,7 @@ param(
 .PARAMETER CaptureLogs
     Guarda una copia local de los logs de la aplicación en scratch/unimon-runtime.log.
 .PARAMETER HostIP
-    Direccion IP de escucha (por defecto 127.0.0.1).
+    Direccion IP de escucha (por defecto 0.0.0.0 para aceptar conexiones LAN).
 .EXAMPLE
     .\run.ps1
 .EXAMPLE
@@ -34,6 +34,9 @@ param(
 #>
 
 $tunnelProcess = $null
+$tunnelChatUrl = $null
+$tunnelStdOutPath = $null
+$tunnelStdErrPath = $null
 $previousUnimonLogFile = $env:UNIMON_LOG_FILE
 
 try {
@@ -204,8 +207,37 @@ try {
         $cloudflaredCmd = Get-Command "cloudflared" -ErrorAction SilentlyContinue
         if ($cloudflaredCmd) {
             Write-Host "      Iniciando Cloudflare Tunnel en segundo plano hacia http://localhost:$Port..." -ForegroundColor Yellow
-            $tunnelProcess = Start-Process -FilePath "cloudflared" -ArgumentList "tunnel --url http://localhost:$Port" -PassThru -WindowStyle Hidden
-            Write-Host "      [OK] Tunel iniciado exitosamente (PID: $($tunnelProcess.Id))." -ForegroundColor Green
+            $tunnelLogId = [guid]::NewGuid().ToString("N")
+            $tunnelStdOutPath = Join-Path $env:TEMP "unimon-cloudflared-$tunnelLogId.out.log"
+            $tunnelStdErrPath = Join-Path $env:TEMP "unimon-cloudflared-$tunnelLogId.err.log"
+            $tunnelProcess = Start-Process -FilePath $cloudflaredCmd.Source `
+                -ArgumentList "tunnel --url http://localhost:$Port" `
+                -PassThru -WindowStyle Hidden `
+                -RedirectStandardOutput $tunnelStdOutPath `
+                -RedirectStandardError $tunnelStdErrPath
+
+            # La URL Quick Tunnel es aleatoria; capturarla permite mostrar el
+            # acceso directo al chatbot jefe, que se activa con ?router=1.
+            $tunnelWaitUntil = (Get-Date).AddSeconds(15)
+            while ((Get-Date) -lt $tunnelWaitUntil -and -not $tunnelChatUrl -and -not $tunnelProcess.HasExited) {
+                Start-Sleep -Milliseconds 500
+                $tunnelOutput = ""
+                foreach ($outputPath in @($tunnelStdOutPath, $tunnelStdErrPath)) {
+                    if (Test-Path -LiteralPath $outputPath) {
+                        try { $tunnelOutput += [System.IO.File]::ReadAllText($outputPath) } catch {}
+                    }
+                }
+                $urlMatch = [regex]::Match($tunnelOutput, 'https://[a-zA-Z0-9-]+\.trycloudflare\.com')
+                if ($urlMatch.Success) { $tunnelChatUrl = "$($urlMatch.Value)/?router=1" }
+            }
+
+            if ($tunnelChatUrl) {
+                Write-Host "      [OK] Tunel iniciado (PID: $($tunnelProcess.Id))." -ForegroundColor Green
+                Write-Host "      Chat jefe por tunel: $tunnelChatUrl" -ForegroundColor Magenta
+            } else {
+                Write-Host "      [AVISO] El tunel sigue en ejecucion (PID: $($tunnelProcess.Id)), pero no se pudo leer su URL temporal." -ForegroundColor Yellow
+                Write-Host "              Salida cloudflared: $tunnelStdOutPath ; errores: $tunnelStdErrPath" -ForegroundColor DarkGray
+            }
         } else {
             Write-Host "      [AVISO] 'cloudflared' no esta instalado en el sistema." -ForegroundColor Yellow
             Write-Host "              Para instalarlo ejecuta: winget install --id Cloudflare.cloudflared" -ForegroundColor DarkGray
@@ -220,12 +252,16 @@ try {
     Write-Host "`n==========================================================================" -ForegroundColor Cyan
     Write-Host " SERVIDOR UNIMON LISTO Y ESCUCHANDO EN TIEMPO REAL                         " -ForegroundColor Green
     Write-Host "==========================================================================" -ForegroundColor Cyan
-    Write-Host " Acceso Local:            " -NoNewline; Write-Host "http://localhost:$Port" -ForegroundColor Green
-    Write-Host " Acceso en Red LAN:       " -NoNewline; Write-Host "http://$($localIP):$Port" -ForegroundColor Green
+    Write-Host " Chat jefe (este equipo): " -NoNewline; Write-Host "http://localhost:$Port/?router=1" -ForegroundColor Green
+    Write-Host " Chat jefe (red LAN):     " -NoNewline; Write-Host "http://$($localIP):$Port/?router=1" -ForegroundColor Green
     Write-Host " Documentacion OpenAPI:   " -NoNewline; Write-Host "http://localhost:$Port/docs" -ForegroundColor Cyan
     Write-Host " Motor de Aceleracion:    " -NoNewline; Write-Host "$gpuName" -ForegroundColor Yellow
     if ($tunnelProcess -and -not $tunnelProcess.HasExited) {
-        Write-Host " Tunel Cloudflare:        " -NoNewline; Write-Host "Activo (PID: $($tunnelProcess.Id))" -ForegroundColor Magenta
+        if ($tunnelChatUrl) {
+            Write-Host " Chat jefe (tunel):       " -NoNewline; Write-Host $tunnelChatUrl -ForegroundColor Magenta
+        } else {
+            Write-Host " Tunel Cloudflare:        " -NoNewline; Write-Host "Activo (PID: $($tunnelProcess.Id)); URL no detectada" -ForegroundColor Magenta
+        }
     }
     Write-Host "==========================================================================" -ForegroundColor Cyan
     Write-Host " Presiona [Ctrl + C] para detener el servidor limpiamente.`n" -ForegroundColor DarkGray
@@ -252,6 +288,9 @@ try {
     if ($tunnelProcess -and -not $tunnelProcess.HasExited) {
         Write-Host "`n[INFO] Cerrando proceso de Cloudflare Tunnel (PID: $($tunnelProcess.Id))..." -ForegroundColor Yellow
         Stop-Process -Id $tunnelProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($tunnelChatUrl) {
+        Remove-Item -LiteralPath $tunnelStdOutPath, $tunnelStdErrPath -ErrorAction SilentlyContinue
     }
     Write-Host "`n[INFO] Servidor UniMon detenido satisfactoriamente.`n" -ForegroundColor Green
 }

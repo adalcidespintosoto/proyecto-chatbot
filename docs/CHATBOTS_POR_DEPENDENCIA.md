@@ -49,6 +49,8 @@ Cada instancia conserva su selección de proveedor y modelo. Los proveedores inc
 
 El modo router se prueba en `http://localhost:8000/?router=1`; no reemplaza la ruta normal `/`.
 
+Al iniciar con `run.ps1`, el servidor escucha por defecto en `0.0.0.0` y la consola muestra los enlaces del chatbot jefe para este equipo (`localhost`) y para la red LAN (`IP_DEL_EQUIPO`). Si Windows Firewall bloquea la conexión, permite el acceso al puerto elegido solo en redes privadas. Con `run.ps1 -Tunnel`, el script captura la URL temporal de Cloudflare y muestra el enlace completo con `/?router=1`. El túnel publica el servidor web mientras el script está activo; detenlo con `Ctrl+C` al terminar.
+
 1. El enrutador toma el alcance declarado y las fichas de catálogo pertinentes a la pregunta de UniMon y cada asistente. Para una solicitud claramente de TI solo considera UniMon y especialistas cuyo alcance declara soporte TI. Si hay más de 12 candidatas, usa embeddings compartidos para preseleccionar hasta 12; el LLM clasificador elige únicamente entre esa lista y UniMon.
 2. Cuando una dependencia coincide claramente, el enrutador reenvía la consulta al endpoint de esa instancia. La respuesta se genera con su índice aislado y conserva la sesión de ese bot.
 3. Si no hay coincidencia clara, la clasificación falla o no existen especialistas activos, se usa UniMon como asistente general.
