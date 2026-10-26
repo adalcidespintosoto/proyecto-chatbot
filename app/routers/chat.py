@@ -16,6 +16,7 @@ from app.services.glpi_service import glpi_client, GLPIService, GLPIException, i
 from app.services.rag_service import rag_service, RAGService
 
 logger = logging.getLogger("unimon.chat_router")
+MAX_CHAT_INPUT_CHARS = 12_000
 
 
 router = APIRouter(
@@ -33,8 +34,8 @@ class ChatRequest(BaseModel):
     Petición enviada al endpoint /api/chat.
     Admite tanto 'mensaje' como 'message' para máxima compatibilidad.
     """
-    mensaje: Optional[str] = Field(default=None, max_length=2000, description="Mensaje o consulta técnica enviada por el usuario", example="No enciende el computador de la sala 2.")
-    message: Optional[str] = Field(default=None, max_length=2000, description="Alias en inglés para el mensaje", example="No enciende el computador de la sala 2.")
+    mensaje: Optional[str] = Field(default=None, max_length=MAX_CHAT_INPUT_CHARS, description="Mensaje o consulta enviada por el usuario; admite solicitudes extensas", example="No enciende el computador de la sala 2.")
+    message: Optional[str] = Field(default=None, max_length=MAX_CHAT_INPUT_CHARS, description="Alias en inglés para el mensaje; admite solicitudes extensas", example="No enciende el computador de la sala 2.")
     session_id: Optional[str] = Field(default=None, max_length=128, description="Identificador único de la sesión conversacional", example="sess_12345")
 
     def get_texto(self) -> str:
@@ -106,9 +107,8 @@ def get_client_ip(request: Optional[Request]) -> str:
 
 
 def sanitize_input_text(text: str, neutralize_injections: bool = True) -> str:
-    """Sanitiza el texto eliminando etiquetas HTML, neutralizando inyecciones de prompt y limitando a 600 caracteres."""
-    # 1. Limitar longitud máxima a 600 caracteres
-    clean = text[:600].strip()
+    """Sanitiza el texto sin truncar cartas o descripciones extensas válidas."""
+    clean = text[:MAX_CHAT_INPUT_CHARS].strip()
     # 2. Eliminar etiquetas HTML / script
     clean = re.sub(r'<[^>]*>', '', clean).strip()
     # 3. Neutralizar intentos de inyección de prompt en consultas normales.
@@ -147,7 +147,7 @@ async def process_chat(request: ChatRequest, raw_request: Request = None) -> Cha
         raise HTTPException(status_code=400, detail="Identificador de sesión inválido")
 
 
-    # Sanitizar y validar longitud del mensaje (máx 600 chars)
+    # ChatRequest limita el tamaño máximo; sanitizar no debe recortar consultas normales.
     # Evaluar la señal de inyección antes de neutralizarla. Si se reemplaza primero,
     # "ignora todas las instrucciones" desaparece y llega al RAG como consulta normal.
     prompt_injection = is_prompt_injection_query(raw_texto)

@@ -56,6 +56,8 @@ Al iniciar con `run.ps1`, el servidor escucha por defecto en `0.0.0.0` y la cons
 3. Si no hay coincidencia clara, la clasificación falla o no existen especialistas activos, se usa UniMon como asistente general.
 4. La respuesta del chat muestra el nombre del asistente que atendió. La clasificación se añade a los tokens y la latencia de esa interacción.
 
+El chat admite mensajes de hasta 12.000 caracteres. Para textos extensos, la instancia elegida usa su propio LLM para preparar hasta cuatro frases de búsqueda, una por cada necesidad identificada. La recuperación conserva candidatos y fragmentos para cada tema antes del reranking, selecciona hasta ocho fragmentos principales y puede añadir hasta cuatro fragmentos contiguos del mismo documento (máximo doce en el contexto). Los vecinos solo se agregan cuando `chunk_index` permite verificar la secuencia; se conservan sus páginas o diapositivas como fuente. La respuesta final recibe el mensaje original completo y el historial conserva una síntesis breve de cartas largas. Las trazas registran cantidades, cobertura por tema y referencias de fuente anonimizadas, sin guardar el texto de la consulta.
+
 El modo router agrega una llamada breve al LLM para clasificar y luego la llamada normal del chatbot elegido para redactar la respuesta. Si hay más de 12 instancias, antes se preseleccionan candidatas con los embeddings compartidos.
 
 ### Prueba manual recomendada
