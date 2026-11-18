@@ -1,42 +1,71 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="790" viewBox="0 0 1100 790">
-<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
-<rect width="1100" height="790" fill="#FFFFFF"/>
-<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Secuencia de radicación en GLPI</text>
-<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">El identificador se comunica solo tras una respuesta de creación confirmada</text>
-<rect x="6" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="90.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">Solicitante</text>
-<line x1="90" y1="168" x2="90" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
-<rect x="226" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="310.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">API / FSM</text>
-<line x1="310" y1="168" x2="310" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
-<rect x="446" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="530.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">GLPIService</text>
-<line x1="530" y1="168" x2="530" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
-<rect x="686" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="770.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">GLPI Cloud</text>
-<line x1="770" y1="168" x2="770" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
-<rect x="906" y="105" width="168" height="62" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="990.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">SQLite</text>
-<line x1="990" y1="168" x2="990" y2="690" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
-<line x1="99" y1="192" x2="301" y2="192" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="200.0" y="183.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">1  Solicita radicación</text>
-<line x1="301" y1="248" x2="99" y2="248" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="200.0" y="239.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">2  Captura nombre, correo y descripción</text>
-<line x1="319" y1="304" x2="521" y2="304" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="420.0" y="295.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">3  create_ticket(datos)</text>
-<line x1="539" y1="360" x2="761" y2="360" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="650.0" y="351.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">4  initSession</text>
-<line x1="539" y1="416" x2="761" y2="416" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="650.0" y="407.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">5  POST /Assistance/Ticket o /Ticket</text>
-<line x1="761" y1="472" x2="539" y2="472" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="650.0" y="463.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">6  ID confirmado o error</text>
-<line x1="539" y1="528" x2="761" y2="528" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="650.0" y="519.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">7  Si hay ID, asociación opcional</text>
-<line x1="539" y1="584" x2="761" y2="584" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="650.0" y="575.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">8  killSession en finally</text>
-<line x1="319" y1="640" x2="981" y2="640" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="650.0" y="631.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">9  Registro local de actividad</text>
-<rect x="185" y="697" width="730" height="72" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
-<text x="199" y="724" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Si no se confirma la creación, el flujo informa el error sin inventar radicado.</text>
-<text x="199" y="747" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">La asociación depende de un correo válido y de la respuesta de GLPI.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1040" viewBox="0 0 1200 1040">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker><marker id="openArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M 1 1 L 10 6 L 1 11" fill="none" stroke="#62809A" stroke-width="1.5"/></marker></defs>
+<rect width="1200" height="1040" fill="#FFFFFF"/>
+<text x="600.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Diagrama UML de secuencia GLPI</text>
+<text x="600.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Mensajes de creación, alternativa de endpoint, asociación opcional y cierre de sesión</text>
+<rect x="20" y="112" width="160" height="58" rx="0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="100" y="147" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">Solicitante</text>
+<line x1="100" y1="170" x2="100" y2="970" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="260" y="112" width="160" height="58" rx="0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="340" y="147" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">API / FSM</text>
+<line x1="340" y1="170" x2="340" y2="970" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="500" y="112" width="160" height="58" rx="0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="580" y="147" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">GLPI adapter</text>
+<line x1="580" y1="170" x2="580" y2="970" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="740" y="112" width="160" height="58" rx="0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="820" y="147" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">GLPI REST API</text>
+<line x1="820" y1="170" x2="820" y2="970" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="1000" y="112" width="160" height="58" rx="0" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="1080" y="147" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">SQLite telemetry</text>
+<line x1="1080" y1="170" x2="1080" y2="970" stroke="#62809A" stroke-width="2" stroke-dasharray="6 5"/>
+<rect x="333" y="205" width="14" height="770" rx="0" fill="#D8E5EE" stroke="#62809A" stroke-width="2"/>
+<rect x="573" y="355" width="14" height="555" rx="0" fill="#D8E5EE" stroke="#62809A" stroke-width="2"/>
+<rect x="813" y="405" width="14" height="480" rx="0" fill="#D8E5EE" stroke="#62809A" stroke-width="2"/>
+<rect x="1073" y="935" width="14" height="20" rx="0" fill="#D8E5EE" stroke="#62809A" stroke-width="2"/>
+<line x1="100" y1="210" x2="340" y2="210" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="220" y="198" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">POST /chat · solicita escalar</text>
+<line x1="340" y1="255" x2="100" y2="255" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="220" y="243" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">solicita datos requeridos</text>
+<line x1="100" y1="300" x2="340" y2="300" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="220" y="288" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">nombre, correo y descripción</text>
+<line x1="340" y1="355" x2="580" y2="355" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="460" y="343" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">create_ticket(datos)</text>
+<line x1="580" y1="405" x2="820" y2="405" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="700" y="393" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">GET /initSession</text>
+<line x1="820" y1="445" x2="580" y2="445" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="700" y="433" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">session_token</text>
+<rect x="545" y="465" width="360" height="230" rx="0" fill="#FFFFFF" stroke="#183047" stroke-width="2"/>
+<path d="M545 465 L612 465 L612 489 L545 489 Z" fill="#FFFFFF" stroke="#183047" stroke-width="1.7"/>
+<text x="579" y="483" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">alt</text>
+<text x="625" y="500" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="start">[ruta preferida]</text>
+<line x1="580" y1="545" x2="820" y2="545" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="700" y="532" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">POST /Assistance/Ticket</text>
+<line x1="820" y1="570" x2="580" y2="570" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="700" y="558" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">id o error</text>
+<line x1="545" y1="595" x2="905" y2="595" stroke="#62809A" stroke-width="2.2"/>
+<text x="625" y="620" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="start">[si falla, probar ruta alterna]</text>
+<line x1="580" y1="655" x2="820" y2="655" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="700" y="643" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">POST /Ticket</text>
+<line x1="820" y1="680" x2="580" y2="680" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="700" y="668" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">id o error</text>
+<rect x="545" y="710" width="360" height="125" rx="0" fill="#FFFFFF" stroke="#183047" stroke-width="2"/>
+<path d="M545 710 L612 710 L612 734 L545 734 Z" fill="#FFFFFF" stroke="#183047" stroke-width="1.7"/>
+<text x="579" y="728" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" text-anchor="middle">opt</text>
+<text x="625" y="747" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="start">[ticket confirmado y correo válido]</text>
+<line x1="580" y1="785" x2="820" y2="785" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="700" y="773" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" text-anchor="middle">POST /Ticket/{id}/Ticket_User</text>
+<line x1="820" y1="812" x2="580" y2="812" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="700" y="800" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">actor asociado</text>
+<line x1="580" y1="860" x2="820" y2="860" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="700" y="848" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">GET /killSession</text>
+<line x1="820" y1="885" x2="580" y2="885" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="700" y="873" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">sesión cerrada</text>
+<line x1="580" y1="910" x2="340" y2="910" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="460" y="898" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">ticket ID o error</text>
+<line x1="340" y1="935" x2="1080" y2="935" stroke="#62809A" stroke-width="2.2" marker-end="url(#arrow)"/>
+<text x="710" y="923" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">registrar resultado del ticket</text>
+<line x1="340" y1="970" x2="100" y2="970" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="220" y="958" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">resultado + estado</text>
+<path d="M170 990 L1012 990 L1030 1008 L1030 1028 L170 1028 Z M1012 990 L1012 1008 L1030 1008" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="183" y="1017" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" text-anchor="start">UniMon informa un identificador solo cuando GLPI confirma su creación.</text>
 </svg>

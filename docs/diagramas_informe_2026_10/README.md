@@ -1,20 +1,28 @@
-# Figuras actualizadas para el informe de práctica
+# Diagramas UML del informe de práctica
 
-Estas ocho figuras sustituyen, en orden, las figuras 1 a 8 del informe de septiembre de 2026. Los archivos SVG son las fuentes editables y los PNG corresponden a esas mismas fuentes para insertar en Word. `generate_diagrams.py` reconstruye los SVG de forma determinista.
+Estas ocho figuras reemplazan, en el mismo orden, las figuras del informe. Se conservaron los apartados y la numeración del formato institucional. Cada título identifica el tipo de vista UML que representa; los elementos y dependencias se contrastaron con el código y los esquemas actuales.
 
-| Figura | Archivo | Sustituye | Base de verificación |
+| Figura | Tipo UML | Fuente | Base de verificación |
 | --- | --- | --- | --- |
-| 1 | `01_casos_de_uso` | Casos de uso | `app/routers/chat.py`, `app/routers/admin_router.py`, `app/routers/whatsapp.py`, `app/services/glpi_service.py` |
-| 2 | `02_secuencia_rag` | Secuencia RAG con modelo fijo | `app/routers/chat.py`, `app/services/router_logic.py`, `app/services/rag_service.py`, `app/services/llm_client.py` |
-| 3 | `03_secuencia_glpi` | Secuencia de radicación GLPI | `app/services/router_logic.py`, `app/services/glpi_service.py`, `app/services/telemetry_service.py` |
-| 4 | `04_fsm` | Máquina de estados | `EstadoTicket` y `RouterLogic.procesar_mensaje` en `app/services/router_logic.py` |
-| 5 | `05_modulos` | Diagrama de clases anterior | `app/main.py` y paquetes `app/routers`, `app/services` |
-| 6 | `06_modelo_datos` | Modelo SQLite de una tabla | `app/services/telemetry_service.py`, `app/services/bot_instance_service.py`, `app/services/golden_cache_service.py` |
-| 7 | `07_componentes` | Componentes | `app/main.py`, `app/config.py`, `app/routers`, `app/services` |
-| 8 | `08_despliegue` | Despliegue híbrido | `app/main.py`, `app/config.py`, `app/services/rag_service.py`, `app/services/bot_instance_service.py` |
+| 1 | Casos de uso | `01_casos_de_uso.svg` / `.png` | `app/routers/chat.py`, `app/routers/admin_router.py`, `app/routers/whatsapp.py`, `app/services/glpi_service.py` |
+| 2 | Secuencia: consulta RAG y generación | `02_secuencia_rag.svg` / `.png` | `app/routers/chat.py`, `app/services/router_logic.py`, `app/services/rag_service.py`, `app/services/llm_client.py` |
+| 3 | Secuencia: radicación en GLPI | `03_secuencia_glpi.svg` / `.png` | `app/services/router_logic.py`, `app/services/glpi_service.py`, `app/services/telemetry_service.py` |
+| 4 | Actividad: diagnóstico y escalamiento | `04_actividad.svg` / `.png` | `EstadoTicket` y `RouterLogic.procesar_mensaje` en `app/services/router_logic.py` |
+| 5 | Paquetes y dependencias de módulos | `05_modulos.svg` / `.png` | `app/main.py`, `app/routers/`, `app/services/` |
+| 6 | Clases de persistencia | `06_modelo_datos.svg` / `.png` | `app/services/telemetry_service.py`, `app/services/bot_instance_service.py` |
+| 7 | Componentes | `07_componentes.svg` / `.png` | `app/main.py`, `app/config.py`, `app/routers/`, `app/services/` |
+| 8 | Despliegue de referencia | `08_despliegue.svg` / `.png` | `app/main.py`, `app/config.py`, `app/services/rag_service.py`, `app/services/bot_instance_service.py` |
 
-La figura 5 se denomina **vista lógica de módulos** porque los servicios y routers de Python no forman una jerarquía de clases única. La figura 8 describe una **topología de referencia de piloto**; el repositorio no demuestra por sí solo un despliegue en producción. Las figuras representan rutas de código y almacenamiento configurado, no resultados de pruebas ni confirmación de que estén disponibles los servicios externos.
+## Criterios de representación
 
-La configuración del proveedor LLM es variable: `app/config.py` define Gemini como proveedor inicial, OpenAI con `gpt-6-luna` como opción, y Ollama local con `unimon:8b`. Los asistentes por dependencia pueden tener configuración propia. Ninguna figura afirma que todas las ejecuciones hayan usado un mismo modelo, que se haya negociado TLS 1.3 en cada conexión, ni que GLPI o WhatsApp hayan respondido en una prueba en vivo.
+Se aplicó la notación de UML 2.5.1: asociaciones sin flecha en casos de uso; mensajes, líneas de vida, activaciones y fragmentos `alt`/`opt` en secuencia; nodos de acción, decisiones y flujos de control en actividad; dependencias `«use»` entre módulos y componentes; clases con atributos, multiplicidades y restricciones de persistencia; y nodos, artefactos y rutas de comunicación en despliegue. La figura 4 es un diagrama de actividad del flujo conversacional; no se titula como diagrama de máquina de estados porque no representa cada estado enumerado de `EstadoTicket`.
 
-Para regenerar: ejecute `generate_diagrams.py` con Python 3 y convierta cada SVG en PNG con un rasterizador SVG. Los PNG entregados fueron convertidos con el runtime empaquetado de Codex y `sharp` a 144 dpi. Al insertar en Word, conserve la proporción y use 6,2 pulgadas de ancho o una página apaisada cuando haga falta.
+Las figuras muestran diseño y dependencias del producto; no presentan por sí solas métricas ni resultados de pruebas. La figura 8 es una topología de referencia y no prueba un despliegue productivo. La figura 6 distingue las tablas SQLite, los índices vectoriales ChromaDB y GLPI, que conserva los tickets oficiales. La figura 7 representa Ollama como servicio local y el proveedor LLM como alternativa configurada.
+
+## Generación
+
+`generate_diagrams.py` reconstruye las ocho fuentes SVG. Los PNG del informe se rasterizaron desde esos SVG a 2200 px de ancho; al insertarlos o sustituirlos en Word, se debe mantener la proporción de cada figura.
+
+## Referencia del estándar
+
+Object Management Group, *Unified Modeling Language (UML), Version 2.5.1* (2017): <https://www.omg.org/spec/UML/2.5.1/PDF>.

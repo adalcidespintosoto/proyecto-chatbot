@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-label="Wireframe representativo del chat web UniMon en estado inicial">
+<defs><linearGradient id="brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0066cc"/><stop offset="1" stop-color="#00d2ff"/></linearGradient><radialGradient id="glow"><stop offset="0" stop-color="#00a3ff" stop-opacity=".12"/><stop offset="1" stop-color="#00a3ff" stop-opacity="0"/></radialGradient></defs>
+<g transform="scale(1)">
+<rect width="1600" height="900" fill="#090d16"/>
+<ellipse cx="80" cy="55" rx="340" ry="230" fill="url(#glow)"/>
+<ellipse cx="1530" cy="865" rx="360" ry="240" fill="url(#glow)"/>
+<rect x="0" y="0" width="1600" height="88" rx="0" fill="#090d16" stroke="#090d16" stroke-width="0"/>
+<line x1="0" y1="87" x2="1600" y2="87" stroke="#1f2937" stroke-width="1"/>
+<rect x="68" y="24" width="40" height="40" rx="12" fill="url(#brand)"/>
+<text x="88.0" y="51.599999999999994" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="23.2" font-weight="700" text-anchor="middle">⚡</text>
+<text x="122" y="43" fill="#f8fafc" font-family="Segoe UI, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">UniMon • Soporte TI</text>
+<text x="122" y="66" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="start">Universidad Simón Bolívar · Asistente Virtual Oficial</text>
+<rect x="1330" y="24" width="205" height="42" rx="10" fill="#111827" stroke="#263447" stroke-width="1.5"/>
+<text x="1432.5" y="50.1" fill="#e2e8f0" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="600" text-anchor="middle">↻  Nueva conversación</text>
+<rect x="300" y="108" width="1000" height="754" rx="20" fill="#0f172a" stroke="#263447" stroke-width="1.7"/>
+<rect x="301" y="109" width="998" height="62" rx="19" fill="#0c1423" stroke="#0c1423" stroke-width="0"/>
+<line x1="302" y1="171" x2="1298" y2="171" stroke="#1f2937" stroke-width="1"/>
+<rect x="324" y="121" width="316" height="38" rx="19" fill="#111b2b" stroke="#263447" stroke-width="1.5"/>
+<text x="346" y="146" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="500" text-anchor="start">◉  Canales de Atención TI</text>
+<rect x="301" y="172" width="998" height="568" rx="0" fill="#0b1220" stroke="#0b1220" stroke-width="0"/>
+<line x1="302" y1="740" x2="1298" y2="740" stroke="#1f2937" stroke-width="1"/>
+<rect x="324" y="763" width="952" height="66" rx="17" fill="#111827" stroke="#334155" stroke-width="1.5"/>
+<text x="353" y="804" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="start">Escribe tu consulta o describe la falla...</text>
+<circle cx="1251" cy="796" r="23" fill="#0284c7"/>
+<path d="M1242 796 L1260 788 L1254 805 L1250 798 Z" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="350" cy="245" r="20.0" fill="#063b5d" stroke="#00a3ff" stroke-width="1.5"/>
+<text x="350" y="253.8" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle">⚡</text>
+<rect x="390" y="204" width="720" height="198" rx="16" fill="#1e293b" stroke="#29384a" stroke-width="1.5"/>
+<text x="422" y="247" fill="#f8fafc" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" text-anchor="start">¡Hola! Soy UniMon</text>
+<text x="422" y="282" fill="#e2e8f0" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Tu asistente virtual de inteligencia artificial para soporte de TI</text>
+<text x="422" y="312" fill="#e2e8f0" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">de la Universidad Simón Bolívar.</text>
+<text x="422" y="342" fill="#e2e8f0" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Estoy listo para ayudarte. Dime, ¿en qué te puedo colaborar hoy?</text>
+<text x="422" y="375" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="500" text-anchor="start">⚡ UniMon Unisimon • Soporte Conversacional Directo</text>
+</g>
+</svg>

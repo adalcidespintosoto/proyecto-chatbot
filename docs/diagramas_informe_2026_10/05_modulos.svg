@@ -1,38 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="775" viewBox="0 0 1100 775">
-<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
-<rect width="1100" height="775" fill="#FFFFFF"/>
-<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Vista lógica de módulos</text>
-<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Dependencias principales verificadas en el paquete app</text>
-<rect x="445" y="105" width="210" height="62" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
-<text x="550.0" y="143.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">main.py</text>
-<line x1="550" y1="167" x2="550" y2="211" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<rect x="45" y="212" width="1010" height="130" rx="13" fill="#FFFFFF" stroke="#62809A" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="63" y="242" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="start">Routers FastAPI</text>
-<rect x="70" y="263" width="216" height="56" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="178.0" y="298.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">chat.py</text>
-<rect x="318" y="263" width="216" height="56" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="426.0" y="298.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">admin_router.py</text>
-<rect x="566" y="263" width="216" height="56" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="674.0" y="298.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">analytics.py</text>
-<rect x="814" y="263" width="216" height="56" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="922.0" y="298.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">whatsapp.py</text>
-<line x1="550" y1="342" x2="550" y2="386" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<rect x="45" y="387" width="1010" height="210" rx="13" fill="#FFFFFF" stroke="#62809A" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="63" y="419" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="start">Servicios de aplicación</text>
-<rect x="70" y="455" width="216" height="100" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
-<text x="178.0" y="500.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">router_logic.py</text>
-<text x="178.0" y="524.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">FSM de TI</text>
-<rect x="318" y="455" width="216" height="100" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
-<text x="426.0" y="500.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">bot_router_service.py</text>
-<text x="426.0" y="524.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">Selección de instancia</text>
-<rect x="566" y="455" width="216" height="100" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
-<text x="674.0" y="500.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">rag_service.py</text>
-<text x="674.0" y="524.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">y llm_client.py</text>
-<rect x="814" y="455" width="216" height="100" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
-<text x="922.0" y="500.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">glpi_service.py</text>
-<text x="922.0" y="524.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">y telemetry_service.py</text>
-<rect x="95" y="638" width="910" height="92" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
-<text x="109" y="665" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">bot_instance_service.py gestiona asistentes por dependencia y su registro.</text>
-<text x="109" y="688" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">golden_cache_service.py y document_catalog_service.py apoyan recuperación.</text>
-<text x="109" y="711" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Los routers delegan según el endpoint; no todos invocan todos los servicios.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker><marker id="openArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M 1 1 L 10 6 L 1 11" fill="none" stroke="#62809A" stroke-width="1.5"/></marker></defs>
+<rect width="1200" height="800" fill="#FFFFFF"/>
+<text x="600.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Diagrama UML de paquetes de UniMon</text>
+<text x="600.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Vista lógica de los módulos Python y sus dependencias principales</text>
+<path d="M490 105 L693 105 L710 122 L710 167 L490 167 Z M693 105 L693 122 L710 122" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="600.0" y="122" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="600.0" y="157" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">main.py</text>
+<path d="M45 247 L45 220 L230 220 L248 247 L535 247 L535 610 L45 610 Z" fill="#FFFFFF" stroke="#62809A" stroke-width="2.2"/>
+<text x="58" y="241" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="start">app.routers</text>
+<path d="M610 247 L610 220 L795 220 L813 247 L1155 247 L1155 610 L610 610 Z" fill="#FFFFFF" stroke="#62809A" stroke-width="2.2"/>
+<text x="623" y="241" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="start">app.services</text>
+<path d="M75 290 L253 290 L270 307 L270 355 L75 355 Z M253 290 L253 307 L270 307" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="172.5" y="307" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="172.5" y="345" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">chat.py</text>
+<path d="M300 290 L478 290 L495 307 L495 355 L300 355 Z M478 290 L478 307 L495 307" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="397.5" y="307" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="397.5" y="345" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">admin_router.py</text>
+<path d="M75 390 L253 390 L270 407 L270 455 L75 455 Z M253 390 L253 407 L270 407" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="172.5" y="407" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="172.5" y="445" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">analytics.py</text>
+<path d="M300 390 L478 390 L495 407 L495 455 L300 455 Z M478 390 L478 407 L495 407" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="397.5" y="407" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="397.5" y="445" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">whatsapp.py</text>
+<path d="M640 285 L848 285 L865 302 L865 347 L640 347 Z M848 285 L848 302 L865 302" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="752.5" y="302" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="752.5" y="337" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">router_logic.py</text>
+<path d="M885 285 L1093 285 L1110 302 L1110 347 L885 347 Z M1093 285 L1093 302 L1110 302" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="997.5" y="302" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="997.5" y="337" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">bot_router_service.py</text>
+<path d="M640 370 L848 370 L865 387 L865 432 L640 432 Z M848 370 L848 387 L865 387" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="752.5" y="387" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="752.5" y="422" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">rag_service.py</text>
+<path d="M885 370 L1093 370 L1110 387 L1110 432 L885 432 Z M1093 370 L1093 387 L1110 387" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="997.5" y="387" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="997.5" y="422" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">llm_client.py</text>
+<path d="M640 455 L848 455 L865 472 L865 517 L640 517 Z M848 455 L848 472 L865 472" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="752.5" y="472" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="752.5" y="507" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">glpi_service.py</text>
+<path d="M885 455 L1093 455 L1110 472 L1110 517 L885 517 Z M1093 455 L1093 472 L1110 472" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="997.5" y="472" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="997.5" y="507" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">telemetry_service.py</text>
+<path d="M640 540 L848 540 L865 557 L865 602 L640 602 Z M848 540 L848 557 L865 557" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="752.5" y="557" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="752.5" y="592" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">bot_instance_service.py</text>
+<path d="M885 540 L1093 540 L1110 557 L1110 602 L885 602 Z M1093 540 L1093 557 L1110 557" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="997.5" y="557" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="997.5" y="592" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">document_catalog_service.py</text>
+<line x1="550" y1="167" x2="290" y2="220" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<line x1="650" y1="167" x2="880" y2="220" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="410" y="192" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" text-anchor="middle">«use»</text>
+<text x="775" y="192" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" text-anchor="middle">«use»</text>
+<line x1="535" y1="405" x2="610" y2="405" stroke="#62809A" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#openArrow)"/>
+<text x="572" y="389" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«use»</text>
+<path d="M135 670 L1047 670 L1065 688 L1065 732 L135 732 Z M1047 670 L1047 688 L1065 688" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="148" y="697" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" text-anchor="start">Los archivos se muestran como artefactos dentro de paquetes; la dependencia depende de la ruta y del servicio invocado.</text>
 </svg>

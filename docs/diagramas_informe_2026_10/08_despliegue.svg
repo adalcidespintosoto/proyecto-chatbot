@@ -1,43 +1,90 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="835" viewBox="0 0 1100 835">
-<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>
-<rect width="1100" height="835" fill="#FFFFFF"/>
-<text x="550.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Despliegue de referencia</text>
-<text x="550.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Topología de piloto; requiere validar infraestructura y configuración efectivas</text>
-<rect x="45" y="125" width="250" height="70" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="170.0" y="167.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Navegador del usuario</text>
-<rect x="45" y="230" width="250" height="70" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
-<text x="170.0" y="272.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Meta WhatsApp Cloud</text>
-<rect x="350" y="115" width="465" height="575" rx="13" fill="#FFFFFF" stroke="#62809A" stroke-width="2" stroke-dasharray="8 5"/>
-<text x="370" y="150" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="bold" text-anchor="start">Entorno autorizado para UniMon</text>
-<rect x="395" y="180" width="375" height="100" rx="13" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
-<text x="411" y="209" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Aplicación FastAPI</text>
-<text x="411" y="237" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">routers, FSM, instancias</text>
-<text x="411" y="260" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">seguridad y cliente LLM</text>
-<rect x="395" y="335" width="375" height="100" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
-<text x="411" y="364" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Procesamiento local</text>
-<text x="411" y="392" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">embeddings, reranking</text>
-<text x="411" y="415" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Ollama si está disponible</text>
-<rect x="395" y="485" width="375" height="145" rx="13" fill="#EDF7F4" stroke="#62809A" stroke-width="2"/>
-<text x="411" y="514" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="start">Persistencia local</text>
-<text x="411" y="542" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">manuales y Markdown saneados</text>
-<text x="411" y="565" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">ChromaDB, Golden Cache</text>
-<text x="411" y="588" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">SQLite de telemetría e instancias</text>
-<line x1="295" y1="160" x2="395" y2="220" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="340" y="178" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">HTTPS</text>
-<line x1="295" y1="265" x2="395" y2="235" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="340" y="274" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">webhook</text>
-<line x1="580" y1="280" x2="580" y2="335" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<line x1="580" y1="435" x2="580" y2="485" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<rect x="865" y="185" width="200" height="80" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
-<text x="965.0" y="220.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">Proveedor LLM</text>
-<text x="965.0" y="244.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">configurado</text>
-<rect x="865" y="370" width="200" height="80" rx="13" fill="#FFF3E6" stroke="#62809A" stroke-width="2"/>
-<text x="965.0" y="417.0" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="bold" text-anchor="middle">GLPI Cloud</text>
-<line x1="770" y1="225" x2="865" y2="225" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="820" y="207" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">API</text>
-<line x1="770" y1="245" x2="865" y2="410" stroke="#62809A" stroke-width="2.3" marker-end="url(#arrow)"/>
-<text x="842" y="330" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">REST</text>
-<rect x="112" y="728" width="875" height="67" rx="9" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
-<text x="126" y="755" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">La estación de desarrollo no demuestra despliegue en producción.</text>
-<text x="126" y="778" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="start">Verificar en el entorno final TLS, accesos, respaldo y disponibilidad de Ollama.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1010" viewBox="0 0 1500 1010">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker><marker id="openArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M 1 1 L 10 6 L 1 11" fill="none" stroke="#62809A" stroke-width="1.5"/></marker></defs>
+<rect width="1500" height="1010" fill="#FFFFFF"/>
+<text x="750.0" y="43" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="bold" text-anchor="middle">Diagrama UML de despliegue de UniMon</text>
+<text x="750.0" y="74" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Topología de referencia del piloto; debe contrastarse con el entorno institucional definitivo</text>
+<rect x="340" y="163" width="632" height="712" fill="#FFFFFF" stroke="#62809A" stroke-width="2.2"/>
+<path d="M340 163 L358 145 L990 145 L972 163 Z" fill="#FFFFFF" stroke="#62809A" stroke-width="2.2"/>
+<path d="M972 163 L990 145 L990 857 L972 875 Z" fill="#FFFFFF" stroke="#62809A" stroke-width="2.2"/>
+<text x="665.0" y="193" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«device»</text>
+<text x="665.0" y="218" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">Host autorizado para UniMon</text>
+<text x="665.0" y="244" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">nodo de referencia; no implica despliegue productivo</text>
+<line x1="270" y1="300" x2="340" y2="365" stroke="#62809A" stroke-width="2.2"/>
+<text x="300" y="320" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">HTTPS</text>
+<line x1="270" y1="610" x2="340" y2="445" stroke="#62809A" stroke-width="2.2"/>
+<text x="305" y="535" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">HTTPS</text>
+<line x1="990" y1="370" x2="1060" y2="300" stroke="#62809A" stroke-width="2.2"/>
+<text x="1020" y="325" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">API</text>
+<line x1="990" y1="455" x2="1060" y2="610" stroke="#62809A" stroke-width="2.2"/>
+<text x="1023" y="535" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">REST</text>
+<line x1="475" y1="495" x2="475" y2="535" stroke="#62809A" stroke-width="2.2"/>
+<line x1="795" y1="495" x2="795" y2="535" stroke="#62809A" stroke-width="2.2"/>
+<rect x="30" y="233" width="222" height="152" fill="#EAF2F8" stroke="#62809A" stroke-width="2.2"/>
+<path d="M30 233 L48 215 L270 215 L252 233 Z" fill="#EAF2F8" stroke="#62809A" stroke-width="2.2"/>
+<path d="M252 233 L270 215 L270 367 L252 385 Z" fill="#EAF2F8" stroke="#62809A" stroke-width="2.2"/>
+<text x="150.0" y="263" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«device»</text>
+<text x="150.0" y="288" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">Equipo del usuario</text>
+<text x="150.0" y="314" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Acceso mediante navegador</text>
+<rect x="30" y="518" width="222" height="172" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M30 518 L48 500 L270 500 L252 518 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M252 518 L270 500 L270 672 L252 690 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<text x="150.0" y="548" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«executionEnvironment»</text>
+<text x="150.0" y="573" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">Meta WhatsApp Cloud</text>
+<text x="150.0" y="599" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Webhook externo</text>
+<text x="150.0" y="619" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">HTTPS</text>
+<rect x="390" y="288" width="532" height="207" fill="#EAF2F8" stroke="#62809A" stroke-width="2.2"/>
+<path d="M390 288 L408 270 L940 270 L922 288 Z" fill="#EAF2F8" stroke="#62809A" stroke-width="2.2"/>
+<path d="M922 288 L940 270 L940 477 L922 495 Z" fill="#EAF2F8" stroke="#62809A" stroke-width="2.2"/>
+<text x="665.0" y="318" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«executionEnvironment»</text>
+<text x="665.0" y="343" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">Python + FastAPI</text>
+<text x="665.0" y="369" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">entorno de ejecución</text>
+<path d="M430 380 L633 380 L650 397 L650 455 L430 455 Z M633 380 L633 397 L650 397" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="540.0" y="397" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="540.0" y="445" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">app/routers + services</text>
+<path d="M675 380 L873 380 L890 397 L890 455 L675 455 Z M873 380 L873 397 L890 397" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="782.5" y="397" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="782.5" y="445" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">Configuración protegida</text>
+<rect x="390" y="553" width="227" height="192" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M390 553 L408 535 L635 535 L617 553 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M617 553 L635 535 L635 727 L617 745 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<text x="512.5" y="583" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«executionEnvironment»</text>
+<text x="512.5" y="608" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">Ollama local</text>
+<text x="512.5" y="634" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">servicio de generación</text>
+<path d="M425 650 L583 650 L600 667 L600 705 L425 705 Z M583 650 L583 667 L600 667" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="512.5" y="667" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="512.5" y="695" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">unimon:8b</text>
+<rect x="665" y="553" width="257" height="302" fill="#EDF7F4" stroke="#62809A" stroke-width="2.2"/>
+<path d="M665 553 L683 535 L940 535 L922 553 Z" fill="#EDF7F4" stroke="#62809A" stroke-width="2.2"/>
+<path d="M922 553 L940 535 L940 837 L922 855 Z" fill="#EDF7F4" stroke="#62809A" stroke-width="2.2"/>
+<text x="802.5" y="583" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«device»</text>
+<text x="802.5" y="608" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">Volumen local de datos</text>
+<text x="802.5" y="634" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">persistencia del piloto</text>
+<path d="M700 650 L888 650 L905 667 L905 698 L700 698 Z M888 650 L888 667 L905 667" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="802.5" y="667" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="802.5" y="688" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">Documentos saneados</text>
+<path d="M700 700 L888 700 L905 717 L905 748 L700 748 Z M888 700 L888 717 L905 717" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="802.5" y="717" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="802.5" y="738" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">ChromaDB persistente</text>
+<path d="M700 750 L888 750 L905 767 L905 798 L700 798 Z M888 750 L888 767 L905 767" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="802.5" y="767" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="802.5" y="788" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">analytics.db</text>
+<path d="M700 800 L888 800 L905 817 L905 848 L700 848 Z M888 800 L888 817 L905 817" fill="#EAF2F8" stroke="#62809A" stroke-width="2"/>
+<text x="802.5" y="817" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" text-anchor="middle">«artifact»</text>
+<text x="802.5" y="838" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">instances.sqlite3</text>
+<rect x="1060" y="233" width="372" height="152" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M1060 233 L1078 215 L1450 215 L1432 233 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M1432 233 L1450 215 L1450 367 L1432 385 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<text x="1255.0" y="263" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«executionEnvironment»</text>
+<text x="1255.0" y="288" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">Proveedor LLM</text>
+<text x="1255.0" y="314" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">Gemini u OpenAI configurado</text>
+<text x="1255.0" y="334" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">API HTTPS</text>
+<rect x="1060" y="518" width="372" height="172" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M1060 518 L1078 500 L1450 500 L1432 518 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<path d="M1432 518 L1450 500 L1450 672 L1432 690 Z" fill="#FFF3E6" stroke="#62809A" stroke-width="2.2"/>
+<text x="1255.0" y="548" fill="#62809A" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="normal" text-anchor="middle">«executionEnvironment»</text>
+<text x="1255.0" y="573" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" text-anchor="middle">GLPI Cloud</text>
+<text x="1255.0" y="599" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">API REST</text>
+<text x="1255.0" y="619" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="normal" text-anchor="middle">tickets institucionales</text>
+<path d="M180 910 L1302 910 L1320 928 L1320 975 L180 975 Z M1302 910 L1302 928 L1320 928" fill="#FFF3E6" stroke="#C79054" stroke-width="2"/>
+<text x="193" y="937" fill="#183047" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="normal" text-anchor="start">El diagrama expresa nodos, artefactos y rutas de comunicación previstas. La disponibilidad depende de credenciales vigentes y de la infraestructura aprobada.</text>
 </svg>

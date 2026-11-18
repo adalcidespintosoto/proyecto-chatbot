@@ -25,7 +25,7 @@ class Diagram:
         self.width, self.height = width, height
         self.items = [
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
-            '<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker></defs>',
+            '<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="#62809A"/></marker><marker id="openArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M 1 1 L 10 6 L 1 11" fill="none" stroke="#62809A" stroke-width="1.5"/></marker></defs>',
             f'<rect width="{width}" height="{height}" fill="{WHITE}"/>',
         ]
         self.text(width / 2, 43, title, size=28, weight="bold", anchor="middle")
@@ -76,6 +76,113 @@ class Diagram:
         self.rect(x, y, w, h, fill=SAND, stroke="#C79054", radius=9)
         self.lines(x + 14, y + 27, lines, size=17, line_h=23)
 
+    def uml_line(self, x1, y1, x2, y2, label="", lx=None, ly=None, dash="", marker=""):
+        extra = f' stroke-dasharray="{dash}"' if dash else ""
+        end = f' marker-end="url(#{marker})"' if marker else ""
+        self.items.append(
+            f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
+            f'stroke="{LINE}" stroke-width="2.2"{extra}{end}/>'
+        )
+        if label:
+            self.text(lx if lx is not None else (x1 + x2) / 2,
+                      ly if ly is not None else (y1 + y2) / 2 - 8,
+                      label, size=16, anchor="middle")
+
+    def uml_path(self, path, marker="arrow", dash="", width=2.2):
+        extra = f' stroke-dasharray="{dash}"' if dash else ""
+        end = f' marker-end="url(#{marker})"' if marker else ""
+        self.items.append(
+            f'<path d="{path}" fill="none" stroke="{LINE}" stroke-width="{width}"{extra}{end}/>'
+        )
+
+    def uml_actor(self, x, y, label, stereotype=""):
+        self.items.append(f'<circle cx="{x}" cy="{y}" r="13" fill="white" stroke="{INK}" stroke-width="2.3"/>')
+        self.uml_line(x, y + 13, x, y + 48)
+        self.uml_line(x - 22, y + 27, x + 22, y + 27)
+        self.uml_line(x, y + 48, x - 18, y + 72)
+        self.uml_line(x, y + 48, x + 18, y + 72)
+        self.text(x, y + 96, label, size=17, weight="bold", anchor="middle")
+        if stereotype:
+            self.text(x, y + 116, stereotype, size=14, anchor="middle", color=LINE)
+
+    def uml_action(self, x, y, w, h, label, fill=LIGHT, size=19):
+        self.rect(x, y, w, h, fill=fill, stroke=LINE, radius=15)
+        values = label.split("\n")
+        self.lines(x + w / 2, y + h / 2 - (len(values) - 1) * 12 + 6,
+                   values, size=size, line_h=24, anchor="middle")
+
+    def uml_decision(self, x, y, w, h, label):
+        points = f'{x+w/2},{y} {x+w},{y+h/2} {x+w/2},{y+h} {x},{y+h/2}'
+        self.items.append(f'<polygon points="{points}" fill="{WHITE}" stroke="{LINE}" stroke-width="2.2"/>')
+        self.lines(x + w / 2, y + h / 2 - 7, label.split("\n"), size=17, line_h=21, anchor="middle")
+
+    def uml_initial(self, x, y, radius=11):
+        self.items.append(f'<circle cx="{x}" cy="{y}" r="{radius}" fill="{INK}"/>')
+
+    def uml_final(self, x, y, radius=13):
+        self.items.append(f'<circle cx="{x}" cy="{y}" r="{radius}" fill="white" stroke="{INK}" stroke-width="2.4"/>')
+        self.items.append(f'<circle cx="{x}" cy="{y}" r="{radius-5}" fill="{INK}"/>')
+
+    def uml_package(self, x, y, w, h, name, contents=(), fill=WHITE):
+        tab_w, tab_h = min(w * 0.68, max(185, len(name) * 12 + 28)), 27
+        name_size = 18 if len(name) > 18 else 20
+        self.items.append(
+            f'<path d="M{x} {y+tab_h} L{x} {y} L{x+tab_w} {y} L{x+tab_w+18} {y+tab_h} '
+            f'L{x+w} {y+tab_h} L{x+w} {y+h} L{x} {y+h} Z" '
+            f'fill="{fill}" stroke="{LINE}" stroke-width="2.2"/>'
+        )
+        self.text(x + 13, y + 21, name, size=name_size, weight="bold")
+        if contents:
+            self.lines(x + 18, y + tab_h + 29, list(contents), size=15, line_h=22)
+
+    def uml_artifact(self, x, y, w, h, name, name_size=16):
+        fold = 17
+        self.items.append(
+            f'<path d="M{x} {y} L{x+w-fold} {y} L{x+w} {y+fold} L{x+w} {y+h} '
+            f'L{x} {y+h} Z M{x+w-fold} {y} L{x+w-fold} {y+fold} L{x+w} {y+fold}" '
+            f'fill="{LIGHT}" stroke="{LINE}" stroke-width="2"/>'
+        )
+        self.text(x + w / 2, y + 17, "«artifact»", size=13, anchor="middle", color=LINE)
+        self.text(x + w / 2, y + h - 10, name, size=name_size, weight="bold", anchor="middle")
+
+    def uml_component(self, x, y, w, h, name, details=(), fill=LIGHT, name_size=19):
+        self.rect(x, y, w, h, fill=fill, radius=2)
+        self.items.append(f'<rect x="{x+w-24}" y="{y+12}" width="17" height="9" fill="white" stroke="{LINE}" stroke-width="1.7"/>')
+        self.items.append(f'<rect x="{x+w-24}" y="{y+25}" width="17" height="9" fill="white" stroke="{LINE}" stroke-width="1.7"/>')
+        self.text(x + w / 2, y + 24, "«component»", size=15, anchor="middle", color=LINE)
+        self.text(x + w / 2, y + 50, name, size=name_size, weight="bold", anchor="middle")
+        if details:
+            self.lines(x + w / 2, y + 72, list(details), size=16, line_h=19, anchor="middle")
+
+    def uml_class(self, x, y, w, h, name, attributes, title_note=""):
+        self.rect(x, y, w, h, fill=WHITE, radius=0)
+        name_h = 39 if not title_note else 55
+        self.items.append(f'<line x1="{x}" y1="{y+name_h}" x2="{x+w}" y2="{y+name_h}" stroke="{LINE}" stroke-width="1.6"/>')
+        self.text(x + w / 2, y + 24, name, size=22, weight="bold", anchor="middle")
+        if title_note:
+            self.text(x + w / 2, y + 45, title_note, size=12, anchor="middle", color=LINE)
+        self.lines(x + 12, y + name_h + 22, list(attributes), size=20, line_h=23)
+
+    def uml_node(self, x, y, w, h, name, details=(), fill=LIGHT, stereotype="«device»"):
+        depth = 18
+        # UML node notation as a cuboid with distinct top, front and right faces.
+        self.items.append(f'<rect x="{x}" y="{y+depth}" width="{w-depth}" height="{h-depth}" fill="{fill}" stroke="{LINE}" stroke-width="2.2"/>')
+        self.items.append(f'<path d="M{x} {y+depth} L{x+depth} {y} L{x+w} {y} L{x+w-depth} {y+depth} Z" fill="{fill}" stroke="{LINE}" stroke-width="2.2"/>')
+        self.items.append(f'<path d="M{x+w-depth} {y+depth} L{x+w} {y} L{x+w} {y+h-depth} L{x+w-depth} {y+h} Z" fill="{fill}" stroke="{LINE}" stroke-width="2.2"/>')
+        self.text(x + w / 2, y + 48, stereotype, size=16, anchor="middle", color=LINE)
+        self.text(x + w / 2, y + 73, name, size=20, weight="bold", anchor="middle")
+        if details:
+            self.lines(x + w / 2, y + 99, list(details), size=17, line_h=20, anchor="middle")
+
+    def uml_note(self, x, y, w, h, lines, size=14, line_h=20):
+        fold = 18
+        self.items.append(
+            f'<path d="M{x} {y} L{x+w-fold} {y} L{x+w} {y+fold} L{x+w} {y+h} '
+            f'L{x} {y+h} Z M{x+w-fold} {y} L{x+w-fold} {y+fold} L{x+w} {y+fold}" '
+            f'fill="{SAND}" stroke="#C79054" stroke-width="2"/>'
+        )
+        self.lines(x + 13, y + 27, list(lines), size=size, line_h=line_h)
+
     def save(self, filename):
         self.items.append("</svg>")
         path = OUT / filename
@@ -84,198 +191,347 @@ class Diagram:
 
 
 def use_cases():
-    d = Diagram(1100, 795, "Casos de uso de UniMon", "Canales y funciones presentes en la versión revisada")
-    d.rect(230, 105, 625, 630, fill=WHITE, dash="8 5")
-    d.text(250, 137, "Sistema UniMon", weight="bold", size=21)
-    d.box(25, 240, 180, 70, "Solicitante")
-    d.box(25, 580, 180, 70, "Administrador")
-    d.box(885, 235, 190, 75, "Proveedor LLM\no Ollama", fill=MINT)
-    d.box(885, 475, 190, 75, "GLPI Cloud", fill=MINT)
+    d = Diagram(1200, 940, "Diagrama UML de casos de uso", "Interacciones del sistema UniMon con usuarios y sistemas externos")
+    d.rect(245, 112, 710, 620, fill=WHITE, radius=0)
+    d.text(265, 144, "Sistema UniMon", weight="bold", size=21)
+
+    d.uml_actor(90, 285, "Solicitante")
+    d.uml_actor(1100, 600, "Administrador")
+    d.uml_actor(1100, 205, "Proveedor LLM", "«sistema externo»")
+    d.uml_actor(1100, 385, "Ollama local", "«servicio local»")
+    d.uml_actor(90, 790, "GLPI Cloud", "«sistema externo»")
+
     cases = [
-        (280, 165, "Consultar soporte\ny documentos"),
-        (555, 165, "Orientación de trámite\ninstitucional"),
-        (280, 290, "Enrutar consulta\npor especialidad"),
-        (555, 290, "Confirmar resultado\no pedir ayuda"),
-        (280, 415, "Radicar incidencia\ntécnica"),
-        (555, 415, "Consultar estado\nde ticket"),
-        (280, 560, "Administrar fuentes\ne instancias"),
-        (555, 560, "Ver analítica\ny auditorías"),
+        (285, 175, "Consultar soporte y\nresolver con fuentes"),
+        (625, 175, "Recuperar y ordenar\nevidencia documental"),
+        (285, 300, "Consultar trámite\ninstitucional"),
+        (625, 300, "Generar respuesta\nconfigurada"),
+        (285, 425, "Solicitar radicación\nde incidente"),
+        (625, 425, "Administrar corpus e\ninstancias"),
+        (285, 550, "Consultar seguimiento\nde ticket"),
+        (625, 550, "Consultar métricas y\nauditorías"),
     ]
     for x, y, title in cases:
-        d.oval(x, y, 235, 78, title)
-    for y, x2, y2 in [(275, 280, 205), (275, 280, 330), (275, 280, 455)]:
-        d.plain_line(205, y, x2, y2)
-    d.plain_line(205, 615, 280, 600)
-    d.plain_line(790, 205, 885, 272)
-    d.plain_line(515, 455, 885, 510)
-    d.plain_line(790, 455, 885, 510)
-    d.note(250, 682, 580, 42, ["El canal web y el webhook WhatsApp comparten capacidades de consulta."])
+        d.oval(x, y, 290, 76, title)
+
+    # UML actor-to-use-case associations are plain lines without arrowheads.
+    for cy in (213, 338, 463, 588):
+        d.uml_line(112, 312, 285, cy)
+    # GLPI participates directly in ticket creation and follow-up. Plain
+    # associations enter distinct lower-left points so they remain legible.
+    d.uml_line(112, 817, 300, 482)
+    d.uml_line(112, 817, 300, 607)
+    # Administrative associations stay in the right margin of the system.
+    d.uml_line(915, 463, 1080, 627)
+    d.uml_line(915, 588, 1080, 627)
+    d.uml_line(915, 338, 1080, 251)
+    d.uml_line(915, 338, 1080, 431)
+
+    # A dashed dependency with the UML include keyword shows the mandatory retrieval step.
+    d.uml_line(575, 213, 625, 213, "«include»", lx=600, ly=196, dash="7 5", marker="openArrow")
+    d.uml_note(260, 675, 680, 42, ["El canal web y el webhook de WhatsApp reutilizan los casos de consulta."])
     d.save("01_casos_de_uso.svg")
 
 
 def sequence_rag():
-    d = Diagram(1100, 755, "Secuencia de consulta documental", "Proveedor configurable; contingencia local si el proveedor falla")
-    xs = [80, 245, 410, 575, 740, 925]
-    names = ["Solicitante", "API / router", "RAG", "Chroma +\nreranker", "Cliente LLM", "Cloud /\nOllama"]
-    for x, n in zip(xs, names):
-        d.box(x - 69, 105, 138, 64, n, fill=LIGHT, size=17)
-        d.plain_line(x, 169, x, 665, dash="6 5")
-    steps = [
-        (192, 0, 1, "1  Consulta"),
-        (245, 1, 2, "2  Consulta de UniMon o instancia"),
-        (298, 2, 3, "3  Recuperación local"),
-        (351, 3, 2, "4  Fragmentos ordenados"),
-        (404, 2, 4, "5  Contexto pertinente"),
-        (457, 4, 5, "6  Generación configurada"),
-        (510, 5, 4, "7  Texto o error"),
-        (563, 4, 1, "8  Respuesta validada"),
-        (616, 1, 0, "9  Orientación y fuentes"),
-    ]
-    for y, a, b, lab in steps:
-        d.arrow(xs[a] + (8 if b > a else -8), y, xs[b] - (8 if b > a else -8), y, lab)
-    d.note(152, 668, 790, 68, ["Si el proveedor remoto falla, el cliente puede intentar Ollama local.", "La API registra latencia, uso y fuentes en SQLite según la ruta."])
+    d = Diagram(1200, 900, "Diagrama UML de secuencia RAG", "Líneas de vida, mensajes, respuestas y fragmento alternativo de contingencia")
+    xs = [70, 220, 370, 520, 670, 820, 970, 1120]
+    names = ["Solicitante", "API chat", "FSM / router", "RAG service", "ChromaDB +\nreranker", "LLM client", "Proveedor cloud", "Ollama local"]
+    for x, name in zip(xs, names):
+        d.rect(x - 62, 112, 124, 58, fill=LIGHT, radius=0)
+        d.lines(x, 137 - (len(name.split("\n")) - 1) * 9, name.split("\n"), size=15, line_h=19, anchor="middle", weight="bold")
+        d.plain_line(x, 170, x, 880, dash="6 5")
+
+    for x, y1, y2 in [(220, 212, 810), (370, 262, 770), (520, 312, 730),
+                      (670, 362, 425), (820, 462, 750), (970, 555, 580), (1120, 650, 675)]:
+        d.rect(x - 7, y1, 14, y2 - y1, fill="#D8E5EE", stroke=LINE, radius=0)
+
+    d.uml_line(70, 212, 220, 212, "POST /chat · consulta", lx=145, ly=199, marker="arrow")
+    d.uml_line(220, 262, 370, 262, "procesar_mensaje()", lx=295, ly=249, marker="arrow")
+    d.uml_line(370, 312, 520, 312, "consulta + rol", lx=445, ly=299, marker="arrow")
+    d.uml_line(520, 362, 670, 362, "búsqueda vectorial y léxica", lx=595, ly=349, marker="arrow")
+    d.uml_line(670, 412, 520, 412, "candidatos + referencias", lx=595, ly=399, dash="7 5", marker="openArrow")
+    d.uml_line(520, 462, 820, 462, "contexto seleccionado", lx=670, ly=449, marker="arrow")
+
+    # UML combined fragment: the configured provider is used, with a guarded fallback.
+    d.rect(785, 490, 380, 205, fill=WHITE, stroke=INK, radius=0)
+    d.items.append(f'<path d="M785 490 L850 490 L850 514 L785 514 Z" fill="{WHITE}" stroke="{INK}" stroke-width="1.7"/>')
+    d.text(817, 508, "alt", size=15, weight="bold", anchor="middle")
+    d.text(860, 527, "[proveedor cloud configurado responde]", size=14)
+    d.uml_line(820, 555, 970, 555, "generate()", lx=895, ly=543, marker="arrow")
+    d.uml_line(970, 580, 820, 580, "respuesta", lx=895, ly=568, dash="7 5", marker="openArrow")
+    d.uml_line(785, 600, 1165, 600)
+    d.text(860, 625, "[falla cloud y Ollama está habilitado]", size=14)
+    d.uml_line(820, 650, 1120, 650, "generate()", lx=970, ly=638, marker="arrow")
+    d.uml_line(1120, 675, 820, 675, "respuesta local", lx=970, ly=663, dash="7 5", marker="openArrow")
+
+    d.uml_line(820, 730, 520, 730, "texto generado", lx=670, ly=718, dash="7 5", marker="openArrow")
+    d.uml_line(520, 770, 370, 770, "respuesta + fuentes", lx=445, ly=758, dash="7 5", marker="openArrow")
+    d.uml_line(370, 810, 220, 810, "respuesta validada", lx=295, ly=798, dash="7 5", marker="openArrow")
+    d.uml_line(220, 850, 70, 850, "respuesta + fuentes", lx=145, ly=838, dash="7 5", marker="openArrow")
     d.save("02_secuencia_rag.svg")
 
 
 def sequence_glpi():
-    d = Diagram(1100, 790, "Secuencia de radicación en GLPI", "El identificador se comunica solo tras una respuesta de creación confirmada")
-    xs = [90, 310, 530, 770, 990]
-    names = ["Solicitante", "API / FSM", "GLPIService", "GLPI Cloud", "SQLite"]
-    for x, n in zip(xs, names):
-        d.box(x - 84, 105, 168, 62, n, size=18)
-        d.plain_line(x, 168, x, 690, dash="6 5")
-    steps = [
-        (192, 0, 1, "1  Solicita radicación"),
-        (248, 1, 0, "2  Captura nombre, correo y descripción"),
-        (304, 1, 2, "3  create_ticket(datos)"),
-        (360, 2, 3, "4  initSession"),
-        (416, 2, 3, "5  POST /Assistance/Ticket o /Ticket"),
-        (472, 3, 2, "6  ID confirmado o error"),
-        (528, 2, 3, "7  Si hay ID, asociación opcional"),
-        (584, 2, 3, "8  killSession en finally"),
-        (640, 1, 4, "9  Registro local de actividad"),
-    ]
-    for y, a, b, lab in steps:
-        d.arrow(xs[a] + (9 if b > a else -9), y, xs[b] - (9 if b > a else -9), y, lab)
-    d.note(185, 697, 730, 72, ["Si no se confirma la creación, el flujo informa el error sin inventar radicado.", "La asociación depende de un correo válido y de la respuesta de GLPI."])
+    d = Diagram(1200, 1040, "Diagrama UML de secuencia GLPI", "Mensajes de creación, alternativa de endpoint, asociación opcional y cierre de sesión")
+    xs = [100, 340, 580, 820, 1080]
+    names = ["Solicitante", "API / FSM", "GLPI adapter", "GLPI REST API", "SQLite telemetry"]
+    for x, name in zip(xs, names):
+        d.rect(x - 80, 112, 160, 58, fill=LIGHT, radius=0)
+        d.text(x, 147, name, size=15, weight="bold", anchor="middle")
+        d.plain_line(x, 170, x, 970, dash="6 5")
+    for x, y1, y2 in [(340, 205, 975), (580, 355, 910), (820, 405, 885), (1080, 935, 955)]:
+        d.rect(x - 7, y1, 14, y2 - y1, fill="#D8E5EE", stroke=LINE, radius=0)
+
+    d.uml_line(100, 210, 340, 210, "POST /chat · solicita escalar", lx=220, ly=198, marker="arrow")
+    d.uml_line(340, 255, 100, 255, "solicita datos requeridos", lx=220, ly=243, marker="arrow")
+    d.uml_line(100, 300, 340, 300, "nombre, correo y descripción", lx=220, ly=288, marker="arrow")
+    d.uml_line(340, 355, 580, 355, "create_ticket(datos)", lx=460, ly=343, marker="arrow")
+    d.uml_line(580, 405, 820, 405, "GET /initSession", lx=700, ly=393, marker="arrow")
+    d.uml_line(820, 445, 580, 445, "session_token", lx=700, ly=433, dash="7 5", marker="openArrow")
+
+    # The implementation retries the alternate creation route when the first route fails.
+    d.rect(545, 465, 360, 230, fill=WHITE, stroke=INK, radius=0)
+    d.items.append(f'<path d="M545 465 L612 465 L612 489 L545 489 Z" fill="{WHITE}" stroke="{INK}" stroke-width="1.7"/>')
+    d.text(579, 483, "alt", size=15, weight="bold", anchor="middle")
+    d.text(625, 500, "[ruta preferida]", size=13)
+    d.uml_line(580, 545, 820, 545, "POST /Assistance/Ticket", lx=700, ly=532, marker="arrow")
+    d.uml_line(820, 570, 580, 570, "id o error", lx=700, ly=558, dash="7 5", marker="openArrow")
+    d.uml_line(545, 595, 905, 595)
+    d.text(625, 620, "[si falla, probar ruta alterna]", size=13)
+    d.uml_line(580, 655, 820, 655, "POST /Ticket", lx=700, ly=643, marker="arrow")
+    d.uml_line(820, 680, 580, 680, "id o error", lx=700, ly=668, dash="7 5", marker="openArrow")
+
+    d.rect(545, 710, 360, 125, fill=WHITE, stroke=INK, radius=0)
+    d.items.append(f'<path d="M545 710 L612 710 L612 734 L545 734 Z" fill="{WHITE}" stroke="{INK}" stroke-width="1.7"/>')
+    d.text(579, 728, "opt", size=15, weight="bold", anchor="middle")
+    d.text(625, 747, "[ticket confirmado y correo válido]", size=13)
+    d.uml_line(580, 785, 820, 785, marker="arrow")
+    d.text(700, 773, "POST /Ticket/{id}/Ticket_User", size=14, anchor="middle")
+    d.uml_line(820, 812, 580, 812, "actor asociado", lx=700, ly=800, dash="7 5", marker="openArrow")
+    d.uml_line(580, 860, 820, 860, "GET /killSession", lx=700, ly=848, marker="arrow")
+    d.uml_line(820, 885, 580, 885, "sesión cerrada", lx=700, ly=873, dash="7 5", marker="openArrow")
+    d.uml_line(580, 910, 340, 910, "ticket ID o error", lx=460, ly=898, dash="7 5", marker="openArrow")
+    d.uml_line(340, 935, 1080, 935, "registrar resultado del ticket", lx=710, ly=923, marker="arrow")
+    d.uml_line(340, 970, 100, 970, "resultado + estado", lx=220, ly=958, dash="7 5", marker="openArrow")
+    d.uml_note(170, 990, 860, 38, ["UniMon informa un identificador solo cuando GLPI confirma su creación."])
     d.save("03_secuencia_glpi.svg")
 
 
-def fsm():
-    d = Diagram(1100, 790, "Estados principales de la conversación", "Vista condensada de router_logic.py; omite subreglas de intención")
-    d.box(425, 104, 250, 64, "IDLE")
-    d.box(80, 222, 245, 70, "PIDIENDO_ROL")
-    d.box(425, 222, 250, 70, "DIAGNOSTICO")
-    d.box(780, 222, 245, 70, "SOLUCIONADO /\nFINALIZADO", fill=MINT)
-    d.arrow(425, 134, 325, 253, "sin rol", lx=315, ly=183)
-    d.arrow(550, 168, 550, 222, "con rol", lx=615, ly=203)
-    d.arrow(325, 253, 425, 253, "rol válido", lx=375, ly=240)
-    d.arrow(675, 253, 780, 253, "resuelto", lx=727, ly=238)
-    d.box(425, 355, 250, 70, "OFRECIENDO_\nRADICACION", fill=SAND)
-    d.arrow(550, 292, 550, 355, "sin respuesta o pide soporte", lx=730, ly=331)
-    d.box(62, 485, 205, 66, "PIDIENDO_\nNOMBRE")
-    d.box(312, 485, 205, 66, "PIDIENDO_\nCORREO")
-    d.box(562, 485, 205, 66, "PIDIENDO_\nDESCRIPCION")
-    d.box(812, 485, 215, 66, "Crear ticket\nen GLPI", fill=SAND)
-    d.arrow(425, 390, 164, 485, "acepta radicar", lx=282, ly=420)
-    d.arrow(267, 518, 312, 518)
-    d.arrow(517, 518, 562, 518)
-    d.arrow(767, 518, 812, 518)
-    d.box(672, 645, 200, 66, "TICKET_CREADO", fill=MINT)
-    d.box(227, 645, 200, 66, "Error informado\no CANCELADO", fill=SAND)
-    d.arrow(920, 551, 770, 645, "confirmado", lx=873, ly=608)
-    d.arrow(920, 551, 327, 645, "fallo o cancelación", lx=525, ly=609)
-    d.note(85, 723, 925, 54, ["La cancelación también puede ocurrir durante la captura; sesiones inactivas se limpian por TTL."])
-    d.save("04_fsm.svg")
+def activity():
+    d = Diagram(1400, 1160, "Diagrama UML de actividad del flujo de UniMon", "Acciones, decisiones y flujos del diagnóstico y la radicación de soporte")
+    d.uml_initial(700, 115)
+    d.uml_action(560, 150, 280, 60, "Recibir consulta y sesión")
+    d.uml_path("M700 126 L700 150")
+    d.uml_decision(630, 240, 140, 80, "¿Rol válido?")
+    d.uml_path("M700 210 L700 240")
+
+    d.uml_action(70, 245, 300, 70, "Solicitar y validar\nel rol del usuario")
+    d.uml_path("M630 280 L500 280 L370 280", marker="arrow")
+    d.text(480, 266, "[sin rol]", size=15, anchor="middle")
+    d.uml_path("M220 245 L220 225 L700 225 L700 240", marker="arrow")
+    d.text(465, 216, "[rol capturado]", size=14, anchor="middle")
+
+    d.uml_action(560, 360, 280, 70, "Diagnosticar y recuperar\nevidencia con RAG")
+    d.uml_path("M700 320 L700 360")
+    d.text(755, 345, "[rol válido]", size=15)
+
+    d.uml_decision(630, 465, 140, 80, "¿Respuesta\nsustentada?")
+    d.uml_path("M700 430 L700 465")
+    d.uml_action(980, 470, 300, 70, "Mostrar orientación\ny fuentes")
+    d.uml_path("M770 505 L980 505")
+    d.text(875, 491, "[sí]", size=15, anchor="middle")
+    d.uml_final(1130, 600)
+    d.uml_path("M1130 540 L1130 587")
+
+    d.uml_action(560, 590, 280, 70, "Ofrecer radicación\na GLPI")
+    d.uml_path("M700 545 L700 590")
+    d.text(754, 572, "[no]", size=15)
+    d.uml_decision(630, 690, 140, 80, "¿Acepta\nescalar?")
+    d.uml_path("M700 660 L700 690")
+
+    d.uml_action(70, 695, 300, 70, "Informar alternativa\nde atención")
+    d.uml_path("M630 730 L500 730 L370 730")
+    d.text(490, 716, "[no]", size=15, anchor="middle")
+    d.uml_final(220, 855)
+    d.uml_path("M220 765 L220 842")
+
+    d.uml_action(560, 820, 280, 70, "Capturar y validar nombre,\ncorreo y descripción")
+    d.uml_path("M700 770 L700 820")
+    d.text(755, 800, "[sí]", size=15)
+    d.uml_action(940, 820, 300, 70, "Crear ticket mediante\nla API de GLPI", fill=SAND)
+    d.uml_path("M840 855 L940 855")
+    d.uml_decision(1020, 925, 140, 80, "¿GLPI confirma\nel identificador?")
+    d.uml_path("M1090 890 L1090 925")
+
+    d.uml_action(1120, 1025, 240, 64, "Mostrar ID\nconfirmado", fill=MINT, size=16)
+    d.uml_path("M1160 965 L1240 965 L1240 1025")
+    d.text(1200, 950, "[sí]", size=15, anchor="middle")
+    d.uml_final(1240, 1130)
+    d.uml_path("M1240 1089 L1240 1117")
+
+    d.uml_action(430, 1025, 240, 64, "Informar error\nsin inventar radicado", fill=SAND, size=16)
+    d.uml_path("M1020 965 L790 965 L790 1057 L670 1057")
+    d.text(900, 950, "[no]", size=15, anchor="middle")
+    d.uml_final(550, 1130)
+    d.uml_path("M550 1089 L550 1117")
+    d.save("04_actividad.svg")
 
 
 def modules():
-    d = Diagram(1100, 775, "Vista lógica de módulos", "Dependencias principales verificadas en el paquete app")
-    d.box(445, 105, 210, 62, "main.py", fill=MINT)
-    d.arrow(550, 167, 550, 211)
-    d.rect(45, 212, 1010, 130, fill=WHITE, dash="7 5")
-    d.text(63, 242, "Routers FastAPI", size=20, weight="bold")
-    for x, n in [(70, "chat.py"), (318, "admin_router.py"), (566, "analytics.py"), (814, "whatsapp.py")]:
-        d.box(x, 263, 216, 56, n, size=18)
-    d.arrow(550, 342, 550, 386)
-    d.rect(45, 387, 1010, 210, fill=WHITE, dash="7 5")
-    d.text(63, 419, "Servicios de aplicación", size=20, weight="bold")
-    for x, n in [
-        (70, "router_logic.py\nFSM de TI"),
-        (318, "bot_router_service.py\nSelección de instancia"),
-        (566, "rag_service.py\ny llm_client.py"),
-        (814, "glpi_service.py\ny telemetry_service.py"),
-    ]:
-        d.box(x, 455, 216, 100, n, fill=MINT, size=18)
-    d.note(95, 638, 910, 92, ["bot_instance_service.py gestiona asistentes por dependencia y su registro.", "golden_cache_service.py y document_catalog_service.py apoyan recuperación.", "Los routers delegan según el endpoint; no todos invocan todos los servicios."])
+    d = Diagram(1200, 800, "Diagrama UML de paquetes de UniMon", "Vista lógica de los módulos Python y sus dependencias principales")
+    d.uml_artifact(490, 105, 220, 62, "main.py")
+    d.uml_package(45, 220, 490, 390, "app.routers")
+    d.uml_package(610, 220, 545, 390, "app.services")
+
+    router_files = [
+        (75, 290, "chat.py"), (300, 290, "admin_router.py"),
+        (75, 390, "analytics.py"), (300, 390, "whatsapp.py"),
+    ]
+    for x, y, name in router_files:
+        d.uml_artifact(x, y, 195, 65, name)
+
+    service_files = [
+        (640, 285, "router_logic.py"), (885, 285, "bot_router_service.py"),
+        (640, 370, "rag_service.py"), (885, 370, "llm_client.py"),
+        (640, 455, "glpi_service.py"), (885, 455, "telemetry_service.py"),
+        (640, 540, "bot_instance_service.py"), (885, 540, "document_catalog_service.py"),
+    ]
+    for x, y, name in service_files:
+        d.uml_artifact(x, y, 225, 62, name, name_size=14 if name == "document_catalog_service.py" else 16)
+
+    d.uml_line(550, 167, 290, 220, dash="7 5", marker="openArrow")
+    d.uml_line(650, 167, 880, 220, dash="7 5", marker="openArrow")
+    d.text(410, 192, "«use»", size=14, anchor="middle")
+    d.text(775, 192, "«use»", size=14, anchor="middle")
+    d.uml_line(535, 405, 610, 405, "«use»", lx=572, ly=389, dash="7 5", marker="openArrow")
+    d.uml_note(135, 670, 930, 62, ["Los archivos se muestran como artefactos dentro de paquetes; la dependencia depende de la ruta y del servicio invocado."])
     d.save("05_modulos.svg")
 
 
 def data_model():
-    d = Diagram(1100, 840, "Persistencia actual del proyecto", "Esquema relacional local y almacenes documentales separados")
-    d.rect(35, 105, 670, 470, fill=WHITE, dash="8 5")
-    d.text(55, 138, "data/analytics.db  SQLite", weight="bold", size=21)
-    d.box(60, 166, 285, 118, "telemetry_sessions", ["PK session_id", "role, final_status", "start_time, end_time"], fill=LIGHT)
-    d.box(385, 166, 285, 164, "telemetry_interactions", ["PK id; FK session_id", "query, response, source", "latency, tokens, feedback", "documentos de referencia"], fill=LIGHT)
-    d.arrow(345, 227, 385, 227, "FK", lx=365, ly=207)
-    d.box(60, 363, 285, 128, "telemetry_tickets", ["PK id; session_id (texto)", "email, ticket_id", "action, created_at"], fill=MINT)
-    d.box(385, 363, 285, 128, "telemetry_ignored_queries", ["PK id; query_text", "normalized_query UNIQUE", "reason, dismissed_at"], fill=MINT)
-    d.rect(745, 105, 320, 470, fill=WHITE, dash="8 5")
-    d.text(762, 138, "Otros almacenes locales", weight="bold", size=21)
-    d.box(765, 170, 280, 120, "instances.sqlite3", ["chatbot_instances", "proveedor y modelo", "configuración por instancia"], fill=LIGHT, size=18)
-    d.box(765, 320, 280, 95, "ChromaDB", ["índice UniMon TI", "índices por instancia"], fill=MINT, size=18)
-    d.box(765, 440, 280, 95, "Golden Cache", ["colección de casos validados", "en ChromaDB"], fill=MINT, size=18)
-    d.box(90, 628, 920, 95, "GLPI Cloud  Sistema externo", ["Conserva los tickets oficiales. UniMon registra actividad local de tickets,", "pero no sustituye el almacenamiento ni el estado oficial de GLPI."], fill=SAND, size=20)
-    d.note(90, 755, 920, 56, ["No existe una única tabla local interactions como esquema principal.", "Las colecciones vectoriales no forman parte del modelo relacional SQLite."])
+    d = Diagram(1500, 930, "Diagrama UML de clases de persistencia", "Clases y asociaciones verificadas; {PK}, {FK} y {UNIQUE} resumen restricciones del esquema")
+    d.uml_package(30, 120, 910, 555, "data/analytics.db · SQLite")
+    d.uml_class(70, 185, 360, 195, "TelemetrySession", [
+        "session_id: TEXT {PK}", "role: TEXT", "start_time: TIMESTAMP",
+        "end_time: TIMESTAMP [0..1]", "final_status: TEXT", "escalated_ticket: INTEGER",
+    ])
+    d.uml_class(500, 170, 395, 270, "TelemetryInteraction", [
+        "id: INTEGER {PK}", "session_id: TEXT {FK}", "timestamp: TIMESTAMP",
+        "user_query: TEXT", "bot_response: TEXT", "source_used: TEXT",
+        "latency_ms: REAL", "prompt_tokens / eval_tokens: INTEGER", "feedback: TEXT",
+    ])
+    d.uml_class(70, 445, 360, 180, "TelemetryTicket", [
+        "id: INTEGER {PK}", "session_id: TEXT", "email: TEXT",
+        "ticket_id: INTEGER", "action: TEXT", "created_at: TIMESTAMP",
+    ])
+    d.uml_class(500, 475, 395, 165, "TelemetryIgnoredQuery", [
+        "id: INTEGER {PK}", "query_text: TEXT", "normalized_query: TEXT {UNIQUE}",
+        "reason: TEXT", "dismissed_at: TIMESTAMP",
+    ])
+
+    # Enforced foreign-key association in telemetry_service.py.
+    d.uml_line(430, 285, 500, 285)
+    d.text(440, 270, "1", size=16, anchor="middle")
+    d.text(489, 270, "0..*", size=16, anchor="middle")
+
+    # The ticket session_id is stored as text and is not declared as a database FK.
+    d.uml_line(250, 445, 250, 380, "session_id · sin FK", lx=320, ly=415, dash="7 5", marker="openArrow")
+
+    d.uml_package(980, 120, 490, 300, "instances.sqlite3 · SQLite")
+    d.uml_class(1020, 195, 410, 190, "ChatbotInstance", [
+        "bot_id: TEXT {PK}", "display_name / dependency_name: TEXT",
+        "scope_description: TEXT", "llm_provider / llm_model: TEXT", "enabled: INTEGER",
+    ])
+    d.uml_note(55, 720, 650, 120, [
+        "ChromaDB contiene índices documentales por asistente y colecciones de Golden Cache.",
+        "Son almacenes vectoriales independientes, no tablas de analytics.db.",
+    ], size=17, line_h=23)
+    d.uml_note(755, 720, 690, 120, [
+        "GLPI Cloud conserva los tickets oficiales.",
+        "TelemetryTicket guarda actividad local; no reemplaza el estado de GLPI.",
+    ], size=17, line_h=23)
     d.save("06_modelo_datos.svg")
 
 
 def components():
-    d = Diagram(1100, 795, "Componentes de UniMon", "Arquitectura implementada y servicios configurables")
-    d.box(55, 120, 255, 70, "Web chat / panel admin")
-    d.box(55, 235, 255, 70, "WhatsApp Cloud API", fill=LIGHT)
-    d.box(405, 165, 275, 90, "FastAPI", ["routers, seguridad", "validación y telemetría"], fill=MINT)
-    d.arrow(310, 155, 405, 195)
-    d.arrow(310, 270, 405, 225)
-    d.box(90, 360, 250, 105, "Enrutamiento", ["UniMon TI o instancia", "por dependencia"], fill=LIGHT)
-    d.box(425, 360, 250, 105, "RAG local", ["ingesta, recuperación", "reranking y fuentes"], fill=LIGHT)
-    d.box(760, 360, 250, 105, "Servicios de soporte", ["GLPI, Golden Cache", "analítica y catálogos"], fill=LIGHT)
-    d.arrow(490, 255, 215, 360)
-    d.arrow(490, 255, 550, 360)
-    d.arrow(590, 255, 885, 360)
-    d.box(85, 580, 250, 70, "Documentos + ChromaDB", fill=MINT)
-    d.box(425, 580, 250, 70, "Cliente LLM", fill=SAND)
-    d.box(765, 580, 250, 70, "SQLite / GLPI Cloud", fill=MINT)
-    d.arrow(490, 465, 210, 580)
-    d.arrow(550, 465, 550, 580)
-    d.arrow(885, 465, 890, 580)
-    d.note(107, 690, 885, 65, ["El cliente LLM puede usar proveedor remoto configurado o Ollama local.", "GLPI y WhatsApp requieren credenciales y configuración externas."])
+    d = Diagram(1320, 960, "Diagrama UML de componentes de UniMon", "Componentes de software y dependencias principales observables en el código")
+
+    # System boundary, clients, and providers are components; directed dashed
+    # dependencies point from each client to the component it consumes.
+    d.rect(255, 105, 750, 795, fill=WHITE, radius=0, dash="9 6")
+    d.text(280, 137, "Aplicación UniMon", size=21, weight="bold")
+
+    # Draw dependencies before components so connectors remain behind symbols.
+    dependencies = [
+        "M225 220 L365 220",                           # Web -> API
+        "M225 390 L270 390 L270 285 L365 285",         # WhatsApp -> API
+        "M580 305 L580 335",                           # API -> orchestration
+        "M500 435 L440 475",                            # orchestration -> RAG
+        "M660 435 L785 475",                            # orchestration -> GLPI
+        "M440 585 L440 635",                           # RAG -> LLM client
+        "M785 585 L785 635",                           # GLPI -> ticket telemetry
+        "M310 685 L225 685",                           # LLM client -> cloud provider
+        "M910 530 L1030 530",                          # GLPI adapter -> GLPI API
+        "M785 735 L785 780",                           # telemetry -> SQLite
+        "M440 735 L440 780",                           # LLM client -> local Ollama
+    ]
+    for path in dependencies:
+        d.uml_path(path, marker="openArrow", dash="7 5")
+
+    d.uml_component(25, 175, 200, 90, "Web client", ["chat + panel admin"], fill=WHITE)
+    d.uml_component(25, 345, 200, 90, "WhatsApp Cloud", ["webhook de entrada"], fill=WHITE)
+    d.uml_component(25, 635, 200, 95, "Proveedor LLM", ["Gemini / OpenAI"], fill=SAND)
+    d.uml_component(1030, 480, 255, 95, "GLPI REST API", ["creación de tickets"], fill=SAND)
+
+    d.uml_component(365, 190, 430, 115, "API FastAPI", ["chat, administración y webhook", "validación"], fill=MINT)
+    d.uml_component(450, 335, 260, 100, "Orquestación conversacional", ["FSM + selección de instancia"], fill=LIGHT, name_size=17)
+    d.uml_component(310, 475, 260, 110, "Recuperación RAG", ["ChromaDB, catálogo", "reranking y fuentes"], fill=LIGHT)
+    d.uml_component(660, 475, 250, 110, "Adaptador GLPI", ["sesión REST y radicación"], fill=LIGHT)
+    d.uml_component(660, 635, 250, 100, "Telemetría e instancias", ["métricas, historial y tickets"], fill=LIGHT)
+    d.uml_component(310, 635, 260, 100, "Cliente LLM", ["proveedor cloud", "contingencia Ollama"], fill=SAND)
+    d.uml_component(660, 780, 250, 100, "Persistencia SQLite", ["analytics.db", "instances.sqlite3"], fill=MINT)
+    d.uml_component(310, 780, 260, 100, "Ollama local", ["servicio de generación"], fill=SAND)
+    d.note(170, 910, 980, 40, ["La disponibilidad de servicios externos requiere configuración y credenciales vigentes."])
     d.save("07_componentes.svg")
 
 
 def deployment():
-    d = Diagram(1100, 835, "Despliegue de referencia", "Topología de piloto; requiere validar infraestructura y configuración efectivas")
-    d.box(45, 125, 250, 70, "Navegador del usuario")
-    d.box(45, 230, 250, 70, "Meta WhatsApp Cloud", fill=SAND)
-    d.rect(350, 115, 465, 575, fill=WHITE, dash="8 5")
-    d.text(370, 150, "Entorno autorizado para UniMon", size=21, weight="bold")
-    d.box(395, 180, 375, 100, "Aplicación FastAPI", ["routers, FSM, instancias", "seguridad y cliente LLM"], fill=LIGHT)
-    d.box(395, 335, 375, 100, "Procesamiento local", ["embeddings, reranking", "Ollama si está disponible"], fill=MINT)
-    d.box(395, 485, 375, 145, "Persistencia local", ["manuales y Markdown saneados", "ChromaDB, Golden Cache", "SQLite de telemetría e instancias"], fill=MINT)
-    d.arrow(295, 160, 395, 220, "HTTPS", lx=340, ly=178)
-    d.arrow(295, 265, 395, 235, "webhook", lx=340, ly=274)
-    d.arrow(580, 280, 580, 335)
-    d.arrow(580, 435, 580, 485)
-    d.box(865, 185, 200, 80, "Proveedor LLM\nconfigurado", fill=SAND)
-    d.box(865, 370, 200, 80, "GLPI Cloud", fill=SAND)
-    d.arrow(770, 225, 865, 225, "API", lx=820, ly=207)
-    d.arrow(770, 245, 865, 410, "REST", lx=842, ly=330)
-    d.note(112, 728, 875, 67, ["La estación de desarrollo no demuestra despliegue en producción.", "Verificar en el entorno final TLS, accesos, respaldo y disponibilidad de Ollama."])
+    d = Diagram(1500, 1010, "Diagrama UML de despliegue de UniMon", "Topología de referencia del piloto; debe contrastarse con el entorno institucional definitivo")
+
+    # Draw the hosting device first so the nested nodes and their links remain visible.
+    d.uml_node(340, 145, 650, 730, "Host autorizado para UniMon", ["nodo de referencia; no implica despliegue productivo"], fill=WHITE, stereotype="«device»")
+
+    # Communication paths are solid, undirected links between deployment nodes.
+    d.uml_line(270, 300, 340, 365, "HTTPS", lx=300, ly=320)
+    d.uml_line(270, 610, 340, 445, "HTTPS", lx=305, ly=535)
+    d.uml_line(990, 370, 1060, 300, "API", lx=1020, ly=325)
+    d.uml_line(990, 455, 1060, 610, "REST", lx=1023, ly=535)
+    d.uml_line(475, 495, 475, 535)
+    d.uml_line(795, 495, 795, 535)
+
+    d.uml_node(30, 215, 240, 170, "Equipo del usuario", ["Acceso mediante navegador"], fill=LIGHT, stereotype="«device»")
+    d.uml_node(30, 500, 240, 190, "Meta WhatsApp Cloud", ["Webhook externo", "HTTPS"], fill=SAND, stereotype="«executionEnvironment»")
+    d.uml_node(390, 270, 550, 225, "Python + FastAPI", ["entorno de ejecución"], fill=LIGHT, stereotype="«executionEnvironment»")
+    d.uml_artifact(430, 380, 220, 75, "app/routers + services")
+    d.uml_artifact(675, 380, 215, 75, "Configuración protegida")
+
+    d.uml_node(390, 535, 245, 210, "Ollama local", ["servicio de generación"], fill=SAND, stereotype="«executionEnvironment»")
+    d.uml_artifact(425, 650, 175, 55, "unimon:8b")
+    d.uml_node(665, 535, 275, 320, "Volumen local de datos", ["persistencia del piloto"], fill=MINT, stereotype="«device»")
+    d.uml_artifact(700, 650, 205, 48, "Documentos saneados")
+    d.uml_artifact(700, 700, 205, 48, "ChromaDB persistente")
+    d.uml_artifact(700, 750, 205, 48, "analytics.db")
+    d.uml_artifact(700, 800, 205, 48, "instances.sqlite3")
+
+    d.uml_node(1060, 215, 390, 170, "Proveedor LLM", ["Gemini u OpenAI configurado", "API HTTPS"], fill=SAND, stereotype="«executionEnvironment»")
+    d.uml_node(1060, 500, 390, 190, "GLPI Cloud", ["API REST", "tickets institucionales"], fill=SAND, stereotype="«executionEnvironment»")
+    d.uml_note(180, 910, 1140, 65, ["El diagrama expresa nodos, artefactos y rutas de comunicación previstas. La disponibilidad depende de credenciales vigentes y de la infraestructura aprobada."])
     d.save("08_despliegue.svg")
 
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
-    for fn in (use_cases, sequence_rag, sequence_glpi, fsm, modules, data_model, components, deployment):
+    for fn in (use_cases, sequence_rag, sequence_glpi, activity, modules, data_model, components, deployment):
         fn()
     print(f"Generated eight SVG figures in {OUT}")
