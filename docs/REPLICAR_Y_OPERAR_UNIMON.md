@@ -100,7 +100,7 @@ El área data/chroma_db es la Golden Cache, no el índice de manuales. No reempl
 .\run.ps1
 ~~~
 
-El script verifica .venv, intenta resolver el proveedor cloud configurado o Ollama, muestra IP LAN y GPU e inicia Uvicorn en modo reload. Admite los parámetros -Port, -HostIP, -Tunnel y -CaptureLogs. El túnel es exposición de red: úsalo solo con autorización institucional y durante la ventana necesaria. --reload es para desarrollo; no es administrador de procesos de producción.
+El script verifica .venv, intenta resolver el proveedor cloud configurado o Ollama, comprueba que el DNS corresponda con la IP fija y muestra la URL de producción del chatbot jefe. `UNIMON_PUBLIC_URL` define la URL visible para los usuarios; por defecto es `https://unimon.unisimon.edu.co`, y el enlace al router jefe agrega `/?router=1`. `UNIMON_CHAT_DOMAIN` y `UNIMON_LAN_IP` identifican el DNS y la dirección del equipo. En producción, Infraestructura debe terminar HTTPS y reenviar al servicio UniMon en el puerto interno 8000; el registro DNS por sí solo no crea el proxy ni el certificado. Admite los parámetros -Port, -HostIP, -Tunnel y -CaptureLogs. El túnel es exposición de red: úsalo solo con autorización institucional y durante la ventana necesaria. `--reload` es para desarrollo; no es administrador de procesos de producción.
 
 En navegador:
 

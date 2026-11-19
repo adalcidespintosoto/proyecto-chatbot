@@ -4,7 +4,7 @@ param(
     [switch]$CaptureLogs,
     [switch]$DevReload,
     [int]$Port = 8000,
-    [string]$HostIP = "0.0.0.0"
+    [string]$HostIP = ""
 )
 
 <#
@@ -24,7 +24,7 @@ param(
 .PARAMETER CaptureLogs
     Guarda una copia local de los logs de la aplicación en scratch/unimon-runtime.log.
 .PARAMETER HostIP
-    Direccion IP de escucha (por defecto 0.0.0.0 para aceptar conexiones LAN).
+    Direccion IP de escucha (por defecto HOST en .env; para producción usa la IP fija del servidor).
 .EXAMPLE
     .\run.ps1
 .EXAMPLE
@@ -76,9 +76,14 @@ try {
     $openaiModel = "gpt-6-luna"
     $geminiKey = ""
     $geminiModel = "gemini-flash-lite-latest"
+    $configuredHost = "10.0.10.161"
+    $chatbotDomain = "unimon.unisimon.edu.co"
+    $advertisedLanIP = "10.0.10.161"
+    $publicChatUrl = "https://unimon.unisimon.edu.co"
     if (Test-Path ".env") {
         $envLines = Get-Content ".env"
         foreach ($line in $envLines) {
+            if ($line -match '^\s*HOST\s*=\s*(.+)') { $configuredHost = $matches[1].Trim().Trim('"').Trim("'") }
             if ($line -match '^\s*LLM_PROVIDER\s*=\s*(.+)') { $provider = $matches[1].Trim().ToLower() }
             if ($line -match '^\s*ANTHROPIC_API_KEY\s*=\s*(.*)') { $anthropicKey = $matches[1].Trim() }
             if ($line -match '^\s*ANTHROPIC_MODEL\s*=\s*(.+)') { $anthropicModel = $matches[1].Trim() }
@@ -86,8 +91,12 @@ try {
             if ($line -match '^\s*OPENAI_MODEL\s*=\s*(.+)') { $openaiModel = $matches[1].Trim() }
             if ($line -match '^\s*GEMINI_API_KEY\s*=\s*(.+)') { $geminiKey = $matches[1].Trim() }
             if ($line -match '^\s*GEMINI_MODEL\s*=\s*(.+)') { $geminiModel = $matches[1].Trim() }
+            if ($line -match '^\s*UNIMON_CHAT_DOMAIN\s*=\s*(.+)') { $chatbotDomain = $matches[1].Trim().Trim('"').Trim("'") }
+            if ($line -match '^\s*UNIMON_LAN_IP\s*=\s*(.+)') { $advertisedLanIP = $matches[1].Trim().Trim('"').Trim("'") }
+            if ($line -match '^\s*UNIMON_PUBLIC_URL\s*=\s*(.+)') { $publicChatUrl = $matches[1].Trim().Trim('"').Trim("'") }
         }
     }
+    if ([string]::IsNullOrWhiteSpace($HostIP)) { $HostIP = $configuredHost }
 
     if ($provider -eq "anthropic" -and -not $anthropicKey) {
         Write-Host "      [AVISO] Anthropic esta seleccionado, pero falta ANTHROPIC_API_KEY; se usara Ollama como contingencia." -ForegroundColor Yellow
@@ -167,8 +176,11 @@ try {
     # -------------------------------------------------------------------------
     Write-Host "[3/5] Detectando configuracion de red y hardware de aceleracion..." -ForegroundColor Cyan
 
-    # Deteccion de IP Local LAN
+    # Priorizar la IP fija asignada por Infraestructura; conservar una IP LAN
+    # detectada como alternativa si el equipo no tiene la IP esperada.
     $localIP = "127.0.0.1"
+    $ipCandidates = @()
+    $fixedIPAssigned = $false
     try {
         $ipCandidates = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
             Where-Object {
@@ -177,11 +189,32 @@ try {
                 $_.IPAddress -notmatch '^169\.254\.'
             }
         if ($ipCandidates) {
-            $primaryIP = ($ipCandidates | Sort-Object -Property InterfaceIndex | Select-Object -First 1).IPAddress
-            if ($primaryIP) { $localIP = $primaryIP }
+            $fixedIPCandidate = $ipCandidates | Where-Object { $_.IPAddress -eq $advertisedLanIP } | Select-Object -First 1
+            if ($fixedIPCandidate) {
+                $localIP = $advertisedLanIP
+                $fixedIPAssigned = $true
+            } else {
+                $primaryIP = ($ipCandidates | Sort-Object -Property InterfaceIndex | Select-Object -First 1).IPAddress
+                if ($primaryIP) { $localIP = $primaryIP }
+            }
         }
     } catch {
         $localIP = "127.0.0.1"
+    }
+
+    $domainPointsToFixedIP = $false
+    try {
+        $domainAddresses = @(
+            Resolve-DnsName -Name $chatbotDomain -Type A -DnsOnly -ErrorAction Stop |
+                Where-Object { $_.Type -eq 'A' } |
+                Select-Object -ExpandProperty IPAddress
+        )
+        $domainPointsToFixedIP = $domainAddresses -contains $advertisedLanIP
+    } catch {}
+
+    $bindAddressAssigned = @($ipCandidates | Where-Object { $_.IPAddress -eq $HostIP }).Count -gt 0
+    if ($HostIP -notin @("0.0.0.0", "127.0.0.1", "localhost") -and -not $bindAddressAssigned) {
+        throw "La dirección de escucha '$HostIP' no está asignada a este equipo. Revisa HOST o usa -HostIP con una dirección local válida."
     }
 
     # Deteccion de GPU NVIDIA
@@ -197,7 +230,17 @@ try {
     } catch {}
 
     Write-Host "      [OK] GPU Activa: $gpuName" -ForegroundColor Green
-    Write-Host "      [OK] IP Local LAN: $localIP" -ForegroundColor Green
+    if ($fixedIPAssigned) {
+        Write-Host "      [OK] IP fija del servidor: $advertisedLanIP" -ForegroundColor Green
+    } else {
+        Write-Host "      [AVISO] La IP fija esperada ($advertisedLanIP) no está asignada a este equipo." -ForegroundColor Yellow
+        Write-Host "             IP LAN detectada como alternativa: $localIP" -ForegroundColor DarkGray
+    }
+    if ($domainPointsToFixedIP) {
+        Write-Host "      [OK] DNS: $chatbotDomain apunta a $advertisedLanIP" -ForegroundColor Green
+    } else {
+        Write-Host "      [AVISO] No se confirmó que $chatbotDomain resuelva a $advertisedLanIP." -ForegroundColor Yellow
+    }
 
     # -------------------------------------------------------------------------
     # 4. EXPOSICION PUBLICA (CLOUDFLARE TUNNEL - OPCIONAL)
@@ -206,12 +249,15 @@ try {
         Write-Host "`n[4/5] Configurando Tunel Publico Cloudflare (cloudflared)..." -ForegroundColor Cyan
         $cloudflaredCmd = Get-Command "cloudflared" -ErrorAction SilentlyContinue
         if ($cloudflaredCmd) {
-            Write-Host "      Iniciando Cloudflare Tunnel en segundo plano hacia http://localhost:$Port..." -ForegroundColor Yellow
+            $tunnelOriginHost = $HostIP
+            if ($HostIP -in @("0.0.0.0", "127.0.0.1", "localhost")) { $tunnelOriginHost = "127.0.0.1" }
+            $tunnelOrigin = "http://$($tunnelOriginHost):$Port"
+            Write-Host "      Iniciando Cloudflare Tunnel en segundo plano hacia $tunnelOrigin..." -ForegroundColor Yellow
             $tunnelLogId = [guid]::NewGuid().ToString("N")
             $tunnelStdOutPath = Join-Path $env:TEMP "unimon-cloudflared-$tunnelLogId.out.log"
             $tunnelStdErrPath = Join-Path $env:TEMP "unimon-cloudflared-$tunnelLogId.err.log"
             $tunnelProcess = Start-Process -FilePath $cloudflaredCmd.Source `
-                -ArgumentList "tunnel --url http://localhost:$Port" `
+                -ArgumentList "tunnel --url $tunnelOrigin" `
                 -PassThru -WindowStyle Hidden `
                 -RedirectStandardOutput $tunnelStdOutPath `
                 -RedirectStandardError $tunnelStdErrPath
@@ -252,9 +298,9 @@ try {
     Write-Host "`n==========================================================================" -ForegroundColor Cyan
     Write-Host " SERVIDOR UNIMON LISTO Y ESCUCHANDO EN TIEMPO REAL                         " -ForegroundColor Green
     Write-Host "==========================================================================" -ForegroundColor Cyan
-    Write-Host " Chat jefe (este equipo): " -NoNewline; Write-Host "http://localhost:$Port/?router=1" -ForegroundColor Green
-    Write-Host " Chat jefe (red LAN):     " -NoNewline; Write-Host "http://$($localIP):$Port/?router=1" -ForegroundColor Green
-    Write-Host " Documentacion OpenAPI:   " -NoNewline; Write-Host "http://localhost:$Port/docs" -ForegroundColor Cyan
+    $productionChatUrl = "$($publicChatUrl.TrimEnd('/'))/?router=1"
+    Write-Host " Chatbot jefe:            " -NoNewline; Write-Host $productionChatUrl -ForegroundColor Green
+    Write-Host " Acceso de producción requiere proxy HTTPS hacia UniMon." -ForegroundColor Yellow
     Write-Host " Motor de Aceleracion:    " -NoNewline; Write-Host "$gpuName" -ForegroundColor Yellow
     if ($tunnelProcess -and -not $tunnelProcess.HasExited) {
         if ($tunnelChatUrl) {

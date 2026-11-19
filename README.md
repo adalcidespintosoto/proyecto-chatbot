@@ -20,7 +20,7 @@ La bitácora de integración OpenAI y las comparativas RAG de la carpeta docs so
 .\run.ps1
 ~~~
 
-Abre / para el chat, /docs para el esquema de API en desarrollo y /admin para el panel con HTTP Basic. Revisa /health. Para preparar la base documental desde fuentes autorizadas, consulta la guía de réplica y [la guía de ingesta Markdown](docs/INGESTA_MARKDOWN_AUTOMATICA.md): las fuentes PDF, PPTX y DOCX compatibles se transforman a Markdown antes de generar embeddings. La carga desde el panel de una instancia compara el Markdown con el original antes de indexarlo.
+El chatbot jefe de producción se publica como `https://unimon.unisimon.edu.co/?router=1`; el proxy institucional debe reenviar al servicio interno en `10.0.10.161:8000`. Abre /docs para el esquema de API en desarrollo y /admin para el panel con HTTP Basic. Revisa /health. Para preparar la base documental desde fuentes autorizadas, consulta la guía de réplica y [la guía de ingesta Markdown](docs/INGESTA_MARKDOWN_AUTOMATICA.md): las fuentes PDF, PPTX y DOCX compatibles se transforman a Markdown antes de generar embeddings. La carga desde el panel de una instancia compara el Markdown con el original antes de indexarlo.
 
 ## Arquitectura en una frase
 
